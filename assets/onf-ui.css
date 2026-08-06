@@ -1,0 +1,44 @@
+/* ONF 공통 스타일 — 브랜드 색과 기본 골격만. 화면별 살은 각 html 에서 붙인다. */
+:root {
+  --onf-ink: #3d2b1f;
+  --onf-brown: #7a5c3e;
+  --onf-line: #e8ddcf;
+  --onf-bg: #fdfbf7;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; background: #fff; }
+body {
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif;
+  color: var(--onf-ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 앱 화면(교재)은 iframe 이 화면을 꽉 채운다 */
+.onf-full { overflow: hidden; }
+.onf-full iframe { display: block; width: 100%; height: 100%; border: 0; position: relative; z-index: 1; }
+
+/* 불러오는 동안 */
+.onf-wait {
+  position: fixed; inset: 0; z-index: 0;
+  display: flex; flex-direction: column; gap: 14px;
+  align-items: center; justify-content: center;
+  background: var(--onf-bg); color: var(--onf-brown); font-size: 15px;
+}
+.onf-spin {
+  width: 26px; height: 26px; border: 3px solid var(--onf-line);
+  border-top-color: var(--onf-brown); border-radius: 50%;
+  animation: onf-spin .8s linear infinite;
+}
+@keyframes onf-spin { to { transform: rotate(360deg); } }
+
+/* 일반 화면(홈 등) */
+.onf-page { padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px)); background: var(--onf-bg); min-height: 100%; }
+.onf-title { margin: 0 0 4px; font-size: 22px; font-weight: 700; }
+.onf-sub { margin: 0 0 20px; color: var(--onf-brown); font-size: 14px; }
+.onf-card {
+  display: block; padding: 16px; margin-bottom: 10px; background: #fff;
+  border: 1px solid var(--onf-line); border-radius: 12px;
+  color: var(--onf-ink); text-decoration: none; font-weight: 600;
+}
+.onf-card:active { background: var(--onf-bg); }
+.onf-muted { color: #9b8877; font-weight: 400; font-size: 14px; }

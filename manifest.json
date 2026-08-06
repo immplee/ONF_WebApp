@@ -1,0 +1,10 @@
+{
+  "name": "Ownify",
+  "short_name": "Ownify",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fdfbf7",
+  "theme_color": "#7a5c3e"
+}

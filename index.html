@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ownify</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ownify">
+<meta name="theme-color" content="#7a5c3e">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="assets/onf-ui.css">
+</head>
+<body>
+<div class="onf-page" id="page"></div>
+<script src="assets/onf-frame.js"></script>
+<script src="assets/onf-api.js"></script>
+<script>
+  // 홈 — 지금은 '내 교재로 가기'만 한다.
+  // 과제 현황(주간·월간 %)·최근 교재 바로가기는 P1(로그인) 뒤에 여기 붙는다.
+  var token = ONF.frame.getToken();
+  var student = ONF.api.lookup(token);
+  var page = document.getElementById('page');
+
+  if (!student) {
+    page.innerHTML = '<h1 class="onf-title">링크로 열어 주세요</h1>' +
+      '<p class="onf-sub">받으신 주소로 다시 열면 바로 들어가집니다.</p>';
+  } else {
+    var html = '<h1 class="onf-title">' + student.name + '님</h1>' +
+      '<p class="onf-sub">오늘도 한 편 해볼까요</p>';
+    student.books.forEach(function (b) {
+      html += '<a class="onf-card" href="' + ONF.frame.withToken('book.html?b=' + encodeURIComponent(b.id)) +
+        '">' + b.title + '</a>';
+    });
+    html += '<a class="onf-card" href="' + ONF.frame.withToken('hw.html') +
+      '">과제 제출 <span class="onf-muted">준비 중</span></a>';
+    html += '<a class="onf-card" href="' + ONF.frame.withToken('dict.html') +
+      '">발음기호 <span class="onf-muted">준비 중</span></a>';
+    page.innerHTML = html;
+  }
+</script>
+</body>
+</html>
