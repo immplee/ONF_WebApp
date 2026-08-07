@@ -3,14 +3,15 @@
 학생이 여는 **하나의 주소**. 구글 사이트를 대신한다.
 
 ```
-index.html   홈        내 교재 · 과제 · 발음기호로 가는 자리
-book.html    교재      구글 앱스스크립트 교재 웹앱을 iframe 으로
+index.html   액자 한 장 — 토큰 기억 · iframe 띄우기 · 키보드 재기
 hw.html      과제      (준비 중)
 dict.html    발음기호  (준비 중)
 assets/
   onf-frame.js  액자 공통 — 토큰 기억 · 키보드 재기 · 앱 화면에 붙이기
-  onf-api.js    구글 쪽 주소와 명부 조회 (P1 에서 명부 시트로 교체)
+  onf-api.js    GAS 배포 주소 (⛔ 명부를 여기 두지 마라 — 공개 저장소다)
   onf-ui.css    브랜드 색 · 공통 골격
+tools/
+  roster-sync.py  노션(정본) → ONF_학생명부 시트 한 방향 동기화
 ```
 
 ## 왜 액자가 필요한가
@@ -26,10 +27,16 @@ assets/
 ## 주소
 
 ```
-/?t=<토큰>                    홈
-/book.html?t=<토큰>&b=<교재>   교재
-/book.html?t=…&diag=1         계측기(키보드 숫자) 표시
+/?t=<토큰>            홈 (GAS 가 그린다 — 이름 + 내 교재 목록)
+/?t=…&diag=1          계측기(키보드 숫자) 표시
 ```
+
+교재로 넘어가는 링크는 **홈 화면(GAS)** 이 그린다. 액자는 주소에 `fileId`·`sheetName` 이
+있으면 그대로 넘겨주기만 한다.
+
+⛔ **화면을 액자에서 그리려 하지 마라.** 액자에서 구글을 `fetch` 하면 CORS 로 전부 막힌다
+(2026-08-06 실기기 크롬 실측: GET·POST text/plain·POST json·no-cors·JSONP 5가지 모두 차단,
+`OPTIONS` 는 405, 응답에 `Access-Control-Allow-Origin` 자체가 없음).
 
 토큰은 처음 한 번 주소로 받고 이 도메인에 저장한다. 다음부턴 주소 없이도 열린다.
 

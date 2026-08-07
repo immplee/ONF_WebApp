@@ -2,6 +2,8 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<!-- ⛔ interactive-widget=resizes-content 를 넣지 마라. 안드로이드에서 innerHeight 까지 같이
+     줄어 (innerHeight − vv.height) = 0 이 되고, 키보드 높이를 못 재게 된다. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ownify</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -11,33 +13,24 @@
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="assets/onf-ui.css">
 </head>
-<body>
-<div class="onf-page" id="page"></div>
+<body class="onf-full">
+<div class="onf-wait"><div class="onf-spin"></div>불러오는 중이에요</div>
+<iframe id="app" allow="clipboard-write; microphone"></iframe>
 <script src="assets/onf-frame.js"></script>
 <script src="assets/onf-api.js"></script>
 <script>
-  // 홈 — 지금은 '내 교재로 가기'만 한다.
-  // 과제 현황(주간·월간 %)·최근 교재 바로가기는 P1(로그인) 뒤에 여기 붙는다.
+  // 액자가 하는 일은 셋뿐 — 토큰 기억 · iframe 띄우기 · 키보드 재서 앱에 넘기기.
+  // 화면(홈·교재)은 전부 GAS 가 그린다(액자에서 구글을 fetch 하면 CORS 로 막힌다).
+  var q = new URLSearchParams(location.search);
   var token = ONF.frame.getToken();
-  var student = ONF.api.lookup(token);
-  var page = document.getElementById('page');
-
-  if (!student) {
-    page.innerHTML = '<h1 class="onf-title">링크로 열어 주세요</h1>' +
-      '<p class="onf-sub">받으신 주소로 다시 열면 바로 들어가집니다.</p>';
-  } else {
-    var html = '<h1 class="onf-title">' + student.name + '님</h1>' +
-      '<p class="onf-sub">오늘도 한 편 해볼까요</p>';
-    student.books.forEach(function (b) {
-      html += '<a class="onf-card" href="' + ONF.frame.withToken('book.html?b=' + encodeURIComponent(b.id)) +
-        '">' + b.title + '</a>';
-    });
-    html += '<a class="onf-card" href="' + ONF.frame.withToken('hw.html') +
-      '">과제 제출 <span class="onf-muted">준비 중</span></a>';
-    html += '<a class="onf-card" href="' + ONF.frame.withToken('dict.html') +
-      '">발음기호 <span class="onf-muted">준비 중</span></a>';
-    page.innerHTML = html;
-  }
+  var extra = [];
+  ['fileId', 'sheetName', 'mode'].forEach(function (k) {
+    if (q.get(k)) extra.push(k + '=' + encodeURIComponent(q.get(k)));
+  });
+  if (q.get('diag') === '1') extra.push('diag=1');
+  ONF.frame.mount(document.getElementById('app'),
+                  ONF.api.appUrl(token, extra.join('&')),
+                  { diag: q.get('diag') === '1' });
 </script>
 </body>
 </html>

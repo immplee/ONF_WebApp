@@ -1,4 +1,4 @@
-/* ONF — 서버(구글) 쪽과 이야기하는 곳. 주소·명부 조회를 여기 한 곳에만 둔다. */
+/* ONF — 구글 쪽 주소를 여기 한 곳에만 둔다. */
 (function (global) {
   'use strict';
 
@@ -7,26 +7,16 @@
   //    새 배포를 만들면 이 주소가 바뀌어 이미 나간 링크가 전부 죽는다.
   var EXEC = 'https://script.google.com/macros/s/AKfycbygZNlsIPKH8bDvVuWjejdd4eb_6KbG3fxh4Jg-Ju-CGIWIAeAaqNwGmwE_M41eNwjx/exec';
 
-  // ⚠️ 임시 명부 — P1(로그인)에서 **명부 시트 조회로 교체된다.**
-  //    지금은 액자를 실기기에서 확인하려고 한 명만 표로 박아 뒀다.
-  //    ⛔ 여기에 학생을 계속 추가하지 마라. 그러면 '학생마다 손대는 일'이 되살아난다.
-  var ROSTER = {
-    A7K2M9: {
-      name: '시범',
-      books: [
-        { id: '1GXo1pkeK9YnSX3POhN0FdUEryKz1UCabUtZGrgndVAk', sheet: 'E1_Pilot',
-          title: 'Young Sheldon S1 E1' }
-      ]
-    }
-  };
+  // ⛔ 명부를 여기 두지 마라. 2026-08-07 이전엔 학생·교재 fileId 가 이 파일에 박혀
+  //    **공개 저장소에 그대로 노출**돼 있었다. 명부는 비공개 시트에 있고, 화면은 GAS 가 그린다.
+  // ⛔ 액자에서 GAS 를 fetch 로 부를 수 없다 — CORS 로 전부 막힌다(실기기 크롬 5가지 실측).
+  //    그래서 액자가 하는 일은 **토큰을 붙여 iframe 을 띄우는 것**뿐이다.
 
-  function lookup(token) { return (token && ROSTER[token]) || null; }
-
-  function bookUrl(book) {
-    return EXEC + '?mode=share&fileId=' + encodeURIComponent(book.id) +
-      '&sheetName=' + encodeURIComponent(book.sheet);
+  function appUrl(token, extra) {
+    var u = EXEC + (token ? '?t=' + encodeURIComponent(token) : '');
+    return extra ? u + (token ? '&' : '?') + extra : u;
   }
 
   global.ONF = global.ONF || {};
-  global.ONF.api = { EXEC: EXEC, lookup: lookup, bookUrl: bookUrl };
+  global.ONF.api = { EXEC: EXEC, appUrl: appUrl };
 })(window);
