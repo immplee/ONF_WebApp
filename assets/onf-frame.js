@@ -106,6 +106,14 @@
     // ⚠️ 핸드셰이크는 **앱이 먼저** 쏜다. 부모가 먼저 보내면 구글 래퍼가 자기 origin 이
     //    아니라며 버린다. 앱이 top 으로 쏘면 두 겹을 건너뛰고, 여기서 event.source 로 답한다.
     global.addEventListener('message', function (ev) {
+      // ⛔ [2026-08-09] 오리진 검사. 지금 오가는 게 키보드 높이뿐이라 없어도 무해했지만,
+      //    검사가 0줄이면 **아무 페이지나** 우리를 iframe 으로 감싸고 appWin 을 가로챌 수 있다.
+      //    앱 본문은 googleusercontent.com 에서 온다(GAS 가 앱 HTML 을 거기서 서빙한다).
+      //    ⚠️ 이 채널에 비밀(PIN·토큰)을 태우지 마라 — 앱 쪽 발신이 targetOrigin '*' 이라
+      //      감싼 쪽이 누구든 같이 받는다. 값을 넘길 거면 iframe src 쿼리를 쓴다.
+      try {
+        if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return;
+      } catch (e) { return; }
       if (ev && ev.data && ev.data.onf === 'frameHello') {
         appWin = ev.source; lastH = -1; lastTop = -1; sync();
       }

@@ -24,7 +24,12 @@
   var q = new URLSearchParams(location.search);
   var token = ONF.frame.getToken();
   var extra = [];
-  ['fileId', 'sheetName', 'mode'].forEach(function (k) {
+  // ⛔ 여기 없는 파라미터는 앱에 **안 전해진다**. 홈이 만드는 링크와 반드시 같이 봐야 한다
+  //    (GAS: ONF_Home_Html.html 의 mk()). 빠뜨리면 액자를 거치는 순간 그 값이 증발한다.
+  //    back = 실수로 다음 회차를 눌렀을 때 돌아갈 회차 · ttok = 선생님 링크
+  //    ⛔ ttok **값**을 이 저장소에 상수로 넣지 마라 — immplee/ONF_WebApp 은 PUBLIC 이다.
+  //      여기서는 주소에 실려 온 것을 그대로 통과시키기만 한다.
+  ['fileId', 'sheetName', 'mode', 'back', 'ttok'].forEach(function (k) {
     if (q.get(k)) extra.push(k + '=' + encodeURIComponent(q.get(k)));
   });
   if (q.get('diag') === '1') extra.push('diag=1');
