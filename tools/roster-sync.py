@@ -6,6 +6,9 @@
 
 ⛔ 토큰은 **한 번 발급하면 절대 바꾸지 않는다.** 학생이 이미 홈 화면에 저장한 링크가 죽는다.
    그래서 기존 줄의 토큰은 항상 재사용하고, 없을 때만 새로 만든다.
+   ⛔ 재사용 기준은 **노션 행 ID**다(2026-08-09). 예전엔 한글 이름이었는데, 그러면
+     **노션에서 이름을 고치는 순간 새 사람으로 보여 새 토큰이 나가고 학생 링크가 죽었다.**
+     노션 행 ID 는 이름을 바꿔도 안 변한다. (옛 줄을 위해 이름 기준 폴백도 함께 본다)
 
 쓰기 전에 무엇이 바뀌는지 보려면 인자 없이(=미리보기), 실제로 쓰려면 `--write`.
 """
@@ -18,8 +21,16 @@ TEACHER_ROOT = '1BB0KWRbsy7xAEx8yzjCGM9ejp8WE1WXz'            # ONF_수업_재�
 STUDENT_DS = '30bd6a62-96ae-8027-82cd-000b946cdac6'           # 노션 재학생 DB
 NTNW = '/Users/peter/ONF_SlackBot/bin/ntnw'
 
-# 명부에 넣을 상태. '테스트'·'졸업'·'환불' 등은 뺀다.
-ACTIVE = {'수강', '보강', '휴강'}
+# 노션 `수강 상태` 실물 8종: 수강 · 보강 · 완료 · 졸업 · 휴강 · 종료 · 환불 · 테스트
+#
+#   [2026-08-09 Peter] **모든 상태를 명부에 싣는다.** 예전엔 활성만 싣고 나머지는 통째로 뺐는데,
+#   그러면 두 가지가 어긋났다:
+#     ① 잠깐 쉬는 학생(휴강)이 명부에서 사라져 홈이 죽었다 — 지난 교재는 볼 수 있어야 한다.
+#     ② 졸업생 교재는 **막고 싶은데 못 막았다** — 명부에 없으면 웹앱이 이름 규칙 폴백으로
+#       그냥 열어 준다(ONF_Roster.js 의 허용 규칙 ③). 막으려면 명부에 **있어야** 한다.
+#   → 이제 전부 싣고, 웹앱이 `수강상태` 열을 보고 판단한다.
+ACTIVE = {'수강', '보강', '휴강'}          # 교재를 볼 수 있다
+BLOCKED = {'졸업', '종료', '완료', '환불', '테스트'}   # 수업이 끝났다 — 교재를 막는다
 
 HEADERS = ['토큰', '한글이름', '영어이름', '담당선생님', '수강상태',
            '교재fileId', '교재시트', '교재제목', '노션행ID', '발급일']
@@ -33,15 +44,49 @@ def new_token(n=12):
     return ''.join(secrets.choice(ALPHABET) for _ in range(n))
 
 
+class SyncError(RuntimeError):
+    """사람이 읽고 바로 조치할 수 있는 실패. 여기서 멈추면 시트는 손대지 않은 상태다."""
+
+
+# ⛔ [2026-08-10] 도구가 멈추면 **왜 멈췄는지**를 문구에 담는다.
+#   실측: 맥 키체인이 '접근을 허용하시겠습니까' 창을 띄우면 `security` 가 그 자리에서 멈추고,
+#   화면을 아무도 안 보고 있으면 그대로 타임아웃까지 간다. 봇의 정기 동기화가 3:18·7:57·12:32
+#   모두 정확히 120초에서 죽은 게 이것이었다. 종전 문구엔 원인이 한 글자도 없었다.
+def _run(cmd, timeout=90):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        raise SyncError(
+            f"`{cmd[0]}` 가 {timeout}초 안에 안 끝났어요. "
+            "맥 화면에 *키체인 접근 허용* 창이 떠 있는지 보세요 — 떠 있으면 "
+            "'항상 허용'을 눌러야 다음부터 안 멈춰요.")
+
+
 def gws(args, params=None, body=None):
     cmd = ['gws'] + args
     if params is not None:
         cmd += ['--params', json.dumps(params, ensure_ascii=False)]
     if body is not None:
         cmd += ['--json', json.dumps(body, ensure_ascii=False)]
-    out = subprocess.run(cmd, capture_output=True, text=True, timeout=120).stdout
+    p = _run(cmd)
+    out = p.stdout
     i = out.find('{')
-    return json.loads(out[i:]) if i >= 0 else {}
+    # ⛔ 종전엔 여기서 조용히 `{}` 를 돌려줬다. 그래서 인증이 끊겨 401 이 와도
+    #   "드라이브에 학생이 하나도 없다 / 명부가 비어 있다" 로 읽혔고, 그 상태로 --write 가 돌면
+    #   **전 학생 토큰이 새로 발급돼 학생이 저장해 둔 홈 링크가 전부 죽는다**(이 파일 머리말의 그 사고).
+    #   조용한 빈손은 이 스크립트에서 가장 비싼 실패다 — 반드시 시끄럽게 죽는다.
+    if i < 0:
+        raise SyncError(f"gws {' '.join(args)} 가 JSON 을 안 줬어요: "
+                        + (p.stderr or out or '(빈 응답)').strip()[:200])
+    d = json.loads(out[i:])
+    if isinstance(d, dict) and d.get('error'):
+        e = d['error'] if isinstance(d['error'], dict) else {'message': str(d['error'])}
+        hint = ''
+        if str(e.get('code')) == '401' or 'credential' in str(e.get('message', '')).lower():
+            hint = "\n   → `gws auth login` 으로 구글 로그인을 다시 해야 해요(지금 auth_method=none)."
+        raise SyncError(f"gws {' '.join(args)} 실패 [{e.get('code', '?')}] "
+                        + str(e.get('message', ''))[:200] + hint)
+    return d
 
 
 def children(fid):
@@ -50,9 +95,10 @@ def children(fid):
 
 
 def notion_students():
-    out = subprocess.run([NTNW, 'api', f'/v1/data_sources/{STUDENT_DS}/query',
-                          '-d', '{"page_size":100}'],
-                         capture_output=True, text=True, timeout=120).stdout
+    r = _run([NTNW, 'api', f'/v1/data_sources/{STUDENT_DS}/query', '-d', '{"page_size":100}'])
+    out = r.stdout
+    if not out.strip():
+        raise SyncError('노션이 빈 응답을 줬어요: ' + (r.stderr or '(stderr 도 비어 있음)').strip()[:200])
     rows = {}
     for p in json.loads(out).get('results', []):
         pr = p['properties']
@@ -128,11 +174,21 @@ def main():
     drive = drive_students()
     existing = read_roster()
 
-    # 기존 토큰은 학생(한글이름) 기준으로 재사용한다 — 한 학생은 교재가 몇이든 토큰 하나.
-    tokens = {}
+    # 기존 토큰 재사용 — 한 학생은 교재가 몇이든 토큰 하나.
+    #   ⛔ 기준은 **노션 행 ID**(I열). 이름은 바뀌지만 행 ID 는 안 바뀐다.
+    #   옛 줄엔 행 ID 가 비어 있을 수 있어 이름 기준도 폴백으로 같이 본다(이행용).
+    by_row, by_name = {}, {}
     for r in existing:
-        if len(r) >= 2 and r[0] and r[1]:
-            tokens.setdefault(r[1], r[0])
+        tok = r[0] if len(r) >= 1 else ''
+        if not tok:
+            continue
+        if len(r) >= 9 and r[8]:
+            by_row.setdefault(r[8], tok)
+        if len(r) >= 2 and r[1]:
+            by_name.setdefault(r[1], tok)
+
+    def token_for(row_id, kor):
+        return by_row.get(row_id) or by_name.get(kor) or new_token()
 
     today = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d')
     rows, skipped = [], []
@@ -142,11 +198,13 @@ def main():
         if not info:
             skipped.append(f"{st['kor']}: 노션 재학생 DB 에 없음")
             continue
-        if info['status'] not in ACTIVE:
-            skipped.append(f"{st['kor']}: 수강상태 '{info['status']}' 라 제외")
-            continue
-        tok = tokens.get(st['kor']) or new_token()
-        tokens[st['kor']] = tok
+        tok = token_for(info['rowId'], st['kor'])
+        by_row[info['rowId']] = tok
+        by_name[st['kor']] = tok
+        if info['status'] in BLOCKED:
+            skipped.append(f"{st['kor']}: 수강상태 '{info['status']}' — 명부엔 싣되 교재는 막힌다")
+        elif info['status'] not in ACTIVE:
+            skipped.append(f"{st['kor']}: 처음 보는 수강상태 '{info['status']}' — 안전하게 열어 둔다")
         eng = info['eng'] or st['eng']
         if not st['books']:
             rows.append([tok, st['kor'], eng, st['teacher'], info['status'],
@@ -160,9 +218,9 @@ def main():
     # 노션엔 있는데 드라이브 폴더가 없는 학생 — 교재 없이 줄만 만든다(홈은 열려야 한다).
     seen = {r[1] for r in rows}
     for kor, info in notion.items():
-        if kor in seen or info['status'] not in ACTIVE:
+        if kor in seen:
             continue
-        tok = tokens.get(kor) or new_token()
+        tok = token_for(info['rowId'], kor)
         rows.append([tok, kor, info['eng'], '', info['status'], '', '', '', info['rowId'], today])
         skipped.append(f"{kor}: 드라이브 학생 폴더 없음 (교재 없이 줄만 만듦)")
 
@@ -178,6 +236,18 @@ def main():
         print('\n미리보기만 했다. 실제로 쓰려면 --write')
         return
 
+    # ⛔ 쓰기 직전 마지막 그물 두 개. 위 gws() 가 이제 시끄럽게 죽으니 여기까지 오면 대개 정상이지만,
+    #   이 스크립트의 실패는 **되돌릴 수 없는 종류**(토큰 재발급 = 학생 링크 영구 사망)라 한 겹 더 둔다.
+    if not rows:
+        raise SyncError('명부에 넣을 줄이 0개예요 — 시트를 비우지 않으려고 멈춥니다.')
+    if existing and len(existing) > 1:
+        old_tokens = {r[0] for r in existing if r and r[0]}
+        fresh = {r[0] for r in rows} - old_tokens
+        if fresh and len(fresh) == len({r[0] for r in rows}):
+            raise SyncError(
+                f'기존 명부에 줄이 {len(existing)}개 있는데 **전원 새 토큰**이 나가려 했어요 — 멈춥니다.\n'
+                '   (명부를 못 읽은 채 다시 쓰려는 신호예요. 그대로 쓰면 학생이 저장해 둔 홈 링크가 전부 죽어요.)')
+
     gws(['sheets', 'spreadsheets', 'values', 'clear'],
         {'spreadsheetId': ROSTER_ID, 'range': f'{ROSTER_TAB}!A2:J'}, body={})
     gws(['sheets', 'spreadsheets', 'values', 'update'],
@@ -188,4 +258,10 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # ⛔ 트레이스백을 내보내지 않는다 — 봇은 stderr 앞 400자만 슬랙에 싣는다.
+    #   트레이스백이면 그 400자가 파일 경로로 다 차서 **원인이 한 글자도 안 보인다**(실제로 그랬다).
+    try:
+        main()
+    except SyncError as e:
+        print(f'❌ {e}', file=sys.stderr)
+        sys.exit(1)
