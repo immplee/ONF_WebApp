@@ -53,13 +53,23 @@ class SyncError(RuntimeError):
 #   화면을 아무도 안 보고 있으면 그대로 타임아웃까지 간다. 봇의 정기 동기화가 3:18·7:57·12:32
 #   모두 정확히 120초에서 죽은 게 이것이었다. 종전 문구엔 원인이 한 글자도 없었다.
 def _run(cmd, timeout=90):
+    # ⛔ [2026-08-11] `stdin=DEVNULL` 이 이 함수의 핵심이다. 빼면 봇에서 90초 멈췄다 실패한다.
+    #   원인(스택 추적으로 확증): `ntn api` 는 `-d` 없이 부르면 **stdin 에서 본문을 읽는다**
+    #     ntn::commands::api::read_input → StdinLock::read_to_string → read(2)
+    #   셸에서는 stdin 이 /dev/null 이라 즉시 EOF → 0초에 끝난다. 그런데 봇은
+    #     node execFile(python3) → subprocess.run(...) → bin/ntnw → ntn
+    #   이고, node 의 execFile 은 자식 stdin 을 **파이프로 열어 둔 채 안 닫는다.**
+    #   subprocess.run 은 stdin 을 그대로 물려주므로 ntn 이 그 파이프를 읽다 **영영 안 끝난다.**
+    #   ⚠️ 이걸 4일 동안 '키체인 문제'로 오해했다(실패가 전부 90~120초라 그럴듯했다).
+    #     키체인·gws 인증·네트워크 전부 정상이었다 — 대조군 `node → curl` 은 0.2초였다.
     try:
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return subprocess.run(cmd, capture_output=True, text=True,
+                              stdin=subprocess.DEVNULL, timeout=timeout)
     except subprocess.TimeoutExpired:
         raise SyncError(
             f"`{cmd[0]}` 가 {timeout}초 안에 안 끝났어요. "
-            "맥 화면에 *키체인 접근 허용* 창이 떠 있는지 보세요 — 떠 있으면 "
-            "'항상 허용'을 눌러야 다음부터 안 멈춰요.")
+            "그 명령을 셸에서 직접 쳐 보세요 — 셸에선 되고 봇에서만 멈춘다면 "
+            "자식 프로세스가 stdin 을 기다리는 것입니다(_run 의 stdin=DEVNULL 주석 참고).")
 
 
 def gws(args, params=None, body=None):
