@@ -32,8 +32,14 @@ NTNW = '/Users/peter/ONF_SlackBot/bin/ntnw'
 ACTIVE = {'수강', '보강', '휴강'}          # 교재를 볼 수 있다
 BLOCKED = {'졸업', '종료', '완료', '환불', '테스트'}   # 수업이 끝났다 — 교재를 막는다
 
+# ⚠️ [2026-08-11 Peter] `성별` 을 **맨 뒤에** 더했다. 앞에 끼우면 GAS 의 열 상수(R_*)가 통째로
+#   밀려 조용히 엉뚱한 칸을 읽는다. 노션 원문 그대로 `남성`/`여성` 을 싣는다(Peter 결정).
+#   설계 74행 "개인정보는 시트에 안 넣는다" 와 걸리지만, 성별은 화면 아이콘에 필요하고
+#   전화·생일과 달리 연락 수단이 아니라서 Peter 가 싣기로 정했다.
 HEADERS = ['토큰', '한글이름', '영어이름', '담당선생님', '수강상태',
-           '교재fileId', '교재시트', '교재제목', '노션행ID', '발급일']
+           '교재fileId', '교재시트', '교재제목', '노션행ID', '발급일', '성별']
+# ⛔ 범위를 손으로 적지 않는다 — 열을 더하고 `A2:J` 를 안 고치면 마지막 열이 조용히 안 써진다.
+LAST_COL = chr(ord('A') + len(HEADERS) - 1)
 
 # 헷갈리는 글자(0 O 1 I l)는 뺀다 — 학생이 손으로 옮겨 적을 수도 있다.
 ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz'
@@ -128,7 +134,8 @@ def notion_students():
         #   그 뒤 drive 루프가 두 폴더 모두에 같은 rowId 를 물려 **같은 토큰**을 발급했고,
         #   토큰이 같으면 학생 웹앱에서 **서로의 교재가 열린다**(주소가 곧 신분증이라서).
         rows[p['id']] = {'kor': kor, 'eng': val('영어 이름'),
-                         'status': val('수강 상태'), 'rowId': p['id']}
+                         'status': val('수강 상태'), 'gender': val('성별'),
+                         'rowId': p['id']}
     return rows
 
 
@@ -200,7 +207,7 @@ def book_title(name):
 
 def read_roster():
     d = gws(['sheets', 'spreadsheets', 'values', 'get'],
-            {'spreadsheetId': ROSTER_ID, 'range': f'{ROSTER_TAB}!A2:J'})
+            {'spreadsheetId': ROSTER_ID, 'range': f'{ROSTER_TAB}!A2:{LAST_COL}'})
     return d.get('values', [])
 
 
@@ -258,12 +265,12 @@ def main():
         eng = info['eng'] or st['eng']
         if not st['books']:
             rows.append([tok, st['kor'], eng, st['teacher'], info['status'],
-                         '', '', '', info['rowId'], today])
+                         '', '', '', info['rowId'], today, info['gender']])
             continue
         for b in st['books']:
             rows.append([tok, st['kor'], eng, st['teacher'], info['status'],
                          b['id'], first_episode(b['id']), book_title(b['name']),
-                         info['rowId'], today])
+                         info['rowId'], today, info['gender']])
 
     # 노션엔 있는데 드라이브 폴더가 없는 학생 — 교재 없이 줄만 만든다(홈은 열려야 한다).
     #   ⛔ 기준이 **행 ID** 다. 이름으로 세면 동명이인 중 한 명만 폴더가 있을 때
@@ -274,7 +281,7 @@ def main():
             continue
         tok = token_for(row_id, info['kor'], info['eng'])
         rows.append([tok, info['kor'], info['eng'], '', info['status'],
-                     '', '', '', row_id, today])
+                     '', '', '', row_id, today, info['gender']])
         skipped.append(f"{info['kor']}: 드라이브 학생 폴더 없음 (교재 없이 줄만 만듦)")
 
     print(f"명부에 넣을 줄 {len(rows)}개")
@@ -325,9 +332,9 @@ def main():
         return
 
     gws(['sheets', 'spreadsheets', 'values', 'clear'],
-        {'spreadsheetId': ROSTER_ID, 'range': f'{ROSTER_TAB}!A2:J'}, body={})
+        {'spreadsheetId': ROSTER_ID, 'range': f'{ROSTER_TAB}!A2:{LAST_COL}'}, body={})
     gws(['sheets', 'spreadsheets', 'values', 'update'],
-        {'spreadsheetId': ROSTER_ID, 'range': f'{ROSTER_TAB}!A1:J{len(rows) + 1}',
+        {'spreadsheetId': ROSTER_ID, 'range': f'{ROSTER_TAB}!A1:{LAST_COL}{len(rows) + 1}',
          'valueInputOption': 'RAW'},
         body={'values': [HEADERS] + rows})
     print('\n명부 시트에 썼다.')
