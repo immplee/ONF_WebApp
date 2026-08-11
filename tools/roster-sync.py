@@ -123,8 +123,34 @@ def notion_students():
         kor = val('한글 이름')
         if not kor:
             continue
-        rows[kor] = {'eng': val('영어 이름'), 'status': val('수강 상태'), 'rowId': p['id']}
+        # ⛔ [2026-08-11] 키가 **노션 행 ID** 다. 예전엔 한글 이름이었는데, 그러면
+        #   동명이인의 뒤 행이 앞 행을 덮어 **두 학생이 한 사람으로 합쳐졌다.**
+        #   그 뒤 drive 루프가 두 폴더 모두에 같은 rowId 를 물려 **같은 토큰**을 발급했고,
+        #   토큰이 같으면 학생 웹앱에서 **서로의 교재가 열린다**(주소가 곧 신분증이라서).
+        rows[p['id']] = {'kor': kor, 'eng': val('영어 이름'),
+                         'status': val('수강 상태'), 'rowId': p['id']}
     return rows
+
+
+def match_notion(notion, kor, eng):
+    """드라이브 학생 폴더 → 노션 행 하나. `(info, 왜 못 찾았나)` 를 돌려준다.
+
+    ⛔ 애매하면 **추측하지 않는다.** 기계가 둘 중 하나를 골라 버리면 그게 조용한 오답이고,
+       여기서 잘못 고르면 남의 토큰이 나가 교재가 서로 열린다.
+    ⚠️ 이름이 유일하면 **영어 이름을 안 본다** — 실물에 `ONF_Peter_(홍길동님)` 처럼
+       영문 자리가 빈 폴더가 있어서, (이름,영문) 을 항상 키로 쓰면 매칭이 끊겨 홈이 죽는다.
+    """
+    same = [v for v in notion.values() if v['kor'] == kor]
+    if len(same) == 1:
+        return same[0], ''
+    if not same:
+        return None, '노션 재학생 DB 에 없음'
+    byeng = [v for v in same if v['eng'] and v['eng'] == eng]
+    if len(byeng) == 1:
+        return byeng[0], ''
+    return None, (f"노션에 '{kor}' 이 {len(same)}명인데 영어 이름('{eng or '빈칸'}')으로도 "
+                  "못 가렸어요 — 어느 쪽인지 몰라 건너뜁니다. "
+                  "노션에서 영어 이름을 서로 다르게 넣어 주세요")
 
 
 def drive_students():
@@ -186,31 +212,45 @@ def main():
 
     # 기존 토큰 재사용 — 한 학생은 교재가 몇이든 토큰 하나.
     #   ⛔ 기준은 **노션 행 ID**(I열). 이름은 바뀌지만 행 ID 는 안 바뀐다.
-    #   옛 줄엔 행 ID 가 비어 있을 수 있어 이름 기준도 폴백으로 같이 본다(이행용).
-    by_row, by_name = {}, {}
+    #   옛 줄엔 행 ID 가 비어 있을 수 있어 폴백을 둘 둔다(이행용):
+    #     ① (한글이름, 영어이름) — 동명이인도 가른다
+    #     ② 한글이름 단독 — ⛔ **그 이름에 토큰이 하나뿐일 때만.**
+    #        동명이인이면 앞사람 토큰을 뒷사람에게 물려줘 둘이 같은 토큰을 갖게 된다.
+    by_row, by_pair, by_name = {}, {}, {}
+    toks_of_name = {}
     for r in existing:
         tok = r[0] if len(r) >= 1 else ''
         if not tok:
             continue
+        kor = r[1] if len(r) >= 2 else ''
+        eng = r[2] if len(r) >= 3 else ''
         if len(r) >= 9 and r[8]:
             by_row.setdefault(r[8], tok)
-        if len(r) >= 2 and r[1]:
-            by_name.setdefault(r[1], tok)
+        if kor and eng:
+            by_pair.setdefault((kor, eng), tok)
+        if kor:
+            toks_of_name.setdefault(kor, set()).add(tok)
+    for kor, ts in toks_of_name.items():
+        if len(ts) == 1:
+            by_name[kor] = next(iter(ts))
 
-    def token_for(row_id, kor):
-        return by_row.get(row_id) or by_name.get(kor) or new_token()
+    by_row_before = dict(by_row)          # 쓰기 직전 대조용 — 여기 있던 토큰은 절대 안 바뀐다
+
+    def token_for(row_id, kor, eng):
+        return (by_row.get(row_id) or by_pair.get((kor, eng))
+                or by_name.get(kor) or new_token())
 
     today = datetime.now(timezone(timedelta(hours=9))).strftime('%Y-%m-%d')
     rows, skipped = [], []
 
     for st in drive:
-        info = notion.get(st['kor'])
+        info, why = match_notion(notion, st['kor'], st['eng'])
         if not info:
-            skipped.append(f"{st['kor']}: 노션 재학생 DB 에 없음")
+            skipped.append(f"{st['kor']}: {why}")
             continue
-        tok = token_for(info['rowId'], st['kor'])
+        tok = token_for(info['rowId'], st['kor'], info['eng'] or st['eng'])
         by_row[info['rowId']] = tok
-        by_name[st['kor']] = tok
+        by_pair[(st['kor'], info['eng'] or st['eng'])] = tok
         if info['status'] in BLOCKED:
             skipped.append(f"{st['kor']}: 수강상태 '{info['status']}' — 명부엔 싣되 교재는 막힌다")
         elif info['status'] not in ACTIVE:
@@ -226,13 +266,16 @@ def main():
                          info['rowId'], today])
 
     # 노션엔 있는데 드라이브 폴더가 없는 학생 — 교재 없이 줄만 만든다(홈은 열려야 한다).
-    seen = {r[1] for r in rows}
-    for kor, info in notion.items():
-        if kor in seen:
+    #   ⛔ 기준이 **행 ID** 다. 이름으로 세면 동명이인 중 한 명만 폴더가 있을 때
+    #     나머지 한 명이 "이미 처리됨"으로 걸려 **줄 자체가 안 만들어졌다.**
+    seen = {r[8] for r in rows if r[8]}
+    for row_id, info in notion.items():
+        if row_id in seen:
             continue
-        tok = token_for(info['rowId'], kor)
-        rows.append([tok, kor, info['eng'], '', info['status'], '', '', '', info['rowId'], today])
-        skipped.append(f"{kor}: 드라이브 학생 폴더 없음 (교재 없이 줄만 만듦)")
+        tok = token_for(row_id, info['kor'], info['eng'])
+        rows.append([tok, info['kor'], info['eng'], '', info['status'],
+                     '', '', '', row_id, today])
+        skipped.append(f"{info['kor']}: 드라이브 학생 폴더 없음 (교재 없이 줄만 만듦)")
 
     print(f"명부에 넣을 줄 {len(rows)}개")
     for r in rows:
@@ -242,14 +285,33 @@ def main():
         for s in skipped:
             print('  ', s)
 
-    if not write:
-        print('\n미리보기만 했다. 실제로 쓰려면 --write')
-        return
-
-    # ⛔ 쓰기 직전 마지막 그물 두 개. 위 gws() 가 이제 시끄럽게 죽으니 여기까지 오면 대개 정상이지만,
-    #   이 스크립트의 실패는 **되돌릴 수 없는 종류**(토큰 재발급 = 학생 링크 영구 사망)라 한 겹 더 둔다.
+    # ⛔ 마지막 그물. 이 스크립트의 실패는 **되돌릴 수 없는 종류**(토큰 재발급 = 학생 링크 영구 사망)다.
+    #   ⚠️ [2026-08-11] 그물을 `--write` 앞으로 옮겼다 — 뒤에 있으면 **미리보기는 "괜찮다"고 하고
+    #     실제 쓰기에서만 터진다.** 미리보기의 존재 이유가 그걸 미리 보는 것인데 정작 못 봤다.
     if not rows:
         raise SyncError('명부에 넣을 줄이 0개예요 — 시트를 비우지 않으려고 멈춥니다.')
+
+    # ⛔ [2026-08-11] 이 그물이 이 파일에서 가장 중요하다 — **토큰 하나 = 학생 하나**.
+    #   토큰이 서로 다른 두 학생에게 붙으면 주소를 아는 쪽이 상대의 교재를 연다(주소가 곧 신분증).
+    #   위 매칭 규칙이 나중에 어떻게 바뀌든, 그게 깨지면 **시트에 닿기 전에** 여기서 멈춘다.
+    owner = {}
+    for r in rows:
+        tok, rid, kor = r[0], r[8], r[1]
+        if tok in owner and owner[tok][0] != rid:
+            raise SyncError(
+                f"토큰 {tok} 이 서로 다른 학생 둘에게 붙었어요 — 멈춥니다.\n"
+                f"   {owner[tok][1]}({owner[tok][0][:8]}…) 와 {kor}({rid[:8]}…)\n"
+                "   (그대로 쓰면 한쪽 주소로 다른 학생의 교재가 열립니다.)")
+        owner[tok] = (rid, kor)
+
+    # ⛔ 이미 발급된 토큰은 **절대 안 바뀐다.** 종전 그물은 '전원 새 토큰'만 잡아서
+    #   한두 명만 바뀌는 부분 재발급은 그대로 통과했다 — 그 한 명의 링크는 영구히 죽는다.
+    moved = [f"{r[1]}: {by_row_before[r[8]]} → {r[0]}"
+             for r in rows if r[8] and r[8] in by_row_before and by_row_before[r[8]] != r[0]]
+    if moved:
+        raise SyncError('이미 발급된 토큰이 바뀌려 했어요 — 멈춥니다. '
+                        '(학생이 저장해 둔 홈 링크가 죽어요)\n   ' + '\n   '.join(moved[:5]))
+
     if existing and len(existing) > 1:
         old_tokens = {r[0] for r in existing if r and r[0]}
         fresh = {r[0] for r in rows} - old_tokens
@@ -257,6 +319,10 @@ def main():
             raise SyncError(
                 f'기존 명부에 줄이 {len(existing)}개 있는데 **전원 새 토큰**이 나가려 했어요 — 멈춥니다.\n'
                 '   (명부를 못 읽은 채 다시 쓰려는 신호예요. 그대로 쓰면 학생이 저장해 둔 홈 링크가 전부 죽어요.)')
+
+    if not write:
+        print('\n✅ 안전 검사 통과. 미리보기만 했다 — 실제로 쓰려면 --write')
+        return
 
     gws(['sheets', 'spreadsheets', 'values', 'clear'],
         {'spreadsheetId': ROSTER_ID, 'range': f'{ROSTER_TAB}!A2:J'}, body={})
