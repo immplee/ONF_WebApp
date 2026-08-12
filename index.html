@@ -32,7 +32,9 @@
   //    back = 실수로 다음 회차를 눌렀을 때 돌아갈 회차 · ttok = 선생님 링크
   //    ⛔ ttok **값**을 이 저장소에 상수로 넣지 마라 — immplee/ONF_WebApp 은 PUBLIC 이다.
   //      여기서는 주소에 실려 온 것을 그대로 통과시키기만 한다.
-  ['fileId', 'sheetName', 'mode', 'back', 'ttok'].forEach(function (k) {
+  //    tas = 이 링크를 받은 **선생님 이름**. 없으면 앱이 교재 담당쌤 이름으로 착각해
+  //      읽음 장부가 남의 칸에 쌓이고 '내 글' 표시도 어긋난다(2026-08-12).
+  ['fileId', 'sheetName', 'mode', 'back', 'ttok', 'tas'].forEach(function (k) {
     if (q.get(k)) extra.push(k + '=' + encodeURIComponent(q.get(k)));
   });
   if (q.get('diag') === '1') extra.push('diag=1');
