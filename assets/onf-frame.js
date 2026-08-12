@@ -117,6 +117,12 @@
       if (ev && ev.data && ev.data.onf === 'frameHello') {
         appWin = ev.source; lastH = -1; lastTop = -1; sync();
       }
+      // 탭 제목 — 앱(=GAS)만 학생 이름을 안다. 보이는 탭 제목은 **이 창**이 정하므로 받아서 세운다.
+      //   위 오리진 검사를 이미 통과한 메시지다. 줄바꿈을 지우고 길이를 잘라 그대로 쓴다.
+      if (ev && ev.data && ev.data.onf === 'title' && typeof ev.data.t === 'string') {
+        var newTitle = ev.data.t.replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120);
+        if (newTitle) document.title = newTitle;
+      }
     });
     if (global.visualViewport) {
       global.visualViewport.addEventListener('resize', sync);
