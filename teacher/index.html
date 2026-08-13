@@ -95,11 +95,18 @@ function answer() {
 
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
-  if (!d || (d.onf !== 'auth-please' && d.onf !== 'frameHello')) return;
-  if (ev.source !== frame.contentWindow) return;             // ② 내가 띄운 그 창인가
+  if (!d || d.onf !== 'auth-please') return;
+  /* ⛔ **손자다.** GAS 는 우리 HTML 을 `script.google.com` 래퍼 안 또 하나의 iframe
+     (`*.googleusercontent.com`)에 넣는다. 그래서 `ev.source === frame.contentWindow` 는
+     **절대 참이 안 된다**(그건 자식=래퍼다) — 그 검사를 걸면 토큰이 영영 안 가고 전원이 잠긴다.
+     쏘는 쪽이 `window.top` 으로 보내므로 여기 도착하는 source 는 손자창이다.
+     → 손자의 **부모**가 내가 띄운 그 iframe 인지 본다. `parent` 는 교차 출처에서도 읽을 수 있다. */
   try {
-    if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return;   // ①
+    if (!ev.source || ev.source.parent !== frame.contentWindow) return;
+    if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return;
   } catch (e) { return; }
+  /* ⛔ 한 번 정하면 안 바꾼다 — 나중에 다른 창이 같은 조건을 흉내 내도 토큰이 안 간다. */
+  if (appWin && ev.source !== appWin) return;
   appWin = ev.source; appOrigin = ev.origin;
 
   /* 화면이 "토큰이 만료됐다"고 하면 **그때** 새로 받는다.
@@ -111,6 +118,14 @@ window.addEventListener('message', function (ev) {
   }
   answer();
 });
+
+/* ⛔ 이 페이지는 **최상위에서만** 돈다. 남이 우리를 iframe 으로 감싸면 로그인·토큰이
+   그 페이지 손에 들어간다. 로그인 화면은 원래 최상위에서만 도는 것이다. */
+if (window.top !== window.self) {
+  document.getElementById('lock').innerHTML =
+    '<div class="em">🔒</div><h2>여기서는 열 수 없어요</h2>'
+    + '<p>주소창에 직접 열어 주세요.</p>';
+} else
 
 /* GIS 가 늦게 도착할 수 있다 — 있을 때 시작한다. */
 (function start() {
