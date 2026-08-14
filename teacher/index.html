@@ -50,10 +50,16 @@
      ⚠️ 이 값은 공개돼도 되는 값이다(클라이언트 ID 는 비밀이 아니다). 비밀은 서버가 하는 검증이다.
      ⛔ 서버(ONF_TeacherHome.js 의 ONF_TEACHER_CLIENT_ID)와 **같은 값**이어야 한다 —
        다르면 서버가 모든 토큰을 거절하고, 화면은 "들어올 수 없어요" 만 보여 준다. */
-var CLIENT_ID = '';
+var CLIENT_ID = '182072398790-1aeau87175kb9ima3205frc8ufvpv78g.apps.googleusercontent.com';
 
-/* 선생님 홈 GAS 배포(익명). ⛔ 지금 도는 DOMAIN 배포와 **다른 주소**다 — 되돌릴 수 있게 따로 판다. */
-var EXEC = '';
+/* 선생님 홈 GAS 배포. ⛔ 지금 도는 DOMAIN 배포(@5)와 **다른 주소**다 — 되돌릴 수 있게 따로 팠다.
+   ⚠️ access 는 ANYONE_ANONYMOUS 가 **아니라 ANYONE** 이다(구글 로그인 필요, 계정 종류는 무관).
+     실측 2026-08-14: 워크스페이스가 **새** 익명 배포를 막는다(403 「Drive 액세스 권한 필요」).
+     학생 웹앱이 익명인 건 정책이 바뀌기 전에 만든 옛 배포라서다.
+   ⚠️ ANYONE 이면 로그인 안 한 브라우저는 구글 로그인 화면으로 튀고 그 화면은 iframe 을 거부한다 —
+     그런데 **이 껍데기가 GIS 로그인을 먼저 시키므로** iframe 을 띄우는 시점엔 이미 구글 세션이 있다.
+     즉 로그인 순서가 그 함정을 막는다. 순서를 뒤집지 마라. */
+var EXEC = 'https://script.google.com/macros/s/AKfycbx4taL78DPmHmzICYP8DjjuedRDVDcgGaOeGUnoSValEI1dW4bWNX-e5x7LWFwfmF8X/exec';
 
 var frame = document.getElementById('app');
 var mounted = false, pending = '';
