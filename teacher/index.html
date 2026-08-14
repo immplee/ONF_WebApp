@@ -17,12 +17,6 @@
   .lock p { margin:0 0 18px; color:#7a5c3e; }
   .lock .why { font-size:12.5px; color:#9b8877; margin-top:14px; }
   #gsi { display:flex; justify-content:center; min-height:44px; }
-  #warnbar { position:fixed; left:0; right:0; top:0; z-index:9; background:#FDF1EC;
-             border-bottom:1px solid #F0C3AC; color:#a8451f; font:13px/1.5 -apple-system, sans-serif;
-             padding:8px 40px 8px 14px; text-align:center; }
-  #warnbar a { color:#a8451f; font-weight:700; }
-  #warnbar button { position:absolute; right:8px; top:5px; border:0; background:none;
-                    color:#a8451f; font-size:14px; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -34,10 +28,6 @@
   <div id="gsi"></div>
   <p class="why" id="why"></p>
 </div>
-<!-- 못 열렸을 때만 뜨는 얇은 띠. ⛔ 본문을 지우지 않는다(오탐이면 멀쩡한 화면을 가린다). -->
-<div id="warnbar" hidden>🔑 화면이 안 뜨면 브라우저 <b>기본 구글 계정</b>이 회사 계정이 아닌 거예요 —
-  <a id="warnlink" href="#" target="_blank" rel="noopener">새 창에서 열기</a>
-  <button type="button" id="warnclose" aria-label="닫기">✕</button></div>
 <iframe id="app" hidden allow="clipboard-write"></iframe>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -103,22 +93,18 @@ function mount() {
      안 오면 구글이 문 앞에서 자른 것이다(회사 계정이 아니거나 로그인이 안 된 것) —
      그때 구글의 「액세스 권한 필요」 화면만 덩그러니 두면 사람이 무엇을 해야 할지 모른다.
      ⚠️ 이건 선갱신 타이머가 아니라 **못 열렸다는 것을 알아채는 마감 시계**다. */
+  /* ⛔ **화면에 경고를 띄우지 않는다.** 「노크가 안 왔다」는 「화면이 안 열렸다」가 아니다 —
+     실제로 잘 도는 화면 위에 두 번이나 겁주는 안내를 띄웠다(2026-08-14).
+     우리가 **구분하지 못하는 것**을 단정해서 말하면 안 된다. 정말 못 열렸으면 그 자리에
+     구글이 자기 오류 화면을 이미 보여 준다.
+     ⚠️ 진단이 필요할 땐 개발자도구 콘솔에 한 줄만 남긴다(사람은 안 본다). */
   clearTimeout(frameWatch);
   frameWatch = setTimeout(function () {
-    if (appWin) return;                       // 안쪽이 인사했다 = 열렸다
-    /* ⛔ **iframe 을 숨기지 마라.** 노크를 못 받았다고 화면이 안 열린 건 아니다 —
-       실제로 잘 도는 화면 위에 겁주는 안내를 띄우고 본문을 지웠다(2026-08-14 오탐).
-       못 열렸을 때만 화면이 비어 있으므로, 안내는 **위에 얇은 띠**로 얹고 본문은 그대로 둔다. */
-    var bar = document.getElementById('warnbar');
-    if (bar) bar.hidden = false;
+    if (appWin) return;
+    console.warn('[onf] 안쪽 노크가 8초 안에 안 왔다 — 토큰 전달이 안 되는 중일 수 있다(화면은 Session 으로 돌 수 있다).');
   }, 8000);
 }
 var frameWatch = null;
-(function () {
-  var l = document.getElementById('warnlink'); if (l) l.href = EXEC;
-  var c = document.getElementById('warnclose');
-  if (c) c.onclick = function () { document.getElementById('warnbar').hidden = true; };
-})();
 
 /* ⛔⛔ **부모가 먼저 보내면 안 된다.** GAS 는 우리 HTML 을 자기 래퍼 안 또 하나의 iframe
    (`*.googleusercontent.com`)에 넣는다. 부모가 `frame.contentWindow` 로 쏘면 그 래퍼가
@@ -157,7 +143,6 @@ window.addEventListener('message', function (ev) {
   if (appWin && ev.source !== appWin) return;
   appWin = ev.source; appOrigin = ev.origin;
   clearTimeout(frameWatch);          // 안쪽이 살아 있다 — 막힘 안내를 띄우지 않는다
-  var _wb = document.getElementById('warnbar'); if (_wb) _wb.hidden = true;
 
   /* 화면이 "토큰이 만료됐다"고 하면 **그때** 새로 받는다.
      ⛔ 타이머로 미리 갱신하지 마라 — 노트북이 자면 그 타이머가 밀려서 새는 그물이 된다.
