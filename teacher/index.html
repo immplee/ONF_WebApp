@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ownify 선생님</title>
 <meta name="theme-color" content="#7a5c3e">
+<!-- 홈 화면 추가(아이콘). ⛔ 학생 액자의 manifest 를 그대로 쓰면 이름·start_url 이 학생 것이라
+     같은 아이콘 두 개가 생긴다 — teacher/ 전용으로 따로 둔다(아이콘 그림은 같은 파일을 가리킨다).
+     ⚠️ iOS 사파리는 manifest 를 안 보고 apple-touch-icon 을 본다. 둘 다 필요하다. -->
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="선생님">
+<link rel="apple-touch-icon" href="../assets/icon/onf-180.png">
+<link rel="icon" href="../assets/icon/onf-32.png" sizes="32x32">
 <link rel="stylesheet" href="../assets/onf-ui.css">
 <style>
   html, body { margin:0; height:100%; background:#fdfbf7; }

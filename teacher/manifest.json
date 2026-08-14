@@ -1,0 +1,15 @@
+{
+  "name": "Ownify 선생님",
+  "short_name": "선생님",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fdfbf7",
+  "theme_color": "#7a5c3e",
+  "icons": [
+    { "src": "../assets/icon/onf-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../assets/icon/onf-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "../assets/icon/onf-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
