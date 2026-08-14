@@ -56,10 +56,19 @@ var CLIENT_ID = '182072398790-1aeau87175kb9ima3205frc8ufvpv78g.apps.googleuserco
    ⚠️ access 는 ANYONE_ANONYMOUS 가 **아니라 ANYONE** 이다(구글 로그인 필요, 계정 종류는 무관).
      실측 2026-08-14: 워크스페이스가 **새** 익명 배포를 막는다(403 「Drive 액세스 권한 필요」).
      학생 웹앱이 익명인 건 정책이 바뀌기 전에 만든 옛 배포라서다.
-   ⚠️ ANYONE 이면 로그인 안 한 브라우저는 구글 로그인 화면으로 튀고 그 화면은 iframe 을 거부한다 —
-     그런데 **이 껍데기가 GIS 로그인을 먼저 시키므로** iframe 을 띄우는 시점엔 이미 구글 세션이 있다.
-     즉 로그인 순서가 그 함정을 막는다. 순서를 뒤집지 마라. */
-var EXEC = 'https://script.google.com/macros/s/AKfycbx4taL78DPmHmzICYP8DjjuedRDVDcgGaOeGUnoSValEI1dW4bWNX-e5x7LWFwfmF8X/exec';
+   ⛔ **틀렸던 전제(2026-08-14 반증)**: 「GIS 로그인을 먼저 시키니 iframe 을 띄울 땐 구글 세션이 있다」고
+     적어 뒀는데 그게 아니었다. GIS 로 **어느 계정을 골랐든**, iframe 이 GAS 를 부를 때 구글이 쓰는 건
+     **브라우저의 기본 구글 계정**이다. 크롬에 개인 지메일이 먼저 로그인돼 있으면 그 계정으로 열리고,
+     회사 밖 계정이라 문 앞에서 잘린다(실물: 「액세스 권한 필요 · 로그인된 계정 immplee@gmail.com」).
+     → 주소에 도메인을 박아(`/a/macros/ownify.co.kr/`) 회사 계정 쪽으로 몰고,
+       그래도 막히면 **화면이 그 사실을 말한다**(아래 frameWatch). 조용히 구글 오류만 띄우지 않는다. */
+var EXEC = 'https://script.google.com/a/macros/ownify.co.kr/s/AKfycbx4taL78DPmHmzICYP8DjjuedRDVDcgGaOeGUnoSValEI1dW4bWNX-e5x7LWFwfmF8X/exec';
+
+/* ⛔ 주소에 **도메인을 박는다**(`/a/macros/ownify.co.kr/`). 그냥 `/macros/s/…` 로 두면
+   구글이 **브라우저 기본 계정**으로 연다 — 크롬에 개인 지메일이 첫 계정이면 그 계정으로 열려서
+   회사 밖 계정이라 문 앞에서 잘린다(실측 2026-08-14: 「액세스 권한 필요 · 로그인된 계정 immplee@gmail.com」).
+   ⚠️ GIS 로그인(우리 토큰)과 **iframe 이 GAS 를 부를 때 쓰는 구글 세션은 별개다.**
+     우리가 토큰을 아무리 잘 만들어도, 그 프레임을 여는 계정이 회사 계정이 아니면 우리 코드는 돌지도 않는다. */
 
 var frame = document.getElementById('app');
 var mounted = false, pending = '';
@@ -80,7 +89,24 @@ function mount() {
   document.getElementById('lock').hidden = true;
   frame.hidden = false;
   frame.src = EXEC;
+  /* ⛔ 프레임이 **막혔는지**를 화면이 말해야 한다. 안쪽이 살아 있으면 몇백 ms 안에 노크가 온다.
+     안 오면 구글이 문 앞에서 자른 것이다(회사 계정이 아니거나 로그인이 안 된 것) —
+     그때 구글의 「액세스 권한 필요」 화면만 덩그러니 두면 사람이 무엇을 해야 할지 모른다.
+     ⚠️ 이건 선갱신 타이머가 아니라 **못 열렸다는 것을 알아채는 마감 시계**다. */
+  clearTimeout(frameWatch);
+  frameWatch = setTimeout(function () {
+    if (appWin) return;                       // 안쪽이 인사했다 = 열렸다
+    frame.hidden = true;
+    var lock = document.getElementById('lock');
+    lock.hidden = false;
+    lock.innerHTML = '<div class="em">🔑</div><h2>회사 계정으로 열어야 해요</h2>'
+      + '<p>브라우저의 <b>기본 구글 계정</b>이 회사 계정이 아니면 구글이 문 앞에서 막아요.<br>'
+      + '아래 링크를 새 창에서 열어 계정을 회사 계정으로 바꾼 뒤, 이 페이지를 새로고침해 주세요.</p>'
+      + '<p><a href="' + EXEC + '" target="_blank" rel="noopener">새 창에서 열기</a></p>'
+      + '<p class="why">지금 로그인한 계정이 여러 개면 <b>맨 처음 로그인한 계정</b>이 기본이 돼요.</p>';
+  }, 8000);
 }
+var frameWatch = null;
 
 /* ⛔⛔ **부모가 먼저 보내면 안 된다.** GAS 는 우리 HTML 을 자기 래퍼 안 또 하나의 iframe
    (`*.googleusercontent.com`)에 넣는다. 부모가 `frame.contentWindow` 로 쏘면 그 래퍼가
@@ -114,6 +140,7 @@ window.addEventListener('message', function (ev) {
   /* ⛔ 한 번 정하면 안 바꾼다 — 나중에 다른 창이 같은 조건을 흉내 내도 토큰이 안 간다. */
   if (appWin && ev.source !== appWin) return;
   appWin = ev.source; appOrigin = ev.origin;
+  clearTimeout(frameWatch);          // 안쪽이 살아 있다 — 막힘 안내를 띄우지 않는다
 
   /* 화면이 "토큰이 만료됐다"고 하면 **그때** 새로 받는다.
      ⛔ 타이머로 미리 갱신하지 마라 — 노트북이 자면 그 타이머가 밀려서 새는 그물이 된다.
