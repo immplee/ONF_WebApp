@@ -1,0 +1,33 @@
+# 명부 동기화 검사 — 토큰 배정만 본다(여기가 틀리면 학생 링크가 죽거나 남의 교재가 열린다).
+#
+# ⛔ 2026-08-20 까지 이 검사는 **Peter 맥에서만** 돌았다. roster-sync.py 를 고쳐도
+#   아무도 안 잡아 줬다는 뜻이다. 검사는 그 코드가 **사는 저장소**에서 돌린다 —
+#   다른 저장소로 파일을 복사하면 사본 둘이 반드시 어긋난다.
+# 네트워크를 안 탄다(노션·드라이브·시트 값은 전부 손으로 만든 것) — 파이썬만 있으면 된다.
+name: check
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/**'
+      - '.github/workflows/check.yml'
+  pull_request:
+    paths:
+      - 'tools/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  roster:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # ⛔ 파일이 없으면 조용히 넘어가지 말고 **실패**시킨다.
+      #   Ownify 쪽에서 그랬듯 "건너뜀"이 쌓이면 검사한 적 없는데 검사했다고 믿게 된다.
+      - name: 명부 토큰 배정 검사
+        run: |
+          test -f tools/test_roster_sync.py || { echo "::error::검사 파일이 없다 — 누가 지웠나"; exit 1; }
+          python3 tools/test_roster_sync.py
