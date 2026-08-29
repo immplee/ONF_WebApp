@@ -38,6 +38,18 @@
     if (q.get(k)) extra.push(k + '=' + encodeURIComponent(q.get(k)));
   });
   if (q.get('diag') === '1') extra.push('diag=1');
+  /* [2026-08-29 Peter] 짧은 주소 — `class.ownify.co.kr/thegoodplace-s1-e1-sandy`.
+     Vercel 이 그 경로를 이 파일로 돌려 주고(vercel.json), 우리는 **경로를 그대로 앱에 넘긴다**.
+     교재를 찾는 것은 GAS 다(명부가 거기 있고, 여기서 구글을 부르면 CORS 로 막힌다).
+     ⛔ 모양이 맞는 것만 넘긴다 — 아무 경로나 넘기면 GAS 가 못 읽는 값을 계속 받는다.
+     ⛔ `fileId` 가 이미 있으면 넘기지 않는다(옛 주소가 이긴다 — 둘 다 오면 뜻이 갈린다). */
+  var path = decodeURIComponent(location.pathname.replace(/^\/+|\/+$/g, '')).toLowerCase();
+  if (!q.get('fileId') && /^[a-z0-9]+-s\d+-e\d+-[a-z0-9]+$/.test(path)) {
+    extra.push('slug=' + encodeURIComponent(path));
+  }
+  /* 토큰은 이미 이 도메인에 저장됐다 — 주소창에서 지운다(화면 찍어 보낼 때 같이 나가면 안 된다).
+     ⛔ 반드시 위 `q.get(...)` 들을 다 읽은 **뒤**여야 한다. */
+  ONF.frame.hideToken();
   ONF.frame.mount(document.getElementById('app'),
                   ONF.api.appUrl(token, extra.join('&')),
                   { diag: q.get('diag') === '1' });

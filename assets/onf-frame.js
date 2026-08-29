@@ -32,6 +32,32 @@
     try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; }
   }
 
+  /* [2026-08-29 Peter — "주소만 보이되 토큰은 숨겨지게"] 주소창을 지운다.
+   *   토큰은 **위에서 이미 이 도메인에 저장**됐다. 주소창에 남겨 둘 이유가 없는데,
+   *   남으면 ① 학생이 화면을 찍어 보낼 때 토큰이 같이 나가고 ② 방문기록·공유 미리보기에
+   *   그대로 남는다. 토큰은 이 학생의 **비밀번호 자리**다(학생 화면엔 로그인이 없다).
+   *   ⛔ `pushState` 가 아니라 `replaceState` 다 — 뒤로가기 한 칸을 만들면 학생이 뒤로 갔을 때
+   *     토큰이 든 주소로 되돌아간다.
+   *   ⚠️ 주소를 **지우기만** 한다. 앱에 넘기는 값은 이미 다 읽어 둔 뒤다(호출 순서를 지켜라).
+   *   ⚠️ 옛 주소(`?fileId=…&sheetName=…`)는 그대로 둔다 — 그게 없으면 새로고침이 홈으로 간다.
+   *     짧은 주소(경로)로 들어온 길만 깨끗해진다.
+   */
+  function hideToken() {
+    try {
+      var u = new URL(location.href);
+      var t = u.searchParams.get('t');
+      if (!t) return;
+      /* ⛔ **저장이 실제로 됐을 때만** 지운다. 시크릿 모드·저장소 차단이면 setItem 이 조용히
+       *   실패하는데, 그 상태에서 주소까지 지우면 새로고침 한 번에 토큰이 증발한다
+       *   (「링크로 열어 주세요」로 떨어진다 — 지금은 되던 것이 안 되게 된다). */
+      var kept = '';
+      try { kept = localStorage.getItem(TOKEN_KEY) || ''; } catch (e2) { kept = ''; }
+      if (kept !== t) return;
+      u.searchParams.delete('t');
+      history.replaceState(null, '', u.pathname + (u.searchParams.toString() ? '?' + u.searchParams : '') + u.hash);
+    } catch (e) {}
+  }
+
   function withToken(url) {
     var t = getToken();
     if (!t) return url;
@@ -134,5 +160,6 @@
   }
 
   global.ONF = global.ONF || {};
-  global.ONF.frame = { mount: mount, getToken: getToken, withToken: withToken, TOKEN_KEY: TOKEN_KEY };
+  global.ONF.frame = {
+    hideToken: hideToken, mount: mount, getToken: getToken, withToken: withToken, TOKEN_KEY: TOKEN_KEY };
 })(window);
