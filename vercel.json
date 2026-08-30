@@ -2,5 +2,26 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     { "source": "/:slug([a-z0-9]+-s\\d+-e\\d+-[a-z0-9]+)", "destination": "/index.html" }
+  ],
+  "redirects": [
+    {
+      "source": "/teacher/:path*",
+      "has": [{ "type": "host", "value": "script.ownify.co.kr" }],
+      "destination": "https://class.ownify.co.kr/teacher/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/:page(hw\\.html|dict\\.html)",
+      "has": [{ "type": "host", "value": "script.ownify.co.kr" }],
+      "destination": "https://class.ownify.co.kr/:page",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "script.ownify.co.kr" }],
+      "missing": [{ "type": "query", "key": "fileId" }],
+      "destination": "https://class.ownify.co.kr/",
+      "permanent": false
+    }
   ]
 }
