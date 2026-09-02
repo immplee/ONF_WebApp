@@ -17,7 +17,16 @@
 <link rel="stylesheet" href="../assets/onf-ui.css">
 <style>
   html, body { margin:0; height:100%; background:#fdfbf7; }
-  #app { display:block; width:100%; height:100%; border:0; }
+  /* ⛔ z-index 를 학생 액자와 **같은 겹침**으로 둔다(assets/onf-ui.css 의 .onf-full iframe).
+     회전자(.onf-wait)는 z-index:0 이라 액자 뒤에 있고, 액자가 한 픽셀이라도 그리는 순간
+     저절로 덮인다 — 걷는 JS 가 없으니 **노크를 놓쳐도 회전자에 갇히지 않는다**(2026-08-14 사고).
+     실측(2026-09-02): 프레임이 막히거나(XFO/CSP) 응답 전이거나 연결이 실패하면 액자는 **투명**하다
+     — 그 셋이 바로 사람이 본 「하얀 화면」이고, 그때 뒤의 회전자가 그대로 보인다. */
+  #app { display:block; width:100%; height:100%; border:0; position:relative; z-index:1; }
+  /* ⛔ .onf-wait 의 display:flex 는 브라우저 기본 [hidden]{display:none} 을 이긴다 — 다시 눌러 준다. */
+  #wait[hidden] { display:none; }
+  /* 8초 뒤 안내는 여러 줄이라 가운데정렬을 눌러 준다(.onf-wait 는 한 줄 기준이라 안 걸어 뒀다). */
+  #waitmsg { text-align:center; }
   .lock { max-width:460px; margin:14vh auto 0; padding:0 24px; text-align:center;
           font:15px/1.65 -apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
           color:#3d2b1f; }
@@ -37,6 +46,10 @@
   <div id="gsi"></div>
   <p class="why" id="why"></p>
 </div>
+<!-- 접속 중 표시. ⛔ 새로 만들지 않는다 — 학생 액자(../index.html)가 쓰는 그 조각 그대로다
+     (../assets/onf-ui.css 의 .onf-wait/.onf-spin). 이미 링크된 CSS 라 파일도 안 늘었다.
+     ⛔ `hidden` 으로 시작한다 — position:fixed;inset:0 이라 안 그러면 로그인 화면(🔒)을 덮는다. -->
+<div class="onf-wait" id="wait" hidden><div class="onf-spin"></div><span id="waitmsg">불러오는 중이에요</span></div>
 <iframe id="app" hidden allow="clipboard-write"></iframe>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -96,6 +109,9 @@ function mount() {
   if (!EXEC) return say('아직 주소가 설정되지 않았어요. (EXEC)');
   mounted = true;
   document.getElementById('lock').hidden = true;
+  /* ⛔ 잠금화면을 치우는 **그 순간**부터 표시가 있어야 한다. 종전엔 여기부터 화면에 아무것도
+     없었고(#why 는 #lock 안이라 같이 숨는다), 「3초」와 「영영」이 같은 흰 종이였다. */
+  document.getElementById('wait').hidden = false;
   frame.hidden = false;
   frame.src = EXEC;
   /* ⛔ 프레임이 **막혔는지**를 화면이 말해야 한다. 안쪽이 살아 있으면 몇백 ms 안에 노크가 온다.
@@ -111,6 +127,12 @@ function mount() {
   frameWatch = setTimeout(function () {
     if (appWin) return;
     console.warn('[onf] 안쪽 노크가 8초 안에 안 왔다 — 토큰 전달이 안 되는 중일 수 있다(화면은 Session 으로 돌 수 있다).');
+    /* ⛔ 원인을 **단정하지 않는다**(위 2026-08-14 교훈 — 멀쩡한 화면에 두 번 겁을 줬다).
+       ⚠️ 이 글자는 액자 **뒤**에 있다 — 화면이 그려졌으면 안 보이고, 정말 빈 종이일 때만 읽힌다.
+         그래서 오탐이 안 된다. 「막혔다」 대신 **아직 안 열렸다는 사실과 다음 손짓**만 준다. */
+    var w = document.getElementById('waitmsg');
+    if (w) w.innerHTML = '아직 안 열려요.<br>회사 계정(@ownify.co.kr)으로 로그인돼 있는지 보고 새로고침해 주세요.'
+      + '<br><a href="' + EXEC + '" target="_blank" rel="noopener" style="color:#7a5c3e">새 탭에서 열어 보기</a>';
   }, 8000);
 }
 var frameWatch = null;
@@ -152,6 +174,10 @@ window.addEventListener('message', function (ev) {
   if (appWin && ev.source !== appWin) return;
   appWin = ev.source; appOrigin = ev.origin;
   clearTimeout(frameWatch);          // 안쪽이 살아 있다 — 막힘 안내를 띄우지 않는다
+  /* 회전자는 원래 액자가 **덮어서** 사라진다(안쪽 배경이 불투명하다). 이건 그 위의 띠 하나 —
+     노크가 왔다 = 안쪽 스크립트가 돌았다 = 그려졌다. ⛔ 반대로 노크를 놓쳐도 갇히지 않는다:
+     덮개가 본진이고 이 줄은 덤이다(2026-08-14 Mary 컴퓨터에서 노크를 통째로 놓친 적이 있다). */
+  var _w = document.getElementById('wait'); if (_w) _w.hidden = true;
 
   /* 화면이 "토큰이 만료됐다"고 하면 **그때** 새로 받는다.
      ⛔ 타이머로 미리 갱신하지 마라 — 노트북이 자면 그 타이머가 밀려서 새는 그물이 된다.
