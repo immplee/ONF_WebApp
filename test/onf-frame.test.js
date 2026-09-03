@@ -121,5 +121,24 @@ t('짧거나 이상한 것은 안 받는다', () => {
 
 g.location.pathname = '/';   // 뒷 검사에 안 새게 되돌린다
 
+
+console.log('\n[여러 깊이로 서빙되는 파일의 자산 경로]');
+/* index.html 한 장이 `/` · `/<짧은주소>` · `/i/<토큰>/` 세 깊이로 서빙된다. 상대경로가 하나라도
+   남으면 가장 깊은 곳에서 CSS·JS 가 404 가 되고 화면이 글자만 남는다 — **오류도 안 난다.**
+   2026-09-03 에 그 상태로 배포했고, 검사가 아니라 스크린샷이 잡았다. 그래서 검사로 못박는다. */
+const shellHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+t('⛔ index.html 의 자산 경로는 전부 절대경로다', () => {
+  const bad = (shellHtml.match(/(?:href|src)="(?!\/|https?:|data:|#)[^"]+"/g) || []);
+  assert.deepStrictEqual(bad, [], '상대경로가 남았다 — /i/<토큰>/ 에서 404 가 된다');
+});
+t('⛔ 매니페스트 링크도 절대경로다', () => {
+  assert.ok(/rel="manifest" href="\/manifest\.json"/.test(shellHtml),
+    '매니페스트가 상대경로면 깊은 주소에서 엉뚱한 곳을 가리킨다');
+});
+const teacherHtml = fs.readFileSync(path.join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
+t('⛔ 선생님 액자의 매니페스트도 절대경로다 (끝 슬래시 없이도 열린다)', () => {
+  assert.ok(/rel="manifest" href="\/teacher\/manifest\.json"/.test(teacherHtml));
+});
+
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패');
 process.exit(fail ? 1 : 0);

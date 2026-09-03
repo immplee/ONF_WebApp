@@ -6,9 +6,9 @@
      줄어 (innerHeight − vv.height) = 0 이 되고, 키보드 높이를 못 재게 된다. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ownify</title>
-<link rel="icon" type="image/png" sizes="32x32" href="assets/icon/onf-32.png">
-<link rel="icon" type="image/png" sizes="192x192" href="assets/icon/onf-192.png">
-<link rel="apple-touch-icon" href="assets/icon/onf-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/icon/onf-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/icon/onf-192.png">
+<link rel="apple-touch-icon" href="/assets/icon/onf-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Ownify">
@@ -16,13 +16,18 @@
 <!-- ⛔ 절대경로로 둔다 — 짧은 주소(`/thegoodplace-s1-e1-sandy`)로 들어오면 상대경로가
      그 경로 기준으로 풀려 엉뚱한 곳을 가리킨다(선생님 화면에서 실제로 그 사고가 났다). -->
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="assets/onf-ui.css">
+<!-- ⛔ 자산 경로는 **절대경로여야 한다.** 이 한 파일이 서로 다른 깊이로 서빙된다:
+       `/` · `/<짧은주소>` · `/i/<토큰>/`(홈 화면 아이콘). 상대경로면 마지막 것에서
+       `/i/<토큰>/assets/…` 로 풀려 **CSS·JS 가 통째로 404** 가 되고, 화면은
+       「불러오는 중이에요」 글자만 남는다(2026-09-03 실제로 그렇게 배포됐다 — 그려 봐서 잡았다).
+       ⚠️ 새 `<link>`·`<script>` 를 넣을 때도 `/` 로 시작해라. test/onf-frame.test.js 가 검사한다. -->
+<link rel="stylesheet" href="/assets/onf-ui.css">
 </head>
 <body class="onf-full">
 <div class="onf-wait"><div class="onf-spin"></div>불러오는 중이에요</div>
 <iframe id="app" allow="clipboard-write; microphone"></iframe>
-<script src="assets/onf-frame.js"></script>
-<script src="assets/onf-api.js"></script>
+<script src="/assets/onf-frame.js"></script>
+<script src="/assets/onf-api.js"></script>
 <script>
   // 액자가 하는 일은 셋뿐 — 토큰 기억 · iframe 띄우기 · 키보드 재서 앱에 넘기기.
   // 화면(홈·교재)은 전부 GAS 가 그린다(액자에서 구글을 fetch 하면 CORS 로 막힌다).
