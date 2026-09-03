@@ -128,12 +128,18 @@ console.log('\n[여러 깊이로 서빙되는 파일의 자산 경로]');
    2026-09-03 에 그 상태로 배포했고, 검사가 아니라 스크린샷이 잡았다. 그래서 검사로 못박는다. */
 const shellHtml = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 t('⛔ index.html 의 자산 경로는 전부 절대경로다', () => {
-  const bad = (shellHtml.match(/(?:href|src)="(?!\/|https?:|data:|#)[^"]+"/g) || []);
+  const bad = (shellHtml.match(/(?:href|src)="(?!\/|https?:|data:|#)[^"]+"/g) || [])
+    .filter(x => !/manifest\.json/.test(x));   // 매니페스트는 일부러 상대경로다(바로 아래 검사)
   assert.deepStrictEqual(bad, [], '상대경로가 남았다 — /i/<토큰>/ 에서 404 가 된다');
 });
-t('⛔ 매니페스트 링크도 절대경로다', () => {
-  assert.ok(/rel="manifest" href="\/manifest\.json"/.test(shellHtml),
-    '매니페스트가 상대경로면 깊은 주소에서 엉뚱한 곳을 가리킨다');
+t('⛔ 매니페스트만은 **상대경로**다 — 깊이에 맞는 것이 걸려야 한다', () => {
+  /* 다른 자산과 규칙이 반대다. `/i/<토큰>/` 에서 `manifest.json` 은 그 학생 매니페스트로
+     풀려야 한다 — 절대경로면 공용(start_url "/")이 걸려 아이콘이 잠금 화면을 연다.
+     ⛔ JS 로 href 를 갈아 끼우는 길은 안 통한다(아이폰 실측) — 그러니 이 줄이 정본이다. */
+  assert.ok(/rel="manifest" href="manifest\.json"/.test(shellHtml),
+    '매니페스트는 상대경로여야 한다');
+  assert.ok(!/mfEl\.href/.test(shellHtml),
+    '⛔ JS 로 매니페스트를 갈아 끼우지 마라 — 안 통하는데 통하는 줄 알게 된다');
 });
 const teacherHtml = fs.readFileSync(path.join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
 t('⛔ 선생님 액자의 매니페스트도 절대경로다 (끝 슬래시 없이도 열린다)', () => {
