@@ -25,8 +25,11 @@
   #app { display:block; width:100%; height:100%; border:0; position:relative; z-index:1; }
   /* ⛔ .onf-wait 의 display:flex 는 브라우저 기본 [hidden]{display:none} 을 이긴다 — 다시 눌러 준다. */
   #wait[hidden] { display:none; }
-  /* 8초 뒤 안내는 여러 줄이라 가운데정렬을 눌러 준다(.onf-wait 는 한 줄 기준이라 안 걸어 뒀다). */
-  #waitmsg { text-align:center; }
+  /* 8초 뒤 안내는 여러 줄이라 가운데정렬을 눌러 준다(.onf-wait 는 한 줄 기준이라 안 걸어 뒀다).
+     ⚠️ 여백·줄바꿈도 여기서 준다 — `.onf-wait` 는 학생 액자와 **같이 쓰는** 조각이라
+       거기에 넣으면 「불러오는 중이에요」 한 줄까지 같이 바뀐다.
+     ⛔ `word-break:keep-all` 을 빼지 마라. 폰에서 어절이 쪼개져 `주세요.` 만 혼자 떨어진다. */
+  #waitmsg { text-align:center; padding:0 22px; max-width:32em; word-break:keep-all; text-wrap:pretty; }
   .lock { max-width:460px; margin:14vh auto 0; padding:0 24px; text-align:center;
           font:15px/1.65 -apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
           color:#3d2b1f; }
@@ -130,9 +133,22 @@ function mount() {
     /* ⛔ 원인을 **단정하지 않는다**(위 2026-08-14 교훈 — 멀쩡한 화면에 두 번 겁을 줬다).
        ⚠️ 이 글자는 액자 **뒤**에 있다 — 화면이 그려졌으면 안 보이고, 정말 빈 종이일 때만 읽힌다.
          그래서 오탐이 안 된다. 「막혔다」 대신 **아직 안 열렸다는 사실과 다음 손짓**만 준다. */
+    /* ⛔ [2026-09-03 Peter] 여기에 **누를 것을 두지 마라.** 이 층은 `z-index:0` 이라 액자
+       (`#app`, z-index:1) **뒤**에 있다. 액자가 투명하면 글자는 비쳐 보이지만 클릭은 액자가
+       전부 먹는다 — 종전의 「새 탭에서 열어 보기」 링크는 **한 번도 눌린 적이 없다**(Peter 실측).
+       ⚠️ 눌리게 하려고 액자를 숨기거나 `pointer-events:none` 로 두지 마라. 우리는 「노크가
+         안 왔다」만 알 뿐 「화면이 안 떴다」를 모른다 — 노크를 놓치고도 멀쩡히 도는 컴퓨터가
+         실제로 있었다(2026-08-14 Mary). 그때 액자를 치우면 **되는 화면을 우리가 죽인다.**
+       → 그래서 손짓은 **브라우저가 늘 주는 것**(새로고침)만 시킨다. */
+    /* ⛔ 기다림을 그만뒀으면 **도는 원도 멈춰야 한다.** 계속 돌면 「곧 됩니다」라는 거짓말이 된다
+       (Peter: "이미 안 열리는데 아직 안 열려요 라는 문구도, 도넛이 도는 것도 이상하다"). */
+    var spin = document.querySelector('#wait .onf-spin');
+    if (spin && spin.parentNode) spin.parentNode.removeChild(spin);
     var w = document.getElementById('waitmsg');
-    if (w) w.innerHTML = '아직 안 열려요.<br>회사 계정(@ownify.co.kr)으로 로그인돼 있는지 보고 새로고침해 주세요.'
-      + '<br><a href="' + EXEC + '" target="_blank" rel="noopener" style="color:#7a5c3e">새 탭에서 열어 보기</a>';
+    /* ⚠️ 시제를 지켜라 — 이 글자가 뜰 땐 이미 못 연 것이다. 「아직」은 더 기다리면 될 것처럼 들린다.
+       ⛔ 원인은 여전히 단정하지 않는다(2026-08-14 교훈) — 「확인해 보라」까지만 말한다. */
+    if (w) w.innerHTML = '화면이 안 열렸어요.'
+      + '<br>@ownify.co.kr 계정으로 로그인했는지 확인하고 새로고침해 주세요.';
   }, 8000);
 }
 var frameWatch = null;
