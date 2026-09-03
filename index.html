@@ -55,6 +55,39 @@
     if (q.get(k)) extra.push(k + '=' + encodeURIComponent(q.get(k)));
   });
   if (q.get('diag') === '1') extra.push('diag=1');
+  /* 홈 화면 아이콘 안내 — **판정은 여기서만 한다.** 앱은 구글 래퍼 안 아이프레임이라
+     `navigator.standalone` 을 믿을 수 없다(인앱 웹뷰에선 `undefined`, 프레임 안에선 없다).
+       ask   = 아이콘을 만들 수 있는 기기인데 아직 `/i/<토큰>/` 에 안 서 있다 → 앱이 링크를 낸다
+       guide = 이미 그 주소에 서 있다 → 앱이 「공유 → 홈 화면에 추가」를 안내한다
+     ⛔ **iOS 만** 켠다. 안드로이드·데스크톱은 브라우저와 저장소를 나눠 쓰므로 `/` 로 깔아도
+       그 학생 홈이 열린다 — 안내가 필요 없다(괜히 내면 없는 버튼을 찾게 된다).
+     ⛔ `!standalone` 으로 쓰지 마라. 카톡·인스타 인앱 웹뷰는 `undefined` 라 그 조건을 통과하는데
+       거기엔 「홈 화면에 추가」가 아예 없다 — **진짜 사파리만 `=== false`** 다.
+     ⚠️ 아이패드는 기본이 데스크톱 UA(`Macintosh`)라 UA 만 보면 통째로 빠진다 — 터치점으로 가른다. */
+  var _iOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  /* ⛔ `navigator.standalone === false` 로 쓰지 마라 — 그건 **사파리 전용** 속성이라
+     **크롬 for iOS 에서는 `undefined`** 다. 그렇게 두면 크롬 쓰는 학생에겐 버튼이 영영 안 뜬다
+     (Peter 가 크롬으로 쓰고 있었다). 그래서 「standalone 이 아니다」로 뒤집어 쓴다. */
+  var _standalone = navigator.standalone === true
+    || !!(window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  /* ⛔ 인앱 웹뷰는 뺀다 — 카톡·인스타·라인·페북 안에는 **「홈 화면에 추가」가 아예 없다.**
+     안내를 내면 학생이 없는 버튼을 찾다가 「카카오톡으로 공유」를 누른다.
+     ⚠️ 넓게 잡아도 안전한 이유: 이 안내는 **누를 때까지** 주소에 토큰을 싣지 않는다.
+       잘못 떠도 최악이 「없는 버튼을 찾는다」이고, 토큰이 새지 않는다. */
+  var _inApp = /KAKAOTALK|Instagram|FBAN|FBAV|FB_IAB|Line\/|NAVER|DaumApps|Twitter|KAKAOSTORY/i
+    .test(navigator.userAgent);
+  if (token && _iOS && !_standalone && !_inApp) {
+    extra.push('a2hs=' + (ONF.frame.tokenFromPath() ? 'guide' : 'ask'));
+  }
+  /* 주소로 넘어온 값은 **그대로 통과시킨다** — 아이폰 없이 이 화면을 보려면 이 길이 필요하다
+     (헤드리스에선 위 판정을 흉내 낼 수 없다: standalone 은 사파리만 준다).
+     ⚠️ 아는 낱말만. 잘못 떠도 위험이 없다(위 주석). */
+  var _a2q = q.get('a2hs');
+  if (token && (_a2q === 'ask' || _a2q === 'guide') && extra.indexOf('a2hs=ask') < 0
+      && extra.indexOf('a2hs=guide') < 0) {
+    extra.push('a2hs=' + _a2q);
+  }
   /* [2026-08-29 Peter] 짧은 주소 — `class.ownify.co.kr/thegoodplace-s1-e1-sandy`.
      Vercel 이 그 경로를 이 파일로 돌려 주고(vercel.json), 우리는 **경로를 그대로 앱에 넘긴다**.
      교재를 찾는 것은 GAS 다(명부가 거기 있고, 여기서 구글을 부르면 CORS 로 막힌다).
