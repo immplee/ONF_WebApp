@@ -10,8 +10,6 @@ assets/
   onf-frame.js  액자 공통 — 토큰 기억 · 키보드 재기 · 앱 화면에 붙이기
   onf-api.js    GAS 배포 주소 (⛔ 명부를 여기 두지 마라 — 공개 저장소다)
   onf-ui.css    브랜드 색 · 공통 골격
-tools/
-  roster-sync.py  노션(정본) → ONF_학생명부 시트 한 방향 동기화
 ```
 
 ## 왜 액자가 필요한가
@@ -39,6 +37,28 @@ tools/
 `OPTIONS` 는 405, 응답에 `Access-Control-Allow-Origin` 자체가 없음).
 
 토큰은 처음 한 번 주소로 받고 이 도메인에 저장한다. 다음부턴 주소 없이도 열린다.
+
+## 감싸기 금지 — `vercel.json` 의 `frame-ancestors`
+
+`vercel.json` 은 두 도메인의 **모든 경로**에 이 헤더를 내보낸다:
+
+```
+Content-Security-Policy: frame-ancestors 'none'
+```
+
+⛔ **지우지 마라.** 이 액자를 남이 iframe 으로 감싸는 것을 막는 유일한 자리다. 감싸이면
+클릭재킹이 되고, 앱이 `window.top` 으로 보내는 말이 **감싼 쪽에게 간다**.
+
+⛔ **여기에 `default-src`·`script-src` 를 같이 얹지 마라.** 이 액자는 `script.google.com`
+을 iframe 으로 띄우고 홈 화면은 `aat.ownify.co.kr`(발음기호)까지 품는다 — 지시문 하나만
+잘못 얹어도 학생 화면이 통째로 백지가 된다. 이 파일에 CSP 는 **`frame-ancestors` 한 줄뿐**이다.
+
+⛔ `X-Frame-Options` 를 같이 두지 마라. `frame-ancestors` 가 있으면 브라우저가 XFO 를
+무시하므로 얻는 게 없고, `SAMEORIGIN` 은 브라우저마다 해석이 갈려 규칙만 둘이 된다.
+
+⚠️ 감싸는 쪽이 **우리가 아니라 GAS `/exec`** 면 이 헤더는 안 닿는다. 옛 구글 사이트가
+심었던 것이 그쪽이고(껍데기가 아니다), GAS 는 `ALLOWALL` 로 나간다. 즉 이 헤더는
+**액자를 지키지 앱을 지키지 않는다.**
 
 ## 손대기 전에
 

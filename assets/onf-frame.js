@@ -64,6 +64,27 @@
     return url + (url.indexOf('?') < 0 ? '?' : '&') + 't=' + encodeURIComponent(t);
   }
 
+  /* 이 창이 **내가 띄운 그 iframe 안**에서 온 것인가. 부모 사슬을 타고 올라가 찾는다.
+   *
+   *   ⛔ 깊이를 숫자로 박지 마라. GAS 는 우리 HTML 을 래퍼 안에 다시 감싸는데 그 겹 수가
+   *     보장되지 않는다(exec → sandboxFrame → userHtmlFrame 로 두 겹인 경우가 실제로 있다).
+   *     선생님 액자는 「자식이거나 손자」로 두 단만 보는데, 그쪽은 **노크를 놓쳐도 덤**이라
+   *     괜찮다고 적혀 있다. 학생 액자는 다르다 — 노크를 놓치면 appWin 이 안 잡혀
+   *     **키보드 높이 보정이 통째로 죽는다**(폰에서 입력칸이 키보드에 가린다).
+   *     그래서 여기서는 겹 수를 안 세고 **끝까지 타고 올라가** 찾는다.
+   *   ⚠️ `parent` 는 교차 출처에서도 읽고 비교할 수 있다(HTML 표준 CrossOriginProperties).
+   *     최상위에서는 `w.parent === w` 라 그 자리에서 멈춘다(무한 루프 방지).
+   *   ⚠️ 상한 8은 안전장치일 뿐이다 — 실제 겹은 1~2다. */
+  function _fromOurFrame(win, frameEl) {
+    var w = win, target = frameEl && frameEl.contentWindow;
+    if (!w || !target) return false;
+    for (var i = 0; i < 8 && w; i++) {
+      if (w === target) return true;
+      try { w = (w.parent && w.parent !== w) ? w.parent : null; } catch (e) { return false; }
+    }
+    return false;
+  }
+
   /* iframe 에 GAS 웹앱을 띄우고, 키보드·팬 보정을 붙인다.
    * @param {HTMLIFrameElement} frameEl
    * @param {string} src  띄울 주소
@@ -137,7 +158,28 @@
       //    앱 본문은 googleusercontent.com 에서 온다(GAS 가 앱 HTML 을 거기서 서빙한다).
       //    ⚠️ 이 채널에 비밀(PIN·토큰)을 태우지 마라 — 앱 쪽 발신이 targetOrigin '*' 이라
       //      감싼 쪽이 누구든 같이 받는다. 값을 넘길 거면 iframe src 쿼리를 쓴다.
+      /* ⛔ [2026-09-03] **출처 자물쇠 — 오리진 검사 하나로는 못 막는다.**
+         `googleusercontent.com` 은 **누구나** GAS 앱을 하나 만들면 받는 도메인이다. 그래서
+         오리진만 보면 「구글이 서빙한 아무 앱」이 다 통과한다. 여기서 좁힌다.
+
+         ⚠️ **막는 것과 못 막는 것을 헷갈리지 마라**(2026-09-03 검수에서 이 주석이 한 번 틀렸다).
+           · 막는다 — 우리가 **최상위**일 때. 남의 페이지가 `window.open(우리주소,'v')` 로 창을
+             열어 두고, 자기 GAS iframe 에서 `window.open('','v')` 로 그 창 손잡이를 얻어
+             `{onf:'title'}` 을 쏘는 길. 오리진만 보면 통과하던 자리다.
+           · **못 막는다** — 우리가 남의 iframe 안에 있을 때. 그때 탭 제목은 애초에 **감싼 쪽
+             문서의 것**이라 우리 title 을 바꿔 봐야 화면에 안 나온다(감싼 쪽은 자기 제목을
+             처음부터 마음대로 쓴다). 게다가 그 상태에선 진짜 앱의 말도 우리에게 안 온다 —
+             앱은 `onfPostToShell(window.top, …)` 로 보내는데 window.top 이 남의 창이면
+             브라우저가 버린다. **감싸기 자체를 막는 것은 이 줄이 아니라 vercel.json 의
+             `frame-ancestors 'none'` 이다.** 그쪽을 지우고 이 줄만 믿지 마라.
+
+         ⛔ 선생님 액자(teacher/index.html)에 있는 **「한 번 정한 창은 안 바꾼다」 빗장은 안 넣는다.**
+           아래 사슬 검사를 통과하려면 이미 내 iframe 안에서 온 말이어야 하므로 빗장이 더 막는
+           것이 **없고**, 대신 안쪽 프레임이 다시 만들어지는 경로에서 새 노크를 영영 버려
+           `appWin` 이 죽은 창을 가리킨 채 **키보드 보정이 조용히 죽는다**(오류도 로그도 안 난다). */
       try {
+        if (!ev || !ev.data || !ev.source) return;
+        if (!_fromOurFrame(ev.source, frameEl)) return;
         if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return;
       } catch (e) { return; }
       if (ev && ev.data && ev.data.onf === 'frameHello') {
@@ -161,5 +203,7 @@
 
   global.ONF = global.ONF || {};
   global.ONF.frame = {
-    hideToken: hideToken, mount: mount, getToken: getToken, withToken: withToken, TOKEN_KEY: TOKEN_KEY };
+    hideToken: hideToken, mount: mount, getToken: getToken, withToken: withToken, TOKEN_KEY: TOKEN_KEY,
+    /* 검사용으로만 낸다 — 순수 판정 함수라 창 없이 잴 수 있다. 화면 코드에서 부르지 마라. */
+    _fromOurFrame: _fromOurFrame };
 })(window);
