@@ -28,6 +28,17 @@
   // 화면(홈·교재)은 전부 GAS 가 그린다(액자에서 구글을 fetch 하면 CORS 로 막힌다).
   var q = new URLSearchParams(location.search);
   var token = ONF.frame.getToken();
+  /* 홈 화면 아이콘이 **그 학생 홈**을 열게 한다.
+     ⛔ 이 줄이 없으면 아이콘에 `start_url: "/"` 가 박히고, iOS 홈 화면 앱은 브라우저와
+       저장소를 안 나눠 쓰므로 아이콘이 **잠금 화면만** 연다(2026-09-03 실측).
+       `/i/<토큰>/manifest.json` 은 Vercel 이 정적 파일 하나로 돌려주고, 그 안의
+       `start_url: "."` 이 **매니페스트 주소 기준**으로 풀려 `/i/<토큰>/` 이 된다.
+     ⚠️ 매니페스트 파일에는 토큰이 없다 — 나르는 것은 주소다. 파일 하나로 전 학생을 덮는다.
+     ⚠️ 토큰이 없으면 손대지 않는다(정적 `/manifest.json` 그대로). */
+  if (token) {
+    var mfEl = document.querySelector('link[rel=manifest]');
+    if (mfEl) mfEl.href = '/i/' + encodeURIComponent(token) + '/manifest.json';
+  }
   var extra = [];
   // ⛔ 여기 없는 파라미터는 앱에 **안 전해진다**. 홈이 만드는 링크와 반드시 같이 봐야 한다
   //    (GAS: ONF_Home_Html.html 의 mk()). 빠뜨리면 액자를 거치는 순간 그 값이 증발한다.

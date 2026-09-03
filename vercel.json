@@ -2,6 +2,18 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
+      "source": "/i/:tok([A-Za-z0-9_-]{6,64})/manifest.json",
+      "destination": "/student-manifest.json"
+    },
+    {
+      "source": "/i/:tok([A-Za-z0-9_-]{6,64})",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/i/:tok([A-Za-z0-9_-]{6,64})/",
+      "destination": "/index.html"
+    },
+    {
       "source": "/:slug([a-z0-9]+-s\\d+-e\\d+-[a-z0-9]+)",
       "destination": "/index.html"
     }

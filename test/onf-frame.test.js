@@ -78,5 +78,48 @@ t('⛔ 아주 깊어도 상한에서 멈춘다 (거짓 통과 없음)', () => {
   assert.strictEqual(fromOurFrame(w, frameEl), false, '상한을 넘으면 막아야');
 });
 
+
+console.log('\n[아이콘 주소에서 토큰 읽기 — /i/<토큰>]');
+/* 왜 재나: iOS 홈 화면 앱은 브라우저와 저장소를 안 나눠 쓴다. 아이콘이 여는 주소가 토큰을
+   나르지 못하면 학생이 **잠금 화면만** 본다(2026-09-03 아이폰 실측). 이 판정이 조용히 죽으면
+   화면만 보고는 절대 모른다 — 아이콘을 눌러 봐야 안다. */
+const fromPath = g.ONF.frame.tokenFromPath;
+assert.strictEqual(typeof fromPath, 'function', 'tokenFromPath 가 안 나왔다');
+function at(pathname) { g.location.pathname = pathname; return fromPath(); }
+
+t('아이콘 주소에서 토큰을 읽는다', () => {
+  assert.strictEqual(at('/i/h6GwGprFBZMU'), 'h6GwGprFBZMU');
+});
+
+t('⛔ 끝 슬래시가 붙어도 읽는다 — start_url "." 이 `/i/<토큰>/` 로 풀린다', () => {
+  assert.strictEqual(at('/i/h6GwGprFBZMU/'), 'h6GwGprFBZMU');
+});
+
+t('⛔ 대소문자를 지킨다 — 낮추면 그 학생을 못 찾는다', () => {
+  assert.strictEqual(at('/i/AbCdEfGhIjKl'), 'AbCdEfGhIjKl');
+});
+
+t('평소 주소·짧은 주소는 토큰이 아니다', () => {
+  assert.strictEqual(at('/'), '');
+  assert.strictEqual(at('/thegoodplace-s1-e1-sandy'), '');
+  assert.strictEqual(at('/teacher/'), '');
+  assert.strictEqual(at('/manifest.json'), '');
+});
+
+t('⛔ 더 깊은 경로는 안 받는다 (매니페스트 주소를 토큰으로 읽으면 안 된다)', () => {
+  assert.strictEqual(at('/i/h6GwGprFBZMU/manifest.json'), '');
+  assert.strictEqual(at('/i/abc/def'), '');
+});
+
+t('짧거나 이상한 것은 안 받는다', () => {
+  assert.strictEqual(at('/i/abc'), '');          // 6자 미만
+  assert.strictEqual(at('/i/'), '');
+  assert.strictEqual(at('/i'), '');
+  assert.strictEqual(at('/i/has space'), '');
+  assert.strictEqual(at('/i/../etc'), '');
+});
+
+g.location.pathname = '/';   // 뒷 검사에 안 새게 되돌린다
+
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패');
 process.exit(fail ? 1 : 0);

@@ -26,8 +26,33 @@
   var KB_MIN = 60;        // 이보다 작으면 키보드가 아니라 잔값
   var KB_ZERO_HOLD = 300; // "키보드 없음"은 이만큼 유지될 때만 믿는다(아래 B7 참조)
 
+  /** 경로에 실린 토큰 — `/i/<토큰>`. **설치된 홈 화면 아이콘**이 이 모양으로 열린다.
+   *
+   *   ⛔ 왜 필요한가 (2026-09-03 아이폰 실측 + Apple 1차 출처):
+   *     iOS 홈 화면 웹앱은 브라우저와 **저장소를 안 나눠 쓴다**(WWDC23: "separate cookies and
+   *     storage from the browser" · WebKit bug 181849 "by design"). 그래서 아이콘으로 처음 열면
+   *     `localStorage` 가 비어 있다. 게다가 iOS 11.3 부터 「홈 화면에 추가」는 그때 열려 있던
+   *     주소가 아니라 **매니페스트의 `start_url`** 을 아이콘에 박는다 — `start_url` 이 `/` 면
+   *     토큰이 통째로 떨어져 나가 아이콘이 잠금 화면만 연다(Peter 가 실물로 잡았다).
+   *   → 그래서 매니페스트를 `/i/<토큰>/manifest.json` 로 걸고 그 안에 `start_url: "."` 을 둔다.
+   *     iOS 는 `start_url` 을 **매니페스트 주소 기준**으로 풀기 때문에 `/i/<토큰>/` 이 박힌다.
+   *     즉 **주소가 토큰을 나른다** — 매니페스트 파일 안에는 토큰이 없다(파일 하나로 전 학생).
+   *   ⚠️ 반드시 **원본 pathname** 을 본다. 짧은 주소(slug)쪽은 소문자로 낮춰 쓰는데 토큰은
+   *     대소문자를 가린다(`h6GwGprFBZMU`) — 낮추면 그 학생을 못 찾는다.
+   *   ⚠️ 평소 브라우징 주소는 그대로 깨끗하다(`/`). 이 모양은 아이콘이 여는 길에만 쓰인다.
+   */
+  function tokenFromPath() {
+    try {
+      var m = /^\/i\/([A-Za-z0-9_-]{6,64})\/?$/.exec(location.pathname);
+      return m ? m[1] : '';
+    } catch (e) { return ''; }
+  }
+
   function getToken() {
-    var t = new URLSearchParams(location.search).get('t');
+    /* 주소가 이긴다: `?t=`(선생님 링크) → `/i/<토큰>`(아이콘) → 저장된 것.
+       ⛔ 찾았으면 **저장까지** 한다. 아이콘으로 처음 열린 앱은 저장소가 비어 있으므로,
+         여기서 안 넣으면 앱 안에서 새로고침 한 번에 토큰이 사라진다. */
+    var t = new URLSearchParams(location.search).get('t') || tokenFromPath();
     if (t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} return t; }
     try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; }
   }
@@ -204,6 +229,7 @@
   global.ONF = global.ONF || {};
   global.ONF.frame = {
     hideToken: hideToken, mount: mount, getToken: getToken, withToken: withToken, TOKEN_KEY: TOKEN_KEY,
+    tokenFromPath: tokenFromPath,
     /* 검사용으로만 낸다 — 순수 판정 함수라 창 없이 잴 수 있다. 화면 코드에서 부르지 마라. */
     _fromOurFrame: _fromOurFrame };
 })(window);
