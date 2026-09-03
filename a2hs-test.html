@@ -1,0 +1,35 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>공유 시트 시험</title>
+<!-- ⛔ 임시 시험 페이지. 재고 나면 **지운다.** 매니페스트를 안 걸고 토큰도 안 쓴다 —
+     공유 시트에 「홈 화면에 추가」가 들어있는지만 본다. -->
+<style>
+  html,body{margin:0;height:100%;background:#33241a;color:#C9B79A;
+    font:16px/1.7 -apple-system,'Apple SD Gothic Neo',sans-serif}
+  .w{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;padding:28px 22px;text-align:center;gap:16px}
+  h1{margin:0;font-size:20px;color:#F1EADE;font-weight:700}
+  p{margin:0;font-size:14.5px;word-break:keep-all;max-width:30em}
+  button{font:inherit;font-weight:700;padding:14px 22px;border-radius:12px;
+    border:1.5px solid #D2691E;background:#D2691E;color:#fff}
+  #o{font-size:13px;color:#9b8877;min-height:2.4em}
+</style></head><body>
+<div class="w">
+  <h1>공유 시트 시험</h1>
+  <p>아래를 누르면 공유 시트가 열립니다.<br><b>「홈 화면에 추가」가 그 안에 있는지</b>만 봐 주세요.</p>
+  <button id="b">공유 시트 열기</button>
+  <div id="o"></div>
+</div>
+<script>
+  var o = document.getElementById('o');
+  o.textContent = ('share' in navigator) ? 'navigator.share 있음 — 눌러 보세요'
+                                         : 'navigator.share 가 없습니다(이 브라우저는 불가)';
+  document.getElementById('b').addEventListener('click', function () {
+    if (!('share' in navigator)) { o.textContent = '이 브라우저엔 navigator.share 가 없습니다'; return; }
+    /* ⛔ 토큰이 든 주소를 넣지 않는다 — 시트에는 카카오톡·메시지가 있다. */
+    navigator.share({ title: 'Ownify', url: 'https://class.ownify.co.kr/' })
+      .then(function () { o.textContent = '시트가 닫혔습니다(무언가 골랐거나 취소)'; })
+      .catch(function (e) { o.textContent = '열지 못했습니다: ' + (e && e.name || e); });
+  });
+</script>
+</body></html>
