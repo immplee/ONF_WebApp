@@ -8,7 +8,11 @@
 <!-- 홈 화면 추가(아이콘). ⛔ 학생 액자의 manifest 를 그대로 쓰면 이름·start_url 이 학생 것이라
      같은 아이콘 두 개가 생긴다 — teacher/ 전용으로 따로 둔다(아이콘 그림은 같은 파일을 가리킨다).
      ⚠️ iOS 사파리는 manifest 를 안 보고 apple-touch-icon 을 본다. 둘 다 필요하다. -->
-<link rel="manifest" href="manifest.json">
+<!-- ⛔ [2026-09-03 Peter] **절대경로여야 한다.** 이 화면은 끝 슬래시 없이도 열린다
+     (`class.ownify.co.kr/teacher`). 그때 상대경로 `manifest.json` 은 `/teacher/manifest.json`
+     이 아니라 **`/manifest.json`**(학생 것)으로 풀려서, 선생님이 「Ownify」 학생 앱을 설치하게
+     된다 — 실제로 그렇게 깔렸다. 선생님 매니페스트는 멀쩡히 있는데 안 읽히고 있었다. -->
+<link rel="manifest" href="/teacher/manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="선생님">

@@ -13,7 +13,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Ownify">
 <meta name="theme-color" content="#7a5c3e">
-<link rel="manifest" href="manifest.json">
+<!-- ⛔ 절대경로로 둔다 — 짧은 주소(`/thegoodplace-s1-e1-sandy`)로 들어오면 상대경로가
+     그 경로 기준으로 풀려 엉뚱한 곳을 가리킨다(선생님 화면에서 실제로 그 사고가 났다). -->
+<link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="assets/onf-ui.css">
 </head>
 <body class="onf-full">
