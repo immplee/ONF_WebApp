@@ -120,7 +120,17 @@ function mount() {
      없었고(#why 는 #lock 안이라 같이 숨는다), 「3초」와 「영영」이 같은 흰 종이였다. */
   document.getElementById('wait').hidden = false;
   frame.hidden = false;
-  frame.src = EXEC;
+  /* ⛔ [2026-09-19] **질의문자열을 액자 안으로 넘긴다.** 학생 한 명짜리 창을
+     `?mode=student&t=…` 로 여는데, 여기서 안 넘기면 안쪽은 그냥 목록을 그린다(주소만 그럴싸하다).
+     ⚠️ **우리가 아는 이름만** 넘긴다 — 주소에 실린 것을 통째로 흘려보내면 남이 만든 링크가
+       안쪽 `doGet` 에 아무 값이나 실어 보낼 수 있다. 값 모양도 여기서 한 번 본다. */
+  var q = new URLSearchParams(location.search);
+  var pass = new URLSearchParams();
+  if (q.get('mode') === 'student') pass.set('mode', 'student');
+  var st = q.get('t') || '';
+  if (/^[A-Za-z0-9_-]{1,40}$/.test(st)) pass.set('t', st);
+  var qs = pass.toString();
+  frame.src = EXEC + (qs ? '?' + qs : '');
   /* ⛔ 프레임이 **막혔는지**를 화면이 말해야 한다. 안쪽이 살아 있으면 몇백 ms 안에 노크가 온다.
      안 오면 구글이 문 앞에서 자른 것이다(회사 계정이 아니거나 로그인이 안 된 것) —
      그때 구글의 「액세스 권한 필요」 화면만 덩그러니 두면 사람이 무엇을 해야 할지 모른다.
