@@ -311,10 +311,12 @@ function offerOther() {
 
 /* ⛔ **GIS 를 기다리기 전에** 받아 둔 토큰부터 본다. 살아 있으면 그 자리에서 화면을 연다 —
    새로고침이 로그인 없이 바로 간다. GIS 는 그 뒤에 조용히 초기화해서 다음 토큰을 준비한다. */
+var reused = false;
 (function reuse() {
   var t = tokLoad();
   if (!t) return;
   pending = t;
+  reused = true;
   mount();
 })();
 
@@ -331,7 +333,12 @@ function offerOther() {
   });
   google.accounts.id.renderButton(document.getElementById('gsi'),
     { theme: 'outline', size: 'large', text: 'signin_with', locale: 'ko' });
-  google.accounts.id.prompt();
+  /* ⛔ [2026-09-23 Peter 「접속은 됐는데 우측 상단에 로그인 알림이 떠」] **이미 들어와 있으면
+     묻지 않는다.** 받아 둔 토큰으로 화면을 연 뒤에도 One Tap 을 띄우면, 다 된 화면 위에
+     「로그인하세요」가 떠 있는 셈이다 — 눌러야 하는 줄 알고 누르면 오히려 계정이 엇갈린다.
+     ⚠️ `initialize` 는 그대로 한다 — 나중에 토큰이 만료되거나 [다른 계정으로]를 누르면
+       그때 `prompt()` 를 부를 수 있어야 한다(그 길은 메시지 핸들러에 있다). */
+  if (!reused) google.accounts.id.prompt();
 })();
 </script>
 </body>
