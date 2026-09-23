@@ -52,6 +52,10 @@
   <p>회사 계정(@ownify.co.kr)으로 로그인해 주세요.</p>
   <div id="gsi"></div>
   <p class="why" id="why"></p>
+  <!-- ⛔ [2026-09-23 Peter] **막다른 골목에 문을 낸다.** One Tap 이 개인 지메일을 고르면
+       서버가 막는데, 종전엔 그 자리에서 할 수 있는 일이 아무것도 없었다("안 될 때가 있다").
+       ⚠️ 평소엔 숨어 있다 — 잘 되는 사람에게 「다른 계정」을 권할 이유가 없다. -->
+  <p class="why"><button type="button" id="other" hidden>다른 계정으로 로그인</button></p>
 </div>
 <!-- 접속 중 표시. ⛔ 새로 만들지 않는다 — 학생 액자(../index.html)가 쓰는 그 조각 그대로다
      (../assets/onf-ui.css 의 .onf-wait/.onf-spin). 이미 링크된 CSS 라 파일도 안 늘었다.
@@ -102,13 +106,66 @@ var EXEC = 'https://script.google.com/a/macros/ownify.co.kr/s/AKfycbx4taL78DPmHm
 var frame = document.getElementById('app');
 var mounted = false, pending = '';
 
+/* ═══ 받아 둔 토큰을 **아껴 쓴다** (Peter 2026-09-23 「새로고침하면 항상 다시 로그인해야 해」)
+   ⛔ 종전엔 토큰이 가는 곳이 전역 변수 하나였다. 새로고침 = 그 변수가 사라짐 = GIS 를 처음부터
+     다시 타야 함. 게다가 `mount()` 가 `onCredential` 안에서만 불려서 **액자 자체가 로그인
+     뒤에야 만들어졌다** — 첫 화면이 느린 까닭의 하나이기도 하다.
+   ⚠️ `localStorage` 가 아니라 `sessionStorage` 다. 토큰 수명이 1시간이라 탭을 닫으면 어차피
+     버려야 하고, 공용 컴퓨터에 남지 않는다.
+   ⛔ 이 검사는 **왕복을 아끼는 용도**이지 문이 아니다 — 진짜 검사(`aud`·`hd`·`exp`·서명)는
+     서버가 한다. 여기서 느슨해도 서버가 막는다. */
+var TOKKEY = 'onf_id_tok';
+var SKEW = 120;                     // 만료 2분 전이면 안 쓴다(왕복 도중에 죽지 않게)
+
+function tokExp(tok) {
+  try {
+    var p = String(tok).split('.');
+    if (p.length !== 3) return 0;
+    var b = p[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    return Number(JSON.parse(atob(b)).exp) || 0;
+  } catch (e) { return 0; }
+}
+function tokAlive(tok) {
+  var e = tokExp(tok);
+  return !!e && (e - SKEW) > Math.floor(Date.now() / 1000);
+}
+/* 회사 계정인가. ⛔ **문이 아니라 안내용**이다 — 진짜 판정은 서버가 서명까지 보고 한다.
+   ⚠️ `hd` 가 없는 개인 지메일이 One Tap 으로 올 수 있다(hd 는 힌트일 뿐 강제가 아니다). */
+function tokHd(tok) {
+  try {
+    var p = String(tok).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (p.length % 4) p += '=';
+    var j = JSON.parse(atob(p));
+    return String(j.hd || (String(j.email || '').split('@')[1] || ''));
+  } catch (e) { return ''; }
+}
+function tokMine(tok) { return tokHd(tok) === 'ownify.co.kr'; }
+function tokSave(tok) { try { sessionStorage.setItem(TOKKEY, tok); } catch (e) {} }
+function tokLoad() {
+  var t = '';
+  try { t = sessionStorage.getItem(TOKKEY) || ''; } catch (e) {}
+  if (t && tokAlive(t) && tokMine(t)) return t;
+  /* 죽은 토큰은 **치운다** — 남겨 두면 다음 새로고침마다 같은 헛수고를 한다. */
+  if (t) { try { sessionStorage.removeItem(TOKKEY); } catch (e2) {} }
+  return '';
+}
+
 function say(msg) { document.getElementById('why').textContent = msg || ''; }
 
 /* 로그인 결과 — 여기서 받는 건 **구글이 서명한 ID 토큰** 하나뿐이다. */
 function onCredential(res) {
   var tok = res && res.credential;
   if (!tok) return say('로그인은 됐는데 토큰을 못 받았어요. 새로고침해 주세요.');
+  /* ⛔ 회사 계정이 아니면 **여기서 말한다.** 종전엔 그냥 액자를 열었고, 안쪽이 「권한 없음」을
+     그리면 사람은 무엇을 해야 할지 몰랐다 — One Tap 이 개인 지메일을 고르면 늘 그랬다. */
+  if (!tokMine(tok)) {
+    say('회사 계정(@ownify.co.kr)이 아니에요. 아래에서 계정을 바꿔 주세요.');
+    offerOther();
+    return;
+  }
   pending = tok;
+  tokSave(tok);                      // 새로고침해도 다시 로그인하지 않게
   if (!mounted) mount(); else answer();
 }
 
@@ -226,6 +283,30 @@ if (window.top !== window.self) {
     '<div class="em">🔒</div><h2>여기서는 열 수 없어요</h2>'
     + '<p>주소창에 직접 열어 주세요.</p>';
 } else
+
+/** 「다른 계정으로 로그인」을 띄운다. 누르면 자동 선택을 끄고 받아 둔 것도 버린 뒤 다시 묻는다. */
+function offerOther() {
+  var b = document.getElementById('other');
+  if (!b) return;
+  b.hidden = false;
+  b.onclick = function () {
+    try { sessionStorage.removeItem(TOKKEY); } catch (e) {}
+    try { google.accounts.id.disableAutoSelect(); } catch (e2) {}
+    say('계정을 고르는 창을 띄웠어요.');
+    try { google.accounts.id.prompt(); } catch (e3) {
+      say('계정 창이 안 떠요 — 크롬 오른쪽 위 프로필에서 회사 계정으로 바꿔 주세요.');
+    }
+  };
+}
+
+/* ⛔ **GIS 를 기다리기 전에** 받아 둔 토큰부터 본다. 살아 있으면 그 자리에서 화면을 연다 —
+   새로고침이 로그인 없이 바로 간다. GIS 는 그 뒤에 조용히 초기화해서 다음 토큰을 준비한다. */
+(function reuse() {
+  var t = tokLoad();
+  if (!t) return;
+  pending = t;
+  mount();
+})();
 
 /* GIS 가 늦게 도착할 수 있다 — 있을 때 시작한다. */
 (function start() {
