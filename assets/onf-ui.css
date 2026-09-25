@@ -30,6 +30,13 @@ body {
   animation: onf-spin .8s linear infinite;
 }
 @keyframes onf-spin { to { transform: rotate(360deg); } }
+/* 「불러오는 중」 점 (Peter 2026-09-25) — 「불러오는 중 → . → .. → ...」 되풀이.
+   ⛔ 점 셋의 자리를 처음부터 차지하고 가림막만 걷는다 — 글자를 늘리면 가운데 정렬된 글이 왼쪽으로 밀린다.
+   ⚠️ GAS 화면(ONF_Ui_Css)에 **같은 규칙**이 있다 — 한쪽만 고치지 마라. */
+.onf-ld::after { content: '...'; display: inline-block; clip-path: inset(0 100% 0 0);
+  animation: onfLd 1.6s steps(4, jump-none) infinite; }
+@keyframes onfLd { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: reduce) { .onf-ld::after { animation: none; clip-path: none; } }
 
 /* 일반 화면(홈 등) */
 .onf-page { padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px)); background: var(--onf-bg); min-height: 100%; }

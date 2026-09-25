@@ -60,7 +60,7 @@
 <!-- 접속 중 표시. ⛔ 새로 만들지 않는다 — 학생 액자(../index.html)가 쓰는 그 조각 그대로다
      (../assets/onf-ui.css 의 .onf-wait/.onf-spin). 이미 링크된 CSS 라 파일도 안 늘었다.
      ⛔ `hidden` 으로 시작한다 — position:fixed;inset:0 이라 안 그러면 로그인 화면(🔒)을 덮는다. -->
-<div class="onf-wait" id="wait" hidden><div class="onf-spin"></div><span id="waitmsg">불러오는 중이에요</span></div>
+<div class="onf-wait" id="wait" hidden><div class="onf-spin"></div><span id="waitmsg">불러오는 중<span class="onf-ld"></span></span></div>
 <iframe id="app" hidden allow="clipboard-write"></iframe>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
