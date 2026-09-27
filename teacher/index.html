@@ -202,6 +202,8 @@ function preload() {
   if (q.get('mode') === 'student') pass.set('mode', 'student');
   var st = q.get('t') || '';
   if (/^[A-Za-z0-9_-]{1,40}$/.test(st)) pass.set('t', st);
+  //   느린 구간 표(선생님 홈 `perf=1` — 2026-09-28)도 넘긴다. 값은 「1」 하나만 안다.
+  if (q.get('perf') === '1') pass.set('perf', '1');
   var qs = pass.toString();
   frame.src = EXEC + (qs ? '?' + qs : '');
 }
