@@ -27,6 +27,12 @@
      실측(2026-09-02): 프레임이 막히거나(XFO/CSP) 응답 전이거나 연결이 실패하면 액자는 **투명**하다
      — 그 셋이 바로 사람이 본 「하얀 화면」이고, 그때 뒤의 회전자가 그대로 보인다. */
   #app { display:block; width:100%; height:100%; border:0; position:relative; z-index:1; }
+  /* ⛔ 바로 위 `display:block` 은 #wait 와 같은 함정이다 — 아이디 규칙이 브라우저 기본 [hidden]{display:none}
+     을 이겨서 `hidden` 인 액자가 **잠금 화면(🔒) 아래에 그대로 깔린다.** 비어 있을 땐 투명해서 몰랐는데,
+     로그인 전에 미리 불러 두면(아래 preload) GAS 화면이 🔒 밑에 비쳐 나온다(2026-09-27 재현).
+     ⚠️ display:none 이 아니라 visibility 로 숨긴다 — 자리·크기는 지금과 똑같이 두어 안쪽이 **보일 때와 같은 폭**으로
+       그려지게 하고, 숨은 동안엔 그려지지도 눌리지도 않는다. */
+  #app[hidden] { visibility:hidden; }
   /* ⛔ .onf-wait 의 display:flex 는 브라우저 기본 [hidden]{display:none} 을 이긴다 — 다시 눌러 준다. */
   #wait[hidden] { display:none; }
   /* 8초 뒤 안내는 여러 줄이라 가운데정렬을 눌러 준다(.onf-wait 는 한 줄 기준이라 안 걸어 뒀다).
@@ -169,17 +175,24 @@ function onCredential(res) {
   }
   pending = tok;
   tokSave(tok);                      // 새로고침해도 다시 로그인하지 않게
-  if (!mounted) mount(); else answer();
+  /* ⛔ 로그인 **도중에 구글 세션이 새로 생겼으면**(버튼 팝업에서 계정 추가 — select_by `*_add_session`)
+     미리 불러 둔 액자는 세션 없이 열린 것이라 구글이 문 앞에서 잘랐다(빈 액자). 그 액자는 한 번 다시 연다.
+     ⚠️ 노크가 이미 왔으면 살아 있는 화면이다 — 다시 열지 않는다. */
+  if (!mounted && !appWin && /add_session/.test(String(res.select_by || ''))) { loaded = false; preload(); }
+  if (!mounted) mount();
+  answer();                          // 미리 불러 둔 안쪽이 먼저 노크해 기다리고 있을 수 있다
 }
 
-function mount() {
-  if (!EXEC) return say('아직 주소가 설정되지 않았어요. (EXEC)');
-  mounted = true;
-  document.getElementById('lock').hidden = true;
-  /* ⛔ 잠금화면을 치우는 **그 순간**부터 표시가 있어야 한다. 종전엔 여기부터 화면에 아무것도
-     없었고(#why 는 #lock 안이라 같이 숨는다), 「3초」와 「영영」이 같은 흰 종이였다. */
-  document.getElementById('wait').hidden = false;
-  frame.hidden = false;
+/* ═══ 액자를 **로그인과 나란히** 불러 둔다 (2026-09-27)
+   ⛔ 종전엔 토큰이 없으면 GIS 로드 → One Tap → 그제서야 액자 주소를 넣었다 — doGet(~3초)·샌드박스 부팅(~2.7초)이
+     로그인 뒤에 줄지어 섰다. 토큰 수명이 1시간이라 하루 두 번째 방문부터는 거의 늘 이 길이다.
+   ⚠️ **숨긴 채로** 불러 둔다(#app[hidden] 위 CSS). 보이는 것·토큰이 가는 때는 그대로다 —
+     로그인이 끝나야 🔒 를 치우고(mount) 그때 토큰을 넘긴다(answer). 안쪽은 토큰이 오기 전엔 서버를 안 부른다.
+   ⚠️ 안쪽 첫 노크는 기다리는 호출이 없어 20초 마감 시계에 안 걸린다 — 오래 로그인 안 해도 안 죽는다. */
+var loaded = false;
+function preload() {
+  if (!EXEC || loaded) return;
+  loaded = true;
   /* ⛔ [2026-09-19] **질의문자열을 액자 안으로 넘긴다.** 학생 한 명짜리 창을
      `?mode=student&t=…` 로 여는데, 여기서 안 넘기면 안쪽은 그냥 목록을 그린다(주소만 그럴싸하다).
      ⚠️ **우리가 아는 이름만** 넘긴다 — 주소에 실린 것을 통째로 흘려보내면 남이 만든 링크가
@@ -191,6 +204,18 @@ function mount() {
   if (/^[A-Za-z0-9_-]{1,40}$/.test(st)) pass.set('t', st);
   var qs = pass.toString();
   frame.src = EXEC + (qs ? '?' + qs : '');
+}
+
+function mount() {
+  if (!EXEC) return say('아직 주소가 설정되지 않았어요. (EXEC)');
+  mounted = true;
+  preload();
+  document.getElementById('lock').hidden = true;
+  /* ⛔ 잠금화면을 치우는 **그 순간**부터 표시가 있어야 한다. 종전엔 여기부터 화면에 아무것도
+     없었고(#why 는 #lock 안이라 같이 숨는다), 「3초」와 「영영」이 같은 흰 종이였다.
+     ⚠️ 미리 불러 둔 안쪽이 이미 노크했으면(=그려졌다) 띄우지 않는다 — 노크 때 걷는 손이 벌써 지나갔다. */
+  if (!appWin) document.getElementById('wait').hidden = false;
+  frame.hidden = false;
   /* ⛔ 프레임이 **막혔는지**를 화면이 말해야 한다. 안쪽이 살아 있으면 몇백 ms 안에 노크가 온다.
      안 오면 구글이 문 앞에서 자른 것이다(회사 계정이 아니거나 로그인이 안 된 것) —
      그때 구글의 「액세스 권한 필요」 화면만 덩그러니 두면 사람이 무엇을 해야 할지 모른다.
@@ -308,6 +333,9 @@ function offerOther() {
     }
   };
 }
+
+/* 로그인 화면이 떠 있는 동안 액자를 숨긴 채 불러 둔다(위 preload). ⛔ 최상위일 때만 — 감싸인 페이지에선 🔒 만 보인다. */
+if (window.top === window.self) preload();
 
 /* ⛔ **GIS 를 기다리기 전에** 받아 둔 토큰부터 본다. 살아 있으면 그 자리에서 화면을 연다 —
    새로고침이 로그인 없이 바로 간다. GIS 는 그 뒤에 조용히 초기화해서 다음 토큰을 준비한다. */
