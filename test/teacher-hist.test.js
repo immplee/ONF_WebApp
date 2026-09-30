@@ -37,7 +37,7 @@ function run(opt) {
   opt = opt || {};
   const H = { st: [{ state: opt.startState || null }], i: 0, backs: 0, goes: [], replaced: 0, to: [],
     get state() { return this.st[this.i].state; },
-    pushState(s) { if (opt.pushThrows) throw new Error('SecurityError'); this.st = this.st.slice(0, this.i + 1); this.st.push({ state: JSON.parse(JSON.stringify(s)) }); this.i++; },
+    pushState(s) { if (opt.pushThrows) throw new Error('SecurityError'); this.raw = s; this.st = this.st.slice(0, this.i + 1); this.st.push({ state: JSON.parse(JSON.stringify(s)) }); this.i++; },
     replaceState(s) { this.replaced++; this.st[this.i].state = s; },
     back() { this.backs++; this.to.push(Math.max(0, this.i - 1)); },
     go(n) { this.goes.push(n); this.to.push(Math.max(0, Math.min(this.st.length - 1, this.i + n))); } };
@@ -159,6 +159,31 @@ t('⛔ 값 검증: op 는 push|back|hello · id 는 [A-Za-z0-9]{1,40} · state �
   const T = run({ pushThrows: true });
   assert.doesNotThrow(() => T.push('abc1', { a: 1 }));
   assert.strictEqual(T.depth(), 0, '⛔ 못 넣은 칸을 깊이에 셌다');
+});
+
+t('⛔ 넣는 state 는 **JSON 으로 납작하게 만든 사본**이다 — Map·Set 같은 JSON 으로 안 나오는 타입이 2KB 상한을 우회해 기록 칸에 실리지 않는다 (검수 2026-10-01)', () => {
+  const R = run();
+  const big = new Map(); for (let i = 0; i < 5; i++) big.set('k' + i, 'v'.repeat(50));
+  R.push('mp1', { m: big, d: new Date(0), ok: 1 });
+  assert.strictEqual(R.H.st.length, 2, '전제: 정상 모양(평범한 객체)이라 받는다');
+  assert.ok(!(R.H.raw.s.m instanceof Map) && !(R.H.raw.s.d instanceof Date), '⛔ pushState 에 JSON 이 아닌 타입 그대로 들어갔다(구조화 복제로 덩어리째 기록에 실린다)');
+  assert.strictEqual(JSON.stringify(R.H.raw.s), '{"m":{},"d":"1970-01-01T00:00:00.000Z","ok":1}', '⛔ 납작하게 만든 사본이 아니다: ' + JSON.stringify(R.H.raw.s));
+  //   JSON 으로 못 바꾸는 값(순환)은 받지 않는다
+  const cyc = { a: 1 }; cyc.self = cyc;
+  R.push('cy1', cyc);
+  assert.strictEqual(R.H.st.length, 2, '⛔ 순환 객체가 칸을 만들었다');
+});
+
+t('⛔ 칸 깊이는 **칸의 n 에서 다시 읽는다** — 칸이 둘일 때 뒤로 한 번 · 앞으로 가기로 깊은 칸에 다시 서도 맞다 (검수 2026-10-01)', () => {
+  const R = run();
+  R.push('pk1', { onfPeek: 'p' }); R.push('hv1', { onfHwv: 'h' });
+  assert.strictEqual(R.depth(), 2);
+  R.browserBack();
+  assert.strictEqual(R.depth(), 1, '⛔ 뒤로 한 번 뒤 깊이가 1 이 아니다');
+  R.H.i++; R.pop();                              // 앞으로 가기 — 깊은 칸(n=2)에 다시 선다
+  assert.strictEqual(R.depth(), 2, '⛔ 앞으로 가기로 깊은 칸에 섰는데 깊이를 1 로 셌다 — hello 의 go(-n) 이 한 칸 모자라게 걷는다');
+  R.hello(); R.flush();
+  assert.strictEqual(R.H.i, 0, '⛔ hello 가 깊은 칸 둘을 다 걷지 못했다');
 });
 
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패');

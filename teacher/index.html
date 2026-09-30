@@ -311,6 +311,8 @@ window.addEventListener('message', function (ev) {
   var d = ev && ev.data, s, n;
   if (!d || d.onf !== 'hist') return;
   if (!appWin || ev.source !== appWin || ev.origin !== appOrigin) return;     // 우리가 정한 그 창·출처만
+  /* ⚠️ hello 의 go(-n) 은 「기록 맨 위 n 칸이 전부 우리 칸」이라는 **전제**에 선다 — 안쪽은 칸을 넣은 뒤 **문서 이동을 하지 않고**(같은 주소의 새로 읽기만) 껍데기는 우리 칸 밖에는 아무것도 안 쌓는다.
+     안쪽이 주소를 바꿔 문서 이동을 얹으면 go(-n) 이 엉뚱한 칸에 닿는다(검수 2026-10-01 · 실제 GAS 「다시 불러오기」는 같은 주소라 해당 없다고 보지만 실기기는 못 쟀다). */
   if (d.op === 'hello') {                 // 안쪽이 새로 떴다 — 옛 안쪽이 남긴 죽은 칸을 치운다(같은 문서 안 칸이라 조용히 빠진다)
     if (histDepth > 0) { n = histDepth; histDepth = 0; try { history.go(-n); } catch (e) {} }
     return;
@@ -318,7 +320,11 @@ window.addEventListener('message', function (ev) {
   if ((d.op !== 'push' && d.op !== 'back') || typeof d.id !== 'string' || !HIST_ID.test(d.id)) return;
   if (d.op === 'push') {
     if (!histSmall(d.state)) return;
-    try { history.pushState({ onfHist: d.id, s: d.state, n: histDepth + 1 }, ''); histDepth++; } catch (e) {}   // 주소 칸은 비운다
+    /* ⛔ 받은 state 를 **JSON 으로 납작하게 만든 사본**으로만 넣는다 — 「JSON 2KB 이하」 상한이 Map·Set·Date 같은 JSON 으로 안 나오는 타입으로 우회되면
+       pushState 의 구조화 복제가 덩어리째 기록 칸에 저장되고 popstate 마다 안쪽으로 되돌려 보낸다(검수 2026-10-01). 평범한 JSON 값만 남긴다. */
+    var flat = null;
+    try { flat = JSON.parse(JSON.stringify(d.state)); } catch (e) { return; }
+    try { history.pushState({ onfHist: d.id, s: flat, n: histDepth + 1 }, ''); histDepth++; } catch (e) {}   // 주소 칸은 비운다
     return;
   }
   s = history.state;                      // back — 맨 위가 그 id 일 때만(남의 칸 보호)
