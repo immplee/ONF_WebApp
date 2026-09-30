@@ -243,7 +243,8 @@ var frameWatch = null;
 var appWin = null, appOrigin = '';
 function answer() {
   if (!pending || !appWin) return;
-  try { appWin.postMessage({ onf: 'auth', token: pending }, appOrigin); } catch (e) {}
+  /* `hist:1` = 「기록 칸은 내가 만들어 줄게」 — 아래 onf-hist 블록이 받는 쪽이다. 껍데기가 최상위일 때만 1(남의 액자 안이면 블록이 안 돈다). */
+  try { appWin.postMessage({ onf: 'auth', token: pending, hist: (window.top === window.self) ? 1 : 0 }, appOrigin); } catch (e) {}
 }
 
 window.addEventListener('message', function (ev) {
@@ -287,6 +288,51 @@ window.addEventListener('message', function (ev) {
   }
   answer();
 });
+
+/* ═══ 기록 칸 다리 — 안쪽의 「뒤로 = 창 닫기」 기록 칸을 **여기(최상위 문서)** 에 만든다 (Peter 2026-10-01) ═══
+   ⛔ 왜: 아이폰 스와이프 뒤로는 이전 기록의 스냅샷을 덮개로 깔고, **메인 프레임**의 같은 문서 이동 신호가 오면 덮개를 걷는다.
+     기록 칸을 가장 안쪽 iframe(GAS 샌드박스)에서 만들면 그 pop 이 서브프레임 이동이라 신호가 안 와 덮개(빈 화면)가 **3초 감시 타이머**까지 남았다
+     (WebKit ViewGestureController 소스 확인 · 「하얀 화면 → 좀 뒤에 목록」 · 아이폰 실기기로 덮개 자체는 못 쟀다). 칸이 여기 있으면 SPA 처럼 제때 걷힌다.
+   ⛔ 받는 말은 **우리가 정한 그 안쪽 창**(`ev.source === appWin && ev.origin === appOrigin`)에서 온 것뿐이다 — 로그인 노크와 같은 자물쇠. 나머지는 버린다.
+   ⛔ 값 검증: op 는 push|back|hello · id 는 [A-Za-z0-9]{1,40} · state 는 JSON 2KB 이하의 평범한 객체. 아니면 버린다.
+   ⛔ **로그인·토큰 배선(auth-please·mount·answer 의 흐름)은 건드리지 않았다**(ff8d00a 로 되돌린 적 있다) — 여기는 별도 리스너 둘 + 시작 한 줄이다.
+   ⚠️ 알고 받아들인 한계: 껍데기 문서 자체가 다시 읽히면(새로고침·아이폰이 탭을 버렸다 복원) 죽은 칸 하나가 남아 첫 뒤로 1회가 같은 주소로 돌아가 다시 읽는다
+     (종전과 같다 — 표식만 지울 수 있고 칸은 못 없앤다). 안쪽만 다시 읽힐 땐 안쪽의 `hello` 로 죽은 칸을 치운다.
+   ⚠️ 이 블록은 껍데기가 최상위일 때만 돈다(남의 액자 안이면 아래 「여기서는 열 수 없어요」 갈래). 검사가 표지 구간만 떼어 vm 에서 돌린다. */
+if (window.top === window.self) {
+/* onf-hist:begin */
+var histDepth = 0;                        // 지금 기록에 쌓인 우리 칸 수(칸 state.n 에서 다시 읽는다)
+var HIST_ID = /^[A-Za-z0-9]{1,40}$/;
+function histSmall(st) {                  // JSON 으로 2KB 이하인 평범한 객체인가
+  if (!st || Object.prototype.toString.call(st) !== '[object Object]') return false;
+  try { return unescape(encodeURIComponent(JSON.stringify(st))).length <= 2048; } catch (e) { return false; }
+}
+window.addEventListener('message', function (ev) {
+  var d = ev && ev.data, s, n;
+  if (!d || d.onf !== 'hist') return;
+  if (!appWin || ev.source !== appWin || ev.origin !== appOrigin) return;     // 우리가 정한 그 창·출처만
+  if (d.op === 'hello') {                 // 안쪽이 새로 떴다 — 옛 안쪽이 남긴 죽은 칸을 치운다(같은 문서 안 칸이라 조용히 빠진다)
+    if (histDepth > 0) { n = histDepth; histDepth = 0; try { history.go(-n); } catch (e) {} }
+    return;
+  }
+  if ((d.op !== 'push' && d.op !== 'back') || typeof d.id !== 'string' || !HIST_ID.test(d.id)) return;
+  if (d.op === 'push') {
+    if (!histSmall(d.state)) return;
+    try { history.pushState({ onfHist: d.id, s: d.state, n: histDepth + 1 }, ''); histDepth++; } catch (e) {}   // 주소 칸은 비운다
+    return;
+  }
+  s = history.state;                      // back — 맨 위가 그 id 일 때만(남의 칸 보호)
+  if (s && s.onfHist === d.id) history.back();
+});
+window.addEventListener('popstate', function () {
+  var s = history.state, h = (s && s.onfHist) ? s : null;
+  histDepth = h ? Math.max(0, Number(h.n) || 0) : 0;
+  if (!appWin) return;
+  try { appWin.postMessage({ onf: 'hist-pop', id: h ? h.onfHist : '', s: h ? (h.s || null) : null }, appOrigin); } catch (e) {}   // '*' 금지
+});
+try { if (history.state && history.state.onfHist) history.replaceState(null, ''); } catch (e) {}   // 껍데기가 다시 읽힌 채 남은 표식만 지운다
+/* onf-hist:end */
+}
 
 /* ⛔ 이 페이지는 **최상위에서만** 돈다. 남이 우리를 iframe 으로 감싸면 로그인·토큰이
    그 페이지 손에 들어간다. 로그인 화면은 원래 최상위에서만 도는 것이다. */
