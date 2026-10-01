@@ -10,10 +10,18 @@ on:
     branches: [main]
     paths:
       - 'tools/**'
+      - 'teacher/**'
+      - 'assets/**'
+      - 'index.html'
+      - 'test/**'
       - '.github/workflows/check.yml'
   pull_request:
     paths:
       - 'tools/**'
+      - 'teacher/**'
+      - 'assets/**'
+      - 'index.html'
+      - 'test/**'
   workflow_dispatch:
 permissions:
   contents: read
@@ -31,3 +39,21 @@ jobs:
         run: |
           test -f tools/test_roster_sync.py || { echo "::error::검사 파일이 없다 — 누가 지웠나"; exit 1; }
           python3 tools/test_roster_sync.py
+  # ⛔ [2026-10-01 Peter 「CI 단계 붙여줘」] 껍데기(teacher/index.html · assets/onf-frame.js)는 **로그인·토큰·키보드·기록 칸 배선**이 사는 파일인데,
+  #   종전엔 이 저장소 검사(`test/*.test.js`)가 어떤 자동 관문에서도 안 돌았다(맥에서 손으로만) — 이 파일을 한 번 잘못 고쳐 라이브 로그인이 막힌 적이 있다(ff8d00a).
+  #   이 검사는 구글·Vercel 을 안 부른다(vm 에 껍데기 코드만 올려 돈다). 로그인이 실제로 되는지는 못 본다 — 라이브에서 같이 재라(login-change-needs-live-test).
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # ⛔ 파일이 없으면 **실패**시킨다 — 「건너뜀」이 쌓이면 검사한 적 없는데 검사했다고 믿는다.
+      - name: 껍데기 검사 (기록 칸 다리 · 액자 출처 자물쇠 · 키보드·제목 무변)
+        run: |
+          ls test/*.test.js > /dev/null || { echo "::error::껍데기 검사 파일이 없다 — 누가 지웠나"; exit 1; }
+          for f in test/*.test.js; do
+            echo "== $f"
+            node "$f" || exit 1
+          done
