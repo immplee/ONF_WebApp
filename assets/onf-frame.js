@@ -1,10 +1,11 @@
 /* ONF 액자(shell) 공통 — 2026-08-06
  *
- * 이 파일이 하는 일 넷. 넷 다 **최상위 창만 할 수 있는 일**이라 여기 있다.
+ * 이 파일이 하는 일 다섯. 다섯 다 **최상위 창만 할 수 있는 일**이라 여기 있다.
  *   1) 주소의 ?t=<토큰> 을 이 도메인에 저장한다 (다음부턴 주소 없이도 열린다)
  *   2) 구글 앱스스크립트 웹앱을 iframe 으로 띄운다 → "이 애플리케이션은 …" 배너가 안 뜬다
  *   3) 키보드 높이를 재서 iframe 안 앱에 넘긴다 (앱은 iframe 안이라 자기가 못 잰다 — MDN)
  *   4) iOS 가 페이지를 통째로 밀 때(pan) 앱을 화면에 도로 붙인다
+ *   5) 안쪽 「뒤로 = 창 닫기」 기록 칸을 이 최상위 문서에 만들어 준다 — 폰 뒤로 스와이프의 하얀 덮개 (mount 안 「기록 칸 다리」)
  *
  * ⛔ 여기 손대기 전에 반드시 읽을 것:
  *    ONF_Archive/웹-앱/ONF_공유웹앱-모바일-입력창.md 의 "재발 방지 체크리스트 B1~B7".
@@ -207,6 +208,7 @@
         if (!_fromOurFrame(ev.source, frameEl)) return;
         if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return;
       } catch (e) { return; }
+      if (ev.data.onf === 'hist') { histMsg(ev); return; }   // 기록 칸 다리 — 위 자물쇠를 통과한 말만(아래 블록)
       if (ev && ev.data && ev.data.onf === 'frameHello') {
         appWin = ev.source; lastH = -1; lastTop = -1; sync();
       }
@@ -217,6 +219,64 @@
         if (newTitle) document.title = newTitle;
       }
     });
+    /* ═══ 기록 칸 다리 — 안쪽(GAS iframe)의 「뒤로 = 창 닫기」 기록 칸을 **여기(최상위 문서)** 에 만든다 (Peter 2026-10-01 「학생홈도 고쳐줘」) ═══
+       ⛔ 왜: 아이폰 스와이프 뒤로는 이전 기록의 스냅샷을 덮개로 깔고, **메인 프레임**의 같은 문서 이동 신호가 오면 덮개를 걷는다.
+         기록 칸을 가장 안쪽 iframe(GAS 샌드박스)에서 만들면 그 pop 이 서브프레임 이동이라 신호가 안 와 덮개(빈 화면)가 **3초 감시 타이머**까지 남았다
+         (WebKit ViewGestureController 소스 확인 · 「하얀 화면 → 좀 뒤에 목록」 · **아이폰 실기기로 덮개 자체는 못 쟀다** — 프로토콜만 크롬·맥 Safari 로 봤다).
+         선생님 껍데기(teacher/index.html 의 onf-hist 블록 `124496e`)와 **같은 처방·같은 모양**이다 — 거기 주석에 적힌 사고(Map 우회·go(-n) 전제·깊이 재읽기)를 통째로 가져왔다.
+       ⛔ 선생님 껍데기와 **다른 점 하나**: 학생 화면엔 로그인 노크(`auth-please`)가 없다. 그래서 켜는 악수가 따로다 —
+         안쪽이 먼저 `{onf:'hist', op:'hi'}` 로 자기를 알리고(부모가 먼저 쏘면 구글 래퍼가 버린다 — 위 주석), 여기서 `{onf:'hist-on'}` 으로 답한다.
+         안쪽 어댑터는 그 답을 받아야 다리를 켠다(ONF_Shell_Js `_onfHistMsg`). 이 껍데기를 모르는 옛 안쪽은 `hi` 를 안 보내고, `hi` 를 보내도 옛 껍데기는 답이 없다 → 어느 쪽이든 **네이티브(종전)** 다.
+       ⛔ 이 블록은 `appWin`·`frameHello` 를 **건드리지 않는다**(키보드 보정 배선 — 별도 변수 `histWin`/`histOrigin`). 받는 말은 위 출처 자물쇠(`_fromOurFrame` + googleusercontent)를 **통과한 뒤**에만 온다.
+       ⛔ `hi` 는 **올 때마다** 창을 갈아 끼운다(「한 번 정한 창은 안 바꾼다」 빗장을 일부러 안 둔 위 주석과 같은 이유 — 안쪽이 다시 만들어지면 새 노크를 버려 다리가 죽은 창을 가리킨다).
+         그 밖의 말(push·back·hello)은 **그 `hi` 로 정한 창·출처**에서 온 것만 받는다 → 옛 안쪽의 늦은 push 가 새 안쪽 뒤에 도착해도 버려진다.
+       ⛔ 보낼 때 targetOrigin 은 `hi` 의 `ev.origin`(브라우저가 채운 값)뿐 — `'*'` 금지(기존 kbH 는 `'*'` 지만 새 말은 아니다).
+       ⛔ 값 검증: op 는 hi|push|back|hello · id 는 [A-Za-z0-9]{1,40} · state 는 JSON 2KB 이하의 평범한 객체. 아니면 버린다.
+       ⚠️ hello 의 go(-n) 은 「기록 맨 위 n 칸이 전부 우리 칸」이라는 **전제**에 선다 — 안쪽은 칸을 넣은 뒤 문서 이동을 하지 않고(같은 주소의 새로 읽기만) 우리는 우리 칸 밖에는 아무것도 안 쌓는다.
+         `hideToken()` 의 replaceState 는 칸을 만들지 않으니 이 전제를 깨지 않는다.
+       ⚠️ 알고 받아들인 한계: 껍데기 문서 자체가 다시 읽히면(새로고침·아이폰이 탭을 버렸다 복원) 죽은 칸 하나가 남아 첫 뒤로 1회가 같은 주소로 돌아가 다시 읽는다(종전과 같다 —
+         아래 시작 줄은 표식만 지울 수 있고 칸은 못 없앤다). 안쪽만 다시 읽힐 땐 새 안쪽의 `hi`→`hist-on`→`hello` 로 죽은 칸을 치운다. */
+    var histWin = null, histOrigin = '', histDepth = 0;   // 깊이 = 지금 기록에 쌓인 우리 칸 수(칸 state.n 에서 다시 읽는다)
+    var HIST_ID = /^[A-Za-z0-9]{1,40}$/;
+    function histSmall(st) {                              // JSON 으로 2KB 이하인 평범한 객체인가
+      if (!st || Object.prototype.toString.call(st) !== '[object Object]') return false;
+      try { return unescape(encodeURIComponent(JSON.stringify(st))).length <= 2048; } catch (e) { return false; }
+    }
+    function histMsg(ev) {
+      var d = ev.data, s, n, flat;
+      if (d.op === 'hi') {                                // 안쪽이 떴다 — 창을 (갈아) 정하고 다리를 켜라고 답한다
+        histWin = ev.source; histOrigin = ev.origin;
+        try { histWin.postMessage({ onf: 'hist-on' }, histOrigin); } catch (e) {}
+        return;
+      }
+      if (!histWin || ev.source !== histWin || ev.origin !== histOrigin) return;   // 우리가 정한 그 창·출처만
+      if (d.op === 'hello') {                             // 안쪽이 새로 떴다 — 옛 안쪽이 남긴 죽은 칸을 치운다(같은 문서 안 칸이라 조용히 빠진다)
+        if (histDepth > 0) { n = histDepth; histDepth = 0; try { history.go(-n); } catch (e) {} }
+        return;
+      }
+      if ((d.op !== 'push' && d.op !== 'back') || typeof d.id !== 'string' || !HIST_ID.test(d.id)) return;
+      if (d.op === 'push') {
+        if (!histSmall(d.state)) return;
+        /* ⛔ 받은 state 를 **JSON 으로 납작하게 만든 사본**으로만 넣는다 — 「JSON 2KB 이하」 상한이 Map·Set·Date 같은 JSON 으로 안 나오는 타입으로 우회되면
+           pushState 의 구조화 복제가 덩어리째 기록 칸에 저장되고 popstate 마다 안쪽으로 되돌려 보낸다(선생님 껍데기 검수 2026-10-01). 평범한 JSON 값만 남긴다. */
+        flat = null;
+        try { flat = JSON.parse(JSON.stringify(d.state)); } catch (e) { return; }
+        try { history.pushState({ onfHist: d.id, s: flat, n: histDepth + 1 }, ''); histDepth++; } catch (e) {}   // 주소 칸은 비운다
+        return;
+      }
+      s = history.state;                                  // back — 맨 위가 그 id 일 때만(남의 칸 보호)
+      if (s && s.onfHist === d.id) history.back();
+    }
+    global.addEventListener('popstate', function () {
+      var s = history.state, h = (s && s.onfHist) ? s : null;
+      histDepth = h ? Math.max(0, Number(h.n) || 0) : 0;
+      if (!histWin) return;                               // `hi` 전엔 알릴 안쪽이 없다
+      try { histWin.postMessage({ onf: 'hist-pop', id: h ? h.onfHist : '', s: h ? (h.s || null) : null }, histOrigin); } catch (e) {}   // '*' 금지
+    });
+    /* 껍데기가 다시 읽힌 채 남은 표식만 지운다. ⚠️ `hideToken()`(index.html 이 mount 보다 먼저 부른다)의 `replaceState(null, …)` 가 **주소에 ?t= 가 있던 때**는 이미 state 를 null 로 만들었다 —
+       그땐 아래가 할 일이 없고(표식이 없다), 표식이 남은 것은 ?t= 가 없는 다시 읽기(새로고침)뿐이다. 둘은 겹치지 않는다. url 인자를 안 주므로 hideToken 이 지운 주소를 되돌리지도 않는다. */
+    try { if (history.state && history.state.onfHist) history.replaceState(null, ''); } catch (e) {}
+
     if (global.visualViewport) {
       global.visualViewport.addEventListener('resize', sync);
       global.visualViewport.addEventListener('scroll', sync);
