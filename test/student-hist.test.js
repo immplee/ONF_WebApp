@@ -25,7 +25,7 @@ const ORIGIN2 = 'https://n-xyz-script.googleusercontent.com';
 function boot(opt) {
   opt = opt || {};
   const H = { st: [{ state: opt.startState || null }], i: 0, backs: 0, goes: [], replaced: [], to: [],
-    get state() { return this.st[this.i].state; },
+    get state() { if (opt.stateThrows) throw new Error('SecurityError'); return this.st[this.i].state; },
     pushState(s) { if (opt.pushThrows) throw new Error('SecurityError'); this.raw = s; this.pushArgs = [].slice.call(arguments);
       this.st = this.st.slice(0, this.i + 1); this.st.push({ state: JSON.parse(JSON.stringify(s)) }); this.i++; },
     replaceState(s, tt, u) { this.replaced.push({ s, u, n: arguments.length }); this.st[this.i].state = s; },
@@ -75,6 +75,8 @@ t('⛔ 출처 자물쇠: 내 iframe 사슬 밖의 창 · 구글이 아닌 출처
   R.hi({ source: stranger });
   R.hi({ origin: 'https://evil.example' });
   R.hi({ origin: 'https://googleusercontent.com.evil.example' });
+  R.hi({ origin: 'http://n-abc-script.googleusercontent.com' });           // 프로토콜 — 호스트 이름만 보는 기존 자물쇠는 통과시키지만 hi 는 https 만
+  R.hi({ origin: 'https://n-abc-script.googleusercontent.com:8443' });     // 포트
   R.hi({ source: R.top });
   R.hi({ source: null });
   assert.deepStrictEqual(R.inner.sent.concat(stranger.sent, R.top.sent), [], '⛔ 자물쇠 밖의 hi 에 답했다');
@@ -330,6 +332,23 @@ t('⛔ 선생님 껍데기(teacher/index.html onf-hist 블록)에 op:hi 를 보�
   assert.strictEqual(vm.runInContext('histDepth', c), 1, '⛔ hi 가 깊이를 흔들었다'); assert.deepStrictEqual(H.goes, []);
   msg({ onf: 'hist', op: 'hello' });
   assert.deepStrictEqual(H.goes, [-1]);
+});
+
+t('⛔ hi·기록 말은 키보드 보정의 중복 거름(lastH·lastTop)을 건드리지 않는다 — frameHello 뒤 같은 값이면 kbH 가 두 번 안 간다 (검수 2026-10-01)', () => {
+  const R = boot();
+  R.msg({ onf: 'frameHello' });
+  const kb = () => R.inner.sent.filter((x) => x.m.onf === 'kbH').length;
+  assert.strictEqual(kb(), 1, '전제: frameHello 뒤 kbH 한 번');
+  R.hi(); R.push('abc1', { a: 1 }); R.hello(); R.back('abc1');
+  R.L.resize.forEach((f) => f());                        // 같은 높이 — 중복 거름이 살아 있으면 안 나간다
+  assert.strictEqual(kb(), 1, '⛔ hi·기록 말이 lastH/lastTop 을 되돌려 kbH 가 또 나갔다');
+});
+
+t('⛔ history.state 가 던져도(막힌 문서) mount() 는 끝까지 간다 — frameEl.src 가 서고 frameHello→kbH 가 그대로 된다 (검수 2026-10-01)', () => {
+  const R = boot({ stateThrows: true });
+  assert.strictEqual(R.frameEl.src, 'about:blank', '⛔ 시작 줄이 던져 mount() 가 중간에 끊겼다 — 학생 화면이 빈다');
+  R.msg({ onf: 'frameHello' });
+  assert.deepStrictEqual(R.inner.sent.map((x) => x.m.onf), ['kbH'], '⛔ 기록 API 가 막힌 곳에서 키보드 보정이 죽었다');
 });
 
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패');

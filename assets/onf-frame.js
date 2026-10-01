@@ -245,6 +245,10 @@
     function histMsg(ev) {
       var d = ev.data, s, n, flat;
       if (d.op === 'hi') {                                // 안쪽이 떴다 — 창을 (갈아) 정하고 다리를 켜라고 답한다
+        /* ⛔ 위 기존 자물쇠는 **호스트 이름만** 본다(프로토콜·포트는 안 봄). 이 출처가 곧 hist-on·hist-pop 의 targetOrigin 이 되므로 여기서만 `https://<호스트>` 모양으로 한 번 더 좁힌다
+           (검수 2026-10-01 — 구글이 서빙하는 GAS 래퍼 안이라 닿는 길은 없지만 값은 싸다). 기존 자물쇠 자체는 건드리지 않는다(키보드 보정·제목 배선).
+           ⚠️ 어댑터를 끼운 창은 **껍데기당 하나**라고 본다 — `hi` 는 올 때마다 다리 창을 갈아 끼우므로 나중에 뜬 쪽이 가져간다(학생 화면은 한 번에 한 안쪽만 뜬다). */
+        if (!/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(String(ev.origin))) return;
         histWin = ev.source; histOrigin = ev.origin;
         try { histWin.postMessage({ onf: 'hist-on' }, histOrigin); } catch (e) {}
         return;
