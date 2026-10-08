@@ -146,5 +146,29 @@ t('⛔ 선생님 액자의 매니페스트도 절대경로다 (끝 슬래시 없
   assert.ok(/rel="manifest" href="\/teacher\/manifest\.json"/.test(teacherHtml));
 });
 
+console.log('\n[액자 → 앱 주소 전달 목록]');
+/* 왜 재나: index.html 의 목록에 없는 파라미터는 앱에 **안 전해진다**(조용히 증발 — 오류도 안 난다).
+   내 문장의 「📖 교재에서 보기」(line)와 「그 칸으로 열기」(view)가 이 목록에 없어 라이브에서 죽을 뻔했다(2026-10-09).
+   목록 글자를 보지 않고 **진짜 코드를 돌려** 주소가 나오는지 본다. */
+function forwarded(search) {
+  const m = shellHtml.match(/\n  \[('fileId'[^\]]*)\]\.forEach\(function \(k\) \{[\s\S]*?\n  \}\);/);
+  assert.ok(m, '전달 목록 코드를 못 찾았다');
+  const sb = { URLSearchParams, encodeURIComponent, q: new URLSearchParams(search), extra: [] };
+  vm.createContext(sb);
+  vm.runInContext(m[0], sb);
+  return sb.extra;
+}
+t('⛔ 교재 줄 점프(line)와 내 문장 칸(view)이 앱까지 전해진다', () => {
+  const x = forwarded('?fileId=F1&sheetName=E1_X&mode=share&line=33&view=The%20Good%20Place%20S1');
+  assert.ok(x.indexOf('line=33') >= 0, '⛔ line 이 증발한다 — 「교재에서 보기」 점프가 죽는다: ' + x);
+  assert.ok(x.indexOf('view=The%20Good%20Place%20S1') >= 0, '⛔ view 가 증발한다 — 내 문장이 첫 칸으로 열린다: ' + x);
+});
+t('기존 파라미터(fileId·sheetName·mode·back·ttok·tas)는 그대로 전해진다 · 없는 건 안 만든다', () => {
+  const x = forwarded('?fileId=F1&sheetName=E1_X&mode=mine&back=E0&ttok=ZZ&tas=Peter&evil=1');
+  ['fileId=F1', 'sheetName=E1_X', 'mode=mine', 'back=E0', 'ttok=ZZ', 'tas=Peter'].forEach((p) => assert.ok(x.indexOf(p) >= 0, p + ' 이 빠졌다: ' + x));
+  assert.ok(!x.some((p) => /^evil=/.test(p)), '⛔ 목록에 없는 파라미터는 안 전한다(문은 목록)');
+  assert.deepStrictEqual(forwarded('?mode=share'), ['mode=share'], '값이 없는 line·view 는 만들지 않는다');
+});
+
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패');
 process.exit(fail ? 1 : 0);

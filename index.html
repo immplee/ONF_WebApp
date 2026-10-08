@@ -51,7 +51,9 @@
   //      여기서는 주소에 실려 온 것을 그대로 통과시키기만 한다.
   //    tas = 이 링크를 받은 **선생님 이름**. 없으면 앱이 교재 담당쌤 이름으로 착각해
   //      읽음 장부가 남의 칸에 쌓이고 '내 글' 표시도 어긋난다(2026-08-12).
-  ['fileId', 'sheetName', 'mode', 'back', 'ttok', 'tas'].forEach(function (k) {
+  //    line = 내 문장의 「📖 교재에서 보기」가 실어 오는 교재 줄 번호 · view = 내 문장 모드가 처음 열 칸(드라마 시즌)
+  //      (2026-10-09). 둘 다 빠져 있어서 점프와 「그 칸으로 열기」가 라이브에서 조용히 죽을 뻔했다 — 이름이 아니라 **목록**이 문이다.
+  ['fileId', 'sheetName', 'mode', 'back', 'ttok', 'tas', 'line', 'view'].forEach(function (k) {
     if (q.get(k)) extra.push(k + '=' + encodeURIComponent(q.get(k)));
   });
   if (q.get('diag') === '1') extra.push('diag=1');
