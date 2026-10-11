@@ -220,9 +220,9 @@ function mount() {
   clearTimeout(frameWatch);
   frameWatch = setTimeout(function () {
     if (appWin) return;
-    /* 🔑 열쇠로 열었는데 안쪽이 안 왔다 = 이 기기는 구글 창구 없이는 액자가 안 뜬다(아이폰 실측과 같은 꼴) →
-       이 기기에서 열쇠를 7일 끄고 치운 뒤 한 번 다시 연다(그때는 구글 창구로 — 지금까지와 같은 길). */
-    if (String(pending).indexOf('odk1.') === 0) {
+    /* 🔑 받아 둔 토큰·열쇠로(구글 창구 없이) 열었는데 안쪽이 안 왔다 = 이 기기는 구글 창구 없이는 액자가 안 뜬다(아이폰 실측과 같은 꼴) →
+       이 기기에서 7일 동안 「받아 둔 것으로 바로 열기」를 끄고 칸을 치운 뒤 한 번 다시 연다(그때는 구글 창구로 · 끈 표시가 있으니 다시 안 돈다). */
+    if (reused || String(pending).indexOf('odk1.') === 0) {
       try { localStorage.setItem(DK_OFF, String(Date.now())); localStorage.removeItem(TOKKEY); } catch (e) {}
       console.warn('[onf] 기기 열쇠로 열었는데 안쪽이 안 왔다 — 이 기기에선 7일 동안 열쇠를 안 쓴다(구글 창구로 다시 연다).');
       location.reload();
@@ -435,7 +435,9 @@ function offerOther() {
 var reused = false;
 (function reuse() {
   var t = tokLoad();
-  if (!t) return;
+  /* ⛔ [2026-10-12 Peter 아이폰] WebKit(아이폰·아이패드·맥 사파리)은 앱을 다시 열면 **구글 창구를 거치기 전엔** 끼운 구글 화면에
+     로그인 쿠키를 안 싣는다 — 받아 둔 토큰(1시간 구글 토큰도)으로 바로 열면 「화면이 안 열렸어요」. 이 기기들은 늘 구글 창구부터. */
+  if (!t || devkeyOff()) return;
   pending = t;
   reused = true;
   mount();
