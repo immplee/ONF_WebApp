@@ -357,7 +357,7 @@ function runDevkey(opt) {
   const top = {}; top.top = top; top.self = top;
   top.addEventListener = (tp, f) => { (L[tp] = L[tp] || []).push(f); };
   const exec = mkWin('exec', null, sent);
-  const c = { window: top, frame: { contentWindow: exec }, pending: opt.pending || '', frameWatch: null,
+  const c = { window: top, frame: { contentWindow: exec }, pending: opt.pending || '', frameWatch: null, navigator: opt.navigator,
     clearTimeout() {}, document: { getElementById() { return { hidden: false }; } }, URL,
     atob: (b) => Buffer.from(b, 'base64').toString('binary'),
     google: { accounts: { id: { cancel() { calls.push('cancel'); }, prompt() { calls.push('prompt'); }, disableAutoSelect() { calls.push('disableAutoSelect'); } } } },
@@ -415,6 +415,38 @@ t('① 받는다: 우리 안쪽 창·출처에서 온 살아 있는 회사 열�
   R.knock();                                                                // 안쪽이 다시 읽혀 노크
   assert.deepStrictEqual(R.sent[R.sent.length - 1], { to: 'inner2', m: { onf: 'auth', token: k, hist: 1 }, o: KORIGIN }, 'auth 말 모양은 그대로 · 토큰 자리에 열쇠');
   assert.strictEqual(R.tokLoad(), k);
+});
+
+t('⛔ 열쇠를 못 쓰는 기기(아이폰·아이패드·맥 사파리 · 끈 표시 7일) — 받아 두지도 꺼내 쓰지도 않는다 (2026-10-12 Peter 아이폰 「화면이 안 열렸어요」)', () => {
+  const IPHONE = { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140.0 Mobile/15E148 Safari/604.1' };
+  const MACSAFARI = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15', platform: 'MacIntel', maxTouchPoints: 0 };
+  const IPADOS = { userAgent: MACSAFARI.userAgent, platform: 'MacIntel', maxTouchPoints: 5 };
+  const CHROME = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36', platform: 'MacIntel', maxTouchPoints: 0 };
+  for (const nav of [IPHONE, MACSAFARI, IPADOS]) {
+    const R = runDevkey({ pending: 'GTOK', stored: 'GTOK', navigator: nav });
+    R.knock();
+    const k = dkey();
+    R.devkey(k);
+    assert.strictEqual(R.store.onf_id_tok, 'GTOK', '⛔ 열쇠를 못 쓰는 기기에 열쇠를 받아 뒀다: ' + nav.userAgent.slice(13, 40));
+    R.store.onf_id_tok = k;
+    assert.strictEqual(R.tokLoad(), '', '⛔ 못 쓰는 기기에서 열쇠를 꺼내 썼다(구글 창구를 건너뛰면 안쪽이 안 뜬다)');
+    assert.ok(!('onf_id_tok' in R.store), '⛔ 못 쓰는 기기의 열쇠가 칸에 남는다');
+  }
+  //   크롬(맥·윈도)은 그대로 쓴다
+  const C = runDevkey({ pending: 'GTOK', stored: 'GTOK', navigator: CHROME });
+  C.knock(); const kc = dkey(); C.devkey(kc);
+  assert.strictEqual(C.store.onf_id_tok, kc, '⛔ 크롬에서 열쇠를 안 받는다');
+  //   끈 표시(DK_OFF) 7일 안이면 크롬도 안 쓴다 · 7일 지나면 다시 쓴다
+  const D = runDevkey({ pending: 'GTOK', stored: 'GTOK', navigator: CHROME });
+  D.store.onf_devkey_off = String(Date.now() - 86400000);
+  D.knock(); D.devkey(dkey());
+  assert.strictEqual(D.store.onf_id_tok, 'GTOK', '⛔ 끈 표시가 있는데 열쇠를 받았다');
+  D.store.onf_devkey_off = String(Date.now() - 8 * 86400000);
+  const k8 = dkey(); D.devkey(k8);
+  assert.strictEqual(D.store.onf_id_tok, k8, '⛔ 7일 지난 끈 표시가 계속 막는다');
+  //   마감 시계: 열쇠로 열다 노크가 안 오면 끈 표시 + 칸 치움 + 다시 열기(소스 단정 — mount 는 vm 밖)
+  const W = src.slice(src.indexOf('frameWatch = setTimeout'), src.indexOf('var frameWatch = null'));
+  assert.match(W, /indexOf\('odk1\.'\) === 0\) \{[\s\S]{0,200}setItem\(DK_OFF[\s\S]{0,80}removeItem\(TOKKEY\)[\s\S]{0,200}location\.reload\(\)/, '⛔ 열쇠로 열다 노크가 안 오면 끄고 치우고 다시 열어야 한다');
 });
 
 t('⛔ ① 위조: appWin 이 정해지기 전 · 남의 창(같은 액자의 다른 후손 포함) · source 없음 · 남의 출처(다른 googleusercontent·껍데기 자신) → 안 받는다', () => {
