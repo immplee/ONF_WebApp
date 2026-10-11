@@ -336,5 +336,164 @@ t('토큰 전의 노크: appWin 은 정하되 아무것도 안 보낸다 → 로
   assert.strictEqual(E.appWin(), null, '⛔ 모르는 말이 appWin 을 정했다');
 });
 
+/* ═══ 🔑 기기 열쇠 (2026-10-12 · 설계서 ONF_Archive docs/superpowers/specs/2026-10-12-월요일_선생님홈-기기열쇠-설계.md) ═══
+   안쪽이 구글 토큰을 서버에서 기기 열쇠(`odk1.<본문>.<서명>`)로 바꿔 `{ onf: 'devkey', key }` 로 넘긴다 → 껍데기가 같은 칸(onf_id_tok)에 둔다.
+   재는 것: ① 받는 자물쇠(appWin·appOrigin — hist 와 같다) ② 값(odk1. · 살아 있음 · 회사 계정) ③ 서버가 열쇠를 거절(stale)하면 지운다
+   (안 지우면 새로고침마다 죽은 열쇠를 꺼내 빙빙 돈다) ④ 껍데기의 만료·도메인 읽기(tokExp·tokHd)가 열쇠에서도 맞다.
+   진짜 토큰 함수(var TOKKEY ~ function say) + 노크 구간 + onf-devkey 구간을 한 vm 에서 돈다.
+   ⛔ 공개 저장소 — 픽스처는 가짜 서명(fakesig)이다. 서명 검사는 서버 몫이다(껍데기는 문이 아니다). */
+console.log('\n[껍데기 기기 열쇠]');
+const DA = src.indexOf('/* onf-devkey:begin */'), DB = src.indexOf('/* onf-devkey:end */');
+const TA = src.indexOf('var TOKKEY'), TB = src.indexOf('function say(');
+const NOW = () => Math.floor(Date.now() / 1000);
+const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+/** 서버 꼴의 가짜 열쇠 — 본문 {email,hd,iat,exp} · 서명은 가짜. o 로 칸을 바꾼다(undefined 면 빠진다). */
+const dkey = (o) => 'odk1.' + b64u(Object.assign({ email: 'someone@ownify.co.kr', hd: 'ownify.co.kr', iat: NOW(), exp: NOW() + 600 }, o || {})) + '.fakesig';
+
+function runDevkey(opt) {
+  opt = opt || {};
+  const L = { message: [] }, sent = [], calls = [], store = {};
+  if (opt.stored) store.onf_id_tok = opt.stored;
+  const top = {}; top.top = top; top.self = top;
+  top.addEventListener = (tp, f) => { (L[tp] = L[tp] || []).push(f); };
+  const exec = mkWin('exec', null, sent);
+  const c = { window: top, frame: { contentWindow: exec }, pending: opt.pending || '', frameWatch: null,
+    clearTimeout() {}, document: { getElementById() { return { hidden: false }; } }, URL,
+    atob: (b) => Buffer.from(b, 'base64').toString('binary'),
+    google: { accounts: { id: { cancel() { calls.push('cancel'); }, prompt() { calls.push('prompt'); }, disableAutoSelect() { calls.push('disableAutoSelect'); } } } },
+    localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { calls.push('setItem'); store[k] = String(v); },
+      removeItem: (k) => { calls.push('removeItem'); delete store[k]; } } };
+  vm.createContext(c);
+  vm.runInContext(src.slice(TA, TB) + src.slice(KA, KB) + src.slice(DA, DB), c, { filename: 'onf-devkey-block' });
+  const inner = mkWin('inner2', mkWin('inner1', exec, sent), sent);       // 라이브 깊이 2(exec → sandboxFrame → userHtmlFrame)
+  const R = { c, sent, calls, store, inner,
+    post: (d, o) => L.message.forEach((f) => f({ data: d, source: (o && 'source' in o) ? o.source : inner, origin: (o && 'origin' in o) ? o.origin : KORIGIN })),
+    knock: (stale, other) => R.post({ onf: 'auth-please', stale: !!stale, other: !!other }),
+    devkey: (key, o) => R.post({ onf: 'devkey', key }, o),
+    pending: () => vm.runInContext('pending', c),
+    tokLoad: () => vm.runInContext('tokLoad()', c) };
+  return R;
+}
+
+t('표지 구간이 하나 있고, 토큰 함수 구간(var TOKKEY ~ function say)도 있다', () => {
+  assert.ok(DA > 0 && DB > DA, 'onf-devkey 표지가 없다');
+  assert.strictEqual((src.match(/onf-devkey:begin/g) || []).length, 1);
+  assert.ok(TA > 0 && TB > TA, '토큰 함수 구간이 없다');
+});
+
+t('④ tokExp·tokHd·tokMine·tokAlive 가 odk1 열쇠(본문 base64url JSON · = 없음 · - _ 섞임 · 길이 나머지 0/2/3)에서도 맞다', () => {
+  const R = runDevkey(), now = NOW();
+  const keys = ['p', 'pe', 'pet', 'x~'].map((l) => dkey({ email: l + '@ownify.co.kr', exp: now + 600 }));
+  assert.ok(keys.some((k) => /[-_]/.test(k.split('.')[1])), '전제: - _ 가 섞인 본문이 있다');
+  assert.strictEqual(new Set(keys.map((k) => k.split('.')[1].length % 4)).size, 3, '전제: 본문 길이 나머지가 셋 다 있다');
+  keys.forEach((k) => {
+    assert.strictEqual(R.c.tokExp(k), now + 600, '⛔ 열쇠의 exp 를 못 읽는다: ' + k);
+    assert.strictEqual(R.c.tokHd(k), 'ownify.co.kr', '⛔ 열쇠의 hd 를 못 읽는다: ' + k);
+    assert.strictEqual(R.c.tokMine(k), true);
+    assert.strictEqual(R.c.tokAlive(k), true);
+  });
+  assert.strictEqual(R.c.tokAlive(dkey({ exp: now + 60 })), false, '만료 2분 안은 안 쓴다(SKEW)');
+  assert.strictEqual(R.c.tokAlive(dkey({ exp: now - 10 })), false);
+  assert.strictEqual(R.c.tokMine(dkey({ hd: 'gmail.com', email: 'someone@gmail.com' })), false);
+  assert.strictEqual(R.c.tokMine(dkey({ hd: undefined, email: 'someone@gmail.com' })), false);
+  //   새로고침: 살아 있는 열쇠는 칸에서 꺼낸다(구글 창구 없이 = 이 일의 이득) · 죽은 것은 치운다
+  const k = dkey();
+  R.store.onf_id_tok = k;
+  assert.strictEqual(R.tokLoad(), k, '⛔ 살아 있는 열쇠를 안 꺼낸다');
+  R.store.onf_id_tok = dkey({ exp: now - 10 });
+  assert.strictEqual(R.tokLoad(), '');
+  assert.ok(!('onf_id_tok' in R.store), '⛔ 죽은 열쇠가 칸에 남는다');
+});
+
+t('① 받는다: 우리 안쪽 창·출처에서 온 살아 있는 회사 열쇠 → 칸에 두고 pending 도 그 열쇠 · 다음 노크·새로고침은 그 열쇠로', () => {
+  const R = runDevkey({ pending: 'GTOK', stored: 'GTOK' });
+  R.knock();
+  const k = dkey();
+  R.devkey(k);
+  assert.strictEqual(R.store.onf_id_tok, k, '⛔ 열쇠를 칸에 안 뒀다');
+  assert.strictEqual(R.pending(), k, '⛔ pending 이 옛 구글 토큰이다 — 안쪽이 다시 노크하면 곧 죽을 토큰을 준다');
+  R.knock();                                                                // 안쪽이 다시 읽혀 노크
+  assert.deepStrictEqual(R.sent[R.sent.length - 1], { to: 'inner2', m: { onf: 'auth', token: k, hist: 1 }, o: KORIGIN }, 'auth 말 모양은 그대로 · 토큰 자리에 열쇠');
+  assert.strictEqual(R.tokLoad(), k);
+});
+
+t('⛔ ① 위조: appWin 이 정해지기 전 · 남의 창(같은 액자의 다른 후손 포함) · source 없음 · 남의 출처(다른 googleusercontent·껍데기 자신) → 안 받는다', () => {
+  const k = dkey();
+  const N = runDevkey({ stored: 'OLD' });                                   // 안쪽이 아직 노크 전
+  N.devkey(k); N.devkey(k, { source: null }); N.devkey(k, { source: undefined });
+  N.devkey(k, { source: null, origin: '' });                                // appWin·appOrigin 의 처음 값(null·'')과 똑같이 맞춘 말 — `!appWin` 이 막는다
+  assert.strictEqual(N.store.onf_id_tok, 'OLD', '⛔ appWin 이 없을 때 열쇠를 받았다');
+  assert.strictEqual(N.pending(), '');
+  const R = runDevkey({ pending: 'GTOK', stored: 'GTOK' });
+  R.knock();
+  const sib = mkWin('sib2', mkWin('sib1', R.c.frame.contentWindow, R.sent), R.sent);   // 노크 자물쇠(fromOurFrame)는 지나지만 appWin 이 아니다
+  [{ source: sib }, { source: {} }, { source: null }, { source: R.c.window },
+    { origin: 'https://evil.example' }, { origin: 'https://n-other-script.googleusercontent.com' }, { origin: 'https://class.ownify.co.kr' }, { origin: '' }]
+    .forEach((o) => R.devkey(k, o));
+  assert.strictEqual(R.store.onf_id_tok, 'GTOK', '⛔ 위조된 devkey 가 칸을 바꿨다');
+  assert.strictEqual(R.pending(), 'GTOK', '⛔ 위조된 devkey 가 pending 을 바꿨다');
+  assert.ok(!R.calls.includes('setItem'));
+  R.devkey(k);                                                              // 검사가 눈멀지 않았다
+  assert.strictEqual(R.store.onf_id_tok, k);
+});
+
+t('⛔ ① 값: odk1. 아님(살아 있는 회사 구글 토큰 꼴이어도) · 만료·2분 안 · 남의 도메인 · 모양 깨짐 · 문자열 아님 · key 없음 → 안 받는다', () => {
+  const R = runDevkey({ pending: 'GTOK', stored: 'GTOK' });
+  R.knock();
+  const now = NOW();
+  const body = b64u({ email: 'someone@ownify.co.kr', hd: 'ownify.co.kr', iat: now, exp: now + 600 });
+  const bad = ['eyJhbGc.' + body + '.sig', 'ODK1.' + body + '.fakesig', 'odk2.' + body + '.fakesig', 'x.odk1.' + body,
+    dkey({ exp: now - 10 }), dkey({ exp: now + 60 }), dkey({ exp: undefined }),
+    dkey({ hd: 'gmail.com', email: 'someone@gmail.com' }), dkey({ hd: undefined, email: 'someone@gmail.com' }),
+    'odk1.', 'odk1.x.y', 'odk1.' + body, 'odk1.' + body + '.a.b', '', null, undefined, 123, [dkey()], { key: dkey() }];
+  bad.forEach((k) => R.devkey(k));
+  R.post({ onf: 'devkey' });
+  assert.strictEqual(R.store.onf_id_tok, 'GTOK', '⛔ 나쁜 값이 칸에 들어갔다');
+  assert.strictEqual(R.pending(), 'GTOK', '⛔ 나쁜 값이 pending 에 들어갔다');
+  assert.ok(!R.calls.includes('setItem'), '⛔ 나쁜 값으로 저장을 불렀다');
+});
+
+t('⛔ ③ 서버가 열쇠를 거절(stale)하면 칸을 지우고 pending 을 비운 뒤 구글 창구 — other 가 없어도 · 다시 노크해도 · 새로고침해도 죽은 열쇠를 안 꺼낸다', () => {
+  const R = runDevkey({ pending: 'GTOK' });
+  R.knock();
+  const k = dkey(); R.devkey(k);
+  R.calls.length = 0; const n = R.sent.length;
+  R.knock(true);                                                            // stale · other 없음 = 서버가 열쇠를 거절
+  assert.ok(!('onf_id_tok' in R.store), '⛔ 거절된 열쇠가 칸에 남았다 — 새로고침마다 꺼내 빙빙 돈다');
+  assert.strictEqual(R.pending(), '', '⛔ pending 에 죽은 열쇠가 남았다 — 다음 노크에 또 준다');
+  assert.deepStrictEqual(R.calls, ['removeItem', 'cancel', 'prompt'], '⛔ 지우고 구글 창구로 — 자동 선택은 안 끈다(같은 계정이 맞다): ' + R.calls);
+  R.knock();
+  assert.strictEqual(R.sent.length, n, '⛔ 죽은 열쇠로 답했다');
+  assert.strictEqual(R.tokLoad(), '', '⛔ 새로고침에 죽은 열쇠를 꺼낸다');
+  vm.runInContext("pending = 'GNEW'; answer();", R.c);                      // 구글이 새 토큰을 줬다(onCredential 몫) — 회복 길
+  assert.deepStrictEqual(R.sent[R.sent.length - 1].m, { onf: 'auth', token: 'GNEW', hist: 1 });
+  //   새로고침 뒤 칸에서 꺼낸 열쇠(reuse — pending = 칸 값)가 거절된 것도 같다
+  const S = runDevkey({ stored: k, pending: k });
+  S.knock(); S.knock(true);
+  assert.ok(!('onf_id_tok' in S.store), '⛔ 꺼내 쓴 열쇠가 거절됐는데 칸에 남았다');
+  assert.strictEqual(S.pending(), '');
+});
+
+t('③ 구글 토큰의 stale 은 지금 그대로 — 칸은 안 건드리고 구글 창구만 (열쇠 갈래가 구글 토큰까지 지우지 않는다)', () => {
+  const R = runDevkey({ pending: 'GTOK', stored: 'GTOK' });
+  R.knock(); R.calls.length = 0;
+  R.knock(true);
+  assert.strictEqual(R.store.onf_id_tok, 'GTOK');
+  assert.deepStrictEqual(R.calls, ['cancel', 'prompt']);
+});
+
+t('「다른 계정으로」는 지금처럼 칸을 지운다 — 열쇠도 같은 칸이라 함께 (안쪽 🔒 의 other 부탁 · 껍데기 버튼 둘 다)', () => {
+  const R = runDevkey({ pending: 'GTOK' });
+  R.knock();
+  R.devkey(dkey());
+  R.calls.length = 0;
+  R.knock(true, true);
+  assert.ok(!('onf_id_tok' in R.store), '⛔ 다른 계정으로 바꾸는데 열쇠가 남았다');
+  assert.strictEqual(R.pending(), '', '⛔ 옛 계정 열쇠가 pending 에 남았다');
+  assert.ok(R.calls.includes('disableAutoSelect') && R.calls[R.calls.length - 1] === 'prompt', R.calls);
+  const oo = src.slice(src.indexOf('function offerOther()'), src.indexOf('var reused'));
+  assert.ok(/localStorage\.removeItem\(TOKKEY\)/.test(oo), '⛔ 껍데기의 [다른 계정으로] 버튼이 칸을 안 지운다');
+});
+
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패');
 process.exit(fail ? 1 : 0);
