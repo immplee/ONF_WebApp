@@ -57,6 +57,7 @@
     if (q.get(k)) extra.push(k + '=' + encodeURIComponent(q.get(k)));
   });
   if (q.get('diag') === '1') extra.push('diag=1');
+  if (q.get('perf') === '1') extra.push('perf=1');   // 속도 표식(2026-10-12 · 기기 열쇠 세션 부탁) — 앱이 화면 구석 표를 그린다
   /* 홈 화면 아이콘 안내 — **판정은 여기서만 한다.** 앱은 구글 래퍼 안 아이프레임이라
      `navigator.standalone` 을 믿을 수 없다(인앱 웹뷰에선 `undefined`, 프레임 안에선 없다).
        ask   = 아이콘을 만들 수 있는 기기인데 아직 `/i/<토큰>/` 에 안 서 있다 → 앱이 링크를 낸다
@@ -102,9 +103,27 @@
   /* 토큰은 이미 이 도메인에 저장됐다 — 주소창에서 지운다(화면 찍어 보낼 때 같이 나가면 안 된다).
      ⛔ 반드시 위 `q.get(...)` 들을 다 읽은 **뒤**여야 한다. */
   ONF.frame.hideToken();
+  /* 📖 홈 안에서 교재 열기(PC · 2026-10-12 Peter 홈 리디자인 3단계) — 홈이 교재 카드 주소를 보내면 그 주소에서 **아는 값만** 골라
+     같은 앱 주소에 `embed=1` 을 붙여 오른쪽 판에 띄운다. 주소의 토큰(t)은 버린다 — 토큰은 이 도메인에 이미 있다.
+     ⛔ 우리 껍데기 주소(class·script.ownify.co.kr)의 교재 모양(짧은 주소 또는 mode=share)만 — 아니면 null(안 연다). */
+  var BOOK_KEYS = ['fileId', 'sheetName', 'mode', 'back', 'line', 'view'];
+  function bookSrc(href) {
+    try {
+      var u = new URL(String(href || ''), location.href);
+      if (!/^(class|script)\.ownify\.co\.kr$/.test(u.hostname) && u.origin !== location.origin) return null;
+      var p = decodeURIComponent(u.pathname.replace(/^\/+|\/+$/g, '')).toLowerCase(), ex = [];
+      var slugOk = /^[a-z0-9]+-s\d+-e\d+-[a-z0-9]+$/.test(p);
+      if (u.searchParams.get('mode') !== 'share' && !slugOk) return null;   // 교재만(내 문장 mode=mine · 홈은 안 연다)
+      BOOK_KEYS.forEach(function (k) { if (u.searchParams.get(k)) ex.push(k + '=' + encodeURIComponent(u.searchParams.get(k))); });
+      if (!u.searchParams.get('fileId') && slugOk) ex.push('slug=' + encodeURIComponent(p));
+      if (!ex.length) return null;
+      ex.push('embed=1');
+      return ONF.api.appUrl(token, ex.join('&'));
+    } catch (e) { return null; }
+  }
   ONF.frame.mount(document.getElementById('app'),
                   ONF.api.appUrl(token, extra.join('&')),
-                  { diag: q.get('diag') === '1' });
+                  { diag: q.get('diag') === '1', bookSrc: bookSrc });
 </script>
 </body>
 </html>

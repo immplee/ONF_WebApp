@@ -212,6 +212,11 @@
       if (ev && ev.data && ev.data.onf === 'frameHello') {
         appWin = ev.source; lastH = -1; lastTop = -1; sync();
       }
+      /* 📖 홈의 노크(bookHello)에 「홈 안에서 교재 열기」를 할 줄 안다고 답한다(2026-10-12). 홈은 이 답을 받은 뒤에만 교재 링크를 가로챈다 —
+         옛 껍데기(답이 없다)면 종전대로 교재 화면으로 넘어간다. ⛔ 키보드 노크(frameHello)와 섞지 않는다(appWin 을 안 바꾼다).
+         targetOrigin 은 노크한 출처(브라우저가 채운 값 · 위 자물쇠를 지난 googleusercontent). */
+      if (ev.data.onf === 'bookHello' && opts.bookSrc) { try { ev.source.postMessage({ onf: 'caps', book: 1 }, ev.origin); } catch (eC) {} return; }
+      if (ev.data.onf === 'openBook' && opts.bookSrc && typeof ev.data.href === 'string') { bookOpen(ev.data.href); return; }
       // 탭 제목 — 앱(=GAS)만 학생 이름을 안다. 보이는 탭 제목은 **이 창**이 정하므로 받아서 세운다.
       //   위 오리진 검사를 이미 통과한 메시지다. 줄바꿈을 지우고 길이를 잘라 그대로 쓴다.
       if (ev && ev.data && ev.data.onf === 'title' && typeof ev.data.t === 'string') {
@@ -277,6 +282,44 @@
       if (!histWin) return;                               // `hi` 전엔 알릴 안쪽이 없다
       try { histWin.postMessage({ onf: 'hist-pop', id: h ? h.onfHist : '', s: h ? (h.s || null) : null }, histOrigin); } catch (e) {}   // '*' 금지
     });
+    /* ═══ 📖 교재 판(2026-10-12 Peter 홈 리디자인 3단계 · PC) ═══
+       홈 액자 옆(오른쪽)에 교재 액자를 **하나 더** 띄운다 — GAS 안 GAS 액자를 만들지 않는다(그건 빈 칸이 된다 · 설계서 §3-1).
+       ⛔ 교재 액자의 말은 **그 액자에서 온 것만**(아래 자물쇠) 받고, 할 줄 아는 말은 둘뿐(bookClose · bookFull).
+         홈 액자 자물쇠(위 frameEl)는 그대로라 교재 액자의 기록 다리(hist)·제목(title)·노크(frameHello)는 **안 받는다** — 키보드·뒤로는 홈 것.
+       ⛔ unload 처리기를 달지 마라(bfcache 「뒤로」를 막는다). 닫을 땐 액자를 지운다(메모리 · 다음 열기는 새로).
+       ⚠️ 주소를 만드는 일(아는 값만 · embed=1)은 index.html 의 opts.bookSrc 가 한다 — 못 만들면 null(안 연다). */
+    var bookBox = null, bookEl = null;
+    function bookOpen(href) {
+      var src = opts.bookSrc(href);
+      if (!src) return;
+      if (!bookBox) {
+        bookBox = document.createElement('div');
+        bookBox.className = 'onf-bookpanel';
+        bookEl = document.createElement('iframe');
+        bookEl.setAttribute('allow', 'clipboard-write; microphone');
+        bookEl.setAttribute('title', '교재');
+        bookBox.appendChild(bookEl);
+        document.body.appendChild(bookBox);
+      }
+      bookBox.classList.remove('full');
+      bookEl.src = src;
+    }
+    function bookClose() {
+      if (!bookBox) return;
+      bookBox.parentNode.removeChild(bookBox);
+      bookBox = null; bookEl = null;
+    }
+    global.addEventListener('message', function (ev) {
+      try {
+        if (!bookEl || !ev || !ev.data || !ev.source) return;
+        if (!_fromOurFrame(ev.source, bookEl)) return;
+        if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return;
+      } catch (e) { return; }
+      if (ev.data.onf === 'bookClose') bookClose();
+      else if (ev.data.onf === 'bookFull' && bookBox) bookBox.classList.toggle('full', !!ev.data.on);
+    });
+    global.addEventListener('keydown', function (e) { if (e.key === 'Escape' && bookBox) bookClose(); });   // 껍데기에 초점이 있을 때만 닿는다(액자 안 키는 [✕])
+
     /* 껍데기가 다시 읽힌 채 남은 표식만 지운다. ⚠️ `hideToken()`(index.html 이 mount 보다 먼저 부른다)의 `replaceState(null, …)` 가 **주소에 ?t= 가 있던 때**는 이미 state 를 null 로 만들었다 —
        그땐 아래가 할 일이 없고(표식이 없다), 표식이 남은 것은 ?t= 가 없는 다시 읽기(새로고침)뿐이다. 둘은 겹치지 않는다. url 인자를 안 주므로 hideToken 이 지운 주소를 되돌리지도 않는다. */
     try { if (history.state && history.state.onfHist) history.replaceState(null, ''); } catch (e) {}
