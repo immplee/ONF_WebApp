@@ -32,7 +32,7 @@ function run() {
   const homeExec = win('home-exec', top), home = win('home-user', win('home-sbx', homeExec));
   const frame = { contentWindow: homeExec };
   const g = { URL, top, frame, innerWidth: 1440, location: { href: 'https://class.ownify.co.kr/teacher/' },
-    document: { body, createElement: mkEl }, ONF: { api: { EXEC } },
+    document: { body, createElement: mkEl, documentElement: { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } } }, ONF: { api: { EXEC } }, localStorage: { s: {}, getItem(k) { return k in this.s ? this.s[k] : null; }, setItem(k, v) { this.s[k] = String(v); } },
     addEventListener: (k, f) => { (L[k] = L[k] || []).push(f); } };
   g.window = g;
   vm.createContext(g);
@@ -107,6 +107,15 @@ t('홈의 bookDismiss(탭 바꿈) · Esc 로 닫는다', () => {
   s.send({ onf: 'openBook', href: TURL }, s.home);
   s.L.keydown.forEach((f) => f({ key: 'Escape' }));
   assert.ok(!s.panel(), '⛔ Esc 로 안 닫힌다');
+});
+
+t('🌙 화면 색 — 선생님 홈(내 액자)이 알린 theme 만 <html data-theme> · localStorage · 남의 창·모르는 값은 버린다 (2026-10-12)', () => {
+  const s = run(), root = s.g.document.documentElement, ls = s.g.localStorage.s;
+  s.send({ onf: 'theme', v: 'dark' }, win('stranger', s.top));
+  s.send({ onf: 'theme', v: 'sepia' }, s.home);
+  assert.ok(!('data-theme' in root.attrs) && !('onfTheme' in ls), '⛔ 남의 말·모르는 값으로 화면 색을 바꿨다');
+  s.send({ onf: 'theme', v: 'dark' }, s.home);
+  assert.ok(root.attrs['data-theme'] === 'dark' && ls.onfTheme === 'dark', '⛔ 선생님 홈이 알린 다크를 안 달았다');
 });
 
 t('⛔ 판 블록에 unload 처리기가 없다(bfcache)', () => {

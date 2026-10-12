@@ -26,7 +26,8 @@ function setup() {
   vm.createContext(g);
   g.window = g; g.URL = URL; g.localStorage = null; g.innerWidth = 1440; g.location = { search: '', pathname: '/', href: 'https://class.ownify.co.kr/' };
   g.navigator = { userAgent: 'node' }; g.history = { state: null, replaceState() {}, pushState() {} };
-  g.document = { addEventListener() {}, body, createElement: mkEl };
+  const root = { attrs: {}, setAttribute(k, v) { root.attrs[k] = v; } };
+  g.document = { addEventListener() {}, body, createElement: mkEl, documentElement: root };
   g.addEventListener = (k, fn) => { (listeners[k] = listeners[k] || []).push(fn); };
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-frame.js'), 'utf8'), g, { filename: 'onf-frame.js' });
   const homeWin = win('home-exec', top), homeInner = win('home-user', homeWin);
@@ -35,7 +36,7 @@ function setup() {
   g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { bookSrc: (h) => { opened.push(h); return /mode=share/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=share&embed=1' : null; } });
   const send = (data, source, origin) => listeners.message.forEach((fn) => fn({ data, source, origin: origin || 'https://n-abc-0lu-script.googleusercontent.com' }));
   const panel = () => body.kids.find((k) => k.className === 'onf-bookpanel');
-  return { g, listeners, body, homeInner, homeWin, send, panel, opened, top };
+  return { g, listeners, body, homeInner, homeWin, send, panel, opened, top, root };
 }
 
 console.log('[홈 안 교재 판 — 껍데기]');
@@ -139,7 +140,7 @@ t('판 자리 — 홈이 알린 왼쪽 메뉴 끝(left)부터 덮는다 · 남�
   const css = fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-ui.css'), 'utf8');
   assert.ok(/\.onf-bookpanel \{[^}]*top: 16px; right: 16px; bottom: 16px;[^}]*border-radius: 28px; overflow: hidden;/.test(css)
     && /\.onf-bookpanel\.beside \{ left: calc\(var\(--bl\) \+ 16px\); width: auto; \}/.test(css)
-    && /\.onf-bookpanel\.full \{ top: 0; right: 0; bottom: 0; left: 0; width: auto; padding: 10px;[^}]*background: #E9DFD0; \}/.test(css)
+    && /\.onf-bookpanel\.full \{ top: 0; right: 0; bottom: 0; left: 0; width: auto; padding: 10px;[^}]*background: var\(--onf-frame\); \}/.test(css) && /--onf-frame: #E9DFD0;/.test(css)   // 🌙 둘레 = 이름(밝은 값 그대로)
     && /\.onf-bookpanel\.full iframe \{ border-radius: 22px;/.test(css), '⛔ 판 모양(떠 있는 큰 판 · 메뉴 옆 · 전체 = 화면 끝까지 덮고 안은 둥근 판 — 뒤 홈이 안 보인다)');
 });
 
@@ -152,6 +153,30 @@ t('홈이 탭을 바꾸면(bookDismiss) 판을 닫는다 · 홈 액자에서 온
   assert.ok(s.panel(), '⛔ 우리 액자 밖 창의 말로 판이 닫혔다');
   s.send({ onf: 'bookDismiss' }, s.homeInner);
   assert.ok(!s.panel(), '⛔ 홈이 탭을 바꿨는데 판이 남았다');
+});
+
+t('🌙 화면 색 — 홈 액자가 알린 theme 만 <html data-theme> · localStorage 에 둔다(다음에 열 때 그리기 전에) · 남의 창·남의 출처·모르는 값은 버린다 (Peter 2026-10-12 에스프레소)', () => {
+  const s = setup(), ls = {};
+  s.g.localStorage = { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); } };
+  s.send({ onf: 'theme', v: 'dark' }, win('stranger', s.top));
+  s.send({ onf: 'theme', v: 'dark' }, s.homeInner, 'https://evil.example.com');
+  s.send({ onf: 'theme', v: 'purple' }, s.homeInner);
+  assert.ok(!('data-theme' in s.root.attrs) && !('onfTheme' in ls), '⛔ 남의 말·모르는 값으로 화면 색을 바꿨다');
+  s.send({ onf: 'theme', v: 'dark' }, s.homeInner);
+  assert.ok(s.root.attrs['data-theme'] === 'dark' && ls.onfTheme === 'dark', '⛔ 홈이 알린 다크를 안 달았다(또는 안 남겼다)');
+  s.send({ onf: 'theme', v: 'light' }, s.homeInner);
+  assert.ok(s.root.attrs['data-theme'] === 'light' && ls.onfTheme === 'light', '⛔ 밝게로 안 돌아온다');
+  //   다크 값 — 바깥 틀의 색 이름은 전부 다크 값이 있다(밝은 값만 있으면 다크에서 그 자리만 밝다)
+  const css = fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-ui.css'), 'utf8');
+  const blk = (sel) => { const i = css.indexOf(sel); return i < 0 ? '' : css.slice(i, css.indexOf('}', i)); };
+  const lightN = [...blk(':root {').matchAll(/(--onf-[a-z]+):/g)].map((m) => m[1]), darkB = blk(':root[data-theme="dark"] {');
+  assert.ok(lightN.length >= 8, '⛔ 색 이름을 못 읽었다');
+  for (const n of lightN) assert.ok(darkB.includes(n + ':'), '⛔ 바깥 틀 ' + n + ' 에 다크 값이 없다');
+  //   머리 스크립트 — 셋 다(학생·선생님·과제) 스타일보다 먼저 · 남긴 값 → 없으면 기기 설정
+  for (const f of ['index.html', 'teacher/index.html', 'hw.html']) {
+    const h = fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), i = h.indexOf('localStorage.getItem("onfTheme")'), c = h.indexOf('onf-ui.css');
+    assert.ok(i > 0 && i < c, '⛔ ' + f + ' — 화면 색을 스타일보다 먼저 안 단다(밝은 틀이 번쩍인다)');
+  }
 });
 
 t('Esc — 판이 열려 있으면 닫는다', () => {

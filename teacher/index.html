@@ -18,9 +18,10 @@
 <meta name="apple-mobile-web-app-title" content="선생님">
 <link rel="apple-touch-icon" href="../assets/icon/onf-180.png">
 <link rel="icon" href="../assets/icon/onf-32.png" sizes="32x32">
+<script>/* 🌙 다크 모드 — 안쪽 액자가 알려 준 색(onfTheme · onf-frame.js)을 **그리기 전에** 단다 · 없으면 기기 설정(Peter 2026-10-12 에스프레소) */(function(){try{var v=localStorage.getItem("onfTheme"),d=v==="dark"||(v!=="light"&&!!(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches));document.documentElement.setAttribute("data-theme",d?"dark":"light");}catch(e){}})();</script>
 <link rel="stylesheet" href="../assets/onf-ui.css">
 <style>
-  html, body { margin:0; height:100%; background:#fdfbf7; }
+  html, body { margin:0; height:100%; background:var(--onf-bg); }
   /* ⛔ z-index 를 학생 액자와 **같은 겹침**으로 둔다(assets/onf-ui.css 의 .onf-full iframe).
      회전자(.onf-wait)는 z-index:0 이라 액자 뒤에 있고, 액자가 한 픽셀이라도 그리는 순간
      저절로 덮인다 — 걷는 JS 가 없으니 **노크를 놓쳐도 회전자에 갇히지 않는다**(2026-08-14 사고).
@@ -36,11 +37,11 @@
   #waitmsg { text-align:center; padding:0 22px; max-width:32em; word-break:keep-all; text-wrap:pretty; }
   .lock { max-width:460px; margin:14vh auto 0; padding:0 24px; text-align:center;
           font:15px/1.65 -apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
-          color:#3d2b1f; }
+          color:var(--onf-ink); }
   .lock .em { font-size:34px; margin-bottom:12px; }
   .lock h2 { margin:0 0 9px; font-size:20px; font-weight:800; }
-  .lock p { margin:0 0 18px; color:#7a5c3e; }
-  .lock .why { font-size:12.5px; color:#9b8877; margin-top:14px; }
+  .lock p { margin:0 0 18px; color:var(--onf-brown); }
+  .lock .why { font-size:12.5px; color:var(--onf-mute); margin-top:14px; }
   #gsi { display:flex; justify-content:center; min-height:44px; }
 </style>
 </head>
@@ -413,6 +414,12 @@ function bookOpen(href, left) {
   }
   bookEl.src = src;
 }
+/** 🌙 안쪽이 알려 준 화면 색 — 틀·판 둘레·「불러오는 중」도 같은 색 · 다음에 열 때 머리 스크립트가 그리기 전에 쓴다. 아는 값만. */
+function onfShellTheme(v) {
+  if (v !== 'dark' && v !== 'light') return;
+  document.documentElement.setAttribute('data-theme', v);
+  try { localStorage.setItem('onfTheme', v); } catch (e) {}
+}
 function bookClose() {
   if (!bookBox) return;
   bookBox.parentNode.removeChild(bookBox);
@@ -426,6 +433,7 @@ window.addEventListener('message', function (ev) {
     if (d.onf === 'bookHello') { try { ev.source.postMessage({ onf: 'caps', book: 1 }, ev.origin); } catch (e) {} return; }
     if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left); return; }
     if (d.onf === 'bookDismiss') { if (bookBox) bookClose(); return; }
+    if (d.onf === 'theme') { onfShellTheme(d.v); return; }   // 🌙 화면 색(안쪽 선생님 홈이 알린다)
     return;
   }
   if (bookEl && bookFrom(ev, bookEl)) {                        // 판 액자(교재·내 문장)

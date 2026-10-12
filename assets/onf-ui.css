@@ -4,9 +4,20 @@
   --onf-brown: #7a5c3e;
   --onf-line: #e8ddcf;
   --onf-bg: #fdfbf7;
+  --onf-page: #fff;       /* 맨 바탕 */
+  --onf-card: #fff;
+  --onf-mute: #9b8877;
+  --onf-frame: #E9DFD0;   /* 판 전체 화면 둘레 — GAS 쪽 --frame 과 같은 값 */
+}
+/* 🌙 다크 — 에스프레소(Peter 2026-10-12 · GAS ONF_Ui_Css 와 같은 값). 안쪽 액자가 onf:'theme' 으로 알려 주면 onf-frame.js 가 <html data-theme> 를 갈고
+   localStorage onfTheme 에 둔다 → 다음에 열 때 머리 스크립트가 **그리기 전에** 단다(밝은 틀이 번쩍이지 않게). */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --onf-ink: #F3EADF; --onf-brown: #C9B39C; --onf-line: #4A3A2E; --onf-bg: #1E1611;
+  --onf-page: #1E1611; --onf-card: #2A2019; --onf-mute: #9A8571; --onf-frame: #140E0A;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; height: 100%; background: #fff; }
+html, body { margin: 0; padding: 0; height: 100%; background: var(--onf-page); }
 body {
   font: 16px/1.6 -apple-system, BlinkMacSystemFont, 'Pretendard', sans-serif;
   color: var(--onf-ink);
@@ -43,12 +54,12 @@ body {
 .onf-title { margin: 0 0 4px; font-size: 22px; font-weight: 700; }
 .onf-sub { margin: 0 0 20px; color: var(--onf-brown); font-size: 14px; }
 .onf-card {
-  display: block; padding: 16px; margin-bottom: 10px; background: #fff;
+  display: block; padding: 16px; margin-bottom: 10px; background: var(--onf-card);
   border: 1px solid var(--onf-line); border-radius: 12px;
   color: var(--onf-ink); text-decoration: none; font-weight: 600;
 }
 .onf-card:active { background: var(--onf-bg); }
-.onf-muted { color: #9b8877; font-weight: 400; font-size: 14px; }
+.onf-muted { color: var(--onf-mute); font-weight: 400; font-size: 14px; }
 
 /* 📖 홈 안 교재 판(2026-10-12 Peter 홈 리디자인 3단계 · PC 전용 — 홈이 넓은 화면에서만 연다).
    떠 있는 큰 판 — 가장자리 16px · 모서리 28(홈 블럭·왼쪽 메뉴와 같은 말) · 닫으면 액자째 지운다(onf-frame.js bookClose).
@@ -58,7 +69,7 @@ body {
   background: var(--onf-bg); border: 1px solid var(--onf-line); border-radius: 28px; overflow: hidden;
   box-shadow: 0 30px 80px -30px rgba(43,29,20,.55); }
 .onf-bookpanel.beside { left: calc(var(--bl) + 16px); width: auto; }
-.onf-bookpanel.full { top: 0; right: 0; bottom: 0; left: 0; width: auto; padding: 10px; border: 0; border-radius: 0; box-shadow: none; background: #E9DFD0; }
+.onf-bookpanel.full { top: 0; right: 0; bottom: 0; left: 0; width: auto; padding: 10px; border: 0; border-radius: 0; box-shadow: none; background: var(--onf-frame); }
 /* 전체 화면 = 화면 끝까지 덮고(뒤 홈이 안 보인다 · 2026-10-12 Peter 「테두리에 뒤 홈페이지가 다 보인다」) 그 안에 둥근 판 — 모서리 한 말은 그대로 */
 .onf-bookpanel.full iframe { border-radius: 22px; box-shadow: 0 0 0 1px var(--onf-line); }
 .onf-bookpanel iframe { display: block; width: 100%; height: 100%; border: 0; position: relative; z-index: 1; }
