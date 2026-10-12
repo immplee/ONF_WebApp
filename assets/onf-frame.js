@@ -218,10 +218,11 @@
       if (ev.data.onf === 'bookHello' && opts.bookSrc) { try { ev.source.postMessage({ onf: 'caps', book: 1 }, ev.origin); } catch (eC) {} return; }
       if (ev.data.onf === 'openBook' && opts.bookSrc && typeof ev.data.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(ev.data.href, ev.data.left); return; }
       /* 홈이 탭을 바꿨다 → 옆 판을 닫는다(2026-10-12 Peter 「창이 켜진 채 탭을 바꾸면 자동으로 꺼져야」) — bookClose 는 판 액자만 말한다(따로 둔 이름) */
-      if (ev.data.onf === 'bookDismiss') { if (bookBox) bookClose(); return; }
-      /* 📖 홈이 「첫 교재를 데워 줘」(2026-10-12 · 설계서 §1-5) — 그 교재 주소를 **한 번** GET 해 교재 서버 캐시만 데운다(봇 수업 전 데우기와 같은 길).
-         ⛔ 판을 숨겨 띄우지 않는다(교재가 접속 신호를 보낸다) · 주소는 판과 같은 거르개(bookSrc — 교재만 · 아는 값만 · embed=1) · 쿠키 안 실음 · 한 주소 한 번. */
-      if (ev.data.onf === 'bookWarm' && opts.bookSrc && typeof ev.data.href === 'string') { bookWarm(ev.data.href); return; }
+      if (ev.data.onf === 'bookDismiss') { bookClose(); return; }   // 보이는 판만 숨긴다(없으면 아무 일 없음)
+      /* 📖 홈이 「첫 교재를 미리 받아 줘」(2026-10-12 · 설계서 §1-5 · 10-13 숨긴 판) — 주소는 판과 같은 거르개(bookSrc — 교재만 · 아는 값만 · embed=1).
+         · panel:1(홈이 판을 쓸 넓은 화면이라고 했다) → **숨긴 판**으로 미리 띄운다(아래 bookPre · 교재는 park=1 로 「대기」 — 접속 신호 0).
+         · 아니면(폰) 종전대로 그 주소를 **한 번** GET 해 교재 서버 캐시만 데운다(봇 수업 전 데우기와 같은 길 · 쿠키 안 실음 · 한 주소 한 번). */
+      if (ev.data.onf === 'bookWarm' && opts.bookSrc && typeof ev.data.href === 'string') { if (ev.data.panel === 1) bookPre(ev.data.href, ev.data.left); else bookWarm(ev.data.href); return; }
       /* 🌙 화면 색(Peter 2026-10-12 다크 모드) — 안쪽 홈이 알린다 · 틀·판 둘레·「불러오는 중」을 같은 색으로 · 다음에 열 때 머리 스크립트가 그리기 전에 쓴다. 아는 값만. */
       if (ev.data.onf === 'theme') { if (ev.data.v === 'dark' || ev.data.v === 'light') { document.documentElement.setAttribute('data-theme', ev.data.v); try { localStorage.setItem('onfTheme', ev.data.v); } catch (eT) {} themeTell(); } return; }
       if (ev.data.onf === 'themeAsk') { themeAsk(ev); return; }   // 🌙 폰에선 교재가 홈 액자째 넘어가 이 자리에서 묻는다
@@ -292,11 +293,21 @@
     });
     /* ═══ 📖 교재 판(2026-10-12 Peter 홈 리디자인 3단계 · PC) ═══
        홈 액자 옆(오른쪽)에 교재 액자를 **하나 더** 띄운다 — GAS 안 GAS 액자를 만들지 않는다(그건 빈 칸이 된다 · 설계서 §3-1).
-       ⛔ 교재 액자의 말은 **그 액자에서 온 것만**(아래 자물쇠) 받고, 할 줄 아는 말은 둘뿐(bookClose · bookFull).
-         홈 액자 자물쇠(위 frameEl)는 그대로라 교재 액자의 기록 다리(hist)·제목(title)·노크(frameHello)는 **안 받는다** — 키보드·뒤로는 홈 것.
-       ⛔ unload 처리기를 달지 마라(bfcache 「뒤로」를 막는다). 닫을 땐 액자를 지운다(메모리 · 다음 열기는 새로).
-       ⚠️ 주소를 만드는 일(아는 값만 · embed=1)은 index.html 의 opts.bookSrc 가 한다 — 못 만들면 null(안 연다). */
-    var bookBox = null, bookEl = null, bookHome = null, bookHomeOrigin = '';
+       ⛔ 교재 액자의 말은 **그 액자에서 온 것만**(아래 자물쇠) 받는다. 홈 액자 자물쇠(위 frameEl)는 그대로라 교재 액자의 기록 다리(hist)·제목(title)·노크(frameHello)는 **안 받는다** — 키보드·뒤로는 홈 것.
+       ⛔ unload 처리기를 달지 마라(bfcache 「뒤로」를 막는다).
+       ⚠️ 주소를 만드는 일(아는 값만 · embed=1)은 index.html 의 opts.bookSrc 가 한다 — 못 만들면 null(안 연다).
+       ═══ 숨긴 판(2026-10-13 Peter 「닫았다가 열면 또 불러오고 … 미리 불러와서 기다리는 시간이 아예 없게」) ═══ ⚠️ 쌍둥이: teacher/index.html onf-book 블록
+       · 닫으면(✕ · Esc · 홈 탭 바꿈) 지우지 않고 **숨긴다**(.park = visibility:hidden — 초점·누르기도 안 간다). 같은 주소를 다시 열면 그 판을 그대로 보인다(0초 · 전체 화면이었으면 그대로).
+       · 다른 주소(다른 회차·교재 · 판 안 교재↔⭐ 내 문장)는 **새 판** — 보이던 판은 숨긴다(돌아가면 0초).
+         ponytail: 숨긴 판에 「그 회차로 바꿔」는 안 한다(짧은 주소→회차를 껍데기가 모른다) — 다른 회차는 새로 받는다.
+       · 홈이 bookWarm 에 panel:1 을 실으면 그 교재를 **숨긴 판으로 미리** 띄운다(bookPre · 주소에 park=1). 자리가 없으면 안 띄운다(쓰던 판을 밀어내지 않는다).
+       ⛔ 숨긴 판의 교재는 「대기」 — 접속 표시·옛 메모 이관·요약본 다시 짓기를 안 보낸다(Ownify ONF_PARK). 보일 때 {onf:'bookPark', on:false} · 숨길 때 {on:true}.
+          말은 교재가 먼저 건 bookHi 의 그 창·그 출처로만('*' 금지 · 부모가 먼저 쏘면 구글 래퍼가 버린다). bookHi 가 늦게 오면 그때 지금 상태를 답한다.
+          bookHi 를 안 한 판(옛 교재 · 아직 뜨는 중)은 숨기지 않고 **지운다** — 대기를 못 알아듣는 교재를 숨겨 두면 선생님 화면에 접속 표시가 남는다.
+       ⛔ 숨긴 판은 아무 말도 못 가로챈다 — bookClose·bookFull·openBook 은 **보이는 판**에서 온 것만 · Esc·bookDismiss 는 보이는 판만 숨긴다. themeAsk 는 숨긴 판도 답한다(보일 때 색이 맞게).
+       ⚠️ 판은 BOOK_MAX 개까지 — 넘으면 가장 오래 안 쓴 숨긴 판부터 지운다 · 숨긴 채 BOOK_IDLE_MS 지나면 지운다(메모리). 지울 땐 액자째(종전 닫기와 같다). */
+    var BOOK_MAX = 2, BOOK_IDLE_MS = 30 * 60 * 1000;
+    var books = [], bookHome = null, bookHomeOrigin = '';   // books = 판들(오래 안 쓴 것이 앞) · { box, el, src, parked, win, origin, idle, left }
     var warmed = {};
     function bookWarm(href) {
       var src = opts.bookSrc(href);
@@ -304,36 +315,68 @@
       warmed[src] = 1;
       try { global.fetch(src, { mode: 'no-cors', credentials: 'omit', cache: 'no-store' }).catch(function () {}); } catch (e) {}
     }
+    function bookShown() { for (var i = 0; i < books.length; i++) if (!books[i].parked) return books[i]; return null; }
+    function bookFind(src) { for (var i = 0; i < books.length; i++) if (books[i].src === src) return books[i]; return null; }
     /* left = 홈 왼쪽 메뉴의 오른쪽 끝(px · 홈이 잰다) — 있으면 판이 그 오른쪽부터 덮는다(2026-10-12 Peter 「창 모드일 때는 맨 왼쪽 탭만 보이게」).
        없으면(옛 홈 · 판 안에서 갈아 끼울 때) 종전 자리 그대로. ⚠️ 숫자·화면 폭 60% 안만 믿는다(남의 값으로 판이 화면 밖으로 가지 않게). */
+    function bookPlace(p, left) {
+      if (typeof left !== 'number' || !isFinite(left)) return;
+      var okL = left > 0 && left < (global.innerWidth || 0) * 0.6;
+      p.left = left;
+      p.box.classList.toggle('beside', okL);
+      if (okL) p.box.style.setProperty('--bl', Math.round(left) + 'px');
+    }
+    function bookMake(src, parked) {
+      var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, parked: parked, win: null, origin: '', idle: null, left: null };
+      p.box.className = 'onf-bookpanel';
+      if (parked) p.box.classList.add('park');
+      p.el.setAttribute('allow', 'clipboard-write; microphone');
+      p.el.setAttribute('title', '교재');
+      p.box.appendChild(p.el);
+      /* 액자 뒤에 「불러오는 중」(2026-10-12 · 홈 첫 화면 .onf-wait 와 같은 것) — 구글이 화면을 그리면 액자가 덮는다.
+         없으면 판이 9~12초 흰 빈칸이었다(라이브 내 문장 실측). ⚠️ 액자가 kids[0] 이어야 한다(검사). */
+      var wait = document.createElement('div');
+      wait.className = 'onf-wait';
+      wait.innerHTML = '<div class="onf-spin"></div><span>불러오는 중<span class="onf-ld"></span></span>';
+      p.box.appendChild(wait);
+      document.body.appendChild(p.box);
+      if (parked) p.idle = setTimeout(function () { bookDrop(p); }, BOOK_IDLE_MS);
+      p.el.src = parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src;
+      books.push(p);
+      return p;
+    }
+    function bookDrop(p) {
+      var i = books.indexOf(p);
+      if (i < 0) return;
+      books.splice(i, 1);
+      if (p.idle) clearTimeout(p.idle);
+      if (p.box.parentNode) p.box.parentNode.removeChild(p.box);
+    }
+    function bookTell(p) { if (p.win) { try { p.win.postMessage({ onf: 'bookPark', on: p.parked }, p.origin); } catch (e) {} } }
+    function bookPark(p, on) {
+      if (on && !p.win) { bookDrop(p); return; }   // 대기를 모르는 판(옛 교재 · 아직 뜨는 중)은 숨기지 않는다
+      p.parked = on;
+      p.box.classList.toggle('park', on);
+      if (p.idle) { clearTimeout(p.idle); p.idle = null; }
+      if (on) { p.idle = setTimeout(function () { bookDrop(p); }, BOOK_IDLE_MS); try { p.el.blur(); } catch (e) {} }
+      bookTell(p);
+    }
     function bookOpen(href, left) {
       var src = opts.bookSrc(href);
       if (!src) return;
-      if (!bookBox) {
-        bookBox = document.createElement('div');
-        bookBox.className = 'onf-bookpanel';
-        bookEl = document.createElement('iframe');
-        bookEl.setAttribute('allow', 'clipboard-write; microphone');
-        bookEl.setAttribute('title', '교재');
-        bookBox.appendChild(bookEl);
-        /* 액자 뒤에 「불러오는 중」(2026-10-12 · 홈 첫 화면 .onf-wait 와 같은 것) — 구글이 화면을 그리면 액자가 덮는다.
-           없으면 판이 9~12초 흰 빈칸이었다(라이브 내 문장 실측). ⚠️ 액자가 kids[0] 이어야 한다(검사). */
-        var wait = document.createElement('div');
-        wait.className = 'onf-wait';
-        wait.innerHTML = '<div class="onf-spin"></div><span>불러오는 중<span class="onf-ld"></span></span>';
-        bookBox.appendChild(wait);
-        document.body.appendChild(bookBox);
-      }
-      bookBox.classList.remove('full');
-      if (typeof left === 'number' && isFinite(left)) {
-        var okL = left > 0 && left < (global.innerWidth || 0) * 0.6;
-        bookBox.classList.toggle('beside', okL);
-        if (okL) bookBox.style.setProperty('--bl', Math.round(left) + 'px');
-      }
-      bookEl.src = src;
+      var cur = bookShown(), p = bookFind(src);
+      if (cur && cur !== p) bookPark(cur, true);
+      if (!p) p = bookMake(src, false);
+      bookPlace(p, (typeof left === 'number') ? left : (cur ? cur.left : null));   // 판 안 갈아 끼우기(left 없음)는 보이던 판 자리 그대로
+      if (p.parked) bookPark(p, false);
+      books.splice(books.indexOf(p), 1); books.push(p);   // 가장 최근
+      for (var i = 0; books.length > BOOK_MAX && i < books.length; ) { if (books[i].parked) bookDrop(books[i]); else i++; }
     }
-    /* 닫으면 판을 연 홈에 「닫혔다」를 알린다(2026-10-12) — 홈이 교재 카드 「% 채움」을 다시 읽는다(교재에서 쓴 만큼).
-       ⚠️ 받는 곳 = openBook 을 보낸 그 창 · 그 출처(위 자물쇠를 지난 googleusercontent) — '*' 금지. 옛 홈은 이 말을 모르니 그냥 버린다. */
+    function bookPre(href, left) {
+      var src = opts.bookSrc(href);
+      if (!src || books.length >= BOOK_MAX || bookFind(src)) return;
+      bookPlace(bookMake(src, true), left);
+    }
     /* 🌙 교재(다크 모드 2단계 · 2026-10-13)가 「무슨 색?」(themeAsk) → 지금 틀 색을 답하고, 홈이 색을 바꾸면 물었던 창에도 알린다.
        교재는 따르기만 한다(색을 알리지 않는다) — 선생님 홈처럼 액자 저장소가 다른 곳에서 연 교재도 홈과 같은 색이 된다.
        받는 곳 = 물은 그 창·그 출처(위 자물쇠를 지난 googleusercontent · '*' 금지) · 최근 넷만 기억. */
@@ -344,26 +387,34 @@
       themeAskers = themeAskers.filter(function (a) { return a.w !== ev.source; }).concat([{ w: ev.source, o: ev.origin }]).slice(-4);
     }
     function themeTell() { themeAskers.forEach(function (a) { try { a.w.postMessage({ onf: 'theme', v: themeNow() }, a.o); } catch (e) {} }); }
+    /* 닫으면(숨기면) 판을 연 홈에 「닫혔다」를 알린다(2026-10-12) — 홈이 교재 카드 「% 채움」을 다시 읽는다(교재에서 쓴 만큼).
+       ⚠️ 받는 곳 = openBook 을 보낸 그 창 · 그 출처(위 자물쇠를 지난 googleusercontent) — '*' 금지. 옛 홈은 이 말을 모르니 그냥 버린다. */
     function bookClose() {
-      if (!bookBox) return;
-      bookBox.parentNode.removeChild(bookBox);
-      bookBox = null; bookEl = null;
+      var p = bookShown();
+      if (!p) return;
+      bookPark(p, true);
       if (bookHome && bookHomeOrigin) { try { bookHome.postMessage({ onf: 'bookClosed' }, bookHomeOrigin); } catch (e) {} }
     }
     global.addEventListener('message', function (ev) {
+      var p = null, i;
       try {
-        if (!bookEl || !ev || !ev.data || !ev.source) return;
-        if (!_fromOurFrame(ev.source, bookEl)) return;
+        if (!ev || !ev.data || !ev.source) return;
+        for (i = 0; i < books.length && !p; i++) if (_fromOurFrame(ev.source, books[i].el)) p = books[i];
+        if (!p) return;
         if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return;
       } catch (e) { return; }
-      if (ev.data.onf === 'bookClose') bookClose();
-      else if (ev.data.onf === 'bookFull' && bookBox) bookBox.classList.toggle('full', !!ev.data.on);
-      /* 판 안에서 교재 ↔ ⭐ 내 문장을 오갈 때(2026-10-12) — 판만 갈아 끼운다(홈째 넘어가면 「뒤로」에 홈을 다시 읽는다).
+      var d = ev.data;
+      /* 교재의 노크 — 이 판의 교재 창·출처를 적고 지금 상태(숨김/보임)를 답한다. 출처는 hist 다리와 같은 모양으로 한 번 더 좁힌다(답의 targetOrigin 이 된다). */
+      if (d.onf === 'bookHi') { if (/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(String(ev.origin))) { p.win = ev.source; p.origin = ev.origin; bookTell(p); } return; }
+      if (d.onf === 'themeAsk') { themeAsk(ev); return; }   // 🌙 판 안 교재가 묻는다(2단계) — 숨긴 판도(보일 때 색이 맞게)
+      if (p.parked) return;                                 // ⛔ 숨긴 판은 닫기·전체·갈아 끼우기를 못 부른다
+      if (d.onf === 'bookClose') bookClose();
+      else if (d.onf === 'bookFull') p.box.classList.toggle('full', !!d.on);
+      /* 판 안에서 교재 ↔ ⭐ 내 문장을 오갈 때(2026-10-12) — 판만 바꾼다(홈째 넘어가면 「뒤로」에 홈을 다시 읽는다) · 10-13 부터 보이던 판은 숨기고 새 판(돌아가면 0초).
          ⚠️ 주소는 홈에서 온 것과 같은 거르개(opts.bookSrc)를 지난다 — 못 만들면 그대로 둔다. */
-      else if (ev.data.onf === 'openBook' && typeof ev.data.href === 'string') bookOpen(ev.data.href);
-      else if (ev.data.onf === 'themeAsk') themeAsk(ev);   // 🌙 판 안 교재가 묻는다(2단계)
+      else if (d.onf === 'openBook' && typeof d.href === 'string') bookOpen(d.href);
     });
-    global.addEventListener('keydown', function (e) { if (e.key === 'Escape' && bookBox) bookClose(); });   // 껍데기에 초점이 있을 때만 닿는다(액자 안 키는 [✕])
+    global.addEventListener('keydown', function (e) { if (e.key === 'Escape') bookClose(); });   // 껍데기에 초점이 있을 때만 닿는다(액자 안 키는 [✕]) · 보이는 판만(숨긴 판은 Esc 를 안 먹는다)
 
     /* 껍데기가 다시 읽힌 채 남은 표식만 지운다. ⚠️ `hideToken()`(index.html 이 mount 보다 먼저 부른다)의 `replaceState(null, …)` 가 **주소에 ?t= 가 있던 때**는 이미 state 를 null 로 만들었다 —
        그땐 아래가 할 일이 없고(표식이 없다), 표식이 남은 것은 ?t= 가 없는 다시 읽기(새로고침)뿐이다. 둘은 겹치지 않는다. url 인자를 안 주므로 hideToken 이 지운 주소를 되돌리지도 않는다. */

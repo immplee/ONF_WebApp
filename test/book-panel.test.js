@@ -22,7 +22,10 @@ function setup() {
     classList: { set: new Set(), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); }, toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } },
     setAttribute(k, v) { el.attrs[k] = v; }, appendChild(c) { el.kids.push(c); c.parentNode = el; } }; return el; };
   const top = win('shell');
-  const g = { listeners, top };
+  const timers = [];
+  const g = { listeners, top, timers,
+    setTimeout: (f, ms) => { timers.push({ f, ms, on: true }); return timers.length; },
+    clearTimeout: (id) => { if (timers[id - 1]) timers[id - 1].on = false; } };
   vm.createContext(g);
   g.window = g; g.URL = URL; g.localStorage = null; g.innerWidth = 1440; g.location = { search: '', pathname: '/', href: 'https://class.ownify.co.kr/' };
   g.navigator = { userAgent: 'node' }; g.history = { state: null, replaceState() {}, pushState() {} };
@@ -33,10 +36,12 @@ function setup() {
   const homeWin = win('home-exec', top), homeInner = win('home-user', homeWin);
   const frameEl = { contentWindow: homeWin, style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 800 }) };
   const opened = [];
-  g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { bookSrc: (h) => { opened.push(h); return /mode=share/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=share&embed=1' : null; } });
+  g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { bookSrc: (h) => { opened.push(h); const m = /-(e\d+)-/.exec(h);
+    return /mode=share/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=share' + (m && m[1] !== 'e1' ? '&ep=' + m[1] : '') + '&embed=1' : /mode=mine&v/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=mine&embed=1' : null; } });
   const send = (data, source, origin) => listeners.message.forEach((fn) => fn({ data, source, origin: origin || 'https://n-abc-0lu-script.googleusercontent.com' }));
   const panel = () => body.kids.find((k) => k.className === 'onf-bookpanel');
-  return { g, listeners, body, homeInner, homeWin, send, panel, opened, top, root };
+  const panels = () => body.kids.filter((k) => k.className === 'onf-bookpanel');
+  return { g, listeners, body, homeInner, homeWin, send, panel, panels, opened, top, root, timers };
 }
 
 console.log('[홈 안 교재 판 — 껍데기]');
@@ -108,19 +113,17 @@ t('교재 액자의 기록 다리(hist hi)·제목(title)·노크는 **홈 자�
   assert.strictEqual(bookInner.sent.length, 0, '⛔ 교재 액자의 노크를 홈 노크로 받았다(키보드 보정 창이 바뀐다)');
 });
 
-t('판 안에서 교재 ↔ 내 문장 — 교재 액자가 보낸 openBook 은 판만 갈아 끼운다 · 거르개(null)면 그대로 · 남의 출처는 버린다', () => {
+t('판 안에서 교재 ↔ 내 문장 — 교재 액자가 보낸 openBook 은 판만 바꾼다(새 판 · 보이던 판은 숨김 — 대기를 모르면 지움) · 거르개(null)면 그대로 · 남의 출처는 버린다', () => {
   const s = setup();
   s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share' }, s.homeInner);
   const box = s.panel(), bookEl = box.kids[0];
   const bookWin = win('book-exec', s.top), bookInner = win('book-user', bookWin);
   bookEl.contentWindow = bookWin;
-  bookEl.src = 'BEFORE';
   s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/?mode=mine' }, bookInner);
-  assert.strictEqual(bookEl.src, 'BEFORE', '⛔ 거르개가 못 만든 주소(null)로 판을 바꿨다');
   s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e2-b?mode=share' }, bookInner, 'https://evil.example.com');
-  assert.strictEqual(bookEl.src, 'BEFORE', '⛔ 남의 출처의 openBook 으로 판을 바꿨다');
+  assert.ok(s.panels().length === 1 && s.panel() === box && !box.classList.contains('park'), '⛔ 거르개가 못 만든 주소(null)·남의 출처의 openBook 으로 판을 바꿨다');
   s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e2-b?mode=share' }, bookInner);
-  assert.ok(s.panel() === box && bookEl.src === 'https://script.google.com/x/exec?t=T&mode=share&embed=1', '⛔ 판 안 openBook 으로 판이 안 바뀌었다(같은 판 · 새 주소)');
+  assert.ok(s.panels().length === 1 && s.panel() !== box && s.panel().kids[0].src === 'https://script.google.com/x/exec?t=T&mode=share&ep=e2&embed=1', '⛔ 판 안 openBook 으로 새 주소 판이 안 떴다(노크 없던 옛 판은 지운다)');
 });
 
 t('판 자리 — 홈이 알린 왼쪽 메뉴 끝(left)부터 덮는다 · 남의 값(0·음수·화면 60% 넘음·숫자 아님)은 종전 자리 · 판 안 갈아 끼우기는 자리 그대로 (2026-10-12 Peter)', () => {
@@ -131,7 +134,8 @@ t('판 자리 — 홈이 알린 왼쪽 메뉴 끝(left)부터 덮는다 · 남�
   const bookWin = win('book-exec', s.top), bookInner = win('book-user', bookWin);
   p.kids[0].contentWindow = bookWin;
   s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e2-b?mode=share' }, bookInner);
-  assert.ok(p.classList.contains('beside') && p.vars['--bl'] === '184px', '⛔ 판 안에서 갈아 끼우니 자리가 바뀌었다');
+  const q = s.panel();
+  assert.ok(q !== p && q.classList.contains('beside') && q.vars['--bl'] === '184px', '⛔ 판 안에서 갈아 끼우니(새 판) 자리가 바뀌었다');
   for (const bad of [0, -5, 1000, '184', NaN]) {
     const s2 = setup();
     s2.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', left: bad }, s2.homeInner);
@@ -209,6 +213,115 @@ t('📖 교재 데우기(bookWarm) — 홈 액자의 말만 · 판과 같은 거
   s.send({ onf: 'bookWarm', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share' }, s.homeInner);
   assert.deepStrictEqual(got, [['https://script.google.com/x/exec?t=T&mode=share&embed=1', { mode: 'no-cors', credentials: 'omit', cache: 'no-store' }]], '⛔ 데우기 GET 이 판 주소·한 번·쿠키 없음이 아니다');
   assert.ok(!s.panel(), '⛔ 데우기가 판을 열었다(교재가 접속 신호를 보낸다)');
+});
+
+console.log('[숨긴 판 — 2026-10-13 Peter 「미리 불러와서 기다리는 시간이 아예 없게」]');
+const O = 'https://n-abc-0lu-script.googleusercontent.com', js = (x) => JSON.parse(JSON.stringify(x));
+const E1 = 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', E2 = 'https://class.ownify.co.kr/a-s1-e2-b?mode=share', E3 = 'https://class.ownify.co.kr/a-s1-e3-b?mode=share';
+/* 판 하나에 교재 창을 붙이고 노크(bookHi)까지 — 새 교재가 뜨면 하는 일 */
+function hi(s, box, origin) {
+  const bw = win('book-exec', s.top), bi = win('book-user', bw);
+  box.kids[0].contentWindow = bw;
+  s.send({ onf: 'bookHi' }, bi, origin);
+  return bi;
+}
+
+t('닫으면 지우지 않고 숨긴다(.park) · 교재에 bookPark{on:true}(노크한 그 창·출처로만) · 홈에 bookClosed 한 번 · 같은 주소를 다시 열면 **그 판** 그대로(새로 안 받는다)', () => {
+  const s = setup();
+  s.send({ onf: 'openBook', href: E1, left: 184 }, s.homeInner);
+  const box = s.panel(), src0 = box.kids[0].src;
+  const bi = hi(s, box);
+  assert.deepStrictEqual(js(bi.sent), [[{ onf: 'bookPark', on: false }, O]], '⛔ 노크에 지금 상태(보임)를 그 출처로 안 답했다');
+  bi.sent.length = 0; s.homeInner.sent.length = 0;
+  s.send({ onf: 'bookFull', on: true }, bi);
+  s.send({ onf: 'bookClose' }, bi);
+  assert.ok(s.panels().length === 1 && box.classList.contains('park'), '⛔ 닫았는데 판을 지웠다(또는 안 숨겼다)');
+  assert.deepStrictEqual(js(bi.sent), [[{ onf: 'bookPark', on: true }, O]], '⛔ 숨겼는데 교재에 「대기」를 안 알렸다(접속 표시가 남는다)');
+  assert.deepStrictEqual(js(s.homeInner.sent), [[{ onf: 'bookClosed' }, O]], '⛔ 닫혔다는 말이 홈에 안 갔다(교재 카드 % 를 다시 안 읽는다)');
+  bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: E1, left: 184 }, s.homeInner);
+  assert.ok(s.panels().length === 1 && s.panel() === box && !box.classList.contains('park') && box.kids[0].src === src0, '⛔ 같은 교재를 다시 열었는데 숨긴 판을 안 쓰고 새로 받았다');
+  assert.ok(box.classList.contains('full'), '⛔ 전체 화면이던 판이 창으로 돌아왔다(교재 단추 글자와 어긋난다)');
+  assert.deepStrictEqual(js(bi.sent), [[{ onf: 'bookPark', on: false }, O]], '⛔ 다시 보였는데 교재에 「보임」을 안 알렸다(접속 표시가 안 돌아온다)');  const css = fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-ui.css'), 'utf8');
+  assert.ok(/\.onf-bookpanel\.park \{ visibility: hidden; pointer-events: none; \}/.test(css) && !/\.onf-bookpanel\.park \{[^}]*display: none/.test(css), '⛔ 숨긴 판이 visibility 로 숨지 않는다(display:none 이면 교재가 0 크기로 그렸다가 보일 때 다시 그린다 · 누르기·초점이 간다)');
+});
+
+t('노크(bookHi)는 그 판 액자 안 · https googleusercontent 에서 온 것만 · 늦게 와도 지금 상태로 답한다 · 노크 없는 판은 숨기지 않고 지운다(대기를 모르는 옛 교재)', () => {
+  const s = setup();
+  s.send({ onf: 'openBook', href: E1 }, s.homeInner);
+  const box = s.panel(), bw = win('book-exec', s.top), bi = win('book-user', bw);
+  box.kids[0].contentWindow = bw;
+  const stranger = win('stranger', s.top);
+  s.send({ onf: 'bookHi' }, stranger);
+  s.send({ onf: 'bookHi' }, bi, 'http://n-abc-0lu-script.googleusercontent.com');
+  s.send({ onf: 'bookHi' }, bi, 'https://evil.example.com');
+  assert.strictEqual(stranger.sent.length + bi.sent.length, 0, '⛔ 남의 창·남의 출처 노크에 답했다');
+  s.send({ onf: 'bookClose' }, bi);
+  assert.strictEqual(s.panels().length, 0, '⛔ 노크 없는 판(옛 교재)을 숨겨 두었다 — 숨긴 채 접속 신호를 보낸다');
+  //   미리 띄운 판에 노크가 늦게 오면 「대기」로 답한다
+  s.send({ onf: 'bookWarm', href: E2, panel: 1 }, s.homeInner);
+  const bi2 = hi(s, s.panel());
+  assert.deepStrictEqual(js(bi2.sent), [[{ onf: 'bookPark', on: true }, O]], '⛔ 숨긴 판의 늦은 노크에 「대기」로 안 답했다');
+});
+
+t('미리 띄우기(bookWarm panel:1) — 숨긴 판 · 주소에 park=1 · GET 데우기 안 함 · 메뉴 옆 자리 · 같은 주소 두 번은 한 번 · 자리(2)가 차면 안 띄운다 · 홈 액자 말만', () => {
+  const s = setup(), got = [];
+  s.g.fetch = (u) => { got.push(u); return Promise.resolve(); };
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 184 }, win('stranger', s.top));
+  s.send({ onf: 'bookWarm', href: 'https://class.ownify.co.kr/?mode=hw', panel: 1 }, s.homeInner);
+  assert.strictEqual(s.panels().length, 0, '⛔ 남의 말·교재 아닌 주소로 미리 띄웠다');
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 184 }, s.homeInner);
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 184 }, s.homeInner);
+  const p = s.panel();
+  assert.ok(s.panels().length === 1 && p.classList.contains('park') && p.kids[0].src === 'https://script.google.com/x/exec?t=T&mode=share&embed=1&park=1', '⛔ 숨긴 판으로(park=1) 한 번만 미리 안 띄웠다');
+  assert.ok(p.classList.contains('beside') && p.vars['--bl'] === '184px', '⛔ 미리 띄운 판이 보일 자리(메뉴 옆)가 아니다(보일 때 다시 그린다)');
+  assert.strictEqual(got.length, 0, '⛔ 숨긴 판을 띄우면서 GET 데우기도 했다(두 번 받는다)');
+  //   누르면 그 판이 0초로 — 새 액자 없음
+  hi(s, p);
+  s.send({ onf: 'openBook', href: E1, left: 184 }, s.homeInner);
+  assert.ok(s.panels().length === 1 && !p.classList.contains('park'), '⛔ 미리 띄운 판을 안 쓰고 새로 받았다');
+  //   자리 — 보이는 판 하나 + 미리 하나 = 둘 · 셋째 미리는 안 띄운다(쓰던 판을 밀어내지 않는다)
+  s.send({ onf: 'bookWarm', href: E2, panel: 1 }, s.homeInner);
+  s.send({ onf: 'bookWarm', href: E3, panel: 1 }, s.homeInner);
+  assert.strictEqual(s.panels().length, 2, '⛔ 자리가 찼는데 또 미리 띄웠다');
+});
+
+t('⛔ 숨긴 판은 아무 말도 못 가로챈다 — bookClose·bookFull·openBook 은 버림 · Esc·bookDismiss 는 보이는 판만(홈에 헛 bookClosed 없음) · themeAsk 는 답한다(보일 때 색)', () => {
+  const s = setup();
+  s.root.getAttribute = (k) => s.root.attrs[k];
+  s.send({ onf: 'bookWarm', href: E1, panel: 1 }, s.homeInner);
+  const box = s.panel(), bi = hi(s, box);
+  bi.sent.length = 0;
+  s.send({ onf: 'bookFull', on: true }, bi);
+  s.send({ onf: 'openBook', href: E2 }, bi);
+  s.send({ onf: 'bookClose' }, bi);
+  assert.ok(s.panels().length === 1 && box.classList.contains('park') && !box.classList.contains('full'), '⛔ 숨긴 판의 말(전체·갈아 끼우기·닫기)을 받았다');
+  s.homeInner.sent.length = 0;
+  s.listeners.keydown.forEach((fn) => fn({ key: 'Escape' }));
+  s.send({ onf: 'bookDismiss' }, s.homeInner);
+  assert.ok(s.panels().length === 1 && s.homeInner.sent.length === 0 && bi.sent.length === 0, '⛔ 숨긴 판만 있는데 Esc·탭 바꿈이 판을 건드렸다(또는 홈에 헛 bookClosed)');
+  s.send({ onf: 'themeAsk' }, bi);
+  assert.deepStrictEqual(js(bi.sent), [[{ onf: 'theme', v: 'light' }, O]], '⛔ 숨긴 판 교재의 색 물음에 안 답했다(보일 때 색이 틀린다)');
+});
+
+t('다른 교재·회차는 새 판 · 보이던 판은 숨김 → 돌아가면 0초 · 판은 둘까지(가장 오래 안 쓴 숨긴 판부터 지움) · 숨긴 채 30분이면 지움', () => {
+  const s = setup();
+  s.send({ onf: 'openBook', href: E1, left: 184 }, s.homeInner);
+  const a = s.panel(), ai = hi(s, a);
+  s.send({ onf: 'openBook', href: E2, left: 184 }, s.homeInner);
+  const b = s.panels().find((x) => x !== a);
+  assert.ok(a.classList.contains('park') && b && !b.classList.contains('park'), '⛔ 다른 회차를 열었는데 보이던 판을 안 숨겼다(또는 새 판이 없다)');
+  assert.deepStrictEqual(js(ai.sent.slice(-1)), [[{ onf: 'bookPark', on: true }, O]], '⛔ 가려진 판 교재에 「대기」를 안 알렸다');
+  hi(s, b);
+  s.send({ onf: 'openBook', href: E1, left: 184 }, s.homeInner);
+  assert.ok(!a.classList.contains('park') && b.classList.contains('park') && s.panels().length === 2, '⛔ 앞 회차로 돌아갔는데 숨긴 판을 안 썼다');
+  s.send({ onf: 'openBook', href: E3, left: 184 }, s.homeInner);
+  assert.ok(s.panels().length === 2 && s.panels().indexOf(b) < 0 && s.panels().indexOf(a) >= 0, '⛔ 셋째 판 — 가장 오래 안 쓴 숨긴 판(E2)을 안 지웠다(또는 방금 쓴 판을 지웠다)');
+  //   숨긴 채 오래 — 지운다(메모리) · 다시 보인 판의 시계는 멈춘다
+  const idle = s.timers.filter((x) => x.on && x.ms === 30 * 60 * 1000);
+  assert.strictEqual(idle.length, 1, '⛔ 숨긴 판(E1)에 30분 시계가 하나가 아니다(보인 판 시계를 안 멈췄거나 숨긴 판에 안 걸었다)');
+  idle[0].f();
+  assert.ok(s.panels().length === 1 && s.panels().indexOf(a) < 0, '⛔ 30분 숨긴 판을 안 지웠다');
 });
 
 t('Esc — 판이 열려 있으면 닫는다', () => {

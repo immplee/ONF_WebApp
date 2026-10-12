@@ -363,9 +363,14 @@ window.addEventListener('message', function (ev) {
    메뉴 옆(left)에 판을 띄운다 · 판 안 [전체 화면/창으로][✕] · 판 안 교재↔내 문장은 판만 갈아 끼움 · 홈이 탭을 바꾸면(bookDismiss) 닫음 · Esc 닫음.
    ⛔ 받는 말: 홈 = 내 액자 후손(fromOurFrame) + googleusercontent · 판 = 판 액자 후손 + googleusercontent. 남의 창 말은 버린다.
    ⛔ 주소는 **아는 값만** 골라 교재 앱(ONF.api.EXEC)으로 — 선생님 보기라 학생 토큰(t)·선생님 자격(ttok)·이름표(tas)를 싣는다(새 탭으로 열던 그 주소의 값 그대로).
-   ⛔ unload 처리기 금지(bfcache). 닫으면 액자째 지운다. */
+   ⛔ unload 처리기 금지(bfcache).
+   ═══ 숨긴 판(2026-10-13 Peter 「미리 불러와서 기다리는 시간이 아예 없게」) — 학생 껍데기 assets/onf-frame.js 의 교재 판 주석이 정본(⚠️ 쌍둥이) ═══
+   닫으면 지우지 않고 숨긴다(.park) · 같은 주소는 그 판 그대로(0초) · 다른 주소는 새 판(보이던 판은 숨김) · 홈이 bookWarm{panel:1}(지금·곧 할 수업 교재)이면 숨긴 판으로 미리(park=1).
+   ⛔ 숨긴 판 교재는 「대기」(bookPark — 노크 bookHi 의 그 창·출처로만) — 선생님이 미리 띄운 것이 학생 화면에 「선생님 접속 중」으로 안 뜬다. 노크 없는 판은 숨기지 않고 지운다.
+   ⛔ 숨긴 판은 닫기·전체·갈아 끼우기·Esc 를 못 가로챈다 · 둘까지 · 숨긴 채 30분이면 지운다. */
 /* onf-book:begin */
-var bookBox = null, bookEl = null, bookHome = null, bookHomeOrigin = '';
+var BOOK_MAX = 2, BOOK_IDLE_MS = 30 * 60 * 1000;
+var books = [], bookHome = null, bookHomeOrigin = '';   // books = 판들(오래 안 쓴 것이 앞) · { box, el, src, parked, win, origin, idle, left }
 var BOOK_KEYS = ['t', 'mode', 'fileId', 'sheetName', 'back', 'line', 'view', 'ttok', 'tas'];
 function teacherBookSrc(href) {
   try {
@@ -390,29 +395,63 @@ function bookFrom(ev, el) {
   } catch (e) {}
   return false;
 }
+function bookShown() { for (var i = 0; i < books.length; i++) if (!books[i].parked) return books[i]; return null; }
+function bookFind(src) { for (var i = 0; i < books.length; i++) if (books[i].src === src) return books[i]; return null; }
+function bookPlace(p, left) {
+  if (typeof left !== 'number' || !isFinite(left)) return;
+  var okL = left > 0 && left < (window.innerWidth || 0) * 0.6;
+  p.left = left;
+  p.box.classList.toggle('beside', okL);
+  if (okL) p.box.style.setProperty('--bl', Math.round(left) + 'px');
+}
+function bookMake(src, parked) {
+  var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, parked: parked, win: null, origin: '', idle: null, left: null };
+  p.box.className = 'onf-bookpanel';
+  if (parked) p.box.classList.add('park');
+  p.el.setAttribute('allow', 'clipboard-write; microphone');
+  p.el.setAttribute('title', '교재');
+  p.box.appendChild(p.el);
+  var wait = document.createElement('div');
+  wait.className = 'onf-wait';
+  wait.innerHTML = '<div class="onf-spin"></div><span>불러오는 중<span class="onf-ld"></span></span>';
+  p.box.appendChild(wait);
+  document.body.appendChild(p.box);
+  if (parked) p.idle = setTimeout(function () { bookDrop(p); }, BOOK_IDLE_MS);
+  p.el.src = parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src;
+  books.push(p);
+  return p;
+}
+function bookDrop(p) {
+  var i = books.indexOf(p);
+  if (i < 0) return;
+  books.splice(i, 1);
+  if (p.idle) clearTimeout(p.idle);
+  if (p.box.parentNode) p.box.parentNode.removeChild(p.box);
+}
+function bookTell(p) { if (p.win) { try { p.win.postMessage({ onf: 'bookPark', on: p.parked }, p.origin); } catch (e) {} } }
+function bookPark(p, on) {
+  if (on && !p.win) { bookDrop(p); return; }   // 대기를 모르는 판(옛 교재 · 아직 뜨는 중)은 숨기지 않는다
+  p.parked = on;
+  p.box.classList.toggle('park', on);
+  if (p.idle) { clearTimeout(p.idle); p.idle = null; }
+  if (on) { p.idle = setTimeout(function () { bookDrop(p); }, BOOK_IDLE_MS); try { p.el.blur(); } catch (e) {} }
+  bookTell(p);
+}
 function bookOpen(href, left) {
   var src = teacherBookSrc(href);
   if (!src) return;
-  if (!bookBox) {
-    bookBox = document.createElement('div');
-    bookBox.className = 'onf-bookpanel';
-    bookEl = document.createElement('iframe');
-    bookEl.setAttribute('allow', 'clipboard-write; microphone');
-    bookEl.setAttribute('title', '교재');
-    bookBox.appendChild(bookEl);
-    var wait = document.createElement('div');
-    wait.className = 'onf-wait';
-    wait.innerHTML = '<div class="onf-spin"></div><span>불러오는 중<span class="onf-ld"></span></span>';
-    bookBox.appendChild(wait);
-    document.body.appendChild(bookBox);
-  }
-  bookBox.classList.remove('full');
-  if (typeof left === 'number' && isFinite(left)) {
-    var okL = left > 0 && left < (window.innerWidth || 0) * 0.6;
-    bookBox.classList.toggle('beside', okL);
-    if (okL) bookBox.style.setProperty('--bl', Math.round(left) + 'px');
-  }
-  bookEl.src = src;
+  var cur = bookShown(), p = bookFind(src);
+  if (cur && cur !== p) bookPark(cur, true);
+  if (!p) p = bookMake(src, false);
+  bookPlace(p, (typeof left === 'number') ? left : (cur ? cur.left : null));   // 판 안 갈아 끼우기(left 없음)는 보이던 판 자리 그대로
+  if (p.parked) bookPark(p, false);
+  books.splice(books.indexOf(p), 1); books.push(p);   // 가장 최근
+  for (var i = 0; books.length > BOOK_MAX && i < books.length; ) { if (books[i].parked) bookDrop(books[i]); else i++; }
+}
+function bookPre(href, left) {
+  var src = teacherBookSrc(href);
+  if (!src || books.length >= BOOK_MAX || bookFind(src)) return;
+  bookPlace(bookMake(src, true), left);
 }
 /** 🌙 안쪽이 알려 준 화면 색 — 틀·판 둘레·「불러오는 중」도 같은 색 · 다음에 열 때 머리 스크립트가 그리기 전에 쓴다. 아는 값만. */
 function onfShellTheme(v) {
@@ -431,29 +470,32 @@ function themeAsk(ev) {
 }
 function themeTell() { themeAskers.forEach(function (a) { try { a.w.postMessage({ onf: 'theme', v: themeNow() }, a.o); } catch (e) {} }); }
 function bookClose() {
-  if (!bookBox) return;
-  bookBox.parentNode.removeChild(bookBox);
-  bookBox = null; bookEl = null;
+  var p = bookShown();
+  if (!p) return;
+  bookPark(p, true);
   if (bookHome && bookHomeOrigin) { try { bookHome.postMessage({ onf: 'bookClosed' }, bookHomeOrigin); } catch (e) {} }
 }
 window.addEventListener('message', function (ev) {
-  var d = ev && ev.data;
+  var d = ev && ev.data, p = null, i;
   if (!d || typeof d.onf !== 'string') return;
   if (bookFrom(ev, frame)) {                                   // 선생님 홈(내 액자)
     if (d.onf === 'bookHello') { try { ev.source.postMessage({ onf: 'caps', book: 1 }, ev.origin); } catch (e) {} return; }
     if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left); return; }
-    if (d.onf === 'bookDismiss') { if (bookBox) bookClose(); return; }
+    if (d.onf === 'bookWarm' && d.panel === 1 && typeof d.href === 'string') { bookPre(d.href, d.left); return; }   // 지금·곧 할 수업 교재를 숨긴 판으로 미리(10-13)
+    if (d.onf === 'bookDismiss') { bookClose(); return; }
     if (d.onf === 'theme') { onfShellTheme(d.v); return; }   // 🌙 화면 색(안쪽 선생님 홈이 알린다)
     return;
   }
-  if (bookEl && bookFrom(ev, bookEl)) {                        // 판 액자(교재·내 문장)
-    if (d.onf === 'bookClose') bookClose();
-    else if (d.onf === 'bookFull' && bookBox) bookBox.classList.toggle('full', !!d.on);
-    else if (d.onf === 'openBook' && typeof d.href === 'string') bookOpen(d.href);
-    else if (d.onf === 'themeAsk') themeAsk(ev);              // 🌙 판 안 교재가 묻는다(2단계)
-  }
+  for (i = 0; i < books.length && !p; i++) if (bookFrom(ev, books[i].el)) p = books[i];
+  if (!p) return;                                              // 판 액자(교재·내 문장)
+  if (d.onf === 'bookHi') { if (/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(String(ev.origin))) { p.win = ev.source; p.origin = ev.origin; bookTell(p); } return; }
+  if (d.onf === 'themeAsk') { themeAsk(ev); return; }         // 🌙 판 안 교재가 묻는다(2단계) — 숨긴 판도(보일 때 색이 맞게)
+  if (p.parked) return;                                        // ⛔ 숨긴 판은 닫기·전체·갈아 끼우기를 못 부른다
+  if (d.onf === 'bookClose') bookClose();
+  else if (d.onf === 'bookFull') p.box.classList.toggle('full', !!d.on);
+  else if (d.onf === 'openBook' && typeof d.href === 'string') bookOpen(d.href);
 });
-window.addEventListener('keydown', function (e) { if (e.key === 'Escape' && bookBox) bookClose(); });
+window.addEventListener('keydown', function (e) { if (e.key === 'Escape') bookClose(); });   // 보이는 판만(숨긴 판은 Esc 를 안 먹는다)
 /* onf-book:end */
 
 /* ═══ 기록 칸 다리 — 안쪽의 「뒤로 = 창 닫기」 기록 칸을 **여기(최상위 문서)** 에 만든다 (Peter 2026-10-01) ═══

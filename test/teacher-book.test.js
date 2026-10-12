@@ -34,12 +34,16 @@ function run() {
   const g = { URL, top, frame, innerWidth: 1440, location: { href: 'https://class.ownify.co.kr/teacher/' },
     document: { body, createElement: mkEl, documentElement: { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } } }, ONF: { api: { EXEC } }, localStorage: { s: {}, getItem(k) { return k in this.s ? this.s[k] : null; }, setItem(k, v) { this.s[k] = String(v); } },
     addEventListener: (k, f) => { (L[k] = L[k] || []).push(f); } };
+  const timers = [];
+  g.setTimeout = (f, ms) => { timers.push({ f, ms, on: true }); return timers.length; };
+  g.clearTimeout = (id) => { if (timers[id - 1]) timers[id - 1].on = false; };
   g.window = g;
   vm.createContext(g);
   vm.runInContext(src.slice(A, B), g, { filename: 'teacher-book' });
   const send = (data, source, origin) => (L.message || []).forEach((f) => f({ data, source, origin: origin || ORIGIN }));
   const panel = () => body.kids.find((k) => k.className === 'onf-bookpanel');
-  return { g, L, home, top, send, panel };
+  const panels = () => body.kids.filter((k) => k.className === 'onf-bookpanel');
+  return { g, L, home, top, send, panel, panels, timers };
 }
 const TURL = 'https://class.ownify.co.kr/young-s1-e1-jungah?mode=share&t=STUTOK&ttok=CRED&tas=Peter&evil=1';
 
@@ -89,12 +93,15 @@ t('판 액자 — 전체 화면 · 닫기(홈에 bookClosed 한 번) · 판 안 
   s.send({ onf: 'bookFull', on: true }, inner);
   assert.ok(p.classList.contains('full'), '⛔ 전체 화면이 안 된다');
   s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/?mode=mine&t=STUTOK&ttok=M&tas=Peter' }, inner);
-  assert.ok(s.panel() === p && /mode=mine/.test(p.kids[0].src) && p.classList.contains('beside'), '⛔ 판 안에서 내 문장으로 안 갈아 끼웠다(또는 자리가 바뀌었다)');
+  const q = s.panel();
+  assert.ok(s.panels().length === 1 && q !== p && /mode=mine/.test(q.kids[0].src) && q.classList.contains('beside'), '⛔ 판 안에서 내 문장으로 안 바꿨다(또는 자리가 바뀌었다 · 노크 없던 옛 판은 지운다)');
+  const qInner = win('book-user2', win('book-exec2', s.top));
+  q.kids[0].contentWindow = qInner.parent;
   s.send({ onf: 'bookClose' }, s.home);
   assert.ok(s.panel(), '⛔ 홈 액자의 bookClose 로 닫혔다');
   s.home.sent.length = 0;
-  s.send({ onf: 'bookClose' }, inner);
-  assert.ok(!s.panel(), '⛔ 판 액자의 bookClose 로 안 닫혔다');
+  s.send({ onf: 'bookClose' }, qInner);
+  assert.ok(!s.panel(), '⛔ 판 액자의 bookClose 로 안 닫혔다(노크 없는 판은 지운다)');
   assert.deepStrictEqual(JSON.parse(JSON.stringify(s.home.sent)), [[{ onf: 'bookClosed' }, ORIGIN]], '⛔ 닫혔다는 말이 홈에 안 갔다');
 });
 
@@ -107,6 +114,59 @@ t('홈의 bookDismiss(탭 바꿈) · Esc 로 닫는다', () => {
   s.send({ onf: 'openBook', href: TURL }, s.home);
   s.L.keydown.forEach((f) => f({ key: 'Escape' }));
   assert.ok(!s.panel(), '⛔ Esc 로 안 닫힌다');
+});
+
+t('📖 숨긴 판(2026-10-13) — 닫으면 숨김(.park) · 교재에 bookPark(노크한 창·출처로만) · 같은 주소는 그 판 그대로 · 노크는 판 액자·https googleusercontent 만', () => {
+  const s = run(), js = (x) => JSON.parse(JSON.stringify(x));
+  s.send({ onf: 'openBook', href: TURL, left: 184 }, s.home);
+  const p = s.panel(), src0 = p.kids[0].src, bw = win('book-exec', s.top), bi = win('book-user', win('book-sbx', bw));
+  p.kids[0].contentWindow = bw;
+  s.send({ onf: 'bookHi' }, win('stranger', s.top));
+  s.send({ onf: 'bookHi' }, bi, 'http://n-abc-script.googleusercontent.com');
+  assert.strictEqual(bi.sent.length, 0, '⛔ 남의 창·http 출처 노크에 답했다');
+  s.send({ onf: 'bookHi' }, bi);
+  assert.deepStrictEqual(js(bi.sent), [[{ onf: 'bookPark', on: false }, ORIGIN]], '⛔ 노크에 지금 상태를 그 출처로 안 답했다');
+  s.home.sent.length = 0; bi.sent.length = 0;
+  s.send({ onf: 'bookClose' }, bi);
+  assert.ok(s.panels().length === 1 && p.classList.contains('park'), '⛔ 닫았는데 지웠다(또는 안 숨겼다)');
+  assert.deepStrictEqual(js(bi.sent), [[{ onf: 'bookPark', on: true }, ORIGIN]], '⛔ 숨겼는데 교재에 「대기」를 안 알렸다(학생 화면에 「선생님 접속 중」이 남는다)');
+  assert.deepStrictEqual(js(s.home.sent), [[{ onf: 'bookClosed' }, ORIGIN]], '⛔ 닫혔다는 말이 홈에 안 갔다');
+  //   숨긴 판은 말을 못 가로챈다 · Esc·탭 바꿈은 보이는 판만
+  s.send({ onf: 'bookFull', on: true }, bi); s.send({ onf: 'openBook', href: TURL.replace('e1', 'e2') }, bi);
+  s.L.keydown.forEach((f) => f({ key: 'Escape' })); s.send({ onf: 'bookDismiss' }, s.home);
+  assert.ok(s.panels().length === 1 && !p.classList.contains('full') && s.home.sent.length === 1, '⛔ 숨긴 판의 말·Esc·탭 바꿈이 판을 건드렸다');
+  bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: TURL, left: 184 }, s.home);
+  assert.ok(s.panels().length === 1 && !p.classList.contains('park') && p.kids[0].src === src0, '⛔ 같은 교재를 다시 열었는데 숨긴 판을 안 썼다');
+  assert.deepStrictEqual(js(bi.sent), [[{ onf: 'bookPark', on: false }, ORIGIN]], '⛔ 다시 보였는데 「보임」을 안 알렸다');  const idle = () => s.timers.filter((x) => x.on && x.ms === 30 * 60 * 1000);
+  assert.strictEqual(idle().length, 0, '⛔ 다시 보인 판의 30분 시계를 안 멈췄다(보는 중에 지워진다)');
+  //   다른 교재 둘 더 — 둘까지 · 가장 오래 안 쓴 숨긴 판부터 지운다 · 숨긴 채 30분이면 지운다
+  s.send({ onf: 'openBook', href: TURL.replace('e1', 'e2'), left: 184 }, s.home);
+  const q = s.panels().find((x) => x !== p), qi = win('book-user2', win('book-exec2', s.top));
+  q.kids[0].contentWindow = qi.parent; s.send({ onf: 'bookHi' }, qi);
+  assert.ok(p.classList.contains('park') && !q.classList.contains('park'), '⛔ 다른 교재를 열었는데 보이던 판을 안 숨겼다');
+  s.send({ onf: 'openBook', href: TURL.replace('e1', 'e3'), left: 184 }, s.home);
+  assert.ok(s.panels().length === 2 && s.panels().indexOf(p) < 0 && s.panels().indexOf(q) >= 0, '⛔ 셋째 판 — 가장 오래 안 쓴 숨긴 판을 안 지웠다');
+  assert.strictEqual(idle().length, 1, '⛔ 숨긴 판(E2)에 30분 시계가 하나가 아니다');
+  idle()[0].f();
+  assert.ok(s.panels().length === 1 && s.panels().indexOf(q) < 0, '⛔ 30분 숨긴 판을 안 지웠다');
+});
+
+t('📖 미리 띄우기(bookWarm panel:1 · 2026-10-13) — 홈 액자 말만 · 숨긴 판 · 주소에 park=1 · 메뉴 옆 · 같은 주소 한 번 · 둘까지 · panel 없으면 안 함 · 숨긴 채 30분이면 지움', () => {
+  const s = run();
+  s.send({ onf: 'bookWarm', href: TURL, panel: 1, left: 184 }, win('stranger', s.top));
+  s.send({ onf: 'bookWarm', href: TURL, left: 184 }, s.home);
+  s.send({ onf: 'bookWarm', href: 'https://class.ownify.co.kr/?mode=hw&t=X', panel: 1 }, s.home);
+  assert.strictEqual(s.panels().length, 0, '⛔ 남의 말·panel 없는 말·교재 아닌 주소로 미리 띄웠다');
+  s.send({ onf: 'bookWarm', href: TURL, panel: 1, left: 184 }, s.home);
+  s.send({ onf: 'bookWarm', href: TURL, panel: 1, left: 184 }, s.home);
+  const p = s.panel();
+  assert.ok(s.panels().length === 1 && p.classList.contains('park') && /&embed=1&park=1$/.test(p.kids[0].src) && p.classList.contains('beside'), '⛔ 숨긴 판(park=1 · 메뉴 옆)으로 한 번만 안 띄웠다');
+  s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e2'), panel: 1 }, s.home);
+  s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e3'), panel: 1 }, s.home);
+  assert.strictEqual(s.panels().length, 2, '⛔ 둘을 넘겨 미리 띄웠다');
+  s.timers.filter((x) => x.on && x.ms === 30 * 60 * 1000).forEach((x) => x.f());
+  assert.strictEqual(s.panels().length, 0, '⛔ 30분 숨긴 판을 안 지웠다');
 });
 
 t('🌙 화면 색 — 선생님 홈(내 액자)이 알린 theme 만 <html data-theme> · localStorage · 남의 창·모르는 값은 버린다 (2026-10-12)', () => {
