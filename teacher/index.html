@@ -419,7 +419,17 @@ function onfShellTheme(v) {
   if (v !== 'dark' && v !== 'light') return;
   document.documentElement.setAttribute('data-theme', v);
   try { localStorage.setItem('onfTheme', v); } catch (e) {}
+  themeTell();
 }
+/** 🌙 판 안 교재(다크 2단계 · 2026-10-13)가 「무슨 색?」(themeAsk) → 지금 틀 색을 답하고, 홈이 색을 바꾸면 물었던 창에도 알린다.
+    교재 액자 저장소는 선생님 홈과 달라 홈에서 고른 색을 모른다 — 이 길로만 같은 색이 된다. 받는 곳 = 물은 그 창·그 출처 · 최근 넷. */
+var themeAskers = [];
+function themeNow() { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+function themeAsk(ev) {
+  try { ev.source.postMessage({ onf: 'theme', v: themeNow() }, ev.origin); } catch (e) {}
+  themeAskers = themeAskers.filter(function (a) { return a.w !== ev.source; }).concat([{ w: ev.source, o: ev.origin }]).slice(-4);
+}
+function themeTell() { themeAskers.forEach(function (a) { try { a.w.postMessage({ onf: 'theme', v: themeNow() }, a.o); } catch (e) {} }); }
 function bookClose() {
   if (!bookBox) return;
   bookBox.parentNode.removeChild(bookBox);
@@ -440,6 +450,7 @@ window.addEventListener('message', function (ev) {
     if (d.onf === 'bookClose') bookClose();
     else if (d.onf === 'bookFull' && bookBox) bookBox.classList.toggle('full', !!d.on);
     else if (d.onf === 'openBook' && typeof d.href === 'string') bookOpen(d.href);
+    else if (d.onf === 'themeAsk') themeAsk(ev);              // 🌙 판 안 교재가 묻는다(2단계)
   }
 });
 window.addEventListener('keydown', function (e) { if (e.key === 'Escape' && bookBox) bookClose(); });

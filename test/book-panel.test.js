@@ -179,6 +179,25 @@ t('🌙 화면 색 — 홈 액자가 알린 theme 만 <html data-theme> · local
   }
 });
 
+t('🌙 다크 2단계 — 판 안 교재가 themeAsk 로 물으면 지금 틀 색을 그 창·그 출처로 답한다 · 홈이 색을 바꾸면 물었던 교재에도 알린다 · 남의 출처엔 안 답한다 · 폰(홈 액자째 넘어간 교재)도 (2026-10-13)', () => {
+  const s = setup(), O = 'https://n-abc-0lu-script.googleusercontent.com', js = (x) => JSON.parse(JSON.stringify(x));
+  s.root.getAttribute = (k) => s.root.attrs[k];
+  s.send({ onf: 'theme', v: 'dark' }, s.homeInner);
+  s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share' }, s.homeInner);
+  const bookWin = win('book-exec', s.top), bookInner = win('book-user', bookWin);
+  s.panel().kids[0].contentWindow = bookWin;
+  s.send({ onf: 'themeAsk' }, bookInner, 'https://evil.example.com');
+  s.send({ onf: 'themeAsk' }, win('stranger', s.top));
+  assert.strictEqual(bookInner.sent.length, 0, '⛔ 남의 출처·남의 창에 답했다');
+  s.send({ onf: 'themeAsk' }, bookInner);
+  assert.deepStrictEqual(js(bookInner.sent), [[{ onf: 'theme', v: 'dark' }, O]], '⛔ 교재 물음에 지금 색(다크)을 그 출처로 안 답했다');
+  s.send({ onf: 'theme', v: 'light' }, s.homeInner);
+  assert.deepStrictEqual(js(bookInner.sent.slice(-1)), [[{ onf: 'theme', v: 'light' }, O]], '⛔ 홈이 바꾼 색을 물었던 교재에 안 알렸다');
+  s.homeInner.sent.length = 0;
+  s.send({ onf: 'themeAsk' }, s.homeInner);
+  assert.deepStrictEqual(js(s.homeInner.sent), [[{ onf: 'theme', v: 'light' }, O]], '⛔ 폰(홈 액자째 넘어간 교재)의 물음에 안 답했다');
+});
+
 t('📖 교재 데우기(bookWarm) — 홈 액자의 말만 · 판과 같은 거르개(교재만) · 쿠키 없이 한 번 GET · 같은 주소 두 번은 한 번 · 판은 안 연다 (2026-10-12 · 설계서 §1-5)', () => {
   const s = setup(), got = [];
   s.g.fetch = (u, o) => { got.push([u, JSON.parse(JSON.stringify(o))]); return Promise.resolve(); };

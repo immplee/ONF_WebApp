@@ -118,6 +118,20 @@ t('🌙 화면 색 — 선생님 홈(내 액자)이 알린 theme 만 <html data-
   assert.ok(root.attrs['data-theme'] === 'dark' && ls.onfTheme === 'dark', '⛔ 선생님 홈이 알린 다크를 안 달았다');
 });
 
+t('🌙 다크 2단계 — 판 안 교재가 themeAsk 로 물으면 지금 틀 색을 그 창·그 출처로 답한다 · 선생님 홈이 색을 바꾸면 물었던 교재에도 · 남의 창엔 안 답한다 (2026-10-13)', () => {
+  const s = run(), root = s.g.document.documentElement, js = (x) => JSON.parse(JSON.stringify(x));
+  root.getAttribute = (k) => root.attrs[k];
+  s.send({ onf: 'theme', v: 'dark' }, s.home);
+  s.send({ onf: 'openBook', href: TURL }, s.home);
+  const bookExec = win('book-exec', s.top), bookInner = win('book-user', win('book-sbx', bookExec));
+  s.panel().kids[0].contentWindow = bookExec;
+  s.send({ onf: 'themeAsk' }, win('stranger', s.top));
+  s.send({ onf: 'themeAsk' }, bookInner);
+  assert.deepStrictEqual(js(bookInner.sent), [[{ onf: 'theme', v: 'dark' }, ORIGIN]], '⛔ 판 안 교재 물음에 지금 색(다크)을 안 답했다');
+  s.send({ onf: 'theme', v: 'light' }, s.home);
+  assert.deepStrictEqual(js(bookInner.sent.slice(-1)), [[{ onf: 'theme', v: 'light' }, ORIGIN]], '⛔ 선생님 홈이 바꾼 색을 교재에 안 알렸다');
+});
+
 t('⛔ 판 블록에 unload 처리기가 없다(bfcache)', () => {
   assert.ok(!/addEventListener\(\s*['"](?:before)?unload['"]|onunload\s*=/.test(src.slice(A, B)));
   assert.ok(/<script src="\.\.\/assets\/onf-api\.js"><\/script>/.test(src), '⛔ 교재 앱 주소(onf-api.js)를 안 싣는다');

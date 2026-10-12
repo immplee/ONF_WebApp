@@ -223,7 +223,8 @@
          ⛔ 판을 숨겨 띄우지 않는다(교재가 접속 신호를 보낸다) · 주소는 판과 같은 거르개(bookSrc — 교재만 · 아는 값만 · embed=1) · 쿠키 안 실음 · 한 주소 한 번. */
       if (ev.data.onf === 'bookWarm' && opts.bookSrc && typeof ev.data.href === 'string') { bookWarm(ev.data.href); return; }
       /* 🌙 화면 색(Peter 2026-10-12 다크 모드) — 안쪽 홈이 알린다 · 틀·판 둘레·「불러오는 중」을 같은 색으로 · 다음에 열 때 머리 스크립트가 그리기 전에 쓴다. 아는 값만. */
-      if (ev.data.onf === 'theme') { if (ev.data.v === 'dark' || ev.data.v === 'light') { document.documentElement.setAttribute('data-theme', ev.data.v); try { localStorage.setItem('onfTheme', ev.data.v); } catch (eT) {} } return; }
+      if (ev.data.onf === 'theme') { if (ev.data.v === 'dark' || ev.data.v === 'light') { document.documentElement.setAttribute('data-theme', ev.data.v); try { localStorage.setItem('onfTheme', ev.data.v); } catch (eT) {} themeTell(); } return; }
+      if (ev.data.onf === 'themeAsk') { themeAsk(ev); return; }   // 🌙 폰에선 교재가 홈 액자째 넘어가 이 자리에서 묻는다
       // 탭 제목 — 앱(=GAS)만 학생 이름을 안다. 보이는 탭 제목은 **이 창**이 정하므로 받아서 세운다.
       //   위 오리진 검사를 이미 통과한 메시지다. 줄바꿈을 지우고 길이를 잘라 그대로 쓴다.
       if (ev && ev.data && ev.data.onf === 'title' && typeof ev.data.t === 'string') {
@@ -333,6 +334,16 @@
     }
     /* 닫으면 판을 연 홈에 「닫혔다」를 알린다(2026-10-12) — 홈이 교재 카드 「% 채움」을 다시 읽는다(교재에서 쓴 만큼).
        ⚠️ 받는 곳 = openBook 을 보낸 그 창 · 그 출처(위 자물쇠를 지난 googleusercontent) — '*' 금지. 옛 홈은 이 말을 모르니 그냥 버린다. */
+    /* 🌙 교재(다크 모드 2단계 · 2026-10-13)가 「무슨 색?」(themeAsk) → 지금 틀 색을 답하고, 홈이 색을 바꾸면 물었던 창에도 알린다.
+       교재는 따르기만 한다(색을 알리지 않는다) — 선생님 홈처럼 액자 저장소가 다른 곳에서 연 교재도 홈과 같은 색이 된다.
+       받는 곳 = 물은 그 창·그 출처(위 자물쇠를 지난 googleusercontent · '*' 금지) · 최근 넷만 기억. */
+    var themeAskers = [];
+    function themeNow() { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+    function themeAsk(ev) {
+      try { ev.source.postMessage({ onf: 'theme', v: themeNow() }, ev.origin); } catch (e) {}
+      themeAskers = themeAskers.filter(function (a) { return a.w !== ev.source; }).concat([{ w: ev.source, o: ev.origin }]).slice(-4);
+    }
+    function themeTell() { themeAskers.forEach(function (a) { try { a.w.postMessage({ onf: 'theme', v: themeNow() }, a.o); } catch (e) {} }); }
     function bookClose() {
       if (!bookBox) return;
       bookBox.parentNode.removeChild(bookBox);
@@ -350,6 +361,7 @@
       /* 판 안에서 교재 ↔ ⭐ 내 문장을 오갈 때(2026-10-12) — 판만 갈아 끼운다(홈째 넘어가면 「뒤로」에 홈을 다시 읽는다).
          ⚠️ 주소는 홈에서 온 것과 같은 거르개(opts.bookSrc)를 지난다 — 못 만들면 그대로 둔다. */
       else if (ev.data.onf === 'openBook' && typeof ev.data.href === 'string') bookOpen(ev.data.href);
+      else if (ev.data.onf === 'themeAsk') themeAsk(ev);   // 🌙 판 안 교재가 묻는다(2단계)
     });
     global.addEventListener('keydown', function (e) { if (e.key === 'Escape' && bookBox) bookClose(); });   // 껍데기에 초점이 있을 때만 닿는다(액자 안 키는 [✕])
 
