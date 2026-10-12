@@ -139,8 +139,19 @@ t('판 자리 — 홈이 알린 왼쪽 메뉴 끝(left)부터 덮는다 · 남�
   const css = fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-ui.css'), 'utf8');
   assert.ok(/\.onf-bookpanel \{[^}]*top: 16px; right: 16px; bottom: 16px;[^}]*border-radius: 28px; overflow: hidden;/.test(css)
     && /\.onf-bookpanel\.beside \{ left: calc\(var\(--bl\) \+ 16px\); width: auto; \}/.test(css)
-    && /\.onf-bookpanel\.full \{ top: 10px; right: 10px; bottom: 10px; left: 10px; width: auto; \}/.test(css), '⛔ 판 모양(떠 있는 큰 판 · 메뉴 옆 · 전체도 둥근 모서리)');
-  assert.ok(!/\.onf-bookpanel\.full \{[^}]*border-radius: 0/.test(css), '⛔ 전체 화면에서 모서리가 다시 각졌다');
+    && /\.onf-bookpanel\.full \{ top: 0; right: 0; bottom: 0; left: 0; width: auto; padding: 10px;[^}]*background: #E9DFD0; \}/.test(css)
+    && /\.onf-bookpanel\.full iframe \{ border-radius: 22px;/.test(css), '⛔ 판 모양(떠 있는 큰 판 · 메뉴 옆 · 전체 = 화면 끝까지 덮고 안은 둥근 판 — 뒤 홈이 안 보인다)');
+});
+
+t('홈이 탭을 바꾸면(bookDismiss) 판을 닫는다 · 홈 액자에서 온 것만 · 판이 없으면 아무 일 없음 (2026-10-12 Peter)', () => {
+  const s = setup();
+  s.send({ onf: 'bookDismiss' }, s.homeInner);
+  assert.ok(!s.panel(), '판이 없을 땐 아무 일 없음');
+  s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share' }, s.homeInner);
+  s.send({ onf: 'bookDismiss' }, win('stranger', s.top));
+  assert.ok(s.panel(), '⛔ 우리 액자 밖 창의 말로 판이 닫혔다');
+  s.send({ onf: 'bookDismiss' }, s.homeInner);
+  assert.ok(!s.panel(), '⛔ 홈이 탭을 바꿨는데 판이 남았다');
 });
 
 t('Esc — 판이 열려 있으면 닫는다', () => {
