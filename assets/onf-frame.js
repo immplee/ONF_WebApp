@@ -219,6 +219,9 @@
       if (ev.data.onf === 'openBook' && opts.bookSrc && typeof ev.data.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(ev.data.href, ev.data.left); return; }
       /* 홈이 탭을 바꿨다 → 옆 판을 닫는다(2026-10-12 Peter 「창이 켜진 채 탭을 바꾸면 자동으로 꺼져야」) — bookClose 는 판 액자만 말한다(따로 둔 이름) */
       if (ev.data.onf === 'bookDismiss') { if (bookBox) bookClose(); return; }
+      /* 📖 홈이 「첫 교재를 데워 줘」(2026-10-12 · 설계서 §1-5) — 그 교재 주소를 **한 번** GET 해 교재 서버 캐시만 데운다(봇 수업 전 데우기와 같은 길).
+         ⛔ 판을 숨겨 띄우지 않는다(교재가 접속 신호를 보낸다) · 주소는 판과 같은 거르개(bookSrc — 교재만 · 아는 값만 · embed=1) · 쿠키 안 실음 · 한 주소 한 번. */
+      if (ev.data.onf === 'bookWarm' && opts.bookSrc && typeof ev.data.href === 'string') { bookWarm(ev.data.href); return; }
       /* 🌙 화면 색(Peter 2026-10-12 다크 모드) — 안쪽 홈이 알린다 · 틀·판 둘레·「불러오는 중」을 같은 색으로 · 다음에 열 때 머리 스크립트가 그리기 전에 쓴다. 아는 값만. */
       if (ev.data.onf === 'theme') { if (ev.data.v === 'dark' || ev.data.v === 'light') { document.documentElement.setAttribute('data-theme', ev.data.v); try { localStorage.setItem('onfTheme', ev.data.v); } catch (eT) {} } return; }
       // 탭 제목 — 앱(=GAS)만 학생 이름을 안다. 보이는 탭 제목은 **이 창**이 정하므로 받아서 세운다.
@@ -293,6 +296,13 @@
        ⛔ unload 처리기를 달지 마라(bfcache 「뒤로」를 막는다). 닫을 땐 액자를 지운다(메모리 · 다음 열기는 새로).
        ⚠️ 주소를 만드는 일(아는 값만 · embed=1)은 index.html 의 opts.bookSrc 가 한다 — 못 만들면 null(안 연다). */
     var bookBox = null, bookEl = null, bookHome = null, bookHomeOrigin = '';
+    var warmed = {};
+    function bookWarm(href) {
+      var src = opts.bookSrc(href);
+      if (!src || warmed[src] || typeof global.fetch !== 'function') return;
+      warmed[src] = 1;
+      try { global.fetch(src, { mode: 'no-cors', credentials: 'omit', cache: 'no-store' }).catch(function () {}); } catch (e) {}
+    }
     /* left = 홈 왼쪽 메뉴의 오른쪽 끝(px · 홈이 잰다) — 있으면 판이 그 오른쪽부터 덮는다(2026-10-12 Peter 「창 모드일 때는 맨 왼쪽 탭만 보이게」).
        없으면(옛 홈 · 판 안에서 갈아 끼울 때) 종전 자리 그대로. ⚠️ 숫자·화면 폭 60% 안만 믿는다(남의 값으로 판이 화면 밖으로 가지 않게). */
     function bookOpen(href, left) {

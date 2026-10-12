@@ -179,6 +179,19 @@ t('🌙 화면 색 — 홈 액자가 알린 theme 만 <html data-theme> · local
   }
 });
 
+t('📖 교재 데우기(bookWarm) — 홈 액자의 말만 · 판과 같은 거르개(교재만) · 쿠키 없이 한 번 GET · 같은 주소 두 번은 한 번 · 판은 안 연다 (2026-10-12 · 설계서 §1-5)', () => {
+  const s = setup(), got = [];
+  s.g.fetch = (u, o) => { got.push([u, JSON.parse(JSON.stringify(o))]); return Promise.resolve(); };
+  s.send({ onf: 'bookWarm', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share' }, win('stranger', s.top));
+  s.send({ onf: 'bookWarm', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share' }, s.homeInner, 'https://evil.example.com');
+  s.send({ onf: 'bookWarm', href: 'https://class.ownify.co.kr/?mode=hw' }, s.homeInner);
+  assert.strictEqual(got.length, 0, '⛔ 남의 말·교재 아닌 주소로 데웠다');
+  s.send({ onf: 'bookWarm', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share' }, s.homeInner);
+  s.send({ onf: 'bookWarm', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share' }, s.homeInner);
+  assert.deepStrictEqual(got, [['https://script.google.com/x/exec?t=T&mode=share&embed=1', { mode: 'no-cors', credentials: 'omit', cache: 'no-store' }]], '⛔ 데우기 GET 이 판 주소·한 번·쿠키 없음이 아니다');
+  assert.ok(!s.panel(), '⛔ 데우기가 판을 열었다(교재가 접속 신호를 보낸다)');
+});
+
 t('Esc — 판이 열려 있으면 닫는다', () => {
   const s = setup();
   s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share' }, s.homeInner);
