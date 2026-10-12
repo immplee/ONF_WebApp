@@ -299,6 +299,12 @@
         bookEl.setAttribute('allow', 'clipboard-write; microphone');
         bookEl.setAttribute('title', '교재');
         bookBox.appendChild(bookEl);
+        /* 액자 뒤에 「불러오는 중」(2026-10-12 · 홈 첫 화면 .onf-wait 와 같은 것) — 구글이 화면을 그리면 액자가 덮는다.
+           없으면 판이 9~12초 흰 빈칸이었다(라이브 내 문장 실측). ⚠️ 액자가 kids[0] 이어야 한다(검사). */
+        var wait = document.createElement('div');
+        wait.className = 'onf-wait';
+        wait.innerHTML = '<div class="onf-spin"></div><span>불러오는 중<span class="onf-ld"></span></span>';
+        bookBox.appendChild(wait);
         document.body.appendChild(bookBox);
       }
       bookBox.classList.remove('full');

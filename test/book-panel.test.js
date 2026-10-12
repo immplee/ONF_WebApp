@@ -63,6 +63,9 @@ t('홈 액자에서 온 openBook 만 판을 연다 · 남의 창·남의 출처�
   const p = s.panel();
   assert.ok(p && p.kids[0].src === 'https://script.google.com/x/exec?t=T&mode=share&embed=1', '⛔ 홈의 openBook 으로 판이 안 열렸다');
   assert.ok(!('sandbox' in p.kids[0].attrs) && p.kids[0].attrs.allow === 'clipboard-write; microphone', '교재 액자 권한은 홈 액자와 같다');
+  assert.ok(p.kids[1] && p.kids[1].className === 'onf-wait' && /불러오는 중/.test(p.kids[1].innerHTML), '⛔ 판에 「불러오는 중」이 없다(구글이 그릴 때까지 흰 빈칸)');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-ui.css'), 'utf8');
+  assert.ok(/\.onf-bookpanel iframe \{[^}]*position: relative; z-index: 1;/.test(css) && /\.onf-bookpanel \.onf-wait \{ position: absolute; \}/.test(css), '⛔ 판 안 「불러오는 중」이 액자 뒤가 아니다(그린 뒤에도 덮거나 판 밖 전체를 덮는다)');
 });
 
 t('교재 액자에서 온 bookFull·bookClose 만 듣는다 — 홈 액자가 보낸 같은 말은 버린다', () => {

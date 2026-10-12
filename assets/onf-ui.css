@@ -55,5 +55,6 @@ body {
 .onf-bookpanel { position: fixed; top: 0; right: 0; bottom: 0; width: min(1100px, 64vw); z-index: 5;
   background: var(--onf-bg); box-shadow: -18px 0 40px -22px rgba(43,29,20,.45); border-left: 1px solid var(--onf-line); }
 .onf-bookpanel.full { width: 100vw; border-left: 0; box-shadow: none; }
-.onf-bookpanel iframe { display: block; width: 100%; height: 100%; border: 0; }
+.onf-bookpanel iframe { display: block; width: 100%; height: 100%; border: 0; position: relative; z-index: 1; }
+.onf-bookpanel .onf-wait { position: absolute; }   /* 판 안에서만 — 액자(z 1) 뒤에 깔려 그려지면 덮인다 */
 
