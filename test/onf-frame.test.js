@@ -170,5 +170,14 @@ t('기존 파라미터(fileId·sheetName·mode·back·ttok·tas)는 그대로 �
   assert.deepStrictEqual(forwarded('?mode=share'), ['mode=share'], '값이 없는 line·view 는 만들지 않는다');
 });
 
+t('⛔ 🧱 학생 새 홈 시험 링크(home=v2)는 그 값 하나만 앱에 전해진다 (2026-10-12)', () => {
+  const m = shellHtml.match(/\n  if \(q\.get\('home'\) === 'v2'\) extra\.push\('home=v2'\);[^\n]*/);
+  assert.ok(m, '⛔ home=v2 전달 줄이 없다 — 시험 링크로 열어도 새 홈이 안 뜬다');
+  const run = (search) => { const sb = { URLSearchParams, q: new URLSearchParams(search), extra: [] }; vm.createContext(sb); vm.runInContext(m[0], sb); return sb.extra; };
+  assert.deepStrictEqual(run('?t=x&home=v2'), ['home=v2']);
+  assert.deepStrictEqual(run('?t=x&home=evil'), [], '⛔ 모르는 값을 통과시켰다');
+  assert.deepStrictEqual(run('?t=x'), []);
+});
+
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패');
 process.exit(fail ? 1 : 0);
