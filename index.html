@@ -106,7 +106,8 @@
   ONF.frame.hideToken();
   /* 📖 홈 안에서 교재 열기(PC · 2026-10-12 Peter 홈 리디자인 3단계) — 홈이 교재 카드 주소를 보내면 그 주소에서 **아는 값만** 골라
      같은 앱 주소에 `embed=1` 을 붙여 오른쪽 판에 띄운다. 주소의 토큰(t)은 버린다 — 토큰은 이 도메인에 이미 있다.
-     ⛔ 우리 껍데기 주소(class·script.ownify.co.kr)의 교재 모양(짧은 주소 또는 mode=share)만 — 아니면 null(안 연다). */
+     ⛔ 우리 껍데기 주소(class·script.ownify.co.kr)의 교재 모양(짧은 주소 또는 mode=share)·⭐ 내 문장(mode=mine)만 — 아니면 null(안 연다).
+     ⭐ 내 문장도 판으로(2026-10-12 Peter 「교재처럼 작게 떴다가 · 창 끄면 바로 홈」) — 같은 교재 틀이라 [전체 화면][✕] 가 이미 있다. */
   var BOOK_KEYS = ['fileId', 'sheetName', 'mode', 'back', 'line', 'view'];
   function bookSrc(href) {
     try {
@@ -114,7 +115,8 @@
       if (!/^(class|script)\.ownify\.co\.kr$/.test(u.hostname) && u.origin !== location.origin) return null;
       var p = decodeURIComponent(u.pathname.replace(/^\/+|\/+$/g, '')).toLowerCase(), ex = [];
       var slugOk = /^[a-z0-9]+-s\d+-e\d+-[a-z0-9]+$/.test(p);
-      if (u.searchParams.get('mode') !== 'share' && !slugOk) return null;   // 교재만(내 문장 mode=mine · 홈은 안 연다)
+      var md = u.searchParams.get('mode');
+      if (md !== 'share' && md !== 'mine' && !slugOk) return null;   // 교재·⭐ 내 문장만(홈은 안 연다)
       BOOK_KEYS.forEach(function (k) { if (u.searchParams.get(k)) ex.push(k + '=' + encodeURIComponent(u.searchParams.get(k))); });
       if (!u.searchParams.get('fileId') && slugOk) ex.push('slug=' + encodeURIComponent(p));
       if (!ex.length) return null;

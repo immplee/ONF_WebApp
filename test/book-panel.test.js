@@ -104,6 +104,21 @@ t('교재 액자의 기록 다리(hist hi)·제목(title)·노크는 **홈 자�
   assert.strictEqual(bookInner.sent.length, 0, '⛔ 교재 액자의 노크를 홈 노크로 받았다(키보드 보정 창이 바뀐다)');
 });
 
+t('판 안에서 교재 ↔ 내 문장 — 교재 액자가 보낸 openBook 은 판만 갈아 끼운다 · 거르개(null)면 그대로 · 남의 출처는 버린다', () => {
+  const s = setup();
+  s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share' }, s.homeInner);
+  const box = s.panel(), bookEl = box.kids[0];
+  const bookWin = win('book-exec', s.top), bookInner = win('book-user', bookWin);
+  bookEl.contentWindow = bookWin;
+  bookEl.src = 'BEFORE';
+  s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/?mode=mine' }, bookInner);
+  assert.strictEqual(bookEl.src, 'BEFORE', '⛔ 거르개가 못 만든 주소(null)로 판을 바꿨다');
+  s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e2-b?mode=share' }, bookInner, 'https://evil.example.com');
+  assert.strictEqual(bookEl.src, 'BEFORE', '⛔ 남의 출처의 openBook 으로 판을 바꿨다');
+  s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e2-b?mode=share' }, bookInner);
+  assert.ok(s.panel() === box && bookEl.src === 'https://script.google.com/x/exec?t=T&mode=share&embed=1', '⛔ 판 안 openBook 으로 판이 안 바뀌었다(같은 판 · 새 주소)');
+});
+
 t('Esc — 판이 열려 있으면 닫는다', () => {
   const s = setup();
   s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share' }, s.homeInner);
@@ -128,7 +143,12 @@ t('교재 주소만 · 아는 값만 · 토큰 버림 · embed=1', () => {
   assert.strictEqual(f('https://script.ownify.co.kr/youngsheldon-s1-e1-jungah?mode=share&t=LEAK&back=E1_Pilot'),
     'EXEC?t=TOK&mode=share&back=E1_Pilot&slug=youngsheldon-s1-e1-jungah&embed=1', '짧은 주소 → slug · 주소의 t 는 버리고 이 도메인 토큰');
   assert.strictEqual(f('https://class.ownify.co.kr/?fileId=F1&sheetName=E2_X&mode=share'), 'EXEC?t=TOK&fileId=F1&sheetName=E2_X&mode=share&embed=1', '옛 주소(fileId)');
-  assert.strictEqual(f('https://class.ownify.co.kr/?mode=mine&view=review'), null, '⛔ 내 문장 주소를 교재 판으로 연다');
+  //   ⭐ 내 문장도 판으로(2026-10-12 Peter) — 보기 칸(view)은 싣고 주소의 토큰·선생님 자격은 버린다
+  assert.strictEqual(f('https://script.ownify.co.kr/?mode=mine&t=LEAK&view=review'), 'EXEC?t=TOK&mode=mine&view=review&embed=1', '⛔ 내 문장 주소가 판 주소로 안 바뀐다');
+  assert.strictEqual(f('https://class.ownify.co.kr/?mode=mine'), 'EXEC?t=TOK&mode=mine&embed=1', '⛔ 토큰 없는 내 문장 주소(이 도메인에 저장된 학생)');
+  assert.ok(!/LEAK|ttok/.test(String(f('https://script.ownify.co.kr/?mode=mine&t=LEAK&ttok=X&tas=Y'))), '⛔ 내 문장 주소의 토큰·선생님 자격을 넘긴다');
+  assert.strictEqual(f('https://class.ownify.co.kr/?mode=hw'), null, '⛔ 교재·내 문장 밖 주소(과제 등)를 판으로 연다');
+  assert.strictEqual(f('https://class.ownify.co.kr/'), null, '⛔ 홈 주소를 판으로 연다');
   assert.strictEqual(f('https://evil.example.com/a-s1-e1-b?mode=share'), null, '⛔ 남의 사이트 주소를 연다');
   assert.strictEqual(f('javascript:alert(1)'), null, '⛔ javascript: 주소');
   assert.ok(!/LEAK/.test(String(f('https://script.ownify.co.kr/a-s1-e1-b?mode=share&t=LEAK&ttok=X&tas=Y'))), '⛔ 주소에 실려 온 토큰·선생님 자격을 넘긴다');

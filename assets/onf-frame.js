@@ -320,6 +320,9 @@
       } catch (e) { return; }
       if (ev.data.onf === 'bookClose') bookClose();
       else if (ev.data.onf === 'bookFull' && bookBox) bookBox.classList.toggle('full', !!ev.data.on);
+      /* 판 안에서 교재 ↔ ⭐ 내 문장을 오갈 때(2026-10-12) — 판만 갈아 끼운다(홈째 넘어가면 「뒤로」에 홈을 다시 읽는다).
+         ⚠️ 주소는 홈에서 온 것과 같은 거르개(opts.bookSrc)를 지난다 — 못 만들면 그대로 둔다. */
+      else if (ev.data.onf === 'openBook' && typeof ev.data.href === 'string') bookOpen(ev.data.href);
     });
     global.addEventListener('keydown', function (e) { if (e.key === 'Escape' && bookBox) bookClose(); });   // 껍데기에 초점이 있을 때만 닿는다(액자 안 키는 [✕])
 
