@@ -216,7 +216,7 @@
          옛 껍데기(답이 없다)면 종전대로 교재 화면으로 넘어간다. ⛔ 키보드 노크(frameHello)와 섞지 않는다(appWin 을 안 바꾼다).
          targetOrigin 은 노크한 출처(브라우저가 채운 값 · 위 자물쇠를 지난 googleusercontent). */
       if (ev.data.onf === 'bookHello' && opts.bookSrc) { try { ev.source.postMessage({ onf: 'caps', book: 1 }, ev.origin); } catch (eC) {} return; }
-      if (ev.data.onf === 'openBook' && opts.bookSrc && typeof ev.data.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(ev.data.href); return; }
+      if (ev.data.onf === 'openBook' && opts.bookSrc && typeof ev.data.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(ev.data.href, ev.data.left); return; }
       // 탭 제목 — 앱(=GAS)만 학생 이름을 안다. 보이는 탭 제목은 **이 창**이 정하므로 받아서 세운다.
       //   위 오리진 검사를 이미 통과한 메시지다. 줄바꿈을 지우고 길이를 잘라 그대로 쓴다.
       if (ev && ev.data && ev.data.onf === 'title' && typeof ev.data.t === 'string') {
@@ -289,7 +289,9 @@
        ⛔ unload 처리기를 달지 마라(bfcache 「뒤로」를 막는다). 닫을 땐 액자를 지운다(메모리 · 다음 열기는 새로).
        ⚠️ 주소를 만드는 일(아는 값만 · embed=1)은 index.html 의 opts.bookSrc 가 한다 — 못 만들면 null(안 연다). */
     var bookBox = null, bookEl = null, bookHome = null, bookHomeOrigin = '';
-    function bookOpen(href) {
+    /* left = 홈 왼쪽 메뉴의 오른쪽 끝(px · 홈이 잰다) — 있으면 판이 그 오른쪽부터 덮는다(2026-10-12 Peter 「창 모드일 때는 맨 왼쪽 탭만 보이게」).
+       없으면(옛 홈 · 판 안에서 갈아 끼울 때) 종전 자리 그대로. ⚠️ 숫자·화면 폭 60% 안만 믿는다(남의 값으로 판이 화면 밖으로 가지 않게). */
+    function bookOpen(href, left) {
       var src = opts.bookSrc(href);
       if (!src) return;
       if (!bookBox) {
@@ -308,6 +310,11 @@
         document.body.appendChild(bookBox);
       }
       bookBox.classList.remove('full');
+      if (typeof left === 'number' && isFinite(left)) {
+        var okL = left > 0 && left < (global.innerWidth || 0) * 0.6;
+        bookBox.classList.toggle('beside', okL);
+        if (okL) bookBox.style.setProperty('--bl', Math.round(left) + 'px');
+      }
       bookEl.src = src;
     }
     /* 닫으면 판을 연 홈에 「닫혔다」를 알린다(2026-10-12) — 홈이 교재 카드 「% 채움」을 다시 읽는다(교재에서 쓴 만큼).

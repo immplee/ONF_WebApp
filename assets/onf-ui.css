@@ -51,10 +51,14 @@ body {
 .onf-muted { color: #9b8877; font-weight: 400; font-size: 14px; }
 
 /* 📖 홈 안 교재 판(2026-10-12 Peter 홈 리디자인 3단계 · PC 전용 — 홈이 넓은 화면에서만 연다).
-   오른쪽에서 홈 위로 덮는다 · [전체 화면]이면 화면 전체 · 닫으면 액자째 지운다(onf-frame.js bookClose). */
-.onf-bookpanel { position: fixed; top: 0; right: 0; bottom: 0; width: min(1100px, 64vw); z-index: 5;
-  background: var(--onf-bg); box-shadow: -18px 0 40px -22px rgba(43,29,20,.45); border-left: 1px solid var(--onf-line); }
-.onf-bookpanel.full { width: 100vw; border-left: 0; box-shadow: none; }
+   떠 있는 큰 판 — 가장자리 16px · 모서리 28(홈 블럭·왼쪽 메뉴와 같은 말) · 닫으면 액자째 지운다(onf-frame.js bookClose).
+   .beside = 홈 왼쪽 메뉴 오른쪽부터 덮는다(--bl · 2026-10-12 Peter 「창 모드는 맨 왼쪽 탭만 보이게」) ·
+   .full = 화면 전체(메뉴까지 덮음) — 모서리는 그대로, 가장자리만 10px(Peter 「전체 화면은 각지고 창은 둥근데 통일」). */
+.onf-bookpanel { position: fixed; top: 16px; right: 16px; bottom: 16px; width: min(1100px, calc(64vw - 16px)); z-index: 5;
+  background: var(--onf-bg); border: 1px solid var(--onf-line); border-radius: 28px; overflow: hidden;
+  box-shadow: 0 30px 80px -30px rgba(43,29,20,.55); }
+.onf-bookpanel.beside { left: calc(var(--bl) + 16px); width: auto; }
+.onf-bookpanel.full { top: 10px; right: 10px; bottom: 10px; left: 10px; width: auto; }
 .onf-bookpanel iframe { display: block; width: 100%; height: 100%; border: 0; position: relative; z-index: 1; }
 .onf-bookpanel .onf-wait { position: absolute; }   /* 판 안에서만 — 액자(z 1) 뒤에 깔려 그려지면 덮인다 */
 

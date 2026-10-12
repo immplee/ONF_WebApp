@@ -18,13 +18,13 @@ function win(name, parent) { const w = { name, sent: [] }; w.parent = parent || 
 function setup() {
   const listeners = {};
   const body = { kids: [], appendChild(c) { this.kids.push(c); c.parentNode = this; }, removeChild(c) { this.kids = this.kids.filter((x) => x !== c); } };
-  const mkEl = (tag) => { const el = { tag, kids: [], attrs: {}, className: '', src: '',
+  const mkEl = (tag) => { const el = { tag, kids: [], attrs: {}, className: '', src: '', vars: {}, style: { setProperty(k, v) { el.vars[k] = v; } },
     classList: { set: new Set(), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); }, toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } },
     setAttribute(k, v) { el.attrs[k] = v; }, appendChild(c) { el.kids.push(c); c.parentNode = el; } }; return el; };
   const top = win('shell');
   const g = { listeners, top };
   vm.createContext(g);
-  g.window = g; g.URL = URL; g.localStorage = null; g.location = { search: '', pathname: '/', href: 'https://class.ownify.co.kr/' };
+  g.window = g; g.URL = URL; g.localStorage = null; g.innerWidth = 1440; g.location = { search: '', pathname: '/', href: 'https://class.ownify.co.kr/' };
   g.navigator = { userAgent: 'node' }; g.history = { state: null, replaceState() {}, pushState() {} };
   g.document = { addEventListener() {}, body, createElement: mkEl };
   g.addEventListener = (k, fn) => { (listeners[k] = listeners[k] || []).push(fn); };
@@ -120,6 +120,27 @@ t('판 안에서 교재 ↔ 내 문장 — 교재 액자가 보낸 openBook 은 
   assert.strictEqual(bookEl.src, 'BEFORE', '⛔ 남의 출처의 openBook 으로 판을 바꿨다');
   s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e2-b?mode=share' }, bookInner);
   assert.ok(s.panel() === box && bookEl.src === 'https://script.google.com/x/exec?t=T&mode=share&embed=1', '⛔ 판 안 openBook 으로 판이 안 바뀌었다(같은 판 · 새 주소)');
+});
+
+t('판 자리 — 홈이 알린 왼쪽 메뉴 끝(left)부터 덮는다 · 남의 값(0·음수·화면 60% 넘음·숫자 아님)은 종전 자리 · 판 안 갈아 끼우기는 자리 그대로 (2026-10-12 Peter)', () => {
+  const s = setup();
+  s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', left: 184 }, s.homeInner);
+  const p = s.panel();
+  assert.ok(p.classList.contains('beside') && p.vars['--bl'] === '184px', '⛔ 왼쪽 메뉴 끝부터 덮지 않는다');
+  const bookWin = win('book-exec', s.top), bookInner = win('book-user', bookWin);
+  p.kids[0].contentWindow = bookWin;
+  s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e2-b?mode=share' }, bookInner);
+  assert.ok(p.classList.contains('beside') && p.vars['--bl'] === '184px', '⛔ 판 안에서 갈아 끼우니 자리가 바뀌었다');
+  for (const bad of [0, -5, 1000, '184', NaN]) {
+    const s2 = setup();
+    s2.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', left: bad }, s2.homeInner);
+    assert.ok(!s2.panel().classList.contains('beside') && !('--bl' in s2.panel().vars), '⛔ 믿지 못할 left 로 판 자리를 바꿨다: ' + String(bad));
+  }
+  const css = fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-ui.css'), 'utf8');
+  assert.ok(/\.onf-bookpanel \{[^}]*top: 16px; right: 16px; bottom: 16px;[^}]*border-radius: 28px; overflow: hidden;/.test(css)
+    && /\.onf-bookpanel\.beside \{ left: calc\(var\(--bl\) \+ 16px\); width: auto; \}/.test(css)
+    && /\.onf-bookpanel\.full \{ top: 10px; right: 10px; bottom: 10px; left: 10px; width: auto; \}/.test(css), '⛔ 판 모양(떠 있는 큰 판 · 메뉴 옆 · 전체도 둥근 모서리)');
+  assert.ok(!/\.onf-bookpanel\.full \{[^}]*border-radius: 0/.test(css), '⛔ 전체 화면에서 모서리가 다시 각졌다');
 });
 
 t('Esc — 판이 열려 있으면 닫는다', () => {
