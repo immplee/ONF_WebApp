@@ -64,6 +64,7 @@
 <iframe id="app" hidden allow="clipboard-write"></iframe>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="../assets/onf-api.js"></script>
 <script>
 /* =====================================================================
    선생님 홈 껍데기 — 하는 일은 **둘뿐**이다: 구글 로그인 · 토큰 넘기기.
@@ -355,6 +356,86 @@ window.addEventListener('message', function (ev) {
   pending = k;
 });
 /* onf-devkey:end */
+
+/* ═══ 📖 선생님 홈 옆 판(2026-10-12 Peter 「선생님 홈에서 교재를 열면 왜 새 창으로? 학생 홈처럼 창으로 열리고 전체 화면으로」) ═══
+   학생 껍데기 assets/onf-frame.js 의 교재 판과 **같은 꼴**(⚠️ 쌍둥이 — 한쪽을 고치면 다른 쪽도): 홈이 caps 를 받은 뒤 교재·⭐ 내 문장 주소를 보내면
+   메뉴 옆(left)에 판을 띄운다 · 판 안 [전체 화면/창으로][✕] · 판 안 교재↔내 문장은 판만 갈아 끼움 · 홈이 탭을 바꾸면(bookDismiss) 닫음 · Esc 닫음.
+   ⛔ 받는 말: 홈 = 내 액자 후손(fromOurFrame) + googleusercontent · 판 = 판 액자 후손 + googleusercontent. 남의 창 말은 버린다.
+   ⛔ 주소는 **아는 값만** 골라 교재 앱(ONF.api.EXEC)으로 — 선생님 보기라 학생 토큰(t)·선생님 자격(ttok)·이름표(tas)를 싣는다(새 탭으로 열던 그 주소의 값 그대로).
+   ⛔ unload 처리기 금지(bfcache). 닫으면 액자째 지운다. */
+/* onf-book:begin */
+var bookBox = null, bookEl = null, bookHome = null, bookHomeOrigin = '';
+var BOOK_KEYS = ['t', 'mode', 'fileId', 'sheetName', 'back', 'line', 'view', 'ttok', 'tas'];
+function teacherBookSrc(href) {
+  try {
+    var u = new URL(String(href || ''), location.href);
+    if (!/^(class|script)\.ownify\.co\.kr$/.test(u.hostname)) return null;
+    var md = u.searchParams.get('mode'), p = decodeURIComponent(u.pathname.replace(/^\/+|\/+$/g, '')).toLowerCase();
+    var slugOk = /^[a-z0-9]+-s\d+-e\d+-[a-z0-9]+$/.test(p);
+    if (md !== 'share' && md !== 'mine' && !slugOk) return null;
+    if (!/^[A-Za-z0-9_-]{1,40}$/.test(u.searchParams.get('t') || '')) return null;   // 선생님 보기는 그 학생 토큰이 있어야 연다
+    var ex = [];
+    BOOK_KEYS.forEach(function (k) { var v = u.searchParams.get(k); if (v) ex.push(k + '=' + encodeURIComponent(v)); });
+    if (!u.searchParams.get('fileId') && slugOk) ex.push('slug=' + encodeURIComponent(p));
+    ex.push('embed=1');
+    return (window.ONF && ONF.api && ONF.api.EXEC) ? ONF.api.EXEC + '?' + ex.join('&') : null;
+  } catch (e) { return null; }
+}
+function bookFrom(ev, el) {
+  try {
+    if (!ev || !ev.source || !/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return false;
+    var w = ev.source, target = el && el.contentWindow;
+    for (var i = 0; i < 8 && w && target; i++) { if (w === target) return true; w = (w.parent && w.parent !== w) ? w.parent : null; }
+  } catch (e) {}
+  return false;
+}
+function bookOpen(href, left) {
+  var src = teacherBookSrc(href);
+  if (!src) return;
+  if (!bookBox) {
+    bookBox = document.createElement('div');
+    bookBox.className = 'onf-bookpanel';
+    bookEl = document.createElement('iframe');
+    bookEl.setAttribute('allow', 'clipboard-write; microphone');
+    bookEl.setAttribute('title', '교재');
+    bookBox.appendChild(bookEl);
+    var wait = document.createElement('div');
+    wait.className = 'onf-wait';
+    wait.innerHTML = '<div class="onf-spin"></div><span>불러오는 중<span class="onf-ld"></span></span>';
+    bookBox.appendChild(wait);
+    document.body.appendChild(bookBox);
+  }
+  bookBox.classList.remove('full');
+  if (typeof left === 'number' && isFinite(left)) {
+    var okL = left > 0 && left < (window.innerWidth || 0) * 0.6;
+    bookBox.classList.toggle('beside', okL);
+    if (okL) bookBox.style.setProperty('--bl', Math.round(left) + 'px');
+  }
+  bookEl.src = src;
+}
+function bookClose() {
+  if (!bookBox) return;
+  bookBox.parentNode.removeChild(bookBox);
+  bookBox = null; bookEl = null;
+  if (bookHome && bookHomeOrigin) { try { bookHome.postMessage({ onf: 'bookClosed' }, bookHomeOrigin); } catch (e) {} }
+}
+window.addEventListener('message', function (ev) {
+  var d = ev && ev.data;
+  if (!d || typeof d.onf !== 'string') return;
+  if (bookFrom(ev, frame)) {                                   // 선생님 홈(내 액자)
+    if (d.onf === 'bookHello') { try { ev.source.postMessage({ onf: 'caps', book: 1 }, ev.origin); } catch (e) {} return; }
+    if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left); return; }
+    if (d.onf === 'bookDismiss') { if (bookBox) bookClose(); return; }
+    return;
+  }
+  if (bookEl && bookFrom(ev, bookEl)) {                        // 판 액자(교재·내 문장)
+    if (d.onf === 'bookClose') bookClose();
+    else if (d.onf === 'bookFull' && bookBox) bookBox.classList.toggle('full', !!d.on);
+    else if (d.onf === 'openBook' && typeof d.href === 'string') bookOpen(d.href);
+  }
+});
+window.addEventListener('keydown', function (e) { if (e.key === 'Escape' && bookBox) bookClose(); });
+/* onf-book:end */
 
 /* ═══ 기록 칸 다리 — 안쪽의 「뒤로 = 창 닫기」 기록 칸을 **여기(최상위 문서)** 에 만든다 (Peter 2026-10-01) ═══
    ⛔ 왜: 아이폰 스와이프 뒤로는 이전 기록의 스냅샷을 덮개로 깔고, **메인 프레임**의 같은 문서 이동 신호가 오면 덮개를 걷는다.
