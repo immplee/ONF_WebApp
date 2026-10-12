@@ -216,7 +216,7 @@
          옛 껍데기(답이 없다)면 종전대로 교재 화면으로 넘어간다. ⛔ 키보드 노크(frameHello)와 섞지 않는다(appWin 을 안 바꾼다).
          targetOrigin 은 노크한 출처(브라우저가 채운 값 · 위 자물쇠를 지난 googleusercontent). */
       if (ev.data.onf === 'bookHello' && opts.bookSrc) { try { ev.source.postMessage({ onf: 'caps', book: 1 }, ev.origin); } catch (eC) {} return; }
-      if (ev.data.onf === 'openBook' && opts.bookSrc && typeof ev.data.href === 'string') { bookOpen(ev.data.href); return; }
+      if (ev.data.onf === 'openBook' && opts.bookSrc && typeof ev.data.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(ev.data.href); return; }
       // 탭 제목 — 앱(=GAS)만 학생 이름을 안다. 보이는 탭 제목은 **이 창**이 정하므로 받아서 세운다.
       //   위 오리진 검사를 이미 통과한 메시지다. 줄바꿈을 지우고 길이를 잘라 그대로 쓴다.
       if (ev && ev.data && ev.data.onf === 'title' && typeof ev.data.t === 'string') {
@@ -288,7 +288,7 @@
          홈 액자 자물쇠(위 frameEl)는 그대로라 교재 액자의 기록 다리(hist)·제목(title)·노크(frameHello)는 **안 받는다** — 키보드·뒤로는 홈 것.
        ⛔ unload 처리기를 달지 마라(bfcache 「뒤로」를 막는다). 닫을 땐 액자를 지운다(메모리 · 다음 열기는 새로).
        ⚠️ 주소를 만드는 일(아는 값만 · embed=1)은 index.html 의 opts.bookSrc 가 한다 — 못 만들면 null(안 연다). */
-    var bookBox = null, bookEl = null;
+    var bookBox = null, bookEl = null, bookHome = null, bookHomeOrigin = '';
     function bookOpen(href) {
       var src = opts.bookSrc(href);
       if (!src) return;
@@ -304,10 +304,13 @@
       bookBox.classList.remove('full');
       bookEl.src = src;
     }
+    /* 닫으면 판을 연 홈에 「닫혔다」를 알린다(2026-10-12) — 홈이 교재 카드 「% 채움」을 다시 읽는다(교재에서 쓴 만큼).
+       ⚠️ 받는 곳 = openBook 을 보낸 그 창 · 그 출처(위 자물쇠를 지난 googleusercontent) — '*' 금지. 옛 홈은 이 말을 모르니 그냥 버린다. */
     function bookClose() {
       if (!bookBox) return;
       bookBox.parentNode.removeChild(bookBox);
       bookBox = null; bookEl = null;
+      if (bookHome && bookHomeOrigin) { try { bookHome.postMessage({ onf: 'bookClosed' }, bookHomeOrigin); } catch (e) {} }
     }
     global.addEventListener('message', function (ev) {
       try {

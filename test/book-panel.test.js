@@ -81,8 +81,13 @@ t('교재 액자에서 온 bookFull·bookClose 만 듣는다 — 홈 액자가 �
   assert.ok(s.panel(), '⛔ 홈 액자의 bookClose 로 닫혔다');
   s.send({ onf: 'bookClose' }, bookInner, 'https://evil.example.com');
   assert.ok(s.panel(), '⛔ 남의 출처로 닫혔다');
+  s.homeInner.sent.length = 0;
   s.send({ onf: 'bookClose' }, bookInner);
   assert.ok(!s.panel(), '⛔ 교재 액자의 bookClose 로 안 닫혔다(액자째 지운다)');
+  //   닫으면 판을 연 홈에 그 출처로 bookClosed(홈이 교재 카드 % 채움을 다시 읽는다 · 2026-10-12) — '*' 금지 · 한 번만
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(s.homeInner.sent)), [[{ onf: 'bookClosed' }, 'https://n-abc-0lu-script.googleusercontent.com']], '⛔ 닫혔다는 말이 홈에 안 갔거나 * 로 갔다');
+  s.send({ onf: 'bookClose' }, bookInner);
+  assert.strictEqual(s.homeInner.sent.length, 1, '⛔ 이미 닫힌 판의 bookClose 로 또 알렸다');
 });
 
 t('교재 액자의 기록 다리(hist hi)·제목(title)·노크는 **홈 자물쇠를 못 지난다** — 뒤로·키보드·탭 제목은 홈 것', () => {
