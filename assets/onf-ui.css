@@ -78,3 +78,8 @@ body {
    ⛔ display:none 금지 — 안쪽 창 크기가 0 이 돼 교재가 빈 판으로 그렸다가 보일 때 다시 그린다. visibility 라 초점·누르기도 안 간다. */
 .onf-bookpanel.park { visibility: hidden; pointer-events: none; }
 
+/* 📱 폰 판(2026-10-14 · onf-frame.js 「폰 판」 · <html class="onf-ph"> = 홈의 onfBookWide 가 아닌 화면) — 늘 화면 전체 · 홈 액자(.onf-full iframe)와 **같은 상자**.
+   안전 영역(노치·홈 막대)은 안쪽 교재가 종전대로 맞춘다 — 교재가 홈 액자째 넘어가던 때와 같은 자리라 퇴행이 없다(여기서 더 비키면 두 번 비킨다).
+   「창 모드」(.full)·메뉴 옆(.beside)·둥근 판은 안 먹는다 — ⚠️ 이 규칙들이 위 .beside·.full 뒤에 있어야 이긴다(같은 무게). */
+.onf-ph .onf-bookpanel { top: 0; right: 0; bottom: 0; left: 0; width: auto; padding: 0; border: 0; border-radius: 0; box-shadow: none; }
+.onf-ph .onf-bookpanel iframe { border-radius: 0; box-shadow: none; }
