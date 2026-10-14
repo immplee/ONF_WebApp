@@ -367,11 +367,64 @@ window.addEventListener('message', function (ev) {
    ═══ 숨긴 판(2026-10-13 Peter 「미리 불러와서 기다리는 시간이 아예 없게」) — 학생 껍데기 assets/onf-frame.js 의 교재 판 주석이 정본(⚠️ 쌍둥이) ═══
    닫으면 지우지 않고 숨긴다(.park) · 같은 주소는 그 판 그대로(0초) · 다른 주소는 새 판(보이던 판은 숨김) · 홈이 bookWarm{panel:1}(지금·곧 할 수업 교재)이면 숨긴 판으로 미리(park=1).
    ⛔ 숨긴 판 교재는 「대기」(bookPark — 노크 bookHi 의 그 창·출처로만) — 선생님이 미리 띄운 것이 학생 화면에 「선생님 접속 중」으로 안 뜬다. 노크 없는 판은 숨기지 않고 지운다.
-   ⛔ 숨긴 판은 닫기·전체·갈아 끼우기·Esc 를 못 가로챈다 · 셋까지(10-14 · 차면 가장 오래 안 쓴 숨긴 판을 비킨다 — 미리 띄우기도) · 숨긴 채 30분이면 지운다. */
+   ⛔ 숨긴 판은 닫기·전체·갈아 끼우기·Esc 를 못 가로챈다 · 셋까지(10-14 · 차면 가장 오래 안 쓴 숨긴 판을 비킨다 — 미리 띄우기도) · 숨긴 채 30분이면 지운다.
+   ═══ 📱 폰 판(2026-10-14 Peter 아이폰 「교재를 열면 새 탭이 떠서 뒤로가기를 못 한다 · 어떤 학생은 [열기]가 「팝업 차단됨」」) — 학생 껍데기 onf-frame.js 「폰 판」이 정본(⚠️ 쌍둥이) ═══
+   종전 선생님 폰은 판 0 — 홈이 window.open 으로 새 탭을 열었다(뒤로 없음 · 주소를 서버에서 받은 뒤 열면 손짓 밖이라 팝업 차단).
+   이제 caps 에 phone:1 → 홈이 폰(dhBookWide 아님)에서도 openBook · 판은 화면 전체(<html class="onf-ph"> · onf-ui.css) · 뒤로/스와이프 = 판 숨김(최상위 판 칸 {onfBook, n, bd}) ·
+   판 안 창(카드·응용)의 칸도 최상위(판마다 기록 다리 p.hw) · ✕ 는 숨기고 판 칸 줄만 go(-bd) · 판 안 다른 교재 = 새 판 칸 위에(뒤로 = 앞 판) · 키보드 높이·밀림 보정은 보이는 판에(p.kb).
+   학생 껍데기와 다른 점: ① 스위치 **기본 켬**(선생님 폰은 새 탭이라 이미 깨져 있었다) — 주소 phonepanel=0 이면 이 기기에서 끈다(기억 · 선생님 키 onfThPhonePanel —
+     학생 onfPhonePanel 과 같은 도메인 저장소라 따로) ② 숨긴 판 미리 띄우기는 폰에서 안 한다(홈 thBookPre 가 넓은 화면만 보낸다 — 폰은 누를 때 연다)
+     ③ 홈 액자엔 키보드 보정이 없다(종전 그대로 · 판만) ④ 홈 기록 다리는 아래 onf-hist 블록 — 판 칸·판 안쪽 칸(bookOwner)은 홈 것으로 안 친다(back·hello·hist-pop). */
 /* onf-book:begin */
-var BOOK_MAX = 3, BOOK_IDLE_MS = 30 * 60 * 1000;
-var books = [], bookHome = null, bookHomeOrigin = '';   // books = 판들(오래 안 쓴 것이 앞) · { box, el, src, parked, win, origin, idle, left }
+var BOOK_MAX = 3, BOOK_IDLE_MS = 30 * 60 * 1000, BOOK_PHONE = 2;
+var books = [], bookHome = null, bookHomeOrigin = '';   // books = 판들(오래 안 쓴 것이 앞) · { box, el, src, key, parked, win, origin, kb, ko, hw, ho, idle, left }
 var BOOK_KEYS = ['t', 'mode', 'fileId', 'sheetName', 'back', 'line', 'view', 'ttok', 'tas'];
+/* ⚠️ 폰 = 이 물음이 아닌 화면 — Ownify 선생님 홈 dhBookWide 와 **글자까지 같아야** 한다(다르면 홈은 폰으로 보내고 껍데기는 PC 판으로 띄운다). matchMedia 가 없으면 PC(종전). */
+var BOOK_WIDE_Q = '(min-width:1100px) and (hover:hover) and (pointer:fine)', wideMq = null, bookSrcs = [];
+try { wideMq = window.matchMedia ? window.matchMedia(BOOK_WIDE_Q) : null; } catch (eM) {}
+var BOOK_PH = (function () {   // 📱 스위치 — 주소 phonepanel=1|0 이면 이 기기에 기억 · 없으면 기억값 · 그것도 없으면 켬
+  var v = null;
+  try { v = new URLSearchParams(location.search).get('phonepanel'); if (v === '1' || v === '0') localStorage.setItem('onfThPhonePanel', v); else v = localStorage.getItem('onfThPhonePanel'); } catch (e) {}
+  return v !== '0';
+})();
+function phone() { return !!(BOOK_PH && wideMq && !wideMq.matches); }
+function bookMax() { return phone() ? BOOK_PHONE : BOOK_MAX; }
+function bookKey(src) { var i = bookSrcs.indexOf(src); if (i < 0) i = bookSrcs.push(src) - 1; return i + 1; }   // 판 번호 — 기록 칸엔 주소(토큰이 든다) 대신 이것
+function histTop() { try { return history.state; } catch (e) { return null; } }
+function bookOwner(s) { return (s && (s.onfBook || s.b)) || 0; }           // 판 칸·판 안쪽 칸이면 그 판 번호
+function histRun() { var t = histTop(); return bookOwner(t) ? Math.max(0, Number(t.bd) || 0) : 0; }   // 맨 위에서 이어진 판 칸 수
+function homeN() { return (typeof histDepth === 'number' && histDepth) || 0; }   // 그 아래 홈 칸 수 = 아래 onf-hist 블록의 histDepth(남의 액자 안이면 그 블록이 안 돈다 — 0)
+/* 보이는 판의 판 칸 {onfBook: 판 번호, n: 그 아래 홈 칸 수, bd: 판 칸 줄 깊이} — 맨 위가 이미 이 판 칸이면 안 넣는다(뒤로로 돌아온 판 · 판 안 창 칸 위). */
+function histBook(p) {
+  if (bookOwner(histTop()) === p.key) return;
+  try { history.pushState({ onfBook: p.key, n: homeN(), bd: histRun() + 1 }, ''); } catch (e) {}   // 주소 칸은 비운다
+}
+/* 판 안쪽 기록 다리(폰) — 홈 다리(onf-hist)와 같은 약속·같은 검증(op · id · 2KB · JSON 사본). hello 는 안 받는다(학생 껍데기 한계 주석). 숨긴 판은 칸을 못 민다. */
+function bookHist(p, ev) {
+  var d = ev.data, t, flat;
+  if (d.op === 'hi') {
+    if (!phone() || !/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(String(ev.origin))) return;
+    p.hw = ev.source; p.ho = ev.origin;
+    try { p.hw.postMessage({ onf: 'hist-on' }, p.ho); } catch (e) {}
+    return;
+  }
+  if (!p.hw || ev.source !== p.hw || ev.origin !== p.ho || typeof d.id !== 'string' || !/^[A-Za-z0-9]{1,40}$/.test(d.id)) return;
+  t = histTop();
+  if (d.op === 'push' && !p.parked && d.state && Object.prototype.toString.call(d.state) === '[object Object]') {
+    try { flat = JSON.parse(JSON.stringify(d.state)); if (unescape(encodeURIComponent(JSON.stringify(flat))).length <= 2048) history.pushState({ onfHist: d.id, s: flat, n: homeN(), b: p.key, bd: histRun() + 1 }, ''); } catch (e) {}
+  } else if (d.op === 'back' && t && t.onfHist === d.id && t.b === p.key) history.back();   // 맨 위가 이 판의 그 칸일 때만(남의 칸 보호)
+}
+/* 기록 칸이 빠졌다 — 폰이면 맨 위 칸 주인 판을 보이고(지워졌으면 그 주소로 다시 받음) · 홈 칸·바닥이면 보이는 판을 숨긴다. 판 안쪽엔 그 판 맨 위 칸을 알린다. PC 는 판을 안 보이고 안 숨긴다. */
+function bookPop(s) {
+  var k = bookOwner(s), src = k ? bookSrcs[k - 1] : '', p = src ? bookFind(src) : null;
+  if (phone()) {
+    if (src && !p) p = bookMake(src, false);
+    if (p) bookShow(p); else bookHide();
+  }
+  (p ? [p] : k ? [] : books).forEach(function (q) {
+    if (q.hw) { try { q.hw.postMessage({ onf: 'hist-pop', id: p && s.onfHist ? s.onfHist : '', s: p && s.onfHist ? (s.s || null) : null }, q.ho); } catch (e) {} }
+  });
+}
 function teacherBookSrc(href) {
   try {
     var u = new URL(String(href || ''), location.href);
@@ -405,7 +458,7 @@ function bookPlace(p, left) {
   if (okL) p.box.style.setProperty('--bl', Math.round(left) + 'px');
 }
 function bookMake(src, parked) {
-  var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, parked: parked, win: null, origin: '', idle: null, left: null };
+  var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, key: bookKey(src), parked: parked, win: null, origin: '', kb: null, ko: '', hw: null, ho: '', idle: null, left: null };
   p.box.className = 'onf-bookpanel';
   if (parked) p.box.classList.add('park');
   p.el.setAttribute('allow', 'clipboard-write; microphone');
@@ -437,25 +490,56 @@ function bookPark(p, on) {
   if (on) { p.idle = setTimeout(function () { bookDrop(p); }, BOOK_IDLE_MS); try { p.el.blur(); } catch (e) {} }
   bookTell(p);
 }
-function bookOpen(href, left) {
-  var src = teacherBookSrc(href);
-  if (!src) return;
-  var cur = bookShown(), p = bookFind(src);
+/* p 를 보이고 보이던 판은 숨긴다 · 📱 폰이면 판 칸(histBook) · 키보드 보정 자리(bookKb). ⚠️ 새 판(bookMake)이면 books 끝이라 bookShown 은 보이던 옛 판을 먼저 찾는다. */
+function bookShow(p, left) {
+  var cur = bookShown();
   if (cur && cur !== p) bookPark(cur, true);
-  if (!p) p = bookMake(src, false);
   bookPlace(p, (typeof left === 'number') ? left : (cur ? cur.left : null));   // 판 안 갈아 끼우기(left 없음)는 보이던 판 자리 그대로
   if (p.parked) bookPark(p, false);
   books.splice(books.indexOf(p), 1); books.push(p);   // 가장 최근
-  bookRoom(BOOK_MAX);
+  bookRoom(bookMax());
+  if (phone()) histBook(p);
+  bookKb();
+}
+function bookOpen(href, left) {
+  var src = teacherBookSrc(href);
+  if (src) bookShow(bookFind(src) || bookMake(src, false), left);
 }
 /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판은 안 건드린다(books 는 오래 안 쓴 것이 앞). */
 function bookRoom(n) { for (var i = 0; books.length > n && i < books.length; ) { if (books[i].parked) bookDrop(books[i]); else i++; } }
 function bookPre(href, left) {
   var src = teacherBookSrc(href);
   if (!src || bookFind(src)) return;
-  bookRoom(BOOK_MAX - 1);   // 자리가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 — 종전엔 안 띄웠다)
+  bookRoom(bookMax() - 1);   // 자리가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 — 종전엔 안 띄웠다 · 📱 폰은 홈이 안 보낸다)
   bookPlace(bookMake(src, true), left);
 }
+/* 📱 키보드 높이·밀림 보정 — **보이는 폰 판**에만(학생 껍데기 onf-frame.js sync 의 판 몫 · 숫자·순서는 그 파일 머리·B1~B7 주석이 정본 — 실기기에서 하나씩 깨져 가며 정한 값).
+   교재가 새 탭(학생 껍데기)으로 열리던 때 받던 보정이라 판으로 옮기며 같이 가져왔다 — 없으면 아이폰에서 입력칸·화살표가 키보드에 가린다. 홈 액자는 종전대로 안 한다.
+   받는 곳 = 그 판 교재의 노크(frameHello) 창·출처('*' 금지). */
+var KB_UA = (window.navigator && navigator.userAgent) || '';
+var KB_SLACK = !/iPhone|iPad/.test(KB_UA) ? 0 : (/CriOS|EdgiOS|FxiOS/.test(KB_UA) ? 12 : 54);
+var kbEl = null, kbH = -1, kbTop = -1, kbZero = null;
+function kbSend(p, h, top) {
+  if (!p || !p.kb || (h === kbH && top === kbTop)) return;
+  kbH = h; kbTop = top;
+  try { p.kb.postMessage({ onf: 'kbH', h: h, top: top }, p.ko); } catch (e) {}
+}
+function bookKb() {
+  var vv = window.visualViewport, p = phone() ? bookShown() : null, el = p ? p.el : null, h = 0, top = 0, r, kt;
+  if (el !== kbEl) { if (kbEl) kbEl.style.transform = ''; kbEl = el; kbH = -1; kbTop = -1; }   // 판이 보이거나 숨었다 — 옛 자리 밀림 풀고 새 자리에 다시 알린다
+  if (!vv || !el) return;
+  var still = Math.abs((vv.scale || 1) - 1) < 0.02;   // 핀치줌 중엔 안 민다(B4)
+  el.style.transform = (still && vv.offsetTop > 0) ? 'translateY(' + vv.offsetTop + 'px)' : '';
+  if (still) {                                         // 위끝 기준(B6) · innerHeight 로 되짚지 않는다(B3)
+    r = el.getBoundingClientRect(); kt = vv.offsetTop + vv.height;
+    h = Math.round(r.bottom - kt); if (h < 60) h = 0;
+    top = h > 0 ? Math.round(kt - r.top) + KB_SLACK : 0;
+  }
+  if (h > 0) { clearTimeout(kbZero); kbZero = null; kbSend(p, h, top); }
+  else if (kbH !== 0 && !kbZero) kbZero = setTimeout(function () { kbZero = null; kbSend(phone() ? bookShown() : null, 0, 0); }, 300);   // 「키보드 없음」은 300ms 유지될 때만(B7)
+}
+if (window.visualViewport) { window.visualViewport.addEventListener('resize', bookKb); window.visualViewport.addEventListener('scroll', bookKb); }
+window.addEventListener('resize', bookKb);
 /** 🌙 안쪽이 알려 준 화면 색 — 틀·판 둘레·「불러오는 중」도 같은 색 · 다음에 열 때 머리 스크립트가 그리기 전에 쓴다. 아는 값만. */
 function onfShellTheme(v) {
   if (v !== 'dark' && v !== 'light') return;
@@ -472,17 +556,26 @@ function themeAsk(ev) {
   themeAskers = themeAskers.filter(function (a) { return a.w !== ev.source; }).concat([{ w: ev.source, o: ev.origin }]).slice(-4);
 }
 function themeTell() { themeAskers.forEach(function (a) { try { a.w.postMessage({ onf: 'theme', v: themeNow() }, a.o); } catch (e) {} }); }
-function bookClose() {
+/* 숨긴다 · 판을 연 홈에 「닫혔다」(교재 카드 % 다시 읽기 — openBook 을 보낸 그 창·출처로만). 숨길 판이 없으면 false. */
+function bookHide() {
   var p = bookShown();
-  if (!p) return;
+  if (!p) return false;
   bookPark(p, true);
   if (bookHome && bookHomeOrigin) { try { bookHome.postMessage({ onf: 'bookClosed' }, bookHomeOrigin); } catch (e) {} }
+  bookKb();
+  return true;
+}
+/* ✕·Esc·홈 탭 바꿈 — 숨기고, 📱 맨 위에 판 칸 줄이 있으면 걷는다(뒤로로 닫은 것과 같은 기록 · 뒤따르는 popstate 는 숨길 판이 없어 알림만). PC 는 판 칸이 없다(폰에서 넓힌 창만). */
+function bookClose() {
+  if (!bookHide()) return;
+  var r = histRun();
+  if (r > 0) { try { history.go(-r); } catch (e) {} }
 }
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data, p = null, i;
   if (!d || typeof d.onf !== 'string') return;
   if (bookFrom(ev, frame)) {                                   // 선생님 홈(내 액자)
-    if (d.onf === 'bookHello') { try { ev.source.postMessage({ onf: 'caps', book: 1 }, ev.origin); } catch (e) {} return; }
+    if (d.onf === 'bookHello') { try { ev.source.postMessage({ onf: 'caps', book: 1, phone: BOOK_PH ? 1 : 0 }, ev.origin); } catch (e) {} return; }   // 📱 phone:1 = 폰 판도 할 줄 안다(홈은 이때만 폰에서 판으로)
     if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left); return; }
     if (d.onf === 'bookWarm' && d.panel === 1 && typeof d.href === 'string') { bookPre(d.href, d.left); return; }   // 지금·곧 할 수업 교재를 숨긴 판으로 미리(10-13)
     if (d.onf === 'bookDismiss') { bookClose(); return; }
@@ -493,12 +586,27 @@ window.addEventListener('message', function (ev) {
   if (!p) return;                                              // 판 액자(교재·내 문장)
   if (d.onf === 'bookHi') { if (/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(String(ev.origin))) { p.win = ev.source; p.origin = ev.origin; bookTell(p); } return; }
   if (d.onf === 'themeAsk') { themeAsk(ev); return; }         // 🌙 판 안 교재가 묻는다(2단계) — 숨긴 판도(보일 때 색이 맞게)
+  if (d.onf === 'hist') { bookHist(p, ev); return; }           // 📱 판 안쪽 기록 다리(폰만 켠다 · 숨긴 판의 노크도 받는다)
+  if (d.onf === 'frameHello') { p.kb = ev.source; p.ko = ev.origin; kbH = -1; kbTop = -1; bookKb(); return; }   // 📱 이 판 교재의 키보드 높이 받는 창
   if (p.parked) return;                                        // ⛔ 숨긴 판은 닫기·전체·갈아 끼우기를 못 부른다
   if (d.onf === 'bookClose') bookClose();
   else if (d.onf === 'bookFull') p.box.classList.toggle('full', !!d.on);
   else if (d.onf === 'openBook' && typeof d.href === 'string') bookOpen(d.href);
 });
 window.addEventListener('keydown', function (e) { if (e.key === 'Escape') bookClose(); });   // 보이는 판만(숨긴 판은 Esc 를 안 먹는다)
+window.addEventListener('popstate', function () { bookPop(histTop()); });   // 📱 홈 칸 깊이·홈 알림은 onf-hist 블록(판 칸이 맨 위면 홈은 안 바뀌었다)
+/* 📱 폰 ↔ PC(폭이 바뀜) — 모양(<html class="onf-ph">)·자리 수를 맞추고, 폰이 되면 보이는 판에 판 칸(뒤로 = 숨김) · 폰→PC 면 남은 판 칸은 ✕ 가 걷는다. 옛 사파리는 addListener 뿐. */
+function bookMode() {
+  try { document.documentElement.classList.toggle('onf-ph', phone()); } catch (e) {}
+  var p = bookShown();
+  if (p && phone()) histBook(p);
+  bookRoom(bookMax());
+  bookKb();
+}
+if (wideMq) {
+  bookMode();
+  try { wideMq.addEventListener('change', bookMode); } catch (e) { try { wideMq.addListener(bookMode); } catch (e2) {} }
+}
 /* onf-book:end */
 
 /* ═══ 기록 칸 다리 — 안쪽의 「뒤로 = 창 닫기」 기록 칸을 **여기(최상위 문서)** 에 만든다 (Peter 2026-10-01) ═══
@@ -526,7 +634,8 @@ window.addEventListener('message', function (ev) {
   /* ⚠️ hello 의 go(-n) 은 「기록 맨 위 n 칸이 전부 우리 칸」이라는 **전제**에 선다 — 안쪽은 칸을 넣은 뒤 **문서 이동을 하지 않고**(같은 주소의 새로 읽기만) 껍데기는 우리 칸 밖에는 아무것도 안 쌓는다.
      안쪽이 주소를 바꿔 문서 이동을 얹으면 go(-n) 이 엉뚱한 칸에 닿는다(검수 2026-10-01 · 실제 GAS 「다시 불러오기」는 같은 주소라 해당 없다고 보지만 실기기는 못 쟀다). */
   if (d.op === 'hello') {                 // 안쪽이 새로 떴다 — 옛 안쪽이 남긴 죽은 칸을 치운다(같은 문서 안 칸이라 조용히 빠진다)
-    if (histDepth > 0) { n = histDepth; histDepth = 0; try { history.go(-n); } catch (e) {} }
+    //   📱 판 칸이 맨 위면 안 치운다 — go(-n) 이 판 칸부터 걷는다(「맨 위 n 칸이 전부 홈 칸」 전제가 깨진다 · 죽은 홈 칸은 남는 한계 · onf-book 블록)
+    if (histDepth > 0 && !histRun()) { n = histDepth; histDepth = 0; try { history.go(-n); } catch (e) {} }
     return;
   }
   if ((d.op !== 'push' && d.op !== 'back') || typeof d.id !== 'string' || !HIST_ID.test(d.id)) return;
@@ -539,16 +648,16 @@ window.addEventListener('message', function (ev) {
     try { history.pushState({ onfHist: d.id, s: flat, n: histDepth + 1 }, ''); histDepth++; } catch (e) {}   // 주소 칸은 비운다
     return;
   }
-  s = history.state;                      // back — 맨 위가 그 id 일 때만(남의 칸 보호)
-  if (s && s.onfHist === d.id) history.back();
+  s = history.state;                      // back — 맨 위가 그 id 일 때만(남의 칸 보호 · 📱 판 칸·판 안쪽 칸은 홈 것이 아니다)
+  if (s && s.onfHist === d.id && !bookOwner(s)) history.back();
 });
 window.addEventListener('popstate', function () {
   var s = history.state, h = (s && s.onfHist) ? s : null;
-  histDepth = h ? Math.max(0, Number(h.n) || 0) : 0;
-  if (!appWin) return;
+  histDepth = (h || bookOwner(s)) ? Math.max(0, Number(s.n) || 0) : 0;   // 📱 판 칸의 n = 그 아래 홈 칸 수
+  if (!appWin || bookOwner(s)) return;    // 📱 판 칸이 맨 위면 홈은 안 바뀌었다(판 칸은 늘 홈 칸 위에 쌓인다 · 판 숨김·보임은 onf-book 블록 bookPop)
   try { appWin.postMessage({ onf: 'hist-pop', id: h ? h.onfHist : '', s: h ? (h.s || null) : null }, appOrigin); } catch (e) {}   // '*' 금지
 });
-try { if (history.state && history.state.onfHist) history.replaceState(null, ''); } catch (e) {}   // 껍데기가 다시 읽힌 채 남은 표식만 지운다
+try { if (history.state && (history.state.onfHist || history.state.onfBook)) history.replaceState(null, ''); } catch (e) {}   // 껍데기가 다시 읽힌 채 남은 표식만 지운다(📱 판 칸 포함)
 /* onf-hist:end */
 }
 

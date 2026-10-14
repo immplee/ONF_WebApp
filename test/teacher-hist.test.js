@@ -11,6 +11,9 @@ const vm = require('vm');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
 const A = src.indexOf('/* onf-hist:begin */'), B = src.indexOf('/* onf-hist:end */');
+/* 📱 이 블록은 onf-book 블록의 판 칸 도우미 셋(histTop·bookOwner·histRun — 2026-10-14 폰 판)을 부른다 — 그 진짜 줄(한 줄짜리)을 떼어 같이 돌린다. */
+const BK = src.slice(src.indexOf('/* onf-book:begin */'), src.indexOf('/* onf-book:end */'));
+const HELP = ['histTop', 'bookOwner', 'histRun'].map((n) => (new RegExp('^function ' + n + '\\(.*$', 'm').exec(BK) || [''])[0]).join('\n');
 let pass = 0, fail = 0;
 function t(label, fn) {
   try { fn(); console.log('  ✅ ' + label); pass++; }
@@ -45,7 +48,7 @@ function run(opt) {
   const appWin = opt.noApp ? null : { postMessage(m, o) { sent.push({ m: JSON.parse(JSON.stringify(m)), o }); } };
   const c = { window: { addEventListener(tp, f) { L[tp].push(f); } }, history: H, appWin, appOrigin: ORIGIN };
   vm.createContext(c);
-  vm.runInContext(src.slice(A, B), c, { filename: 'onf-hist-block' });
+  vm.runInContext(HELP + '\n' + src.slice(A, B), c, { filename: 'onf-hist-block' });
   const R = { H, sent, appWin, c,
     depth: () => vm.runInContext('histDepth', c),
     msg: (d, o) => L.message.forEach((f) => f({ data: d, source: (o && 'source' in o) ? o.source : appWin, origin: (o && o.origin) || ORIGIN })),

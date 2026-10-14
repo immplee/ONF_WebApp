@@ -319,7 +319,10 @@ t('⛔ 선생님 껍데기(teacher/index.html onf-hist 블록)에 op:hi 를 보�
   const L = { message: [], popstate: [] }, sent = [];
   const appWin = { postMessage(m, o) { sent.push({ m, o }); } };
   const c = { window: { addEventListener(tp, f) { L[tp].push(f); } }, history: H, appWin, appOrigin: ORIGIN };
-  vm.createContext(c); vm.runInContext(tsrc.slice(A, B), c);
+  //   📱 onf-hist 블록은 onf-book 블록의 판 칸 도우미(histTop·bookOwner·histRun)를 부른다 — 진짜 줄을 떼어 같이 돌린다(teacher-hist.test.js 와 같은 길)
+  const BK = tsrc.slice(tsrc.indexOf('/* onf-book:begin */'), tsrc.indexOf('/* onf-book:end */'));
+  const help = ['histTop', 'bookOwner', 'histRun'].map((n) => (new RegExp('^function ' + n + '\\(.*$', 'm').exec(BK) || [''])[0]).join('\n');
+  vm.createContext(c); vm.runInContext(help + '\n' + tsrc.slice(A, B), c);
   const msg = (d) => L.message.forEach((f) => f({ data: d, source: appWin, origin: ORIGIN }));
   msg({ onf: 'hist', op: 'hi' });
   msg({ onf: 'hist', op: 'hi', id: 'abc1', state: { a: 1 } });                 // id·state 를 달아도(push 로 오해받게) 칸이 안 생긴다
