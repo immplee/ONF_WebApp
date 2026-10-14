@@ -140,19 +140,27 @@ t('📖 숨긴 판(2026-10-13) — 닫으면 숨김(.park) · 교재에 bookPark
   assert.ok(s.panels().length === 1 && !p.classList.contains('park') && p.kids[0].src === src0, '⛔ 같은 교재를 다시 열었는데 숨긴 판을 안 썼다');
   assert.deepStrictEqual(js(bi.sent), [[{ onf: 'bookPark', on: false }, ORIGIN]], '⛔ 다시 보였는데 「보임」을 안 알렸다');  const idle = () => s.timers.filter((x) => x.on && x.ms === 30 * 60 * 1000);
   assert.strictEqual(idle().length, 0, '⛔ 다시 보인 판의 30분 시계를 안 멈췄다(보는 중에 지워진다)');
-  //   다른 교재 둘 더 — 둘까지 · 가장 오래 안 쓴 숨긴 판부터 지운다 · 숨긴 채 30분이면 지운다
+  //   다른 교재 셋 더 — 셋까지(10-14) · 가장 오래 안 쓴 숨긴 판부터 지운다 · 숨긴 채 30분이면 지운다
+  const knock = (box, n) => { const ki = win('book-user' + n, win('book-exec' + n, s.top)); box.kids[0].contentWindow = ki.parent; s.send({ onf: 'bookHi' }, ki); };
   s.send({ onf: 'openBook', href: TURL.replace('e1', 'e2'), left: 184 }, s.home);
-  const q = s.panels().find((x) => x !== p), qi = win('book-user2', win('book-exec2', s.top));
-  q.kids[0].contentWindow = qi.parent; s.send({ onf: 'bookHi' }, qi);
+  const q = s.panels().find((x) => x !== p);
+  knock(q, 2);
   assert.ok(p.classList.contains('park') && !q.classList.contains('park'), '⛔ 다른 교재를 열었는데 보이던 판을 안 숨겼다');
   s.send({ onf: 'openBook', href: TURL.replace('e1', 'e3'), left: 184 }, s.home);
-  assert.ok(s.panels().length === 2 && s.panels().indexOf(p) < 0 && s.panels().indexOf(q) >= 0, '⛔ 셋째 판 — 가장 오래 안 쓴 숨긴 판을 안 지웠다');
-  assert.strictEqual(idle().length, 1, '⛔ 숨긴 판(E2)에 30분 시계가 하나가 아니다');
+  const r = s.panels().find((x) => x !== p && x !== q);
+  knock(r, 3);
+  assert.ok(s.panels().length === 3 && p.classList.contains('park') && q.classList.contains('park'), '⛔ 셋째 판 — 셋까지 둘 수 있는데 숨긴 판을 지웠다');
+  //   E1 → E3 을 다시 열면 가장 오래 안 쓴 것은 E2 — 넷째(E4)는 E2 를 비킨다(만든 순서가 아니라 쓴 순서)
+  s.send({ onf: 'openBook', href: TURL, left: 184 }, s.home);
+  s.send({ onf: 'openBook', href: TURL.replace('e1', 'e3'), left: 184 }, s.home);
+  s.send({ onf: 'openBook', href: TURL.replace('e1', 'e4'), left: 184 }, s.home);
+  assert.ok(s.panels().length === 3 && s.panels().indexOf(q) < 0 && s.panels().indexOf(p) >= 0 && s.panels().indexOf(r) >= 0, '⛔ 넷째 판 — 가장 오래 안 쓴 숨긴 판(E2)을 안 지웠다(만든 순서로 지웠다)');
+  assert.strictEqual(idle().length, 2, '⛔ 숨긴 판(E1·E3)에 30분 시계가 하나씩이 아니다');
   idle()[0].f();
-  assert.ok(s.panels().length === 1 && s.panels().indexOf(q) < 0, '⛔ 30분 숨긴 판을 안 지웠다');
+  assert.ok(s.panels().length === 2 && s.panels().indexOf(p) < 0, '⛔ 30분 숨긴 판을 안 지웠다');
 });
 
-t('📖 미리 띄우기(bookWarm panel:1 · 2026-10-13) — 홈 액자 말만 · 숨긴 판 · 주소에 park=1 · 메뉴 옆 · 같은 주소 한 번 · 둘까지 · panel 없으면 안 함 · 숨긴 채 30분이면 지움', () => {
+t('📖 미리 띄우기(bookWarm panel:1 · 2026-10-13) — 홈 액자 말만 · 숨긴 판 · 주소에 park=1 · 메뉴 옆 · 같은 주소 한 번 · 셋까지(차면 가장 오래 안 쓴 숨긴 판을 비킴 · 보이는 판은 그대로 · 10-14) · panel 없으면 안 함 · 숨긴 채 30분이면 지움', () => {
   const s = run();
   s.send({ onf: 'bookWarm', href: TURL, panel: 1, left: 184 }, win('stranger', s.top));
   s.send({ onf: 'bookWarm', href: TURL, left: 184 }, s.home);
@@ -164,9 +172,20 @@ t('📖 미리 띄우기(bookWarm panel:1 · 2026-10-13) — 홈 액자 말만 �
   assert.ok(s.panels().length === 1 && p.classList.contains('park') && /&embed=1&park=1$/.test(p.kids[0].src) && p.classList.contains('beside'), '⛔ 숨긴 판(park=1 · 메뉴 옆)으로 한 번만 안 띄웠다');
   s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e2'), panel: 1 }, s.home);
   s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e3'), panel: 1 }, s.home);
-  assert.strictEqual(s.panels().length, 2, '⛔ 둘을 넘겨 미리 띄웠다');
+  assert.strictEqual(s.panels().length, 3, '⛔ 셋까지 미리 안 띄웠다');
+  //   넷째(교재 탭에서 머문 다른 학생) — 가장 오래 안 쓴 숨긴 판(첫 미리 p)을 비키고 띄운다
+  s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e4'), panel: 1 }, s.home);
+  assert.ok(s.panels().length === 3 && s.panels().indexOf(p) < 0 && /e4/.test(s.panels()[2].kids[0].src) && s.panels()[2].classList.contains('park'), '⛔ 자리가 찼을 때 가장 오래 안 쓴 숨긴 판을 비키고 띄우지 않았다(또는 넷을 띄웠다)');
+  //   보이는 판은 미리 띄우기가 못 지운다 — e2 를 열고(보임) 미리 둘 더
+  const e2 = s.panels()[0];
+  e2.kids[0].contentWindow = win('book-exec9', s.top); s.send({ onf: 'bookHi' }, win('book-user9', e2.kids[0].contentWindow));
+  s.send({ onf: 'openBook', href: TURL.replace('e1', 'e2'), left: 184 }, s.home);
+  s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e5'), panel: 1 }, s.home);
+  s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e6'), panel: 1 }, s.home);
+  s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e7'), panel: 1 }, s.home);   // 이때 보이는 판(E2)이 가장 오래 안 쓴 판이다
+  assert.ok(s.panels().length === 3 && s.panels().indexOf(e2) >= 0 && !e2.classList.contains('park'), '⛔ 미리 띄우기가 보이는 판을 지웠다');
   s.timers.filter((x) => x.on && x.ms === 30 * 60 * 1000).forEach((x) => x.f());
-  assert.strictEqual(s.panels().length, 0, '⛔ 30분 숨긴 판을 안 지웠다');
+  assert.ok(s.panels().length === 1 && s.panels()[0] === e2, '⛔ 30분 숨긴 판을 안 지웠다(또는 보이는 판을 지웠다)');
 });
 
 t('🌙 화면 색 — 선생님 홈(내 액자)이 알린 theme 만 <html data-theme> · localStorage · 남의 창·모르는 값은 버린다 (2026-10-12)', () => {

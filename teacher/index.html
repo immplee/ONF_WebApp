@@ -367,9 +367,9 @@ window.addEventListener('message', function (ev) {
    ═══ 숨긴 판(2026-10-13 Peter 「미리 불러와서 기다리는 시간이 아예 없게」) — 학생 껍데기 assets/onf-frame.js 의 교재 판 주석이 정본(⚠️ 쌍둥이) ═══
    닫으면 지우지 않고 숨긴다(.park) · 같은 주소는 그 판 그대로(0초) · 다른 주소는 새 판(보이던 판은 숨김) · 홈이 bookWarm{panel:1}(지금·곧 할 수업 교재)이면 숨긴 판으로 미리(park=1).
    ⛔ 숨긴 판 교재는 「대기」(bookPark — 노크 bookHi 의 그 창·출처로만) — 선생님이 미리 띄운 것이 학생 화면에 「선생님 접속 중」으로 안 뜬다. 노크 없는 판은 숨기지 않고 지운다.
-   ⛔ 숨긴 판은 닫기·전체·갈아 끼우기·Esc 를 못 가로챈다 · 둘까지 · 숨긴 채 30분이면 지운다. */
+   ⛔ 숨긴 판은 닫기·전체·갈아 끼우기·Esc 를 못 가로챈다 · 셋까지(10-14 · 차면 가장 오래 안 쓴 숨긴 판을 비킨다 — 미리 띄우기도) · 숨긴 채 30분이면 지운다. */
 /* onf-book:begin */
-var BOOK_MAX = 2, BOOK_IDLE_MS = 30 * 60 * 1000;
+var BOOK_MAX = 3, BOOK_IDLE_MS = 30 * 60 * 1000;
 var books = [], bookHome = null, bookHomeOrigin = '';   // books = 판들(오래 안 쓴 것이 앞) · { box, el, src, parked, win, origin, idle, left }
 var BOOK_KEYS = ['t', 'mode', 'fileId', 'sheetName', 'back', 'line', 'view', 'ttok', 'tas'];
 function teacherBookSrc(href) {
@@ -446,11 +446,14 @@ function bookOpen(href, left) {
   bookPlace(p, (typeof left === 'number') ? left : (cur ? cur.left : null));   // 판 안 갈아 끼우기(left 없음)는 보이던 판 자리 그대로
   if (p.parked) bookPark(p, false);
   books.splice(books.indexOf(p), 1); books.push(p);   // 가장 최근
-  for (var i = 0; books.length > BOOK_MAX && i < books.length; ) { if (books[i].parked) bookDrop(books[i]); else i++; }
+  bookRoom(BOOK_MAX);
 }
+/* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판은 안 건드린다(books 는 오래 안 쓴 것이 앞). */
+function bookRoom(n) { for (var i = 0; books.length > n && i < books.length; ) { if (books[i].parked) bookDrop(books[i]); else i++; } }
 function bookPre(href, left) {
   var src = teacherBookSrc(href);
-  if (!src || books.length >= BOOK_MAX || bookFind(src)) return;
+  if (!src || bookFind(src)) return;
+  bookRoom(BOOK_MAX - 1);   // 자리가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 — 종전엔 안 띄웠다)
   bookPlace(bookMake(src, true), left);
 }
 /** 🌙 안쪽이 알려 준 화면 색 — 틀·판 둘레·「불러오는 중」도 같은 색 · 다음에 열 때 머리 스크립트가 그리기 전에 쓴다. 아는 값만. */

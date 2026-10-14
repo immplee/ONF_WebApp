@@ -300,13 +300,13 @@
        · 닫으면(✕ · Esc · 홈 탭 바꿈) 지우지 않고 **숨긴다**(.park = visibility:hidden — 초점·누르기도 안 간다). 같은 주소를 다시 열면 그 판을 그대로 보인다(0초 · 전체 화면이었으면 그대로).
        · 다른 주소(다른 회차·교재 · 판 안 교재↔⭐ 내 문장)는 **새 판** — 보이던 판은 숨긴다(돌아가면 0초).
          ponytail: 숨긴 판에 「그 회차로 바꿔」는 안 한다(짧은 주소→회차를 껍데기가 모른다) — 다른 회차는 새로 받는다.
-       · 홈이 bookWarm 에 panel:1 을 실으면 그 교재를 **숨긴 판으로 미리** 띄운다(bookPre · 주소에 park=1). 자리가 없으면 안 띄운다(쓰던 판을 밀어내지 않는다).
+       · 홈이 bookWarm 에 panel:1 을 실으면 그 교재를 **숨긴 판으로 미리** 띄운다(bookPre · 주소에 park=1). 자리가 차면 가장 오래 안 쓴 **숨긴** 판을 비키고 띄운다(10-14 · 보이는 판은 안 건드린다 · 종전엔 안 띄웠다).
        ⛔ 숨긴 판의 교재는 「대기」 — 접속 표시·옛 메모 이관·요약본 다시 짓기를 안 보낸다(Ownify ONF_PARK). 보일 때 {onf:'bookPark', on:false} · 숨길 때 {on:true}.
           말은 교재가 먼저 건 bookHi 의 그 창·그 출처로만('*' 금지 · 부모가 먼저 쏘면 구글 래퍼가 버린다). bookHi 가 늦게 오면 그때 지금 상태를 답한다.
           bookHi 를 안 한 판(옛 교재 · 아직 뜨는 중)은 숨기지 않고 **지운다** — 대기를 못 알아듣는 교재를 숨겨 두면 선생님 화면에 접속 표시가 남는다.
        ⛔ 숨긴 판은 아무 말도 못 가로챈다 — bookClose·bookFull·openBook 은 **보이는 판**에서 온 것만 · Esc·bookDismiss 는 보이는 판만 숨긴다. themeAsk 는 숨긴 판도 답한다(보일 때 색이 맞게).
-       ⚠️ 판은 BOOK_MAX 개까지 — 넘으면 가장 오래 안 쓴 숨긴 판부터 지운다 · 숨긴 채 BOOK_IDLE_MS 지나면 지운다(메모리). 지울 땐 액자째(종전 닫기와 같다). */
-    var BOOK_MAX = 2, BOOK_IDLE_MS = 30 * 60 * 1000;
+       ⚠️ 판은 BOOK_MAX(3 · 10-14 Peter 「미리 띄우는 교재 셋」 · 보이는 판 하나 + 숨긴 판 둘) 개까지 — 넘으면 가장 오래 안 쓴 숨긴 판부터 지운다(bookRoom) · 숨긴 채 BOOK_IDLE_MS 지나면 지운다(메모리). 지울 땐 액자째(종전 닫기와 같다). */
+    var BOOK_MAX = 3, BOOK_IDLE_MS = 30 * 60 * 1000;
     var books = [], bookHome = null, bookHomeOrigin = '';   // books = 판들(오래 안 쓴 것이 앞) · { box, el, src, parked, win, origin, idle, left }
     var warmed = {};
     function bookWarm(href) {
@@ -370,11 +370,14 @@
       bookPlace(p, (typeof left === 'number') ? left : (cur ? cur.left : null));   // 판 안 갈아 끼우기(left 없음)는 보이던 판 자리 그대로
       if (p.parked) bookPark(p, false);
       books.splice(books.indexOf(p), 1); books.push(p);   // 가장 최근
-      for (var i = 0; books.length > BOOK_MAX && i < books.length; ) { if (books[i].parked) bookDrop(books[i]); else i++; }
+      bookRoom(BOOK_MAX);
     }
+    /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판은 안 건드린다(books 는 오래 안 쓴 것이 앞). */
+    function bookRoom(n) { for (var i = 0; books.length > n && i < books.length; ) { if (books[i].parked) bookDrop(books[i]); else i++; } }
     function bookPre(href, left) {
       var src = opts.bookSrc(href);
-      if (!src || books.length >= BOOK_MAX || bookFind(src)) return;
+      if (!src || bookFind(src)) return;
+      bookRoom(BOOK_MAX - 1);   // 자리가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 — 종전엔 안 띄웠다)
       bookPlace(bookMake(src, true), left);
     }
     /* 🌙 교재(다크 모드 2단계 · 2026-10-13)가 「무슨 색?」(themeAsk) → 지금 틀 색을 답하고, 홈이 색을 바꾸면 물었던 창에도 알린다.

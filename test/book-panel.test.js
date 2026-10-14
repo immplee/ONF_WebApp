@@ -217,7 +217,7 @@ t('📖 교재 데우기(bookWarm) — 홈 액자의 말만 · 판과 같은 거
 
 console.log('[숨긴 판 — 2026-10-13 Peter 「미리 불러와서 기다리는 시간이 아예 없게」]');
 const O = 'https://n-abc-0lu-script.googleusercontent.com', js = (x) => JSON.parse(JSON.stringify(x));
-const E1 = 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', E2 = 'https://class.ownify.co.kr/a-s1-e2-b?mode=share', E3 = 'https://class.ownify.co.kr/a-s1-e3-b?mode=share';
+const E1 = 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', E2 = 'https://class.ownify.co.kr/a-s1-e2-b?mode=share', E3 = 'https://class.ownify.co.kr/a-s1-e3-b?mode=share', E4 = 'https://class.ownify.co.kr/a-s1-e4-b?mode=share';
 /* 판 하나에 교재 창을 붙이고 노크(bookHi)까지 — 새 교재가 뜨면 하는 일 */
 function hi(s, box, origin) {
   const bw = win('book-exec', s.top), bi = win('book-user', bw);
@@ -264,7 +264,7 @@ t('노크(bookHi)는 그 판 액자 안 · https googleusercontent 에서 온 �
   assert.deepStrictEqual(js(bi2.sent), [[{ onf: 'bookPark', on: true }, O]], '⛔ 숨긴 판의 늦은 노크에 「대기」로 안 답했다');
 });
 
-t('미리 띄우기(bookWarm panel:1) — 숨긴 판 · 주소에 park=1 · GET 데우기 안 함 · 메뉴 옆 자리 · 같은 주소 두 번은 한 번 · 자리(2)가 차면 안 띄운다 · 홈 액자 말만', () => {
+t('미리 띄우기(bookWarm panel:1) — 숨긴 판 · 주소에 park=1 · GET 데우기 안 함 · 메뉴 옆 자리 · 같은 주소 두 번은 한 번 · 자리(3)가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(보이는 판은 그대로 · 10-14) · 홈 액자 말만', () => {
   const s = setup(), got = [];
   s.g.fetch = (u) => { got.push(u); return Promise.resolve(); };
   s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 184 }, win('stranger', s.top));
@@ -280,10 +280,20 @@ t('미리 띄우기(bookWarm panel:1) — 숨긴 판 · 주소에 park=1 · GET 
   hi(s, p);
   s.send({ onf: 'openBook', href: E1, left: 184 }, s.homeInner);
   assert.ok(s.panels().length === 1 && !p.classList.contains('park'), '⛔ 미리 띄운 판을 안 쓰고 새로 받았다');
-  //   자리 — 보이는 판 하나 + 미리 하나 = 둘 · 셋째 미리는 안 띄운다(쓰던 판을 밀어내지 않는다)
+  //   자리(10-14 Peter 「미리 띄우는 교재 셋」) — 보이는 판 하나 + 미리 둘 = 셋 · 넷째 미리는 가장 오래 안 쓴 숨긴 판(E2)을 비키고 띄운다 · 보이는 판(E1)은 안 건드린다
   s.send({ onf: 'bookWarm', href: E2, panel: 1 }, s.homeInner);
   s.send({ onf: 'bookWarm', href: E3, panel: 1 }, s.homeInner);
-  assert.strictEqual(s.panels().length, 2, '⛔ 자리가 찼는데 또 미리 띄웠다');
+  assert.strictEqual(s.panels().length, 3, '⛔ 판 셋까지 미리 안 띄웠다(보이는 판 하나 + 숨긴 판 둘)');
+  const e2 = s.panels()[1];
+  s.send({ onf: 'bookWarm', href: E4, panel: 1 }, s.homeInner);
+  assert.ok(s.panels().length === 3 && s.panels().indexOf(e2) < 0 && s.panels().indexOf(p) >= 0 && !p.classList.contains('park'), '⛔ 자리가 찼을 때 가장 오래 안 쓴 숨긴 판(E2)을 비키지 않았다(또는 보이는 판을 지웠다 · 넷을 띄웠다)');
+  assert.ok(/&ep=e4&embed=1&park=1$/.test(s.panels()[2].kids[0].src) && s.panels()[2].classList.contains('park'), '⛔ 비킨 자리에 넷째를 숨긴 판으로 안 띄웠다');
+  //   보이는 판만 남았을 때(숨긴 판 0) — 셋 중 둘을 숨긴 판으로 지워도 보이는 판은 끝까지 그대로
+  s.send({ onf: 'bookWarm', href: E2, panel: 1 }, s.homeInner);
+  assert.ok(s.panels().length === 3 && s.panels().indexOf(p) >= 0 && !p.classList.contains('park'), '⛔ 미리 띄우기가 보이는 판을 지웠다');
+  //   미리 띄운 판도 숨긴 채 30분이면 지운다(메모리) — 보이는 판은 남는다
+  s.timers.filter((x) => x.on && x.ms === 30 * 60 * 1000).forEach((x) => x.f());
+  assert.ok(s.panels().length === 1 && s.panels()[0] === p, '⛔ 미리 띄운 판을 30분 뒤에도 안 지웠다(또는 보이는 판을 지웠다)');
 });
 
 t('⛔ 숨긴 판은 아무 말도 못 가로챈다 — bookClose·bookFull·openBook 은 버림 · Esc·bookDismiss 는 보이는 판만(홈에 헛 bookClosed 없음) · themeAsk 는 답한다(보일 때 색)', () => {
@@ -304,7 +314,7 @@ t('⛔ 숨긴 판은 아무 말도 못 가로챈다 — bookClose·bookFull·ope
   assert.deepStrictEqual(js(bi.sent), [[{ onf: 'theme', v: 'light' }, O]], '⛔ 숨긴 판 교재의 색 물음에 안 답했다(보일 때 색이 틀린다)');
 });
 
-t('다른 교재·회차는 새 판 · 보이던 판은 숨김 → 돌아가면 0초 · 판은 둘까지(가장 오래 안 쓴 숨긴 판부터 지움) · 숨긴 채 30분이면 지움', () => {
+t('다른 교재·회차는 새 판 · 보이던 판은 숨김 → 돌아가면 0초 · 판은 셋까지(가장 오래 안 쓴 숨긴 판부터 지움 · 10-14) · 숨긴 채 30분이면 지움', () => {
   const s = setup();
   s.send({ onf: 'openBook', href: E1, left: 184 }, s.homeInner);
   const a = s.panel(), ai = hi(s, a);
@@ -316,12 +326,16 @@ t('다른 교재·회차는 새 판 · 보이던 판은 숨김 → 돌아가면 
   s.send({ onf: 'openBook', href: E1, left: 184 }, s.homeInner);
   assert.ok(!a.classList.contains('park') && b.classList.contains('park') && s.panels().length === 2, '⛔ 앞 회차로 돌아갔는데 숨긴 판을 안 썼다');
   s.send({ onf: 'openBook', href: E3, left: 184 }, s.homeInner);
-  assert.ok(s.panels().length === 2 && s.panels().indexOf(b) < 0 && s.panels().indexOf(a) >= 0, '⛔ 셋째 판 — 가장 오래 안 쓴 숨긴 판(E2)을 안 지웠다(또는 방금 쓴 판을 지웠다)');
+  const c = s.panels().find((x) => x !== a && x !== b);
+  assert.ok(s.panels().length === 3 && c && a.classList.contains('park') && b.classList.contains('park'), '⛔ 셋째 판 — 셋까지 둘 수 있는데 숨긴 판을 지웠다');
+  hi(s, c);
+  s.send({ onf: 'openBook', href: E4, left: 184 }, s.homeInner);
+  assert.ok(s.panels().length === 3 && s.panels().indexOf(b) < 0 && s.panels().indexOf(a) >= 0 && s.panels().indexOf(c) >= 0, '⛔ 넷째 판 — 가장 오래 안 쓴 숨긴 판(E2)을 안 지웠다(또는 방금 쓴 판을 지웠다)');
   //   숨긴 채 오래 — 지운다(메모리) · 다시 보인 판의 시계는 멈춘다
   const idle = s.timers.filter((x) => x.on && x.ms === 30 * 60 * 1000);
-  assert.strictEqual(idle.length, 1, '⛔ 숨긴 판(E1)에 30분 시계가 하나가 아니다(보인 판 시계를 안 멈췄거나 숨긴 판에 안 걸었다)');
+  assert.strictEqual(idle.length, 2, '⛔ 숨긴 판(E1·E3)에 30분 시계가 하나씩이 아니다(보인 판 시계를 안 멈췄거나 숨긴 판에 안 걸었다)');
   idle[0].f();
-  assert.ok(s.panels().length === 1 && s.panels().indexOf(a) < 0, '⛔ 30분 숨긴 판을 안 지웠다');
+  assert.ok(s.panels().length === 2 && s.panels().indexOf(a) < 0, '⛔ 30분 숨긴 판을 안 지웠다');
 });
 
 t('Esc — 판이 열려 있으면 닫는다', () => {
