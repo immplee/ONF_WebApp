@@ -506,6 +506,25 @@ t('📱 ✕ = 숨김 + 판 칸 줄만 걷기(go(-bd)) — 홈 기록 다리 칸�
   assert.deepStrictEqual(js(s.homeInner.sent).filter((x) => x[0].onf === 'bookClosed').length, 1, '⛔ bookClosed 가 한 번이 아니다');
 });
 
+t('📱 남의 칸 보호 — 판 안쪽은 맨 위 **홈 칸**을 같은 id 로도 못 걷는다 · 판 칸이 맨 위일 때 홈의 hello(다시 뜸)는 기록을 안 흔든다(판 칸부터 걷게 된다)', () => {
+  const s = phoneSetup();
+  s.hist({ op: 'hi' }, s.homeInner);
+  s.send({ onf: 'openBook', href: E1 }, s.homeInner);
+  const p = s.panel(), bi = hi(s, p);
+  s.hist({ op: 'hi' }, bi);
+  s.browserBack();
+  s.hist({ op: 'push', id: 'same1', state: { onfHwv: 'v' } }, s.homeInner);
+  assert.ok(s.H.state.onfHist === 'same1' && !s.H.state.b, '전제: 맨 위가 홈 칸');
+  s.hist({ op: 'back', id: 'same1' }, bi);
+  assert.strictEqual(s.H.backs, 0, '⛔ 판 안쪽이 맨 위 홈 칸을 걷었다(id 만 보고)');
+  s.send({ onf: 'openBook', href: E1 }, s.homeInner);
+  assert.ok(s.H.state.onfBook === 1 && s.H.state.n === 1, '전제: 홈 칸 위에 판 칸');
+  s.hist({ op: 'hello' }, s.homeInner);
+  assert.deepStrictEqual(s.H.goes, [], '⛔ 판 칸이 맨 위인데 홈 hello 가 go(-n) 으로 판 칸부터 걷었다');
+  s.hist({ op: 'hello' }, bi);
+  assert.deepStrictEqual(s.H.goes, [], '⛔ 판 안쪽 hello 가 기록을 흔들었다');
+});
+
 t('📱 판 안 창(카드·응용) 칸도 최상위 — 노크(hist hi)는 폰 판만 답(PC 판·홈 다리 그대로) · 칸 = {onfHist, s, n, b, bd} · 뒤로 → 그 판에만 hist-pop(창만 닫힘 · 판 그대로) · 한 번 더 → 판 숨김 · 숨긴 판은 못 민다 · ✕ 는 판 칸 줄 통째', () => {
   const s = phoneSetup();
   s.hist({ op: 'hi' }, s.homeInner);
