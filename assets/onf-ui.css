@@ -16,6 +16,11 @@
   --onf-ink: #F3EADF; --onf-brown: #C9B39C; --onf-line: #4A3A2E; --onf-bg: #1E1611;
   --onf-page: #1E1611; --onf-card: #2A2019; --onf-mute: #9A8571; --onf-frame: #140E0A;
 }
+/* ⛔ 액자는 밝은 색 체계로 둔다 — 안에 드는 구글 문서(exec 래퍼 · 로그인 버튼 · 판)는 색 체계를 안 밝힌 밝은 문서다.
+   액자 요소(위 dark 를 물려받음)와 안 문서의 색 체계가 다르면 브라우저가 그 액자를 **불투명 흰 종이**로 칠한다(CSS color-scheme 규약) —
+   로그인 버튼 둘레 흰 테 · 「불러오는 중」 위를 덮는 흰 화면이 그것(2026-10-14 Peter 아이폰 · WebKit 은 빈 액자·읽는 중도 흰색, 크롬은 다 읽은 구글 문서가 흰색 — 둘 다 실측).
+   같게 맞추면 투명해져 뒤의 어두운 바탕이 비친다 · 안쪽 다크 홈은 제 바탕을 스스로 칠한다. */
+:root[data-theme="dark"] iframe { color-scheme: light; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; height: 100%; background: var(--onf-page); }
 body {
