@@ -28,8 +28,11 @@
      실측(2026-09-02): 프레임이 막히거나(XFO/CSP) 응답 전이거나 연결이 실패하면 액자는 **투명**하다
      — 그 셋이 바로 사람이 본 「하얀 화면」이고, 그때 뒤의 회전자가 그대로 보인다. */
   #app { display:block; width:100%; height:100%; border:0; position:relative; z-index:1; }
-  /* ⛔ .onf-wait 의 display:flex 는 브라우저 기본 [hidden]{display:none} 을 이긴다 — 다시 눌러 준다. */
+  /* ⛔ .onf-wait 의 display:flex 는 브라우저 기본 [hidden]{display:none} 을 이긴다 — 다시 눌러 준다.
+     ⛔ #app 도 같다(위 display:block) — 안 누르면 로그인 화면 밑에 「숨긴」 액자가 화면 높이만큼 깔려 페이지가 길어지고,
+       아이폰(WebKit)은 그 빈 액자를 흰 종이로 칠한다(2026-10-14 Peter 「로그인 화면 아래 절반이 하얗다」 · WKWebView 실측 y=332 부터 흰색). */
   #wait[hidden] { display:none; }
+  #app[hidden] { display:none; }
   /* 8초 뒤 안내는 여러 줄이라 가운데정렬을 눌러 준다(.onf-wait 는 한 줄 기준이라 안 걸어 뒀다).
      ⚠️ 여백·줄바꿈도 여기서 준다 — `.onf-wait` 는 학생 액자와 **같이 쓰는** 조각이라
        거기에 넣으면 「불러오는 중이에요」 한 줄까지 같이 바뀐다.
@@ -163,11 +166,15 @@ function tokLoad() {
    → 이 기기들은 열쇠를 **받아 두지도 꺼내 쓰지도 않는다**(지금처럼 구글 창구). 그 밖의 기기도 열쇠로 열다 노크가 안 오면
      DK_OFF 를 찍어 7일 동안 끈다(아래 mount 의 마감 시계). ⚠️ 크롬(맥·윈도) 은 그대로 쓴다. */
 var DK_OFF = 'onf_devkey_off';
-function devkeyOff() {
+/* WebKit(아이폰·아이패드·맥 사파리)인가 — 기기 열쇠(아래)와 One Tap(맨 아래 start) 두 곳이 같이 본다. */
+function webkitOnly() {
   var ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
   if (/iPhone|iPad|iPod/.test(ua)) return true;                                          // iOS 의 크롬(CriOS)도 WebKit
   if (/Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg/.test(ua)) return true;     // 맥 사파리
-  if (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;   // 데스크톱 UA 를 쓰는 아이패드
+  return typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;   // 데스크톱 UA 를 쓰는 아이패드
+}
+function devkeyOff() {
+  if (webkitOnly()) return true;
   try { var t = Number(localStorage.getItem(DK_OFF) || 0); return !!t && (Date.now() - t) < 7 * 86400000; } catch (e) { return false; }
 }
 
@@ -715,7 +722,14 @@ var reused = false;
      「로그인하세요」가 떠 있는 셈이다 — 눌러야 하는 줄 알고 누르면 오히려 계정이 엇갈린다.
      ⚠️ `initialize` 는 그대로 한다 — 나중에 토큰이 만료되거나 [다른 계정으로]를 누르면
        그때 `prompt()` 를 부를 수 있어야 한다(그 길은 메시지 핸들러에 있다). */
-  if (!reused) google.accounts.id.prompt();
+  /* ⛔ [2026-10-14 Peter 아이폰 「로그인했는데 또 로그인 창이 뜬다」] **WebKit 에선 첫 One Tap 을 안 띄운다.**
+     WebKit 은 ITP 라 One Tap 이 계정을 모른다 — 계정 없는 「Google 계정으로 … 로그인 [계속]」 시트를 띄우고, [계속]을 누르면
+     구글 계정 고르기 창(팝업)을 **또** 연다(GIS 문서 「ITP 브라우저」 · itp_support). 버튼도 같은 팝업 하나로 끝나니 시트는 겹치는 한 단계다.
+     ⚠️ 그 팝업(구글 창구)은 남는다 — WebKit 은 구글 창구를 거쳐야 끼운 exec 에 로그인 쿠키를 싣는다(위 webkitOnly · 2026-10-12 실측).
+       ⛔ 버튼 팝업으로도 그 문이 열리는지는 **라이브에서 Peter 와 확인**(가짜로는 못 잰다) — 안쪽이 안 열리면 이 줄을 `if (!reused)` 로 되돌린다.
+     ⚠️ login_hint 로 고르기 창을 건너뛰지 않는다 — 고르기 창에서 누르는 손이 WebKit 쿠키 문을 여는 것일 수 있다(못 잼).
+     ⚠️ 만료·[다른 계정으로]의 prompt()(메시지 핸들러)는 그대로다 — 그땐 누를 버튼이 화면에 없다. */
+  if (!reused && !webkitOnly()) google.accounts.id.prompt();
 })();
 </script>
 </body>
