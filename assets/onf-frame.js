@@ -222,7 +222,7 @@
          옛 껍데기(답이 없다)면 종전대로 교재 화면으로 넘어간다. ⛔ 키보드 노크(frameHello)와 섞지 않는다(appWin 을 안 바꾼다).
          targetOrigin 은 노크한 출처(브라우저가 채운 값 · 위 자물쇠를 지난 googleusercontent).
          📱 phone:1 = 폰 판(전체 화면 · 뒤로 = 숨김 · 아래 「폰 판」)도 할 줄 안다(2026-10-14) — 홈은 이 칸이 있을 때만 폰에서 가로챈다(옛 껍데기 = 종전대로 넘어감). */
-      if (ev.data.onf === 'bookHello' && opts.bookSrc) { try { ev.source.postMessage({ onf: 'caps', book: 1, phone: 1 }, ev.origin); } catch (eC) {} return; }
+      if (ev.data.onf === 'bookHello' && opts.bookSrc) { try { ev.source.postMessage({ onf: 'caps', book: 1, phone: opts.phone ? 1 : 0 }, ev.origin); } catch (eC) {} return; }
       if (ev.data.onf === 'openBook' && opts.bookSrc && typeof ev.data.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(ev.data.href, ev.data.left); return; }
       /* 홈이 탭을 바꿨다 → 옆 판을 닫는다(2026-10-12 Peter 「창이 켜진 채 탭을 바꾸면 자동으로 꺼져야」) — bookClose 는 판 액자만 말한다(따로 둔 이름) */
       if (ev.data.onf === 'bookDismiss') { bookClose(); return; }   // 보이는 판만 숨긴다(없으면 아무 일 없음)
@@ -338,7 +338,9 @@
     var BOOK_PHONE = 2, BOOK_WIDE_Q = '(min-width:1100px) and (hover:hover) and (pointer:fine)';
     var wideMq = null, bookSrcs = [];
     try { wideMq = global.matchMedia ? global.matchMedia(BOOK_WIDE_Q) : null; } catch (eM) {}
-    function phone() { return !!(wideMq && !wideMq.matches); }   // matchMedia 가 없으면 PC(종전)
+    /* ⛔ opts.phone(index.html 스위치 · 2026-10-14 기본 끔)이 없으면 폰 판 전부 안 켠다 — 실기기(아이폰 스와이프·안드로이드 뒤로) 확인 전엔
+       켠 기기에서만(주소 phonepanel=1 → 그 기기에 기억). 꺼져 있으면 caps 에 phone 0 → 홈이 폰에서 안 가로챈다(종전). */
+    function phone() { return !!(opts.phone && wideMq && !wideMq.matches); }   // matchMedia 가 없으면 PC(종전)
     function bookMax() { return phone() ? BOOK_PHONE : BOOK_MAX; }
     function bookKey(src) { var i = bookSrcs.indexOf(src); if (i < 0) i = bookSrcs.push(src) - 1; return i + 1; }
     function histTop() { try { return history.state; } catch (e) { return null; } }

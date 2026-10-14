@@ -38,7 +38,7 @@ function setup(bs, o) {
   const homeWin = win('home-exec', top), homeInner = win('home-user', homeWin);
   const frameEl = { contentWindow: homeWin, style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 800 }) };
   const opened = [];
-  g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { bookSrc: bs || ((h) => { opened.push(h); const m = /-(e\d+)-/.exec(h);
+  g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { phone: o.phone !== false, bookSrc: bs || ((h) => { opened.push(h); const m = /-(e\d+)-/.exec(h);
     return /mode=share/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=share' + (m && m[1] !== 'e1' ? '&ep=' + m[1] : '') + '&embed=1' : /mode=mine&v/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=mine&embed=1' : null; }) });
   const send = (data, source, origin) => listeners.message.forEach((fn) => fn({ data, source, origin: origin || 'https://n-abc-0lu-script.googleusercontent.com' }));
   const panel = () => body.kids.find((k) => k.className === 'onf-bookpanel');
@@ -432,7 +432,7 @@ function phoneSetup(o) {
     replaceState(st) { this.st[this.i].state = st; },
     back() { this.backs++; this.to.push(Math.max(0, this.i - 1)); },
     go(n) { this.goes.push(n); this.to.push(Math.max(0, Math.min(this.st.length - 1, this.i + n))); } };
-  const s = setup(null, { pre(g, root) {
+  const s = setup(null, { phone: o.phone, pre(g, root) {
     g.matchMedia = (q) => { assert.strictEqual(q, '(min-width:1100px) and (hover:hover) and (pointer:fine)', '⛔ 폰 물음이 홈 onfBookWide 와 다르다'); return mq; };
     g.history = H;
     root.classList = { set: new Set(), toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } };
@@ -666,6 +666,17 @@ t('교재 주소만 · 아는 값만 · 토큰 버림 · embed=1', () => {
   assert.strictEqual(f('https://evil.example.com/a-s1-e1-b?mode=share'), null, '⛔ 남의 사이트 주소를 연다');
   assert.strictEqual(f('javascript:alert(1)'), null, '⛔ javascript: 주소');
   assert.ok(!/LEAK/.test(String(f('https://script.ownify.co.kr/a-s1-e1-b?mode=share&t=LEAK&ttok=X&tas=Y'))), '⛔ 주소에 실려 온 토큰·선생님 자격을 넘긴다');
+});
+
+t('📱 폰 판 스위치 — 꺼져 있으면(opts.phone 없음 · 기본) caps 에 phone 0 · 폰 폭이어도 onf-ph·판 칸 없음(종전 PC 판 그대로) · index.html 은 phonepanel=1 · 기억값으로만 켠다', () => {
+  const s = phoneSetup({ phone: false });
+  s.send({ onf: 'bookHello' }, s.homeInner);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(s.homeInner.sent.find((x) => x[0].onf === 'caps')[0])), { onf: 'caps', book: 1, phone: 0 }, '⛔ 스위치가 꺼졌는데 caps 에 phone:1 — 모든 폰에서 가로챈다');
+  assert.ok(!s.root.classList.contains('onf-ph'), '⛔ 스위치가 꺼졌는데 폰 모양(onf-ph)');
+  s.send({ onf: 'openBook', href: E1, left: 0 }, s.homeInner);
+  assert.strictEqual(s.H.st.length, 1, '⛔ 스위치가 꺼졌는데 판 칸을 넣었다');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  assert.ok(/phone: phoneOn === '1' \}\);/.test(html) && /q\.get\('phonepanel'\)/.test(html) && /localStorage\.getItem\('onfPhonePanel'\)/.test(html), '⛔ index.html 이 스위치를 안 넘긴다(또는 늘 켬)');
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
