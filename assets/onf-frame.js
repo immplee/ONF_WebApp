@@ -300,6 +300,7 @@
        · 닫으면(✕ · Esc · 홈 탭 바꿈) 지우지 않고 **숨긴다**(.park = visibility:hidden — 초점·누르기도 안 간다). 같은 주소를 다시 열면 그 판을 그대로 보인다(0초 · 전체 화면이었으면 그대로).
        · 다른 주소(다른 회차·교재 · 판 안 교재↔⭐ 내 문장)는 **새 판** — 보이던 판은 숨긴다(돌아가면 0초).
          ponytail: 숨긴 판에 「그 회차로 바꿔」는 안 한다(짧은 주소→회차를 껍데기가 모른다) — 다른 회차는 새로 받는다.
+         단 view(review · cards)만 다른 주소는 그 view 를 할 줄 아는 판이면 같은 판에 「열어」만 보낸다(10-14 · 아래 bookLike · bookView).
        · 홈이 bookWarm 에 panel:1 을 실으면 그 교재를 **숨긴 판으로 미리** 띄운다(bookPre · 주소에 park=1). 자리가 차면 가장 오래 안 쓴 **숨긴** 판을 비키고 띄운다(10-14 · 보이는 판은 안 건드린다 · 종전엔 안 띄웠다).
        ⛔ 숨긴 판의 교재는 「대기」 — 접속 표시·옛 메모 이관·요약본 다시 짓기를 안 보낸다(Ownify ONF_PARK). 보일 때 {onf:'bookPark', on:false} · 숨길 때 {on:true}.
           말은 교재가 먼저 건 bookHi 의 그 창·그 출처로만('*' 금지 · 부모가 먼저 쏘면 구글 래퍼가 버린다). bookHi 가 늦게 오면 그때 지금 상태를 답한다.
@@ -317,6 +318,17 @@
     }
     function bookShown() { for (var i = 0; i < books.length; i++) if (!books[i].parked) return books[i]; return null; }
     function bookFind(src) { for (var i = 0; i < books.length; i++) if (books[i].src === src) return books[i]; return null; }
+    /* 📖 view 만 다른 주소는 같은 판에서 연다(2026-10-14 Peter 「미리 띄워 둔 내 문장 판에 '복습/카드 열어'를 전달해서, 다시 안 불러오고 바로 열기」).
+       view 는 「열자마자 무엇을 띄울까」뿐이다 — 홈 [복습 시작] = ⭐ 내 문장 view=review(🔁 오늘 복습) · 「카드 시작」 = 교재 view=cards(🗂️ 회차 덱).
+       종전엔 주소가 달라 판을 하나 새로 받았다(라이브 [복습 시작] ≈4.4초 — 미리 띄운 내 문장 판이 옆에 숨어 있는데도).
+       · 그 view 를 할 줄 안다고 노크(bookHi views)한 판이 있으면 그 판을 보이고 {onf:'bookView', view} 를 보낸다(새로 안 받음 · 페이지가 view 로 연 것과 같은 길로 연다).
+         주소까지 같은 판에도 보낸다 — 닫아 둔 복습을 [복습 시작]으로 다시 누르면 판만 보이고 복습은 안 열렸다(복습이 떠 있으면 페이지가 그대로 둔다).
+       · 할 줄 아는 판이 없으면(옛 교재 · 노크 전 · 미리 띄운 판이 아닌 교재) 종전대로 그 주소로 새 판.
+       ⛔ views 는 그 판 교재가 노크로 말한 값 그대로(글자 하나하나 같아야 맞다 · 페이지는 review·cards 만 안다) · bookView 는 bookHi 의 그 창·그 출처로만('*' 금지 — bookPark 와 같다). */
+    function bookView(src) { try { return new URL(src).searchParams.get('view') || ''; } catch (e) { return ''; } }
+    function bookBase(src) { try { var u = new URL(src); u.searchParams.delete('view'); return u.href; } catch (e) { return src; } }
+    function bookCan(p, view) { return !!(view && p && p.views.indexOf(view) >= 0); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 []
+    function bookLike(src, view) { var b = bookBase(src); for (var i = 0; i < books.length; i++) if (bookCan(books[i], view) && bookBase(books[i].src) === b) return books[i]; return null; }
     /* left = 홈 왼쪽 메뉴의 오른쪽 끝(px · 홈이 잰다) — 있으면 판이 그 오른쪽부터 덮는다(2026-10-12 Peter 「창 모드일 때는 맨 왼쪽 탭만 보이게」).
        없으면(옛 홈 · 판 안에서 갈아 끼울 때) 종전 자리 그대로. ⚠️ 숫자·화면 폭 60% 안만 믿는다(남의 값으로 판이 화면 밖으로 가지 않게). */
     function bookPlace(p, left) {
@@ -327,7 +339,7 @@
       if (okL) p.box.style.setProperty('--bl', Math.round(left) + 'px');
     }
     function bookMake(src, parked) {
-      var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, parked: parked, win: null, origin: '', idle: null, left: null };
+      var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, parked: parked, win: null, origin: '', views: [], idle: null, left: null };
       p.box.className = 'onf-bookpanel';
       if (parked) p.box.classList.add('park');
       p.el.setAttribute('allow', 'clipboard-write; microphone');
@@ -364,11 +376,12 @@
     function bookOpen(href, left) {
       var src = opts.bookSrc(href);
       if (!src) return;
-      var cur = bookShown(), p = bookFind(src);
+      var cur = bookShown(), view = bookView(src), p = bookFind(src) || bookLike(src, view);   // 📖 view 만 다른 판이 할 줄 알면 그 판(위 bookLike)
       if (cur && cur !== p) bookPark(cur, true);
       if (!p) p = bookMake(src, false);
       bookPlace(p, (typeof left === 'number') ? left : (cur ? cur.left : null));   // 판 안 갈아 끼우기(left 없음)는 보이던 판 자리 그대로
       if (p.parked) bookPark(p, false);
+      if (bookCan(p, view)) { try { p.win.postMessage({ onf: 'bookView', view: view }, p.origin); } catch (e) {} }   // 보인다(bookPark) 다음에 — 페이지가 「보임」 손질 뒤 연다
       books.splice(books.indexOf(p), 1); books.push(p);   // 가장 최근
       bookRoom(BOOK_MAX);
     }
@@ -408,7 +421,13 @@
       } catch (e) { return; }
       var d = ev.data;
       /* 교재의 노크 — 이 판의 교재 창·출처를 적고 지금 상태(숨김/보임)를 답한다. 출처는 hist 다리와 같은 모양으로 한 번 더 좁힌다(답의 targetOrigin 이 된다). */
-      if (d.onf === 'bookHi') { if (/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(String(ev.origin))) { p.win = ev.source; p.origin = ev.origin; bookTell(p); } return; }
+      if (d.onf === 'bookHi') {
+        if (!/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(String(ev.origin))) return;
+        p.win = ev.source; p.origin = ev.origin;
+        p.views = typeof d.views === 'string' ? d.views.split(',') : [];   // 📖 할 줄 아는 view(위 bookLike) — 옛 교재는 안 싣는다 = 없음
+        bookTell(p);
+        return;
+      }
       if (d.onf === 'themeAsk') { themeAsk(ev); return; }   // 🌙 판 안 교재가 묻는다(2단계) — 숨긴 판도(보일 때 색이 맞게)
       if (p.parked) return;                                 // ⛔ 숨긴 판은 닫기·전체·갈아 끼우기를 못 부른다
       if (d.onf === 'bookClose') bookClose();

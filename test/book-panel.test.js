@@ -15,7 +15,7 @@ function t(label, fn) {
 }
 function win(name, parent) { const w = { name, sent: [] }; w.parent = parent || w; w.postMessage = (m, o) => w.sent.push([m, o]); return w; }
 
-function setup() {
+function setup(bs) {
   const listeners = {};
   const body = { kids: [], appendChild(c) { this.kids.push(c); c.parentNode = this; }, removeChild(c) { this.kids = this.kids.filter((x) => x !== c); } };
   const mkEl = (tag) => { const el = { tag, kids: [], attrs: {}, className: '', src: '', vars: {}, style: { setProperty(k, v) { el.vars[k] = v; } },
@@ -36,8 +36,8 @@ function setup() {
   const homeWin = win('home-exec', top), homeInner = win('home-user', homeWin);
   const frameEl = { contentWindow: homeWin, style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 800 }) };
   const opened = [];
-  g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { bookSrc: (h) => { opened.push(h); const m = /-(e\d+)-/.exec(h);
-    return /mode=share/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=share' + (m && m[1] !== 'e1' ? '&ep=' + m[1] : '') + '&embed=1' : /mode=mine&v/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=mine&embed=1' : null; } });
+  g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { bookSrc: bs || ((h) => { opened.push(h); const m = /-(e\d+)-/.exec(h);
+    return /mode=share/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=share' + (m && m[1] !== 'e1' ? '&ep=' + m[1] : '') + '&embed=1' : /mode=mine&v/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=mine&embed=1' : null; }) });
   const send = (data, source, origin) => listeners.message.forEach((fn) => fn({ data, source, origin: origin || 'https://n-abc-0lu-script.googleusercontent.com' }));
   const panel = () => body.kids.find((k) => k.className === 'onf-bookpanel');
   const panels = () => body.kids.filter((k) => k.className === 'onf-bookpanel');
@@ -358,6 +358,65 @@ t('⛔ 어느 프레임 코드에도 unload 처리기가 없다(bfcache 「뒤�
     const src = fs.readFileSync(path.join(__dirname, '..', f), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '');
     assert.ok(!/addEventListener\(\s*['"](?:before)?unload['"]|onunload\s*=/.test(src), '⛔ ' + f + ' 에 unload 처리기');
   }
+});
+
+console.log('[view 만 다른 주소 — 같은 판에 「열어」(2026-10-14 Peter 「미리 띄워 둔 내 문장 판에 복습/카드 열어를 전달해서 바로」)]');
+/* index.html bookSrc 처럼 아는 값(mode·sheet·view)만 옮겨 판 주소를 짓는다 — view 가 주소 가운데 낀다(진짜도 slug·embed 앞) */
+const vSrc = (h) => { const u = new URL(h), q = ['mode', 'sheet', 'view'].filter((k) => u.searchParams.get(k)).map((k) => k + '=' + encodeURIComponent(u.searchParams.get(k)));
+  return /^(share|mine)$/.test(u.searchParams.get('mode') || '') ? 'https://script.google.com/x/exec?t=T&' + q.join('&') + '&embed=1' : null; };
+const MINE = 'https://class.ownify.co.kr/?mode=mine', RV = MINE + '&view=review', BK = 'https://class.ownify.co.kr/?mode=share&sheet=E1', DK = BK + '&view=cards';
+function hiV(s, box, views) { const bw = win('book-exec', s.top), bi = win('book-user', bw); box.kids[0].contentWindow = bw; s.send(views === undefined ? { onf: 'bookHi' } : { onf: 'bookHi', views }, bi); bi.sent.length = 0; return bi; }
+
+t('미리 띄운 ⭐ 내 문장(views review) — [복습 시작](view=review)은 새로 안 받고 그 판을 보이며 「보임」 다음 bookView{review} 를 노크한 창·출처로만 · 판 주소 그대로', () => {
+  const s = setup(vSrc);
+  s.send({ onf: 'bookWarm', href: MINE, panel: 1, left: 184 }, s.homeInner);
+  const box = s.panel(), src0 = box.kids[0].src, bi = hiV(s, box, 'review');
+  s.send({ onf: 'openBook', href: RV, left: 184 }, s.homeInner);
+  assert.ok(s.panels().length === 1 && !box.classList.contains('park') && box.kids[0].src === src0, '⛔ 미리 띄운 내 문장 판을 안 쓰고 복습 주소로 새로 받았다(라이브 4.4초)');
+  assert.deepStrictEqual(js(bi.sent), [[{ onf: 'bookPark', on: false }, O], [{ onf: 'bookView', view: 'review' }, O]], '⛔ 「보임」 다음 「복습 열어」가 노크한 출처로 안 갔다');
+  //   닫았다 다시 [복습 시작] — 같은 판에 또 「열어」(복습이 떠 있으면 페이지가 그대로 둔다) · 그냥 「내 문장」은 판만 보인다(열어 없음)
+  s.send({ onf: 'bookDismiss' }, s.homeInner); bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: RV, left: 184 }, s.homeInner);
+  assert.deepStrictEqual(js(bi.sent).map((x) => x[0].onf + ':' + (x[0].view || x[0].on)), ['bookPark:false', 'bookView:review'], '⛔ 두 번째 [복습 시작]에 「열어」를 다시 안 보냈다');
+  s.send({ onf: 'bookDismiss' }, s.homeInner); bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: MINE, left: 184 }, s.homeInner);
+  assert.ok(s.panels().length === 1 && js(bi.sent).every((x) => x[0].onf !== 'bookView'), '⛔ view 없는 「내 문장」에 「열어」를 보냈다(또는 새 판)');
+});
+
+t('할 줄 모르는 판은 안 쓴다 — 노크 없음 · views 없음(옛 교재) · 모르는 값만 · 다른 view · 다른 주소면 종전대로 그 주소로 새 판', () => {
+  for (const [views, why] of [[null, '노크 전'], [undefined, '옛 교재(views 없음)'], ['review2,*, review', '모르는 값'], ['cards', '다른 view'], [['review'], '문자열 아님'], ['', '빈 값']]) {
+    const s = setup(vSrc);
+    s.send({ onf: 'bookWarm', href: MINE, panel: 1 }, s.homeInner);
+    const box = s.panel(), bi = views === null ? null : hiV(s, box, views);
+    s.send({ onf: 'openBook', href: RV }, s.homeInner);
+    assert.ok(s.panels().length === 2 && /&view=review&embed=1$/.test(s.panels()[1].kids[0].src) && box.classList.contains('park'), '⛔ ' + why + ' 판에 복습을 맡겼다(복습이 안 열린다)');
+    assert.ok(!bi || js(bi.sent).every((x) => x[0].onf !== 'bookView'), '⛔ ' + why + ' 판에 「열어」를 보냈다');
+  }
+  const s = setup(vSrc);
+  s.send({ onf: 'bookWarm', href: BK, panel: 1 }, s.homeInner);
+  const bi = hiV(s, s.panel(), 'cards');
+  s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/?mode=share&sheet=E2&view=cards' }, s.homeInner);
+  assert.ok(s.panels().length === 2 && js(bi.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 다른 회차 덱을 이 회차 판에 맡겼다');
+  //   view 없는 열기는 종전대로 — 덱 주소로 열린(미리 띄운 판 아님 · views '') 교재 판을 같은 교재 보통 열기가 가로채지 않는다
+  const v = setup(vSrc);
+  v.send({ onf: 'openBook', href: DK }, v.homeInner);
+  const di = hiV(v, v.panel(), '');
+  v.send({ onf: 'openBook', href: BK }, v.homeInner);
+  assert.ok(v.panels().length === 2 && js(di.sent).every((x) => x[0].onf !== 'bookView'), '⛔ view 없는 보통 열기를 덱 판에 맡겼다(빈 view 를 「할 줄 안다」로 셌다)');
+});
+
+t('미리 띄운 교재(views cards) — 「카드 시작」(view=cards)은 그 판에 bookView{cards} · 다른 판(보이던 내 문장)은 숨긴다 · 홈이 아닌 남의 openBook 은 그대로 버림', () => {
+  const s = setup(vSrc);
+  s.send({ onf: 'bookWarm', href: BK, panel: 1, left: 184 }, s.homeInner);
+  const book = s.panel(), bi = hiV(s, book, 'cards');
+  s.send({ onf: 'openBook', href: MINE, left: 184 }, s.homeInner);
+  const mine = s.panels().find((x) => x !== book), mi = hiV(s, mine, 'review');
+  s.send({ onf: 'openBook', href: DK }, win('stranger', s.top));
+  assert.ok(bi.sent.length === 0 && book.classList.contains('park'), '⛔ 남의 창 말로 판을 열었다');
+  s.send({ onf: 'openBook', href: DK, left: 184 }, s.homeInner);
+  assert.ok(s.panels().length === 2 && !book.classList.contains('park') && mine.classList.contains('park'), '⛔ 미리 띄운 교재 판을 안 썼다(또는 보이던 판을 안 숨겼다)');
+  assert.deepStrictEqual(js(bi.sent), [[{ onf: 'bookPark', on: false }, O], [{ onf: 'bookView', view: 'cards' }, O]], '⛔ 교재 판에 「카드 열어」가 안 갔다');
+  assert.ok(js(mi.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 내 문장 판에 교재 덱 「열어」가 갔다');
 });
 
 console.log('[홈 안 교재 판 — 주소(index.html bookSrc)]');
