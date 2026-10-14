@@ -18,7 +18,7 @@
 <meta name="apple-mobile-web-app-title" content="선생님">
 <link rel="apple-touch-icon" href="../assets/icon/onf-180.png">
 <link rel="icon" href="../assets/icon/onf-32.png" sizes="32x32">
-<script>/* 🌙 다크 모드 — 안쪽 액자가 알려 준 색(onfTheme · onf-frame.js)을 **그리기 전에** 단다 · 없으면 기기 설정(Peter 2026-10-12 에스프레소) */(function(){try{var v=localStorage.getItem("onfTheme"),d=v==="dark"||(v!=="light"&&!!(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches));document.documentElement.setAttribute("data-theme",d?"dark":"light");}catch(e){}})();</script>
+<script>/* 🌙 다크 모드 — 안쪽 액자가 알려 준 색(onfTheme · onf-frame.js)을 **그리기 전에** 단다 · 없으면 어둡게(Peter 2026-10-14 「홈페이지 기본은 다크모드로」 — 종전 기기 설정 · 홈에서 「기기 설정 따라」를 고르면 안쪽이 그 색을 알려 남는다) */(function(){try{var v=localStorage.getItem("onfTheme"),d=v!=="light";document.documentElement.setAttribute("data-theme",d?"dark":"light");}catch(e){}})();</script>
 <link rel="stylesheet" href="../assets/onf-ui.css">
 <style>
   html, body { margin:0; height:100%; background:var(--onf-bg); }

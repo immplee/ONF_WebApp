@@ -180,6 +180,14 @@ t('🌙 화면 색 — 홈 액자가 알린 theme 만 <html data-theme> · local
   for (const f of ['index.html', 'teacher/index.html', 'hw.html']) {
     const h = fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), i = h.indexOf('localStorage.getItem("onfTheme")'), c = h.indexOf('onf-ui.css');
     assert.ok(i > 0 && i < c, '⛔ ' + f + ' — 화면 색을 스타일보다 먼저 안 단다(밝은 틀이 번쩍인다)');
+    //   [Peter 2026-10-14 「홈페이지 기본은 다크모드로」] 남긴 값이 없으면 기기가 밝아도 어둡게 · 남긴 밝게는 밝게
+    const code = /<script>(\/\* 🌙 다크 모드[\s\S]*?)<\/script>/.exec(h)[1];
+    const paint = (store) => { const root = { attrs: {}, setAttribute(k, v) { root.attrs[k] = v; } };
+      const g = { localStorage: { getItem: (k) => (k in store ? store[k] : null) }, matchMedia: () => ({ matches: false }), document: { documentElement: root } };
+      g.window = g; vm.createContext(g); vm.runInContext(code, g); return root.attrs['data-theme']; };
+    assert.strictEqual(paint({}), 'dark', '⛔ ' + f + ' — 처음 여는 기기(밝음)에서 바깥 틀이 밝게 번쩍인다(기본 어둡게)');
+    assert.strictEqual(paint({ onfTheme: 'light' }), 'light', '⛔ ' + f + ' — 안쪽이 남긴 밝게를 안 따른다');
+    assert.strictEqual(paint({ onfTheme: 'dark' }), 'dark');
   }
 });
 
