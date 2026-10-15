@@ -668,7 +668,7 @@ t('교재 주소만 · 아는 값만 · 토큰 버림 · embed=1', () => {
   assert.ok(!/LEAK/.test(String(f('https://script.ownify.co.kr/a-s1-e1-b?mode=share&t=LEAK&ttok=X&tas=Y'))), '⛔ 주소에 실려 온 토큰·선생님 자격을 넘긴다');
 });
 
-t('📱 폰 판 스위치 — 꺼져 있으면(opts.phone 없음 · 기본) caps 에 phone 0 · 폰 폭이어도 onf-ph·판 칸 없음(종전 PC 판 그대로) · index.html 은 phonepanel=1 · 기억값으로만 켠다', () => {
+t('📱 폰 판 스위치 — 꺼져 있으면(opts.phone 없음) caps 에 phone 0 · 폰 폭이어도 onf-ph·판 칸 없음(종전 PC 판 그대로) · index.html 은 기본 켬(2026-10-16) · phonepanel=0 · 기억값 0 으로만 끈다', () => {
   const s = phoneSetup({ phone: false });
   s.send({ onf: 'bookHello' }, s.homeInner);
   assert.deepStrictEqual(JSON.parse(JSON.stringify(s.homeInner.sent.find((x) => x[0].onf === 'caps')[0])), { onf: 'caps', book: 1, phone: 0 }, '⛔ 스위치가 꺼졌는데 caps 에 phone:1 — 모든 폰에서 가로챈다');
@@ -676,7 +676,7 @@ t('📱 폰 판 스위치 — 꺼져 있으면(opts.phone 없음 · 기본) caps
   s.send({ onf: 'openBook', href: E1, left: 0 }, s.homeInner);
   assert.strictEqual(s.H.st.length, 1, '⛔ 스위치가 꺼졌는데 판 칸을 넣었다');
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  assert.ok(/phone: phoneOn === '1' \}\);/.test(html) && /q\.get\('phonepanel'\)/.test(html) && /localStorage\.getItem\('onfPhonePanel'\)/.test(html), '⛔ index.html 이 스위치를 안 넘긴다(또는 늘 켬)');
+  assert.ok(/phone: phoneOn !== '0' \}\);/.test(html) && /q\.get\('phonepanel'\)/.test(html) && /localStorage\.getItem\('onfPhonePanel'\)/.test(html), '⛔ index.html 이 스위치를 안 넘긴다(또는 기본 꺼짐 · 끄는 길 없음)');
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);

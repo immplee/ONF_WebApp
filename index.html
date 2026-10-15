@@ -102,8 +102,8 @@
   if (!q.get('fileId') && /^[a-z0-9]+-s\d+-e\d+-[a-z0-9]+$/.test(path)) {
     extra.push('slug=' + encodeURIComponent(path));
   }
-  /* 📱 폰 판 스위치(2026-10-14 · 실기기 확인 전 기본 끔) — 주소에 phonepanel=1 이면 이 기기에 켜 두고(기억) · phonepanel=0 이면 끈다.
-     켜는 날(모두에게)은 아래 기본값을 '1' 로. ⚠️ 저장소가 막힌 창(사생활 보호)이면 주소로 연 그 한 번만. */
+  /* 📱 폰 판 스위치(2026-10-14 · 2026-10-16 Peter 「켜보자」로 기본 켬) — 주소에 phonepanel=0 이면 이 기기에서 끄고(기억) ·
+     phonepanel=1 이면 다시 켠다. 아무것도 없으면 켬. ⚠️ 저장소가 막힌 창(사생활 보호)이면 주소로 연 그 한 번만. */
   var phoneOn = q.get('phonepanel');
   try { if (phoneOn === '1' || phoneOn === '0') localStorage.setItem('onfPhonePanel', phoneOn); else phoneOn = localStorage.getItem('onfPhonePanel'); } catch (eP) {}
   /* 토큰은 이미 이 도메인에 저장됐다 — 주소창에서 지운다(화면 찍어 보낼 때 같이 나가면 안 된다).
@@ -131,7 +131,7 @@
   }
   ONF.frame.mount(document.getElementById('app'),
                   ONF.api.appUrl(token, extra.join('&')),
-                  { diag: q.get('diag') === '1', bookSrc: bookSrc, phone: phoneOn === '1' });
+                  { diag: q.get('diag') === '1', bookSrc: bookSrc, phone: phoneOn !== '0' });
 </script>
 </body>
 </html>

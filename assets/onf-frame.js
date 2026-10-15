@@ -338,8 +338,8 @@
     var BOOK_PHONE = 2, BOOK_WIDE_Q = '(min-width:1100px) and (hover:hover) and (pointer:fine)';
     var wideMq = null, bookSrcs = [];
     try { wideMq = global.matchMedia ? global.matchMedia(BOOK_WIDE_Q) : null; } catch (eM) {}
-    /* ⛔ opts.phone(index.html 스위치 · 2026-10-14 기본 끔)이 없으면 폰 판 전부 안 켠다 — 실기기(아이폰 스와이프·안드로이드 뒤로) 확인 전엔
-       켠 기기에서만(주소 phonepanel=1 → 그 기기에 기억). 꺼져 있으면 caps 에 phone 0 → 홈이 폰에서 안 가로챈다(종전). */
+    /* ⛔ opts.phone(index.html 스위치 · 2026-10-16 기본 켬 · 주소 phonepanel=0 → 그 기기에서 끔)이 없으면 폰 판 전부 안 켠다.
+       꺼져 있으면 caps 에 phone 0 → 홈이 폰에서 안 가로챈다(종전). */
     function phone() { return !!(opts.phone && wideMq && !wideMq.matches); }   // matchMedia 가 없으면 PC(종전)
     function bookMax() { return phone() ? BOOK_PHONE : BOOK_MAX; }
     function bookKey(src) { var i = bookSrcs.indexOf(src); if (i < 0) i = bookSrcs.push(src) - 1; return i + 1; }
