@@ -154,13 +154,20 @@ t('④-b 「두 번」은 잇달아야 — 한 번 걸린 뒤 보통으로 뜨�
   assert.ok(!('onfCl' in s3.ls) && Number(s3.ls.onfClTry) === s3.now.v, '⛔ 7일 넘은 표시를 두 번째로 쳤다');
 });
 
-t('④-c 🟠 판(숨긴 미리 판 포함)은 기억을 **안 정한다** — 판 하나의 일시 오류로 기기 전체가 credentialless 가 되지 않게(R3) · 같은 페이지 다음 판도 보통부터', () => {
+t('④-c 🟠 판(숨긴 미리 판 포함)은 기억을 **안 정한다**(R3 — 판 하나의 일시 오류로 기기 전체 7일 안 됨) · 다만 같은 페이지 다음 판은 처음부터(clPage · 저장 안 함 — 여러 계정 선생님 크롬이 판마다 오류 + 1.5초를 안 거친다 · T2)', () => {
   const s = open({ panel: true });
   bypass(s);
   assert.ok(!('onfCl' in s.ls) && !('onfClTry' in s.ls), '⛔ 판이 기억을 썼다(숨긴 판 하나의 오류로 기기 전체 7일 — R3)');
   const el2 = mkFrame(s);
   s.g.ONF.frame.openExec(el2, SRC, null, null, false);
-  assert.deepStrictEqual(el2.nav, [['src', SRC, false]], '⛔ 판이 막힌 것으로 같은 페이지 다른 판까지 credentialless 로 열었다');
+  assert.deepStrictEqual(el2.nav, [['src', SRC, true]], '⛔ 판이 우회로 뜬 페이지에서 다음 판을 또 보통부터 열었다(선생님 판마다 오류 화면 + 1.5초 — T2)');
+  assert.ok(!('onfCl' in s.ls) && !('onfClTry' in s.ls), '⛔ 페이지 안 기억을 기기에 적었다');
+  //   그 판이 credentialless 로 안 되면 페이지 기억도 버린다(다음 판은 보통부터)
+  el2.load(0); s.tick(GRACE());
+  assert.deepStrictEqual(el2.nav[1], ['replace', SRC, false], '⛔ 페이지 기억으로 연 판이 안 됐는데 보통으로 안 갔다');
+  const el3 = mkFrame(s);
+  s.g.ONF.frame.openExec(el3, SRC, null, null, false);
+  assert.deepStrictEqual(el3.nav, [['src', SRC, false]], '⛔ 안 되는 페이지 기억을 안 버렸다');
 });
 
 t('④-d 같은 페이지 — 홈이 우회로 떴으면(첫 방문 · 아직 기억 전) 뒤에 여는 판은 처음부터 credentialless(판마다 오류 화면 + 여유를 안 거친다) · 저장은 안 한다', () => {

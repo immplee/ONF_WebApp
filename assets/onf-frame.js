@@ -126,7 +126,8 @@
    *     그걸로 7일 credentialless 면 아래 대가(오프라인 백업·홈 첫 화면 사본·사전 사본)를 7일 낸다. 그래서
    *       첫 우회 성공 = onfClTry(시각)만 · 다음 열기에서 보통이 **또** 막혀 우회가 되면 그때 onfCl(CL_MS) · 그 사이 보통으로 뜨면 onfClTry 를 지운다(잇달아야 두 번).
    *     기억을 정하는 건 **홈 액자(mount · keep)** 뿐 — 판(숨긴 미리 판 포함)은 읽기만 한다(학생이 안 본 미리 판 하나의 오류로 기기 전체가 바뀌지 않게).
-   *     같은 페이지 안에선 홈이 우회로 떴으면(clPage · 저장 안 함) 뒤 판은 처음부터 credentialless — 첫 방문 여러 계정 학생이 판마다 오류 화면 + 여유를 안 거친다.
+   *     같은 페이지 안에선 홈이든 판이든 우회로 떴으면(clPage · 저장 안 함) 뒤 판은 처음부터 credentialless — 첫 방문 여러 계정 학생·여러 계정 선생님(판만 학생 exec)이
+   *     판마다 오류 화면 + 여유를 안 거친다(재확인 T2). 저장을 안 하니 숨긴 판 하나의 일시 오류는 그 페이지에서 끝난다(R3).
    *     기억 시각은 **안 늘린다** — CL_MS 마다 보통으로 다시 재 본다. 기억으로 연 credentialless 가 안 되면 홈은 기억을 버리고 보통으로 한 번(판은 기억을 안 건드리고 보통으로만).
    *   · 그래도 안 되면 구글 영어 오류를 걷고(액자 visibility) 뒤의 「불러오는 중」 자리에 우리 말 — **연결 안내 하나**(원인을 단정하지 않는다):
    *     credentialless 까지 해 봤으면 쿠키를 안 실었으니 여러 계정 탓이 아니고, credentialless 를 모르는 사파리·iOS·파이어폭스는 끼운 액자에 구글 쿠키를
@@ -153,10 +154,10 @@
     function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
     function ok() {
       end();
-      if (!keep) return;                                             // 판은 읽기만
+      if (cl && tried.norm) clPage = true;                           // 이 페이지의 뒤 판은 처음부터 — 판이 정해도(저장 안 함 · 여러 계정 선생님 판마다 오류 + 1.5초 · 재확인 T2)
+      if (!keep) return;                                             // 기기 기억은 홈 액자만 — 판은 읽기만
       if (!cl) return clSet(CL_TRY, false);                          // 보통으로 떴다 — 「한 번 걸림」을 지운다(잇달아야 두 번)
       if (!tried.norm) return;                                       // 기억(또는 이 페이지)으로 처음부터 연 것 — 시각을 안 늘린다
-      clPage = true;                                                 // 이 페이지의 뒤 판은 처음부터
       if (clAt(CL_TRY)) { clSet(CL_KEY, true); clSet(CL_TRY, false); } else clSet(CL_TRY, true);   // 두 번째면 기억 · 첫 번째면 표시만
     }
     function kids() { try { return el.contentWindow.length; } catch (e) { return 0; } }
@@ -166,7 +167,7 @@
     }
     function fail() {
       tried[cl ? 'cl' : 'norm'] = 1;
-      if (cl && byMemory) { if (keep) { clSet(CL_KEY, false); clPage = false; } byMemory = false; }
+      if (cl && byMemory) { clPage = false; if (keep) clSet(CL_KEY, false); byMemory = false; }   // 기억(기기·페이지)으로 연 cl 이 안 됐다 — 페이지 기억은 누구든 버리고 기기 기억은 홈만
       if (!tried.norm) { cl = false; console.info('[onf] credentialless 로 연 화면이 안 떴다 — 보통으로 한 번 더'); return go(); }
       if (can && !tried.cl) { cl = true; console.info('[onf] 구글 오류 화면(여러 계정?) — credentialless 로 다시 연다'); return go(); }
       end();
