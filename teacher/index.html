@@ -404,7 +404,7 @@ var BOOK_SW = (function () {
   return v === '1';
 })();
 var BOOK_PERF = (function () { try { return new URLSearchParams(location.search).get('perf') === '1'; } catch (e) { return false; } })();
-var BOOK_SWAP_MS = 14000, bookSwapN = 0;   // 갈아 끼우기 답 시한(판의 맺음 8초와 받기 10초는 같이 돈다 + 여유 4초) · 번호(나중 것이 이긴다)
+var BOOK_SWAP_MS = 14000, bookSwapN = 0, BOOK_AGE_MS = 2 * 60 * 60 * 1000;   // 갈아 끼우기 답 시한(판의 맺음 8초와 받기 10초는 같이 돈다 + 여유 4초) · 번호(나중 것이 이긴다) · 판 나이(판 ONF_BOOK_AGE_MS 와 같다 · D3)
 function phone() { return !!(BOOK_PH && wideMq && !wideMq.matches); }
 function bookMax() { return phone() ? BOOK_PHONE : BOOK_MAX; }
 function bookKey(src) { var i = bookSrcs.indexOf(src); if (i < 0) i = bookSrcs.push(src) - 1; return i + 1; }   // 판 번호 — 기록 칸엔 주소(토큰이 든다) 대신 이것
@@ -467,7 +467,7 @@ function bookFrom(ev, el) {
   return false;
 }
 function bookShown() { for (var i = 0; i < books.length; i++) if (!books[i].parked) return books[i]; return null; }
-function bookFind(src) { for (var i = 0; i < books.length; i++) if (books[i].src === src) return books[i]; return null; }
+function bookFind(src) { for (var i = 0; i < books.length; i++) if (books[i].src === src && !books[i].gone) return books[i]; return null; }   // 📖 gone = 내용과 주소가 어긋날 수 있는 판(아래 bookRetire)
 function bookPlace(p, left, m, r) {
   if (typeof left !== 'number' || !isFinite(left)) return;
   var okL = left > 0 && left < (window.innerWidth || 0) * 0.6;
@@ -485,7 +485,7 @@ function bookPx(p, name, v) {
 }
 function bookMake(src, parked) {
   var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, key: bookKey(src), parked: parked, win: null, origin: '', kb: null, ko: '', hw: null, ho: '', idle: null, left: null, m: null, r: null, back: null,   // back = 나를 열어 준 판(하나만 · 없으면 null) — 아래 「앞 판 규칙」(학생 껍데기 onf-frame.js 와 같다)
-    swap: false, load: src, real: src, sw: null, ask: {} };   // 📖 아래 「판 한 장」 — swap = 노크 swap:1 · load = 액자가 처음 연 주소 · real = 판이 실제로 든 교재(답으로 맞춘다) · sw = 기다리는 갈아 끼우기 · ask = 보낸 번호 → 주소
+    swap: false, load: src, real: src, sw: null, ask: {}, born: Date.now(), gone: false };   // 📖 아래 「판 한 장」 — swap = 노크 swap:1 · load = 액자가 처음 연 주소 · real = 판이 실제로 든 교재(답으로 맞춘다) · sw = 기다리는 갈아 끼우기 · ask = 보낸 번호 → 주소 · born = 만든 때 · gone = 주소로 못 찾음
   p.box.className = 'onf-bookpanel';
   if (parked) p.box.classList.add('park');
   p.el.setAttribute('allow', 'clipboard-write; microphone');
@@ -528,6 +528,7 @@ function bookIdle(p) { p.idle = null; if (p !== bookBoard()) bookDrop(p); }
 /* p 를 보이고 보이던 판은 숨긴다 · 📱 폰이면 판 칸(histBook) · 키보드 보정 자리(bookKb). ⚠️ 새 판(bookMake)이면 books 끝이라 bookShown 은 보이던 옛 판을 먼저 찾는다. */
 function bookShow(p, left, m, r) {
   if (p.oe && p.oe.stuck()) { bookDrop(p); p = bookMake(p.src, false); }   // 🔐 못 연 판(안내) — 지우고 새로 받는다(학생 껍데기와 같다)
+  if (BOOK_SW && p.parked && Date.now() - p.born > BOOK_AGE_MS) { var old = p; p = bookMake(old.src, false); bookRetire(old); }   // 📖 2시간 넘은 숨긴 판(판은 30분 지우기에서 빠진다) — 옛 코드 그대로 안 띄우고 새로 · 옛 판은 저장 중일 수 있어 안 지운다(반박 검토 🟡 2026-10-17)
   var cur = bookShown();
   if (cur && cur !== p) bookPark(cur, true);
   if (typeof left === 'number') bookPlace(p, left, m, r);
@@ -561,7 +562,7 @@ function bookPre(href, left, m, r) {
    홈에서 연 판 하나(판)가 다른 교재로 **갈아 끼운다** — 새 판(GAS doGet ≈5초) 대신 판이 값만 받아 표를 바꾼다(받아 둔 값 ≤0.5초 · 서버 ≈2.5~3.2초).
    ▸ 판 = 노크 swap:1(둘째 노크 — 판의 ONF_BOARD 가 evaluate 뒤에 붙어 첫 노크엔 없다) · 홈에서 연 판(back === null) · 보이는 것, 없으면 가장 최근의 숨긴 것. 스위치 끔이면 없다.
    ▸ 차례: bookSwap{id, src} 를 **먼저**(R12 — 「보임」 bookPark 보다 먼저) → 주소를 낙관적으로 바꿈 → 그 판을 back 으로 든 판의 back 비움 → bookShow(칸 값) → 답을 기다린다.
-     ok → 끝. ok:false(busy·fail·notice·…) · 14초 답 없음 → 주소 되돌림(real) + 종전 새 판(bookMake). stale(판 2시간)·답 없음은 판을 버린다(다음 [열기]가 새 판 = 새 판이 판이 된다).
+     ok → 끝. ok:false(busy·fail·notice·…) · 14초 답 없음 → 주소 되돌림(real) + 종전 새 판(bookMake). stale(판 2시간)·답 없음은 판 자격만 내린다(bookRetire — 액자는 안 지움 · 새 판이 판이 된다).
    ▸ 기다리는 건 판마다 **마지막 번호 하나** — 진 갈아 끼우기엔 판이 답을 안 한다(옛 시한을 안 걷으면 진 교재가 14초 뒤 새 판으로 뜬다).
      진 번호의 ok 가 늦게 오면(그 사이 끝났다) 판이 실제로 든 교재(real)만 그것으로 맞춘다 — 마지막이 실패하면 거기로 되돌린다.
    ▸ 노크가 다시 오면 판이 다시 읽힌 것(오래 산 판의 「다시 시도」 = location.reload)이다 — 처음 주소(load)를 든다 · 기다리던 갈아 끼우기는 말이 사라졌으니 물러난다.
@@ -594,13 +595,17 @@ function bookSwapped(p, d) {
 }
 function bookSwapEnd(p, sw, ok, why, from) {
   var shown = !p.parked;
-  clearTimeout(sw.tm); p.sw = null; p.ask = {};   // 마지막 번호가 끝났다 — 앞 번호들은 판이 더는 답하지 않는다
+  clearTimeout(sw.tm); p.sw = null;   // 마지막 번호가 끝났다 — 앞 번호들은 판이 더는 답하지 않는다(ask 에 남아도 무해)
   bookPerf(sw, ok ? String(from || '') : 'new', ok ? '' : why);
   if (ok) return;
   p.src = p.real; p.key = bookKey(p.real);
-  if (why === 'stale' || why === 'time') bookDrop(p);
+  if (why === 'stale' || why === 'time') bookRetire(p);   // ⛔ 지우지 않는다 — 판은 stale 을 맺음(편집 확정·저장) 앞에서 곧장 답한다 · 지우면 beforeunload 도 안 돌아 안 보낸 글이 사라진다(반박 검토 🟠 2026-10-17)
   if (shown) bookShow(bookMake(sw.src, false), sw.left, sw.m, sw.r);   // 종전 길 그대로(판은 숨김 — bookShow 가 숨긴다) · 그 사이 사람이 닫았으면(숨김) 안 띄운다
 }
+/* 판 자격만 내린다 — ⛔ 액자는 안 지운다(안 보낸 글·저장 중일 수 있다). 숨긴 판이면 30분 시계를 다시 건다(이제 판이 아니라 bookIdle 이 지운다 · 셋 넘침도 치운다) — 보이는 판이면 곧 새 판이 숨긴다(bookShow → bookPark).
+   gone = 주소로 못 찾게 — 내용을 못 믿는다: 14초 답 없음(늦게 갈아 끼웠을 수 있다) · stale(판은 바꾸다 던진 「반쯤 바뀐 판」도 stale 로 답한다 — 1c ONF_BOOK_T0=0) · 늙은 판(같은 주소 새 판이 따로 있다).
+   swap=false 라 판으로도 안 뽑힌다(다시 읽혀 노크가 다시 오면 새 화면이라 판이 돼도 된다). */
+function bookRetire(p) { p.swap = false; p.gone = true; if (p.parked) bookPark(p, true); }
 /* perf=1 — 「판 갈아 끼움 Nms(받아 둔 값|서버)」 · 물러남은 from:'new'(why). 줄은 홈 속도표가 그린다(1e) · 콘솔에도 한 줄. */
 function bookPerf(sw, from, why) {
   if (!BOOK_PERF) return;

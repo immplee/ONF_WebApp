@@ -680,7 +680,7 @@ t('H5·H9 — bookSwap 이 bookPark{on:false} 보다 먼저 · 갈아 끼울 때
   assert.ok(P.vars['--bl'] === '310px' && P.vars['--bm'] === '18px' && P.vars['--br'] === '26px' && P.classList.contains('beside'), '⛔ 갈아 끼운 판이 openBook 의 칸 값(left·m·r)으로 안 놓였다');
 });
 
-t('H2 — ok:false(busy·fail·notice) → 종전 새 판 + 판 숨김 + 판 주소 되돌림(다시 열면 0초) · stale → 판 버림 · 14초 답 없음 → 판 버림 + 새 판', () => {
+t('H2 — ok:false(busy·fail·notice) → 종전 새 판 + 판 숨김 + 판 주소 되돌림(다시 열면 0초) · stale·14초 답 없음 → 판 자격만 내림(액자는 안 지움 · 30분 시계) + 새 판', () => {
   for (const why of ['busy', 'fail', 'notice', 'bad_arg']) {
     const { s, P, bi, src0 } = boardRun();
     s.send({ onf: 'openBook', href: E2, left: 270 }, s.home);
@@ -694,15 +694,43 @@ t('H2 — ok:false(busy·fail·notice) → 종전 새 판 + 판 숨김 + 판 주
     s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
     assert.ok(shownOf(s)[0] === P && P.kids[0].src === src0 && swapMsg(bi).length === 0, '⛔ ' + why + ' 뒤 판 주소를 안 되돌렸다(E1 을 다시 열면 0초여야 — 판은 E1 을 그대로 들고 있다)');
   }
+  /* stale(판 2시간)·14초 답 없음 — ⛔ 판 액자를 **지우지 않는다**(반박 검토 🟠 2026-10-17: 판은 나이 검사를 맺음 앞에서 해 stale 이 곧장 온다 →
+     지우면 beforeunload 도 안 돌아 안 보낸 글·오프라인 백업이 사라진다). 판 자격만 내리고 숨긴 채 30분 시계 — 저장을 마친 뒤 30분 지우기·셋 넘침이 치운다. */
+  const T30 = (s) => s.timers.filter((x) => x.on && x.ms === 30 * 60 * 1000);
   let c = boardRun();
   c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
   c.s.send({ onf: 'bookSwapped', id: swapMsg(c.bi)[0].id, ok: false, why: 'stale' }, c.bi);
-  assert.ok(!c.s.panels().includes(c.P) && c.s.panels().length === 1 && shownOf(c.s)[0].kids[0].src === srcOf(c.s, E2), '⛔ stale(오래 산 판) 인데 옛 판을 안 버렸다(또는 새 판을 안 띄웠다)');
+  assert.ok(c.s.panels().includes(c.P) && c.P.parentNode && c.P.classList.contains('park') && shownOf(c.s).length === 1 && shownOf(c.s)[0].kids[0].src === srcOf(c.s, E2), '⛔ stale 에 옛 판 액자를 지웠다(안 보낸 글이 사라진다) — 또는 새 판(E2)을 안 띄웠다');
+  assert.strictEqual(c.obj().swap, false, '⛔ stale 판이 아직 판 자격을 들고 있다(다시 갈아 끼우기로 뽑힌다)');
+  assert.ok(T30(c.s).length >= 1, '⛔ stale 판에 30분 시계가 없다(영영 안 치운다)');
+  c.s.send({ onf: 'bookClose' }, swapKnock(c.s, shownOf(c.s)[0], 7, false));   // 새 E2 판(아직 swap 노크 전)을 닫고
+  c.bi.sent.length = 0;
+  c.s.send({ onf: 'openBook', href: E3, left: 270 }, c.s.home);
+  assert.ok(swapMsg(c.bi).length === 0, '⛔ stale 판을 다시 판으로 뽑아 갈아 끼웠다');
+  c.s.send({ onf: 'openBook', href: E1, left: 270 }, c.s.home);
+  assert.ok(shownOf(c.s)[0] !== c.P, '⛔ stale 판을 E1 주소로 찾아 보였다(판은 바꾸다 던지면 「반쯤 바뀐 판」을 stale 로 답한다 — 내용을 못 믿는다)');
+  T30(c.s).forEach((x) => { x.on = false; x.f(); });
+  assert.ok(!c.s.panels().includes(c.P), '⛔ 30분 뒤에도 stale 판이 남았다');
+  //   숨긴 판이 stale 답을 받았다(그 사이 사람이 닫음) — 지우지 않고 30분 시계만
+  c = boardRun();
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  c.s.send({ onf: 'bookClose' }, c.bi);
+  c.s.timers.forEach((x) => { if (x.ms === 30 * 60 * 1000) x.on = false; });   // 닫을 때 건 시계를 치우고 — stale 이 다시 거는지 본다
+  c.s.send({ onf: 'bookSwapped', id: swapMsg(c.bi)[0].id, ok: false, why: 'stale' }, c.bi);
+  assert.ok(c.s.panels().includes(c.P) && shownOf(c.s).length === 0 && T30(c.s).length === 1, '⛔ 숨긴 판의 stale — 지웠거나(안 보낸 글) 30분 시계를 안 걸었다(판이 아니게 됐는데 영영 남는다)');
+  //   14초 답 없음 — 같게 하되 판 내용과 주소가 어긋날 수 있으니 아무도 그 판을 주소로 못 찾는다
   c = boardRun();
   c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
   assert.strictEqual(T14(c.s).length, 1, '⛔ 14초 시한이 없다');
   T14(c.s)[0].f();
-  assert.ok(!c.s.panels().includes(c.P) && shownOf(c.s).length === 1 && shownOf(c.s)[0].kids[0].src === srcOf(c.s, E2), '⛔ 14초 답 없음 → 판 버림 + 새 판(E2)이 아니다');
+  assert.ok(c.s.panels().includes(c.P) && c.P.parentNode && c.P.classList.contains('park') && shownOf(c.s).length === 1 && shownOf(c.s)[0].kids[0].src === srcOf(c.s, E2), '⛔ 14초 답 없음 — 옛 판 액자를 지웠다(또는 새 판 E2 가 아니다)');
+  assert.ok(c.obj().swap === false && T30(c.s).length >= 1, '⛔ 14초 답 없는 판이 판 자격을 들고 있다(또는 30분 시계가 없다)');
+  c.s.send({ onf: 'bookClose' }, swapKnock(c.s, shownOf(c.s)[0], 8, false));
+  c.bi.sent.length = 0;
+  c.s.send({ onf: 'openBook', href: E1, left: 270 }, c.s.home);
+  assert.ok(shownOf(c.s)[0] !== c.P && swapMsg(c.bi).length === 0, '⛔ 14초 답 없던 판(내용 모름)을 E1 주소로 찾아 보였다');
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  assert.ok(shownOf(c.s)[0] !== c.P, '⛔ 14초 답 없던 판(내용 모름)을 E2 주소로 찾아 보였다');
   //   남의 창·모르는 번호의 답은 버린다
   c = boardRun();
   c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
@@ -728,6 +756,19 @@ t('H2 — 그 사이 사람이 닫았으면(판 숨김) 물러나도 새 판을 
   bi.sent.length = 0;
   s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
   assert.ok(shownOf(s)[0] === P && swapMsg(bi).length === 0, '⛔ 주소를 안 되돌렸다');
+});
+
+t('판 고르기 — 보이는 판이 먼저(그보다 나중에 생긴 숨긴 판이 있어도) · 기다리던 판을 지우면 그 14초 시한도 걷힌다(14초 뒤 엉뚱한 새 판 없음)', () => {
+  const s = phoneRun({ wide: true, search: '?swap=1' });
+  s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
+  const A = s.panel();
+  s.send({ onf: 'bookWarm', href: E3, panel: 1, left: 270 }, s.home);   // 아직 노크 전이라 판이 없다 → 종전 숨긴 판(뒤에 생김)
+  const C = s.panels().find((x) => x !== A), ai = swapKnock(s, A, 1), ci = swapKnock(s, C, 3);
+  assert.ok(!A.classList.contains('park') && C.classList.contains('park'), '전제: A 보임 · C 숨김(나중에 생김)');
+  s.send({ onf: 'openBook', href: E2, left: 270 }, s.home);
+  assert.ok(swapMsg(ai).length === 1 && swapMsg(ci).length === 0 && shownOf(s)[0] === A, '⛔ 보이는 판(A)을 두고 숨긴 판(C)을 갈아 끼웠다');
+  s.g.bookDrop(s.g.books.find((b) => b.box === A));
+  assert.strictEqual(T14(s).length, 0, '⛔ 지운 판의 갈아 끼우기 시한이 남았다(14초 뒤 새 판이 불쑥 뜬다)');
 });
 
 t('갈래 12 — 빠르게 둘(C 뒤 D): 나중 것만 기다린다(시한 하나) · 진 C 의 답 없음은 무해 · C 가 먼저 끝났는데(ok) D 가 실패하면 판 주소는 C', () => {
@@ -766,6 +807,12 @@ t('판이 다시 읽혔다(노크가 다시 옴) — 판 주소를 처음 주소
   c.s.send({ onf: 'bookClose' }, c.bi);
   c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
   assert.ok(swapMsg(c.bi).length === 1 && c.s.panels().length === 1, '⛔ 다시 읽힌 판을 아직 E2 로 안다(E2 를 열면 E1 이 보인다)');
+  //   첫 노크만 왔다(다시 읽히는 중 · swap:1 은 둘째 노크에) — 그 사이엔 판이 아니다(반박 검토 🟡 2026-10-17 · 행동으로 잰다)
+  c = boardRun();
+  c.s.send({ onf: 'bookHi', views: 'line' }, c.bi);
+  c.bi.sent.length = 0;
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  assert.ok(swapMsg(c.bi).length === 0 && c.s.panels().length === 2, '⛔ 첫 노크(swap 없음) 뒤에도 옛 swap:1 을 믿고 갈아 끼웠다(다시 읽힌 판이 옛 교재 화면이면 말이 버려진다)');
   //   기다리는 중에 다시 읽힘 → 새 판
   c = boardRun();
   c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
@@ -806,6 +853,29 @@ t('H6 — 판은 30분 지우기·판 셋 넘침에서 빠진다 · 물러난 �
   assert.ok(s.panels().length === 3 && s.panels().includes(P) && !s.panels().includes(q2), '⛔ 판 셋 넘침에서 판(P)을 비켰다(가장 오래 안 쓴 「판 아닌」 숨긴 판 q2 를 비켜야)');
   s.timers.filter((x) => x.on && x.ms === 30 * 60 * 1000).forEach((x) => { x.on = false; x.f(); });
   assert.ok(s.panels().includes(P) && !s.panels().includes(q3), '⛔ 판 안에서 연 숨긴 판의 30분 지우기가 안 돈다(종전)');
+});
+
+t('판 나이 — 숨긴 판이 만든 지 2시간 넘었으면 다시 보일 때 새로(옛 코드 그대로 안 뜬다) · 옛 판은 지우지 않고(저장 중일 수 있다) 숨긴 채 30분 시계 · 보이는 판·스위치 끔은 종전 (반박 검토 🟡 2026-10-17)', () => {
+  const OLD = 2 * 60 * 60 * 1000 + 1000;
+  let c = boardRun();
+  c.obj().born -= OLD;
+  c.s.send({ onf: 'openBook', href: E1, left: 270 }, c.s.home);
+  const n = shownOf(c.s)[0];
+  assert.ok(n && n !== c.P && n.kids[0].src === srcOf(c.s, E1) && c.s.panels().includes(c.P) && c.P.classList.contains('park'), '⛔ 2시간 넘은 숨긴 판을 그대로 보였다(또는 옛 판을 지웠다 — 저장 중일 수 있다)');
+  assert.ok(c.obj().swap === false && c.s.timers.some((x) => x.on && x.ms === 30 * 60 * 1000), '⛔ 늙은 판이 판 자격을 들고 있다(또는 30분 시계가 없다)');
+  c.s.send({ onf: 'bookClose' }, swapKnock(c.s, n, 9, false));
+  c.s.send({ onf: 'openBook', href: E1, left: 270 }, c.s.home);
+  assert.ok(shownOf(c.s)[0] === n, '⛔ 새로 띄운 E1 판을 다시 못 찾는다(늙은 판을 또 찾았다)');
+  //   보이는 판은 그대로(사람이 쓰는 중) · 스위치 끔은 종전(늙어도 그대로)
+  c = boardRun();
+  c.s.send({ onf: 'openBook', href: E1, left: 270 }, c.s.home);
+  c.obj().born -= OLD;
+  c.s.send({ onf: 'openBook', href: E1, left: 270 }, c.s.home);
+  assert.ok(shownOf(c.s)[0] === c.P && c.s.panels().length === 1, '⛔ 보이는 판을 나이로 갈았다');
+  c = boardRun({ search: '' });
+  c.obj().born -= OLD;
+  c.s.send({ onf: 'openBook', href: E1, left: 270 }, c.s.home);
+  assert.ok(shownOf(c.s)[0] === c.P && c.s.panels().length === 1, '⛔ 스위치 끔인데 종전(같은 판 0초)이 아니다');
 });
 
 t('H8 — 판 안에서 온 openBook 은 bookSwap 0 · 새 판 + back · 판을 갈아 끼우면 그 판을 back 으로 든 판의 back 을 비운다', () => {
