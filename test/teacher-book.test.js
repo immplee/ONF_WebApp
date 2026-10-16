@@ -605,5 +605,272 @@ t('앞 판 기억은 한 줄로 이어진다 — 교재 → E2 → 내 문장 �
   assert.ok(shownOf(s).length === 0, '⛔ 교재 ✕ 가 홈으로 안 갔다 — 교재 ← 내 문장 ← E2 ← 교재 고리가 생겼다(✕ 가 끝없이 돈다)');
 });
 
+/* ═══ 📖 교재 판 한 장 1d — 홈에서 연 판 하나가 다른 교재로 갈아 끼운다 (설계 ONF_SlackBot docs/2026-10-15-교재판-한장-설계.md §5.1 · 갈래 표 2·3 · H1~H9) ═══
+   판 쪽 약속(Ownify ONF_Share_WebApp_Html onfBookSwap): 노크 bookHi 는 두 번(둘째에 swap:1 — ONF_BOARD 가 evaluate 뒤에 붙는다) · {onf:'bookSwap', id, src} → {onf:'bookSwapped', id, ok, why, from, ms}
+   · 진 갈아 끼우기엔 답이 없다 · {onf:'bookFetch', src} = 값만 받아 두기. */
+console.log('[📖 교재 판 한 장 1d — 갈아 끼우기]');
+const E4 = TURL.replace('e1', 'e4');
+const srcOf = (s, h) => s.g.teacherBookSrc(h);
+const T14 = (s) => s.timers.filter((x) => x.on && x.ms === 14000);
+const sentOf = (w) => jsn(w.sent).map((x) => x[0]);
+/* 판 노크 — 첫 노크(swap 없음) 뒤 둘째 노크(swap:1). swap === false 면 첫 노크만(옛 교재 · 스위치 꺼진 서버). */
+function swapKnock(s, box, n, swap) {
+  const bw = win('book-exec' + (n || ''), s.top), bi = win('book-user' + (n || ''), win('book-sbx' + (n || ''), bw));
+  box.kids[0].contentWindow = bw;
+  s.send({ onf: 'bookHi', views: 'line' }, bi);
+  if (swap !== false) s.send({ onf: 'bookHi', views: 'line', swap: 1 }, bi);
+  bi.sent.length = 0;
+  return bi;
+}
+/* S1(갈래 표 2): PC · 스위치 켬 · 홈에서 연 판 P(E1)가 노크 swap:1 뒤 닫혀 숨김. o.search 로 주소 질의를 바꾼다(기본 ?swap=1). */
+function boardRun(o) {
+  o = o || {};
+  const s = phoneRun({ wide: !o.phone, search: o.search != null ? o.search : '?swap=1', ls: o.ls });
+  s.send({ onf: 'openBook', href: E1, left: 270, m: 22, r: 28 }, s.home);
+  const P = s.panel(), src0 = P.kids[0].src, bi = swapKnock(s, P, 1, o.swap);
+  if (o.phone) s.browserBack(); else s.send({ onf: 'bookClose' }, bi);
+  bi.sent.length = 0; s.home.sent.length = 0;
+  return { s, P, bi, src0, obj: () => s.g.books.find((b) => b.box === P) };
+}
+const swapMsg = (bi) => sentOf(bi).filter((m) => m.onf === 'bookSwap');
+
+t('H1 — 홈에서 연 판이 있으면 [열기] = bookSwap(새 액자 0 · 같은 액자 · 그 창·그 출처로) · 같은 주소 다시 = 말 0 · 판 칸 값 그대로', () => {
+  const { s, P, bi, src0 } = boardRun();
+  assert.ok(P.classList.contains('park') && s.panels().length === 1, '전제: P 숨김');
+  s.send({ onf: 'openBook', href: E2, left: 270, m: 22, r: 28 }, s.home);
+  assert.ok(s.panels().length === 1 && !P.classList.contains('park') && P.kids[0].src === src0, '⛔ 갈아 끼우지 않고 새 판을 띄웠다(또는 P 를 안 보였다 · 액자를 다시 불렀다)');
+  const m = swapMsg(bi);
+  assert.ok(m.length === 1 && m[0].src === srcOf(s, E2) && typeof m[0].id === 'number' && m[0].id > 0, '⛔ bookSwap{id, src} 가 판에 안 갔다');
+  assert.ok(jsn(bi.sent).every((x) => x[1] === ORIGIN), "⛔ 판에 '*' 나 남의 출처로 보냈다");
+  s.send({ onf: 'bookSwapped', id: m[0].id, ok: true, why: '', from: 'cache', ms: 40 }, bi);
+  assert.strictEqual(T14(s).length, 0, '⛔ 답(ok)을 받았는데 14초 시계가 남았다(진 교재가 새 판으로 뜬다)');
+  bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: E2, left: 270, m: 22, r: 28 }, s.home);
+  assert.ok(bi.sent.length === 0 && s.panels().length === 1 && !P.classList.contains('park'), '⛔ 같은 주소인데 또 말을 보냈다(0초 길이 아니다)');
+  s.send({ onf: 'bookClose' }, bi);
+  s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
+  assert.ok(swapMsg(bi).length === 1 && swapMsg(bi)[0].src === srcOf(s, E1) && s.panels().length === 1, '⛔ 갈아 끼운 판을 옛 주소(E1)로 찾았다 — 판은 이제 E2 다');
+});
+
+t('H1 — 판이 아니면 종전(새 판): 스위치 꺼짐 · swap 노크 없음(옛 교재·서버 스위치 끔) · ⭐ 내 문장 주소 · 판 안에서 연 판', () => {
+  for (const o of [{ search: '' }, { search: '?swap=0' }, { swap: false }]) {
+    const { s, P, bi } = boardRun(o);
+    s.send({ onf: 'openBook', href: E2, left: 270 }, s.home);
+    assert.ok(s.panels().length === 2 && P.classList.contains('park') && swapMsg(bi).length === 0, '⛔ 판이 아닌데 갈아 끼웠다: ' + JSON.stringify(o));
+  }
+  const { s, P, bi } = boardRun();
+  s.send({ onf: 'openBook', href: MYS, left: 270 }, s.home);
+  assert.ok(s.panels().length === 2 && P.classList.contains('park') && swapMsg(bi).length === 0, '⛔ ⭐ 내 문장 주소를 교재 판에 갈아 끼웠다(내 문장 판은 따로 — 설계 §5.4)');
+  //   판 안에서 연 판(back 있음)은 판이 아니다 — 그 판만 남았을 때 [열기] 는 새 판
+  const c = boardRun();
+  c.s.send({ onf: 'openBook', href: E1, left: 270 }, c.s.home);
+  c.s.send({ onf: 'openBook', href: E2 }, c.bi);
+  const q = shownOf(c.s)[0], qi = swapKnock(c.s, q, 2);
+  c.s.g.bookDrop(c.obj());
+  c.s.send({ onf: 'openBook', href: E3, left: 270 }, c.s.home);
+  assert.ok(swapMsg(qi).length === 0 && c.s.panels().length === 2, '⛔ 판 안에서 연 판(back 있음)을 판으로 갈아 끼웠다');
+});
+
+t('H5·H9 — bookSwap 이 bookPark{on:false} 보다 먼저 · 갈아 끼울 때 openBook 의 left·m·r 로 자리(bookBox 뒤에도)', () => {
+  const { s, P, bi } = boardRun();
+  s.send({ onf: 'bookBox', left: 300, m: 20, r: 24 }, s.home);
+  assert.ok(P.vars['--bl'] === '300px', '전제: 숨긴 판도 새 칸');
+  s.send({ onf: 'openBook', href: E2, left: 310, m: 18, r: 26 }, s.home);
+  assert.deepStrictEqual(sentOf(bi).map((m) => m.onf + (m.onf === 'bookPark' ? ':' + m.on : '')), ['bookSwap', 'bookPark:false'], '⛔ 「보임」이 bookSwap 보다 먼저 갔다(판이 A 로 「들어옴」을 알린다 — R12)');
+  assert.ok(P.vars['--bl'] === '310px' && P.vars['--bm'] === '18px' && P.vars['--br'] === '26px' && P.classList.contains('beside'), '⛔ 갈아 끼운 판이 openBook 의 칸 값(left·m·r)으로 안 놓였다');
+});
+
+t('H2 — ok:false(busy·fail·notice) → 종전 새 판 + 판 숨김 + 판 주소 되돌림(다시 열면 0초) · stale → 판 버림 · 14초 답 없음 → 판 버림 + 새 판', () => {
+  for (const why of ['busy', 'fail', 'notice', 'bad_arg']) {
+    const { s, P, bi, src0 } = boardRun();
+    s.send({ onf: 'openBook', href: E2, left: 270 }, s.home);
+    const id = swapMsg(bi)[0].id;
+    s.send({ onf: 'bookSwapped', id, ok: false, why, from: '', ms: 3 }, bi);
+    const n = shownOf(s)[0];
+    assert.ok(s.panels().length === 2 && n !== P && P.classList.contains('park') && n.kids[0].src === srcOf(s, E2), '⛔ ' + why + ' 인데 종전 새 판(E2)으로 안 물러났다(또는 판을 안 숨겼다)');
+    assert.ok(n.vars['--bl'] === '270px', '⛔ 물러난 새 판이 openBook 칸 값으로 안 놓였다');
+    assert.strictEqual(T14(s).length, 0, '⛔ 물러났는데 14초 시계가 남았다');
+    bi.sent.length = 0;
+    s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
+    assert.ok(shownOf(s)[0] === P && P.kids[0].src === src0 && swapMsg(bi).length === 0, '⛔ ' + why + ' 뒤 판 주소를 안 되돌렸다(E1 을 다시 열면 0초여야 — 판은 E1 을 그대로 들고 있다)');
+  }
+  let c = boardRun();
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  c.s.send({ onf: 'bookSwapped', id: swapMsg(c.bi)[0].id, ok: false, why: 'stale' }, c.bi);
+  assert.ok(!c.s.panels().includes(c.P) && c.s.panels().length === 1 && shownOf(c.s)[0].kids[0].src === srcOf(c.s, E2), '⛔ stale(오래 산 판) 인데 옛 판을 안 버렸다(또는 새 판을 안 띄웠다)');
+  c = boardRun();
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  assert.strictEqual(T14(c.s).length, 1, '⛔ 14초 시한이 없다');
+  T14(c.s)[0].f();
+  assert.ok(!c.s.panels().includes(c.P) && shownOf(c.s).length === 1 && shownOf(c.s)[0].kids[0].src === srcOf(c.s, E2), '⛔ 14초 답 없음 → 판 버림 + 새 판(E2)이 아니다');
+  //   남의 창·모르는 번호의 답은 버린다
+  c = boardRun();
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  const id = swapMsg(c.bi)[0].id;
+  c.s.send({ onf: 'bookSwapped', id, ok: false, why: 'busy' }, win('stranger', c.s.top));
+  c.s.send({ onf: 'bookSwapped', id: id + 99, ok: false, why: 'busy' }, c.bi);
+  c.s.send({ onf: 'bookSwapped', id: id + 99, ok: true, from: 'cache' }, c.bi);   // 모르는 번호의 ok — 판이 든 교재(real)로 믿으면 안 된다
+  c.s.send({ onf: 'bookSwapped', id, ok: false, why: 'busy' }, c.s.home);
+  assert.ok(c.s.panels().length === 1 && T14(c.s).length === 1, '⛔ 남의 창·모르는 번호·홈 액자의 답으로 물러났다');
+  c.s.send({ onf: 'bookSwapped', id, ok: false, why: 'busy' }, c.bi);
+  c.bi.sent.length = 0;
+  c.s.send({ onf: 'openBook', href: E1, left: 270 }, c.s.home);
+  assert.ok(shownOf(c.s)[0] === c.P && swapMsg(c.bi).length === 0, '⛔ 모르는 번호의 ok 로 판이 든 교재를 바꿔 알았다(E1 을 못 찾는다)');
+});
+
+t('H2 — 그 사이 사람이 닫았으면(판 숨김) 물러나도 새 판을 안 띄운다(주소만 되돌림)', () => {
+  const { s, P, bi } = boardRun();
+  s.send({ onf: 'openBook', href: E2, left: 270 }, s.home);
+  const id = swapMsg(bi)[0].id;
+  s.send({ onf: 'bookClose' }, bi);
+  s.send({ onf: 'bookSwapped', id, ok: false, why: 'busy' }, bi);
+  assert.ok(s.panels().length === 1 && shownOf(s).length === 0, '⛔ 닫은 뒤 늦게 온 busy 가 새 판을 띄웠다');
+  bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
+  assert.ok(shownOf(s)[0] === P && swapMsg(bi).length === 0, '⛔ 주소를 안 되돌렸다');
+});
+
+t('갈래 12 — 빠르게 둘(C 뒤 D): 나중 것만 기다린다(시한 하나) · 진 C 의 답 없음은 무해 · C 가 먼저 끝났는데(ok) D 가 실패하면 판 주소는 C', () => {
+  let c = boardRun();
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  c.s.send({ onf: 'openBook', href: E3, left: 270 }, c.s.home);
+  let m = swapMsg(c.bi);
+  assert.ok(m.length === 2 && m[1].id > m[0].id && m[1].src === srcOf(c.s, E3) && c.s.panels().length === 1, '⛔ 둘째가 bookSwap 으로 안 갔다');
+  assert.strictEqual(T14(c.s).length, 1, '⛔ 진 갈아 끼우기의 14초 시계를 안 걷었다(진 교재가 14초 뒤 새 판으로 뜬다)');
+  c.s.send({ onf: 'bookSwapped', id: m[1].id, ok: true, from: 'server', ms: 2600 }, c.bi);
+  assert.ok(T14(c.s).length === 0 && c.s.panels().length === 1, '⛔ 나중 것(D) ok 뒤에 시계·판이 남았다');
+  //   C 가 받아 둔 값으로 바로 끝나(ok) 그 답이 D 를 보낸 뒤 도착 · D 는 실패 → 판은 C 를 들고 있다
+  c = boardRun();
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  c.s.send({ onf: 'openBook', href: E3, left: 270 }, c.s.home);
+  m = swapMsg(c.bi);
+  c.s.send({ onf: 'bookSwapped', id: m[0].id, ok: true, from: 'cache', ms: 30 }, c.bi);
+  assert.strictEqual(T14(c.s).length, 1, '⛔ 진 번호(C)의 답으로 D 기다림을 끝냈다');
+  c.s.send({ onf: 'bookSwapped', id: m[1].id, ok: false, why: 'fail' }, c.bi);
+  assert.ok(c.s.panels().length === 2 && shownOf(c.s)[0].kids[0].src === srcOf(c.s, E3), '전제: D 는 새 판으로 물러났다');
+  c.bi.sent.length = 0;
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  assert.ok(shownOf(c.s)[0] === c.P && swapMsg(c.bi).length === 0, '⛔ 판이 실제로 든 C(E2)를 못 찾았다 — 옛 A 로 되돌렸다(C 를 열면 엉뚱한 교재)');
+});
+
+t('판이 다시 읽혔다(노크가 다시 옴) — 판 주소를 처음 주소로 · 기다리던 갈아 끼우기는 말이 사라졌으니 물러난다', () => {
+  let c = boardRun();
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  c.s.send({ onf: 'bookSwapped', id: swapMsg(c.bi)[0].id, ok: true, from: 'cache' }, c.bi);
+  c.s.send({ onf: 'bookClose' }, c.bi);
+  c.s.send({ onf: 'bookHi', views: 'line' }, c.bi);                   // 판이 처음 주소(E1)로 다시 읽혔다(오래 산 판의 「다시 시도」 = location.reload)
+  c.s.send({ onf: 'bookHi', views: 'line', swap: 1 }, c.bi);
+  c.bi.sent.length = 0;
+  c.s.send({ onf: 'openBook', href: E1, left: 270 }, c.s.home);
+  assert.ok(shownOf(c.s)[0] === c.P && swapMsg(c.bi).length === 0, '⛔ 다시 읽힌 판(E1)을 E1 로 못 찾았다');
+  c.s.send({ onf: 'bookClose' }, c.bi);
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  assert.ok(swapMsg(c.bi).length === 1 && c.s.panels().length === 1, '⛔ 다시 읽힌 판을 아직 E2 로 안다(E2 를 열면 E1 이 보인다)');
+  //   기다리는 중에 다시 읽힘 → 새 판
+  c = boardRun();
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  c.s.send({ onf: 'bookHi', views: 'line' }, c.bi);
+  assert.ok(c.s.panels().length === 2 && shownOf(c.s)[0].kids[0].src === srcOf(c.s, E2) && T14(c.s).length === 0, '⛔ 말이 사라진 갈아 끼우기를 14초 기다린다(또는 새 판을 안 띄웠다)');
+});
+
+t('H3 — 미리(bookWarm panel:1): 판 있음 → bookFetch(새 판 0) · 판이 든 주소면 말 0 · 판 없음 → 종전 숨긴 판 · 📱 폰은 판 없으면 미리 판 없음(D1)', () => {
+  const { s, P, bi } = boardRun();
+  s.send({ onf: 'bookWarm', href: E3, panel: 1, left: 270 }, s.home);
+  assert.ok(s.panels().length === 1 && P.classList.contains('park'), '⛔ 판이 있는데 미리 새 판을 띄웠다(또는 판을 보였다)');
+  assert.deepStrictEqual(sentOf(bi), [{ onf: 'bookFetch', src: srcOf(s, E3) }], '⛔ 판에 bookFetch{src} 가 안 갔다');
+  bi.sent.length = 0;
+  s.send({ onf: 'bookWarm', href: E1, panel: 1 }, s.home);
+  s.send({ onf: 'bookWarm', href: MYS, panel: 1 }, s.home);
+  assert.ok(sentOf(bi).length === 0, '⛔ 판이 든 주소·내 문장 주소를 bookFetch 로 보냈다');
+  const off = boardRun({ search: '' });
+  off.s.send({ onf: 'bookWarm', href: E3, panel: 1 }, off.s.home);
+  assert.ok(off.s.panels().length === 2 && off.s.panels()[1].classList.contains('park') && sentOf(off.bi).length === 0, '⛔ 스위치 꺼짐인데 종전(숨긴 판 미리)이 아니다');
+  const ph = phoneRun({ search: '?swap=1' });
+  ph.send({ onf: 'bookWarm', href: E3, panel: 1 }, ph.home);
+  assert.strictEqual(ph.panels().length, 0, '⛔ 폰(스위치 켬)인데 판 없이 미리 판을 띄웠다(D1 — 첫 [열기]로 생긴 판을 쓴다)');
+  const ph0 = phoneRun();
+  ph0.send({ onf: 'bookWarm', href: E3, panel: 1 }, ph0.home);
+  assert.strictEqual(ph0.panels().length, 1, '⛔ 스위치 꺼짐 폰의 종전 길이 바뀌었다');
+});
+
+t('H6 — 판은 30분 지우기·판 셋 넘침에서 빠진다 · 물러난 판·판 안에서 연 판은 종전대로', () => {
+  const { s, P, bi } = boardRun();
+  s.timers.filter((x) => x.on && x.ms === 30 * 60 * 1000).forEach((x) => { x.on = false; x.f(); });
+  assert.ok(s.panels().includes(P), '⛔ 판이 숨긴 채 30분에 지워졌다(하루 종일 한 판)');
+  s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
+  s.send({ onf: 'openBook', href: E2 }, bi);                                  // 판 안에서 E2 → E3 → E4(새 판 셋 · back 있음)
+  const q2 = shownOf(s)[0], i2 = swapKnock(s, q2, 2);
+  s.send({ onf: 'openBook', href: E3 }, i2);
+  const q3 = shownOf(s)[0], i3 = swapKnock(s, q3, 3);
+  s.send({ onf: 'openBook', href: E4 }, i3);
+  assert.ok(s.panels().length === 3 && s.panels().includes(P) && !s.panels().includes(q2), '⛔ 판 셋 넘침에서 판(P)을 비켰다(가장 오래 안 쓴 「판 아닌」 숨긴 판 q2 를 비켜야)');
+  s.timers.filter((x) => x.on && x.ms === 30 * 60 * 1000).forEach((x) => { x.on = false; x.f(); });
+  assert.ok(s.panels().includes(P) && !s.panels().includes(q3), '⛔ 판 안에서 연 숨긴 판의 30분 지우기가 안 돈다(종전)');
+});
+
+t('H8 — 판 안에서 온 openBook 은 bookSwap 0 · 새 판 + back · 판을 갈아 끼우면 그 판을 back 으로 든 판의 back 을 비운다', () => {
+  const { s, P, bi } = boardRun();
+  s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
+  s.send({ onf: 'openBook', href: E2 }, bi);
+  const q = shownOf(s)[0], qi = swapKnock(s, q, 2);
+  assert.ok(q !== P && swapMsg(bi).length === 0 && s.panels().length === 2, '⛔ 판 안 openBook 이 판을 갈아 끼웠다');
+  s.send({ onf: 'bookClose' }, qi);
+  assert.ok(shownOf(s)[0] === P, '⛔ 판 안에서 연 판의 ✕ 가 앞 판(P) 0초가 아니다');
+  s.send({ onf: 'openBook', href: E2 }, bi);                                  // 다시 q(back = P)
+  s.send({ onf: 'openBook', href: E3, left: 270 }, s.home);                   // 홈에서 E3 → 판 P 를 갈아 끼움(q 는 숨김)
+  assert.ok(swapMsg(bi).length === 1 && shownOf(s)[0] === P, '전제: P 를 E3 으로');
+  const qo = s.g.books.find((b) => b.box === q);
+  assert.strictEqual(qo.back, null, '⛔ 갈아 끼운 판을 back 으로 든 판(q)의 back 이 남았다(✕ 가 엉뚱한 교재를 보인다)');
+});
+
+t('H4 — 📱 폰: [열기] → bookSwap · 판 칸 push {onfBook:key(B)} · 뒤로 = 숨김 · 판이 없는 칸으로 돌아오면 판을 그 주소로(새 액자 아님) · 기록 칸에 자격(ttok) 없음', () => {
+  const { s, P, bi } = boardRun({ phone: true });
+  assert.ok(P.classList.contains('park') && s.H.i === 0, '전제: 폰 판 숨김 · 홈 칸');
+  s.send({ onf: 'openBook', href: E2 }, s.home);
+  const k2 = s.g.bookKey(srcOf(s, E2));
+  assert.ok(swapMsg(bi).length === 1 && s.panels().length === 1 && !P.classList.contains('park'), '⛔ 폰 [열기]가 갈아 끼우지 않았다');
+  assert.deepStrictEqual(s.H.state, { onfBook: k2, n: 0, bd: 1 }, '⛔ 갈아 끼운 판 칸이 key(B) 가 아니다(뒤로가 엉뚱한 판을 찾는다)');
+  s.send({ onf: 'bookSwapped', id: swapMsg(bi)[0].id, ok: true, from: 'cache' }, bi);
+  s.browserBack();
+  assert.ok(P.classList.contains('park'), '⛔ 뒤로가 판을 안 숨겼다');
+  //   판이 E2 를 든 채 E1 칸으로 돌아온다(앞으로 가기 등) — E1 판은 없다 → 판을 E1 로
+  bi.sent.length = 0;
+  s.H.st = [{ state: null }, { state: { onfBook: s.g.bookKey(srcOf(s, E1)), n: 0, bd: 1 } }, { state: { onfBook: k2, n: 0, bd: 1 } }]; s.H.i = 2;
+  s.browserBack();
+  assert.ok(swapMsg(bi).length === 1 && swapMsg(bi)[0].src === srcOf(s, E1) && s.panels().length === 1 && !P.classList.contains('park'), '⛔ 판이 없는 칸으로 돌아왔는데 판을 갈아 끼우지 않았다(새 액자를 띄웠다)');
+  assert.ok(!/CRED/.test(JSON.stringify(s.H.st)), '⛔ 기록 칸에 선생님 자격(ttok)이 실렸다');
+});
+
+t('H7 — caps: 스위치 켜면 swap:1 · 꺼짐이면 칸 없음(종전 글자 그대로) · 주소 swap=1|0 은 이 기기에 기억(onfThSwap)', () => {
+  const caps = (s) => { s.send({ onf: 'bookHello' }, s.home); return jsn(s.home.sent.find((x) => x[0].onf === 'caps')[0]); };
+  let s = phoneRun({ wide: true, search: '?swap=1' });
+  assert.deepStrictEqual(caps(s), { onf: 'caps', book: 1, phone: 1, swap: 1 }, '⛔ 켰는데 caps 에 swap:1 이 없다');
+  assert.strictEqual(s.g.localStorage.s.onfThSwap, '1', '⛔ 켠 것을 이 기기에 기억 안 했다');
+  s = phoneRun({ wide: true, ls: { onfThSwap: '1' } });
+  assert.strictEqual(caps(s).swap, 1, '⛔ 기억한 켬을 안 따랐다');
+  s = phoneRun({ wide: true, ls: { onfThSwap: '1' }, search: '?swap=0' });
+  assert.deepStrictEqual(caps(s), { onf: 'caps', book: 1, phone: 1 }, '⛔ swap=0 인데 swap 칸이 있다');
+  assert.strictEqual(s.g.localStorage.s.onfThSwap, '0', '⛔ 끈 것을 기억 안 했다');
+  s = phoneRun({ wide: true, ls: { onfSwap: '1' } });
+  assert.ok(!('swap' in caps(s)), '⛔ 기본이 끔이 아니다(또는 학생 키 onfSwap 을 봤다)');
+});
+
+t('perf=1 — 갈아 끼움이 끝나면 홈에 bookPerf{ms, from}(속도표 줄 「판 갈아 끼움 Nms」 · 1e 가 그린다) · 물러나면 from:new · perf 없으면 말 0', () => {
+  let c = boardRun({ search: '?swap=1&perf=1' });
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  c.s.send({ onf: 'bookSwapped', id: swapMsg(c.bi)[0].id, ok: true, from: 'cache', ms: 30 }, c.bi);
+  let pf = sentOf(c.s.home).filter((m) => m.onf === 'bookPerf');
+  assert.ok(pf.length === 1 && pf[0].from === 'cache' && typeof pf[0].ms === 'number' && pf[0].ms >= 0, '⛔ perf=1 인데 홈에 bookPerf{from:cache, ms} 가 없다');
+  c.s.send({ onf: 'bookClose' }, c.bi);
+  c.s.send({ onf: 'openBook', href: E3, left: 270 }, c.s.home);
+  c.s.send({ onf: 'bookSwapped', id: swapMsg(c.bi)[1].id, ok: false, why: 'busy' }, c.bi);
+  pf = sentOf(c.s.home).filter((m) => m.onf === 'bookPerf');
+  assert.ok(pf.length === 2 && pf[1].from === 'new' && pf[1].why === 'busy', '⛔ 물러남이 속도표에 안 남는다');
+  c = boardRun();
+  c.s.send({ onf: 'openBook', href: E2, left: 270 }, c.s.home);
+  c.s.send({ onf: 'bookSwapped', id: swapMsg(c.bi)[0].id, ok: true, from: 'cache' }, c.bi);
+  assert.ok(!sentOf(c.s.home).some((m) => m.onf === 'bookPerf'), '⛔ perf 없이 bookPerf 를 보냈다');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);
