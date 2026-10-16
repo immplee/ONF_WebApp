@@ -398,7 +398,13 @@
     function bookAsk(src) { try { var q = new URL(src).searchParams, l = q.get('line') || ''; return { view: q.get('view') || '', line: /^\d{1,7}$/.test(l) ? Number(l) : 0 }; } catch (e) { return { view: '', line: 0 }; } }
     function bookBase(src) { try { var u = new URL(src); u.searchParams.delete('view'); u.searchParams.delete('line'); return u.href; } catch (e) { return src; } }
     function bookCan(p, a) { return !!(p && (a.view || a.line) && (!a.view || p.views.indexOf(a.view) >= 0) && (!a.line || p.views.indexOf('line') >= 0)); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 []
-    function bookLike(src, a) { var b = bookBase(src); for (var i = 0; i < books.length; i++) if (bookCan(books[i], a) && bookBase(books[i].src) === b) return books[i]; return null; }
+    /* 아무것도 안 묻는 열기([이어서 하기])도 **줄 링크로 연 판**(view 없음)이면 그 판(반박 검토 🟡4) — 판은 이미 그 교재다 · 할 말이 없으니 보이기만.
+       ⛔ view 로 연 판(덱·복습)은 안 맡긴다 — 열자마자 그 창을 띄운 판이다(위 「view 없는 보통 열기」 검사). */
+    function bookLike(src, a) {
+      var b = bookBase(src), q;
+      for (var i = 0; i < books.length; i++) { q = books[i]; if (bookBase(q.src) === b && (bookCan(q, a) || (!a.view && !a.line && !bookAsk(q.src).view))) return q; }
+      return null;
+    }
     /* left = 홈 왼쪽 메뉴의 오른쪽 끝(px · 홈이 잰다) — 있으면 판이 그 오른쪽부터 덮는다(2026-10-12 Peter 「창 모드일 때는 맨 왼쪽 탭만 보이게」).
        없으면(옛 홈 · 판 안에서 갈아 끼울 때) 종전 자리 그대로. ⚠️ 숫자·화면 폭 60% 안만 믿는다(남의 값으로 판이 화면 밖으로 가지 않게). */
     function bookPlace(p, left) {

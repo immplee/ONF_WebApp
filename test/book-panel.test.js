@@ -448,6 +448,22 @@ t('미리 띄운 교재(views line) — 줄 링크(line=17)는 새로 안 받고
   assert.ok(s.panels().length === 3 && !book.classList.contains('park') && js(bi.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 줄 없는 [이어서 하기]에 「열어」를 보냈다(또는 새 판)');
 });
 
+t('줄 링크로 새로 연 판(미리 띄운 판 없음) — 뒤 [이어서 하기]는 그 판을 그대로(새로 안 받음 · 「열어」 없음) · 덱(view)으로 연 판은 종전대로 안 맡긴다 (반박 검토 🟡4 2026-10-16)', () => {
+  const s = setup(realSrc());
+  s.send({ onf: 'openBook', href: LB + '&line=17', left: 248 }, s.homeInner);
+  const box = s.panel(), bi = hiV(s, box, 'line');
+  s.send({ onf: 'bookDismiss' }, s.homeInner); bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: LB, left: 248 }, s.homeInner);
+  assert.ok(s.panels().length === 1 && !box.classList.contains('park'), '⛔ 줄 링크로 연 판을 두고 [이어서 하기]가 새로 받았다');
+  assert.ok(js(bi.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 아무것도 안 물었는데 「열어」를 보냈다');
+  //   옛 교재(줄 모름)로 줄 링크를 연 판도 — 맡길 말이 없으니 그대로 보이기만
+  const o = setup(realSrc());
+  o.send({ onf: 'openBook', href: LB + '&line=17' }, o.homeInner);
+  hiV(o, o.panel(), undefined);
+  o.send({ onf: 'openBook', href: LB }, o.homeInner);
+  assert.strictEqual(o.panels().length, 1, '⛔ 옛 교재 줄 판을 두고 새로 받았다');
+});
+
 t('줄을 할 줄 모르는 판은 안 쓴다 — 노크 전 · 옛 교재(views 없음 · cards 만) · 다른 회차 줄이면 종전대로 그 주소로 새 판(그 판은 &line 으로 뜬다)', () => {
   for (const [views, why] of [[null, '노크 전'], [undefined, '옛 교재(views 없음)'], ['cards', '옛 교재(cards 만)'], ['review', '내 문장']]) {
     const s = setup(realSrc());
@@ -467,7 +483,8 @@ t('줄을 할 줄 모르는 판은 안 쓴다 — 노크 전 · 옛 교재(views
   v.send({ onf: 'bookWarm', href: LB, panel: 1 }, v.homeInner);
   const vi = hiV(v, v.panel(), 'cards,line');
   v.send({ onf: 'openBook', href: LB + '&line=1e9' }, v.homeInner);
-  assert.ok(js(vi.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 숫자 아닌 줄 값을 판에 넘겼다');
+  v.send({ onf: 'openBook', href: LB + '&line=12345678' }, v.homeInner);   // 서버도 7자리까지만 본다(jumpRow slice(0,7))
+  assert.ok(js(vi.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 숫자 아닌·8자리 줄 값을 판에 넘겼다');
 });
 
 console.log('[📱 폰 판 — 2026-10-14 Peter 「미리 불러와서 로딩 전혀 없이 열고 되돌리고」 → 「폰 숨긴 판 1개」]');
