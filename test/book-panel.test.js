@@ -22,7 +22,7 @@ function setup(bs, o) {
   const mkEl = (tag) => { const el = { tag, kids: [], attrs: {}, className: '', src: '', vars: {}, style: { setProperty(k, v) { el.vars[k] = v; } },
     classList: { set: new Set(), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); }, toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } },
     setAttribute(k, v) { el.attrs[k] = v; }, appendChild(c) { el.kids.push(c); c.parentNode = el; }, getBoundingClientRect: () => ({ top: 0, bottom: 800 }),
-    addEventListener() {} }; return el; };   // 🔐 액자 load(여러 계정 우회 openExec — 따로 multilogin.test.js)
+    L: {}, addEventListener(k, f) { (el.L[k] = el.L[k] || []).push(f); } }; return el; };   // 🔐 액자 load(여러 계정 우회 openExec — 따로 multilogin.test.js · 못 연 판은 아래 🔐 검사)
   const top = win('shell');
   const timers = [];
   const g = { listeners, top, timers,
@@ -756,6 +756,67 @@ t('📱 폰 판 스위치 — 꺼져 있으면(opts.phone 없음) caps 에 phone
   assert.strictEqual(s.H.st.length, 1, '⛔ 스위치가 꺼졌는데 판 칸을 넣었다');
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   assert.ok(/phone: phoneOn !== '0' \}\);/.test(html) && /q\.get\('phonepanel'\)/.test(html) && /localStorage\.getItem\('onfPhonePanel'\)/.test(html), '⛔ index.html 이 스위치를 안 넘긴다(또는 기본 꺼짐 · 끄는 길 없음)');
+});
+
+console.log('[🔐 못 연 판 — 여러 계정 우회 반박 검토 🟡4 2026-10-16]');
+/* 판 액자를 「구글 오류 화면(자식 0)」으로 다 읽히게 하고 여유를 흘린다 → 안내 판(이 대역엔 credentialless 가 없다 = 다시 안 열고 바로 안내) */
+function stuckLoad(s, box) {
+  const el = box.kids[0];
+  el.contentWindow = { length: 0, parent: null, location: { get href() { throw new Error('cross-origin'); }, replace() {} } };
+  el.contentWindow.parent = el.contentWindow;
+  (el.L.load || []).forEach((f) => f({}));
+  s.timers.filter((x) => x.on && x.ms === 1500).forEach((x) => { x.on = false; x.f(); });
+  assert.ok(box.kids[1].kids.some((k) => k.className === 'onf-stuck'), '안내가 안 떴다(대역 확인)');
+}
+t('🔐 못 연 판(안내)을 다시 열면 지우고 **새로 받는다** — 보이던 판·숨긴 미리 판 둘 다(종전: 안내가 그대로 · [닫기] 해야 새로)', () => {
+  const s = setup();
+  s.send({ onf: 'openBook', href: E1 }, s.homeInner);
+  const box = s.panel();
+  stuckLoad(s, box);
+  s.send({ onf: 'openBook', href: E1 }, s.homeInner);
+  assert.ok(s.panels().length === 1 && s.panel() !== box && s.panel().kids[0].src === box.kids[0].src, '⛔ 못 연 판을 다시 보였다(안내가 그대로)');
+  assert.ok(!s.panel().classList.contains('park'), '새 판은 보인다');
+  //   숨긴 미리 판(park=1)이 못 열렸으면 — 누를 때 새로(보이는 판으로)
+  const w = setup();
+  w.send({ onf: 'bookWarm', href: E2, panel: 1 }, w.homeInner);
+  const pre = w.panel();
+  assert.ok(pre.classList.contains('park') && /park=1/.test(pre.kids[0].src));
+  stuckLoad(w, pre);
+  w.send({ onf: 'openBook', href: E2 }, w.homeInner);
+  const now = w.panels().find((b) => !b.classList.contains('park'));
+  assert.ok(now && now !== pre && !w.body.kids.includes(pre) && !/park=1/.test(now.kids[0].src), '⛔ 못 연 숨긴 미리 판을 그대로 보였다');
+});
+t('🔐 판을 지우면(load 전 · 닫기·자리 비키기) 그 판의 노크 듣기를 걷는다 — 누수 없음', () => {
+  const s = setup();
+  s.send({ onf: 'bookHello' }, s.homeInner);                  // 홈 노크 — 홈 액자 판정이 끝나 홈의 노크 듣기가 걷힌다(그 뒤로 센다)
+  const n0 = s.listeners.message.length;
+  s.send({ onf: 'openBook', href: E1 }, s.homeInner);
+  assert.strictEqual(s.listeners.message.length, n0 + 1, '판이 노크 듣기를 단다(대역 확인)');
+  s.send({ onf: 'bookDismiss' }, s.homeInner);                // 노크(bookHi) 없는 판 = 숨기지 않고 지운다(bookDrop)
+  assert.ok(!s.panel(), '판이 지워졌다(대역 확인)');
+  assert.strictEqual(s.listeners.message.length, n0, '⛔ 지운 판의 노크 듣기가 남았다(판이 오갈 때마다 쌓인다)');
+});
+
+t('📤🔐 과제 끝맺음 맡기기(hwFin) — credentialless 창이 맡긴 끝맺음을 이 껍데기 저장소에 둔다 · 홈 액자 말만 · sid 로 넣고 뺀다 · hwFinAsk 엔 그 창·그 출처로 목록 · 모양·크기·개수 거름 (반박 검토 🟡3 2026-10-16)', () => {
+  const s = setup(), ls = {};
+  s.g.localStorage = { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } };
+  const job = { sid: 'a1b2-c3', ymd: '2026-10-16', id: 'F1', name: 'rec.m4a', mime: 'audio/mp4' };
+  s.send({ onf: 'hwFin', on: true, job }, win('stranger', s.top));
+  s.send({ onf: 'hwFin', on: true, job }, s.homeInner, 'https://evil.example.com');
+  s.send({ onf: 'hwFin', on: true, job: { sid: '../x', ymd: 'D' } }, s.homeInner);
+  s.send({ onf: 'hwFin', on: true, job: { sid: 'big', pad: 'x'.repeat(3000) } }, s.homeInner);
+  assert.ok(!('onfHwFin' in ls), '⛔ 남의 창·남의 출처·이상한 sid·큰 값을 맡았다');
+  s.send({ onf: 'hwFin', on: true, job }, s.homeInner);
+  s.send({ onf: 'hwFin', on: true, job }, s.homeInner);
+  assert.deepStrictEqual(JSON.parse(ls.onfHwFin), [job], '⛔ 맡긴 끝맺음을 안 뒀다(또는 같은 sid 를 둘로)');
+  s.homeInner.sent.length = 0;
+  s.send({ onf: 'hwFinAsk' }, win('stranger', s.top));
+  s.send({ onf: 'hwFinAsk' }, s.homeInner);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(s.homeInner.sent)), [[{ onf: 'hwFin', jobs: [job] }, 'https://n-abc-0lu-script.googleusercontent.com']], '⛔ 물은 그 창·그 출처로 목록을 안 줬다(또는 남의 창에 줬다)');
+  s.send({ onf: 'hwFin', on: false, job: { sid: 'a1b2-c3' } }, s.homeInner);
+  assert.ok(!('onfHwFin' in ls), '⛔ 끝난 끝맺음을 안 뺐다');
+  for (let i = 0; i < 25; i++) s.send({ onf: 'hwFin', on: true, job: { sid: 's' + i, ymd: 'D' } }, s.homeInner);
+  assert.strictEqual(JSON.parse(ls.onfHwFin).length, 20, '⛔ 맡긴 끝맺음 개수 상한이 없다');
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);

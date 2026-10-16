@@ -29,20 +29,23 @@ function run(o) {
   const mkEl = () => { const el = { kids: [], attrs: {}, className: '', src: '', vars: {}, innerHTML: '',
     style: { setProperty(k, v) { el.vars[k] = v; } },
     classList: { set: new Set(), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); }, toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } },
-    setAttribute(k, v) { el.attrs[k] = v; }, appendChild(c) { el.kids.push(c); c.parentNode = el; }, getBoundingClientRect: () => ({ top: 0, bottom: 800 }) }; return el; };
+    setAttribute(k, v) { el.attrs[k] = v; }, appendChild(c) { el.kids.push(c); c.parentNode = el; }, getBoundingClientRect: () => ({ top: 0, bottom: 800 }),
+    L: {}, addEventListener(k, f) { (el.L[k] = el.L[k] || []).push(f); } }; return el; };   // 🔐 판 액자 load(우회 openExec — 아래 🔐 검사)
   const top = win('shell');
   const homeExec = win('home-exec', top), home = win('home-user', win('home-sbx', homeExec));
   const frame = { contentWindow: homeExec };
   const g = { URL, top, frame, innerWidth: 1440, location: { href: 'https://class.ownify.co.kr/teacher/' },
     document: { body, createElement: mkEl, documentElement: { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; },
       classList: { set: new Set(), toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } } } }, ONF: { api: { EXEC } }, localStorage: { s: {}, getItem(k) { return k in this.s ? this.s[k] : null; }, setItem(k, v) { this.s[k] = String(v); } },
-    addEventListener: (k, f) => { (L[k] = L[k] || []).push(f); } };
+    addEventListener: (k, f) => { (L[k] = L[k] || []).push(f); }, removeEventListener: (k, f) => { L[k] = (L[k] || []).filter((x) => x !== f); } };
   const timers = [];
   g.setTimeout = (f, ms) => { timers.push({ f, ms, on: true }); return timers.length; };
   g.clearTimeout = (id) => { if (timers[id - 1]) timers[id - 1].on = false; };
   g.window = g;
   if (o.pre) o.pre(g, home);
   vm.createContext(g);
+  //   🔐 o.frame — 진짜 onf-frame.js 를 먼저 싣는다(선생님 껍데기가 <script> 로 싣는 그것 · 판 우회 openExec)
+  if (o.frame) { g.navigator = { userAgent: 'node' }; vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-frame.js'), 'utf8'), g, { filename: 'onf-frame.js' }); }
   vm.runInContext(src.slice(A, B) + (o.hist ? src.slice(HA, HB) : ''), g, { filename: 'teacher-book' });
   const send = (data, source, origin) => (L.message || []).forEach((f) => f({ data, source, origin: origin || ORIGIN }));
   const panel = () => body.kids.find((k) => k.className === 'onf-bookpanel');
@@ -430,6 +433,24 @@ t('📱 껍데기가 다시 읽힌 채 남은 판 칸 표식({onfBook})도 지�
   assert.ok(s.H.replaced === 1 && s.H.state === null, '⛔ 판 칸 표식을 안 지웠다(다시 읽은 뒤 뒤로가 판을 찾는다)');
   s = phoneRun({ startState: { other: 1 } });
   assert.strictEqual(s.H.replaced, 0, '⛔ 남의 state 를 지웠다');
+});
+
+console.log('[🔐 선생님 판 — 여러 계정 우회(onf-frame.js openExec 쌍둥이) · 반박 검토 🟡4 2026-10-16]');
+t('🔐 선생님 판도 우회 길 — 못 연 판(안내)을 다시 열면 지우고 새로 받는다 · load 전에 지운 판의 노크 듣기를 걷는다', () => {
+  const s = run({ frame: true });
+  const n0 = s.L.message.length;
+  s.send({ onf: 'openBook', href: TURL }, s.home);
+  const box = s.panel(), el = box.kids[0];
+  assert.strictEqual(s.L.message.length, n0 + 1, '⛔ 선생님 판이 우회 길(openExec)을 안 탄다');
+  el.contentWindow = { length: 0, location: { get href() { throw new Error('cross-origin'); }, replace() {} } };
+  el.contentWindow.parent = el.contentWindow;
+  (el.L.load || []).forEach((f) => f({}));
+  s.timers.filter((x) => x.on && x.ms === 1500).forEach((x) => { x.on = false; x.f(); });
+  assert.ok(box.kids[1].kids.some((k) => k.className === 'onf-stuck'), '못 연 판 안내(대역 확인)');
+  s.send({ onf: 'openBook', href: TURL }, s.home);
+  assert.ok(s.panels().length === 1 && s.panel() !== box, '⛔ 못 연 선생님 판을 다시 보였다(안내 그대로)');
+  s.send({ onf: 'bookDismiss' }, s.home);
+  assert.ok(!s.panel() && s.L.message.length === n0, '⛔ 지운 선생님 판의 노크 듣기가 남았다');
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);

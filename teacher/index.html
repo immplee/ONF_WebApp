@@ -482,7 +482,7 @@ function bookMake(src, parked) {
   /* 🔐 여러 계정 우회(학생 껍데기 onf-frame.js openExec 이 정본) — 선생님은 회사+개인 계정을 한 크롬에 같이 쓰는 일이 흔하다 → 판(학생 exec)이 구글 오류 화면이면 credentialless 로 한 번 더.
      ⛔ 선생님 **홈** 액자(위 mount 의 EXEC · /a/macros/ownify.co.kr)에는 쓰지 마라 — 구글 로그인 쿠키가 있어야 열린다. onf-frame.js 를 못 받았으면 종전대로. */
   var u = parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src;
-  if (window.ONF && ONF.frame && ONF.frame.openExec) ONF.frame.openExec(p.el, u, wait, bookClose);
+  if (window.ONF && ONF.frame && ONF.frame.openExec) p.oe = ONF.frame.openExec(p.el, u, wait, bookClose);   // 기억(onfCl)은 읽기만 — 정하는 건 학생 홈 액자
   else p.el.src = u;
   books.push(p);
   return p;
@@ -492,6 +492,7 @@ function bookDrop(p) {
   if (i < 0) return;
   books.splice(i, 1);
   if (p.idle) clearTimeout(p.idle);
+  if (p.oe) p.oe.stop();                                  // 🔐 load 전에 지우는 판 — 노크 듣기를 걷는다
   if (p.box.parentNode) p.box.parentNode.removeChild(p.box);
 }
 function bookTell(p) { if (p.win) { try { p.win.postMessage({ onf: 'bookPark', on: p.parked }, p.origin); } catch (e) {} } }
@@ -505,6 +506,7 @@ function bookPark(p, on) {
 }
 /* p 를 보이고 보이던 판은 숨긴다 · 📱 폰이면 판 칸(histBook) · 키보드 보정 자리(bookKb). ⚠️ 새 판(bookMake)이면 books 끝이라 bookShown 은 보이던 옛 판을 먼저 찾는다. */
 function bookShow(p, left) {
+  if (p.oe && p.oe.stuck()) { bookDrop(p); p = bookMake(p.src, false); }   // 🔐 못 연 판(안내) — 지우고 새로 받는다(학생 껍데기와 같다)
   var cur = bookShown();
   if (cur && cur !== p) bookPark(cur, true);
   bookPlace(p, (typeof left === 'number') ? left : (cur ? cur.left : null));   // 판 안 갈아 끼우기(left 없음)는 보이던 판 자리 그대로

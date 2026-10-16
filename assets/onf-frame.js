@@ -121,31 +121,44 @@
    *     정상 GAS 바깥 문서는 샌드박스 액자(sandboxFrame)를 **HTML 에 박아 두어** 1 · 구글 오류 화면은 0(Peter 실측 · curl 로 박힌 것 확인).
    *     0 이면 CL_GRACE 만큼 더 본다 — 그 사이 그 액자 후손의 말(노크)이 오거나 자식이 생기면 산 화면(구글이 래퍼를 늦게 그리게 바뀌어도 안 속게).
    *   · 막혔으면 같은 주소를 credentialless 로 **한 번** 더 — `location.replace`(src 를 다시 넣으면 기록 칸이 하나 쌓여 기록 다리의 go(-n) 전제가 깨진다).
-   *     되면 이 기기를 CL_MS 동안 기억해 다음부터 처음부터 credentialless(오류 화면을 안 거친다). 기억 시각은 **안 늘린다** — CL_MS 마다 보통으로 다시 재 본다
-   *     (로그인을 정리했는데 영영 credentialless 면 아래 대가를 계속 낸다).
-   *     기억으로 연 credentialless 가 안 되면 기억을 버리고 보통으로 한 번(구글이 바뀌어 credentialless 가 막히는 날 7일 갇히지 않게).
-   *   · 그래도 안 되거나 credentialless 를 모르는 브라우저면 구글 영어 오류를 걷고(액자 visibility) 뒤의 「불러오는 중」 자리에 우리 말.
-   *     ⚠️ 사파리·파이어폭스는 끼운 액자에 구글 쿠키를 애초에 안 싣는다(ITP · 쿠키 나눔) — 그래서 이 버그가 거의 안 난다. 안내는 그 밖의 경우용.
-   *     credentialless 까지 해 봤는데 안 되면 여러 계정 탓이 아니다(쿠키를 안 실었다) — 연결 안내.
+   *     다시 열기 자체는 늘 한다(구글 일시 오류도 이걸로 구한다).
+   *   · 기억은 **「두 번 걸리면」**(반박 검토 🟠1 2026-10-16) — 계정 하나 학생도 구글 일시 오류(동시 실행 한도 등 · 자식 0 화면) 한 번이면 막힌 꼴이다.
+   *     그걸로 7일 credentialless 면 아래 대가(오프라인 백업·홈 첫 화면 사본·사전 사본)를 7일 낸다. 그래서
+   *       첫 우회 성공 = onfClTry(시각)만 · 다음 열기에서 보통이 **또** 막혀 우회가 되면 그때 onfCl(CL_MS) · 그 사이 보통으로 뜨면 onfClTry 를 지운다(잇달아야 두 번).
+   *     기억을 정하는 건 **홈 액자(mount · keep)** 뿐 — 판(숨긴 미리 판 포함)은 읽기만 한다(학생이 안 본 미리 판 하나의 오류로 기기 전체가 바뀌지 않게).
+   *     같은 페이지 안에선 홈이 우회로 떴으면(clPage · 저장 안 함) 뒤 판은 처음부터 credentialless — 첫 방문 여러 계정 학생이 판마다 오류 화면 + 여유를 안 거친다.
+   *     기억 시각은 **안 늘린다** — CL_MS 마다 보통으로 다시 재 본다. 기억으로 연 credentialless 가 안 되면 홈은 기억을 버리고 보통으로 한 번(판은 기억을 안 건드리고 보통으로만).
+   *   · 그래도 안 되면 구글 영어 오류를 걷고(액자 visibility) 뒤의 「불러오는 중」 자리에 우리 말 — **연결 안내 하나**(원인을 단정하지 않는다):
+   *     credentialless 까지 해 봤으면 쿠키를 안 실었으니 여러 계정 탓이 아니고, credentialless 를 모르는 사파리·iOS·파이어폭스는 끼운 액자에 구글 쿠키를
+   *     애초에 안 실어(ITP · 쿠키 나눔) 이 버그가 거의 없다(반박 검토 🟡2 — 그 브라우저의 구글 일시 오류에 「여러 계정」은 틀린 말). 시크릿 창은 덤 한 마디.
+   *     홈엔 [다시 열기](새로고침) · 판엔 [닫기](교재가 안 떴으니 교재의 ✕ 도 없다) — 못 연 판은 다시 열면 지우고 새로 받는다(bookShow · 🟡4).
    *   ⛔ 대가: credentialless 액자 안 저장소(localStorage·IndexedDB·쿠키)는 **이 페이지가 닫히거나 새로고침되면 사라진다** —
-   *     교재 오프라인 백업(저장 못 한 수정)·사전 기기 사본·테마·카드 크기 고름·과제 끝맺음 미룬 것이 안 남는다.
-   *     그래서 교재 저장 실패 카드·과제 끝맺음이 그 창에선 다르게 군다(Ownify `window.credentialless`). 껍데기 저장소(토큰 onfTok·onfTheme·이 기억)는 그대로다.
+   *     교재 오프라인 백업(저장 못 한 수정)·사전 기기 사본·테마·카드 크기 고름이 안 남는다. 교재 저장 실패 카드는 그 창에선 「닫으면 사라져요」를 말하고
+   *     (Ownify `window.credentialless`) · 과제 끝맺음 미룬 것은 이 껍데기 저장소에 맡긴다(아래 mount 의 hwFin). 껍데기 저장소(onfTok·onfTheme·이 기억)는 그대로다.
    *   ⛔ 학생 exec(ONF.api.EXEC)에만 쓴다. 선생님 홈 액자(`/a/macros/ownify.co.kr`)는 구글 로그인이 있어야 열린다 — credentialless 면 쿠키가 없어 문에서 잘린다. */
-  var CL_KEY = 'onfCl', CL_MS = 7 * 86400000, CL_GRACE = 1500;
+  var CL_KEY = 'onfCl', CL_TRY = 'onfClTry', CL_MS = 7 * 86400000, CL_GRACE = 1500, clPage = false;
   function clCan() { try { return 'credentialless' in HTMLIFrameElement.prototype; } catch (e) { return false; } }
-  function clKept() { try { var t = Number(localStorage.getItem(CL_KEY) || 0); return t > 0 && Date.now() - t < CL_MS; } catch (e) { return false; } }
-  function clKeep(on) { try { if (on) localStorage.setItem(CL_KEY, String(Date.now())); else localStorage.removeItem(CL_KEY); } catch (e) {} }
-  var CL_SAY_MULTI = '구글 계정이 여러 개 로그인돼 있으면 이렇게 돼요. 시크릿(개인정보 보호) 창으로 열거나, 구글에서 모두 로그아웃한 뒤 한 계정으로만 로그인해 주세요.';
-  var CL_SAY_NET = '인터넷 연결을 확인하고 잠시 뒤 새로고침해 주세요.';
+  function clAt(k) { try { var t = Number(localStorage.getItem(k) || 0); return t > 0 && Date.now() - t < CL_MS; } catch (e) { return false; } }
+  function clSet(k, on) { try { if (on) localStorage.setItem(k, String(Date.now())); else localStorage.removeItem(k); } catch (e) {} }
+  var CL_SAY = '인터넷 연결을 확인하고 다시 열어 주세요. 계속 안 되면 시크릿(개인정보 보호) 창으로 열어 보세요.';
 
   /** el 에 학생 exec 주소 src 를 연다(위 「여러 계정 우회」).
    *  @param wait  액자 뒤 「불러오는 중」(.onf-wait) — 못 열면 여기에 우리 말 · 없으면 액자만 걷는다
-   *  @param close 판이면 닫는 함수 — 안내에 [닫기](교재가 안 떴으니 교재의 ✕ 도 없다) */
-  function openExec(el, src, wait, close) {
-    var can = clCan(), cl = can && clKept(), byMemory = cl, tried = {}, done = false, tm = null;
+   *  @param close 판이면 닫는 함수 — 안내에 [닫기] · 없으면(홈) [다시 열기]
+   *  @param keep  홈 액자만 true — 이 기기 기억(onfClTry·onfCl)을 정한다 · 판은 읽기만
+   *  @return { stop: 판정을 그만두고 노크 듣기를 걷는다(판을 지울 때) · stuck: 못 열어 안내를 띄웠나 } */
+  function openExec(el, src, wait, close, keep) {
+    var can = clCan(), cl = can && (clPage || clAt(CL_KEY)), byMemory = cl, tried = {}, done = false, stuck = false, tm = null;
     function onMsg(ev) { if (!done && ev && _fromOurFrame(ev.source, el)) ok(); }   // 노크 — 깊이 무관 · 내 액자 후손의 말이면 산 화면(값은 안 본다 · load 전에 와도 여기서 끝난다)
     function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
-    function ok() { end(); if (cl && tried.norm) clKeep(true); }   // 보통이 막혔고 credentialless 가 됐다 — 그때만 기억
+    function ok() {
+      end();
+      if (!keep) return;                                             // 판은 읽기만
+      if (!cl) return clSet(CL_TRY, false);                          // 보통으로 떴다 — 「한 번 걸림」을 지운다(잇달아야 두 번)
+      if (!tried.norm) return;                                       // 기억(또는 이 페이지)으로 처음부터 연 것 — 시각을 안 늘린다
+      clPage = true;                                                 // 이 페이지의 뒤 판은 처음부터
+      if (clAt(CL_TRY)) { clSet(CL_KEY, true); clSet(CL_TRY, false); } else clSet(CL_TRY, true);   // 두 번째면 기억 · 첫 번째면 표시만
+    }
     function kids() { try { return el.contentWindow.length; } catch (e) { return 0; } }
     function go() {
       if (can) el.credentialless = cl;                               // 다음 탐색부터 먹는다(속성을 비추는 값)
@@ -153,23 +166,25 @@
     }
     function fail() {
       tried[cl ? 'cl' : 'norm'] = 1;
-      if (cl && byMemory) { clKeep(false); byMemory = false; }
+      if (cl && byMemory) { if (keep) { clSet(CL_KEY, false); clPage = false; } byMemory = false; }
       if (!tried.norm) { cl = false; console.info('[onf] credentialless 로 연 화면이 안 떴다 — 보통으로 한 번 더'); return go(); }
       if (can && !tried.cl) { cl = true; console.info('[onf] 구글 오류 화면(여러 계정?) — credentialless 로 다시 연다'); return go(); }
       end();
-      say(tried.cl || navigator.onLine === false ? CL_SAY_NET : CL_SAY_MULTI);
+      say();
     }
-    function say(msg) {
+    function say() {
       console.warn('[onf] 화면을 못 열었다 — 안내로 바꾼다');
+      stuck = true;
       el.style.visibility = 'hidden';                                // 구글 영어 오류를 걷는다 — 뒤(z 0)의 안내가 보이고 눌린다
       if (!wait) return;
-      var box = document.createElement('div'), h = document.createElement('b'), p = document.createElement('span'), b;
+      var box = document.createElement('div'), h = document.createElement('b'), p = document.createElement('span'), b = document.createElement('button');
       box.className = 'onf-stuck';
-      h.textContent = '화면이 안 열렸어요'; p.textContent = msg;
-      box.appendChild(h); box.appendChild(p);
+      h.textContent = '화면이 안 열렸어요'; p.textContent = CL_SAY;
+      b.type = 'button'; b.textContent = close ? '닫기' : '다시 열기';
+      b.onclick = close || function () { location.reload(); };
+      box.appendChild(h); box.appendChild(p); box.appendChild(b);
       wait.textContent = '';                                         // 「불러오는 중」 고리·글을 걷는다(못 연 것을 여는 중처럼 보이지 않게)
       wait.appendChild(box);
-      if (close) { b = document.createElement('button'); b.type = 'button'; b.textContent = '닫기'; b.onclick = close; box.appendChild(b); }
     }
     global.addEventListener('message', onMsg);
     el.addEventListener('load', function () {
@@ -179,12 +194,13 @@
       clearTimeout(tm);
       tm = setTimeout(function () {                                  // 그 사이 노크가 오면 onMsg 가 끝낸다
         if (done) return;
-        if (!el.contentWindow) return end();                         // 그 사이 판이 지워졌다(bookDrop) — 판정하지 않는다(기억을 잘못 버리지 않게)
+        if (!el.contentWindow) return end();                         // 그 사이 액자가 지워졌다 — 판정하지 않는다(기억을 잘못 버리지 않게)
         if (kids() > 0) ok(); else fail();
       }, CL_GRACE);
     });
     if (can) el.credentialless = cl;
     el.src = src;
+    return { stop: end, stuck: function () { return stuck; } };
   }
 
   /* iframe 에 GAS 웹앱을 띄우고, 키보드·팬 보정을 붙인다.
@@ -309,6 +325,12 @@
       /* 🌙 화면 색(Peter 2026-10-12 다크 모드) — 안쪽 홈이 알린다 · 틀·판 둘레·「불러오는 중」을 같은 색으로 · 다음에 열 때 머리 스크립트가 그리기 전에 쓴다. 아는 값만. */
       if (ev.data.onf === 'theme') { if (ev.data.v === 'dark' || ev.data.v === 'light') { document.documentElement.setAttribute('data-theme', ev.data.v); try { localStorage.setItem('onfTheme', ev.data.v); } catch (eT) {} themeTell(); } return; }
       if (ev.data.onf === 'themeAsk') { themeAsk(ev); return; }   // 🌙 폰에선 교재가 홈 액자째 넘어가 이 자리에서 묻는다
+      /* 📤 과제 끝맺음 맡기기(반박 검토 🟡3 2026-10-16) — credentialless 창(위 openExec 우회)의 과제 화면은 제 저장소가 페이지와 같이 사라져
+         「못 한 끝맺음(이름·도장·「새 과제」)은 다음에 열 때」를 못 지킨다 → 그 창이 이 껍데기 저장소(onfHwFin)에 맡기고(hwFin · sid 로 넣고 뺀다) 열 때 묻는다(hwFinAsk).
+         ⛔ 위 홈 자물쇠를 지난 말만 · 답은 물은 그 창·그 출처로('*' 금지) · 한 줄은 JSON 2KB 이하 평범한 객체(histSmall) · 스무 줄까지(오래된 것부터 버림).
+         ⚠️ 학생 구분은 안 한다 — 남의 것이면 서버가 gone 으로 답해 그 창이 뺀다(_onfHwUpEnd 는 세션의 토큰을 본다). */
+      if (ev.data.onf === 'hwFin') { hwFinKeep(ev.data); return; }
+      if (ev.data.onf === 'hwFinAsk') { try { ev.source.postMessage({ onf: 'hwFin', jobs: hwFinList() }, ev.origin); } catch (eH) {} return; }
       // 탭 제목 — 앱(=GAS)만 학생 이름을 안다. 보이는 탭 제목은 **이 창**이 정하므로 받아서 세운다.
       //   위 오리진 검사를 이미 통과한 메시지다. 줄바꿈을 지우고 길이를 잘라 그대로 쓴다.
       if (ev && ev.data && ev.data.onf === 'title' && typeof ev.data.t === 'string') {
@@ -333,6 +355,15 @@
          `hideToken()` 의 replaceState 는 칸을 만들지 않으니 이 전제를 깨지 않는다.
        ⚠️ 알고 받아들인 한계: 껍데기 문서 자체가 다시 읽히면(새로고침·아이폰이 탭을 버렸다 복원) 죽은 칸 하나가 남아 첫 뒤로 1회가 같은 주소로 돌아가 다시 읽는다(종전과 같다 —
          아래 시작 줄은 표식만 지울 수 있고 칸은 못 없앤다). 안쪽만 다시 읽힐 땐 새 안쪽의 `hi`→`hist-on`→`hello` 로 죽은 칸을 치운다. */
+    function hwFinList() { try { var a = JSON.parse(localStorage.getItem('onfHwFin') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+    function hwFinKeep(d) {
+      var j = d.job, sid = (j && typeof j.sid === 'string') ? j.sid : '', a;
+      if (!/^[A-Za-z0-9-]{1,64}$/.test(sid) || (d.on === true && !histSmall(j))) return;
+      a = hwFinList().filter(function (x) { return x && x.sid !== sid; });
+      if (d.on === true) a.push(JSON.parse(JSON.stringify(j)));
+      a = a.slice(-20);
+      try { if (a.length) localStorage.setItem('onfHwFin', JSON.stringify(a)); else localStorage.removeItem('onfHwFin'); } catch (e) {}
+    }
     var histWin = null, histOrigin = '', histDepth = 0;   // 깊이 = 지금 기록에 쌓인 우리 칸 수(칸 state.n 에서 다시 읽는다)
     var HIST_ID = /^[A-Za-z0-9]{1,40}$/;
     function histSmall(st) {                              // JSON 으로 2KB 이하인 평범한 객체인가
@@ -505,7 +536,7 @@
       p.box.appendChild(wait);
       document.body.appendChild(p.box);
       if (parked) p.idle = setTimeout(function () { bookDrop(p); }, BOOK_IDLE_MS);
-      openExec(p.el, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, wait, bookClose);   // 🔐 여러 계정 우회(위) — 못 열면 이 판 「불러오는 중」 자리에 안내 + [닫기]
+      p.oe = openExec(p.el, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, wait, bookClose);   // 🔐 여러 계정 우회(위) — 못 열면 이 판 「불러오는 중」 자리에 안내 + [닫기] · 기억은 읽기만
       books.push(p);
       return p;
     }
@@ -514,6 +545,7 @@
       if (i < 0) return;
       books.splice(i, 1);
       if (p.idle) clearTimeout(p.idle);
+      if (p.oe) p.oe.stop();                              // 🔐 load 전에 지우는 판 — 노크 듣기를 걷는다
       if (p.box.parentNode) p.box.parentNode.removeChild(p.box);
     }
     function bookTell(p) { if (p.win) { try { p.win.postMessage({ onf: 'bookPark', on: p.parked }, p.origin); } catch (e) {} } }
@@ -527,6 +559,7 @@
     }
     /* p 를 보이고 보이던 판은 숨긴다 · 폰이면 판 칸(histBook) · 키보드 보정 자리(sync). ⚠️ 새 판(bookMake 가 보이게 만든)이면 books 끝이라 bookShown 은 보이던 옛 판을 먼저 찾는다. */
     function bookShow(p, left) {
+      if (p.oe && p.oe.stuck()) { bookDrop(p); p = bookMake(p.src, false); }   // 🔐 못 연 판(안내) — 지우고 새로 받는다(반박 검토 🟡4 · 종전: 안내 그대로 · [닫기] 해야 새로)
       var cur = bookShown();
       if (cur && cur !== p) bookPark(cur, true);
       bookPlace(p, (typeof left === 'number') ? left : (cur ? cur.left : null));   // 판 안 갈아 끼우기(left 없음)는 보이던 판 자리 그대로
@@ -540,7 +573,7 @@
       var src = opts.bookSrc(href);
       if (!src) return;
       var a = bookAsk(src), p = bookFind(src) || bookLike(src, a) || bookMake(src, false), m = { onf: 'bookView' };   // 📖 view·line 만 다른 판이 할 줄 알면 그 판(위 bookLike)
-      bookShow(p, left);
+      bookShow(p, left);   // 🔐 못 연 판이면 bookShow 가 새 판으로 바꾼다 — 새 판은 노크 전이라 아래 bookCan 이 거짓(말 안 보냄)
       if (a.view) m.view = a.view;
       if (a.line) m.line = a.line;
       if (bookCan(p, a)) { try { p.win.postMessage(m, p.origin); } catch (e) {} }   // 보인다(bookPark) 다음에 — 페이지가 「보임」 손질 뒤 연다
@@ -632,7 +665,7 @@
     }
     global.addEventListener('resize', sync);
 
-    openExec(frameEl, src, opts.wait || null, null);   // 🔐 여러 계정 우회(위) — 못 열면 index.html 의 「불러오는 중」 자리에 안내
+    openExec(frameEl, src, opts.wait || null, null, true);   // 🔐 여러 계정 우회(위) — 못 열면 index.html 의 「불러오는 중」 자리에 안내 · 기억은 홈 액자만 정한다
   }
 
   global.ONF = global.ONF || {};
