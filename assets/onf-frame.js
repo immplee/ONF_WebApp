@@ -1,11 +1,12 @@
 /* ONF 액자(shell) 공통 — 2026-08-06
  *
- * 이 파일이 하는 일 다섯. 다섯 다 **최상위 창만 할 수 있는 일**이라 여기 있다.
+ * 이 파일이 하는 일 여섯. 여섯 다 **최상위 창만 할 수 있는 일**이라 여기 있다.
  *   1) 주소의 ?t=<토큰> 을 이 도메인에 저장한다 (다음부턴 주소 없이도 열린다)
  *   2) 구글 앱스스크립트 웹앱을 iframe 으로 띄운다 → "이 애플리케이션은 …" 배너가 안 뜬다
  *   3) 키보드 높이를 재서 iframe 안 앱에 넘긴다 (앱은 iframe 안이라 자기가 못 잰다 — MDN)
  *   4) iOS 가 페이지를 통째로 밀 때(pan) 앱을 화면에 도로 붙인다
  *   5) 안쪽 「뒤로 = 창 닫기」 기록 칸을 이 최상위 문서에 만들어 준다 — 폰 뒤로 스와이프의 하얀 덮개 (mount 안 「기록 칸 다리」)
+ *   6) 구글 계정이 여러 개 로그인된 크롬에서 학생 exec 가 구글 오류 화면이면 credentialless 액자로 한 번 더 연다 (openExec · 선생님 판도 쓴다)
  *
  * ⛔ 여기 손대기 전에 반드시 읽을 것:
  *    ONF_Archive/웹-앱/ONF_공유웹앱-모바일-입력창.md 의 "재발 방지 체크리스트 B1~B7".
@@ -109,6 +110,81 @@
       try { w = (w.parent && w.parent !== w) ? w.parent : null; } catch (e) { return false; }
     }
     return false;
+  }
+
+  /* ═══ 🔐 구글 계정이 여러 개 로그인된 크롬 — 학생 exec 우회 (2026-10-16 Peter 「우회 주소도 시험해봐」 → 시험 성공) ═══
+   *   한 브라우저에 구글 계정이 여럿이면 `/macros/s/<id>/exec` 가 `/macros/u/N/…` 로 튀어 구글 드라이브 오류 화면
+   *   (「Sorry, unable to open the file at this time」)이 뜬다 — 우리 앱이 아니라 Apps Script 의 여러 계정 버그다
+   *   (`authuser=0`·`/u/0/`·`/u/1/` 도 같은 오류 · 기록 ONF_Archive 웹-앱/ONF_공유웹앱-접근권한 「원인 ②」).
+   *   `<iframe credentialless>`(크롬·엣지)는 쿠키 없이 열어 안 튄다 — Peter 의 여러 계정 크롬에서 우리 화면이 떴다(2026-10-16 실측).
+   *   · 판별: 다 읽힌 뒤(load) 그 문서의 자식 프레임 수(`contentWindow.length` — 교차 출처여도 읽힌다).
+   *     정상 GAS 바깥 문서는 샌드박스 액자(sandboxFrame)를 **HTML 에 박아 두어** 1 · 구글 오류 화면은 0(Peter 실측 · curl 로 박힌 것 확인).
+   *     0 이면 CL_GRACE 만큼 더 본다 — 그 사이 그 액자 후손의 말(노크)이 오거나 자식이 생기면 산 화면(구글이 래퍼를 늦게 그리게 바뀌어도 안 속게).
+   *   · 막혔으면 같은 주소를 credentialless 로 **한 번** 더 — `location.replace`(src 를 다시 넣으면 기록 칸이 하나 쌓여 기록 다리의 go(-n) 전제가 깨진다).
+   *     되면 이 기기를 CL_MS 동안 기억해 다음부터 처음부터 credentialless(오류 화면을 안 거친다). 기억 시각은 **안 늘린다** — CL_MS 마다 보통으로 다시 재 본다
+   *     (로그인을 정리했는데 영영 credentialless 면 아래 대가를 계속 낸다).
+   *     기억으로 연 credentialless 가 안 되면 기억을 버리고 보통으로 한 번(구글이 바뀌어 credentialless 가 막히는 날 7일 갇히지 않게).
+   *   · 그래도 안 되거나 credentialless 를 모르는 브라우저면 구글 영어 오류를 걷고(액자 visibility) 뒤의 「불러오는 중」 자리에 우리 말.
+   *     ⚠️ 사파리·파이어폭스는 끼운 액자에 구글 쿠키를 애초에 안 싣는다(ITP · 쿠키 나눔) — 그래서 이 버그가 거의 안 난다. 안내는 그 밖의 경우용.
+   *     credentialless 까지 해 봤는데 안 되면 여러 계정 탓이 아니다(쿠키를 안 실었다) — 연결 안내.
+   *   ⛔ 대가: credentialless 액자 안 저장소(localStorage·IndexedDB·쿠키)는 **이 페이지가 닫히거나 새로고침되면 사라진다** —
+   *     교재 오프라인 백업(저장 못 한 수정)·사전 기기 사본·테마·카드 크기 고름·과제 끝맺음 미룬 것이 안 남는다.
+   *     그래서 교재 저장 실패 카드·과제 끝맺음이 그 창에선 다르게 군다(Ownify `window.credentialless`). 껍데기 저장소(토큰 onfTok·onfTheme·이 기억)는 그대로다.
+   *   ⛔ 학생 exec(ONF.api.EXEC)에만 쓴다. 선생님 홈 액자(`/a/macros/ownify.co.kr`)는 구글 로그인이 있어야 열린다 — credentialless 면 쿠키가 없어 문에서 잘린다. */
+  var CL_KEY = 'onfCl', CL_MS = 7 * 86400000, CL_GRACE = 1500;
+  function clCan() { try { return 'credentialless' in HTMLIFrameElement.prototype; } catch (e) { return false; } }
+  function clKept() { try { var t = Number(localStorage.getItem(CL_KEY) || 0); return t > 0 && Date.now() - t < CL_MS; } catch (e) { return false; } }
+  function clKeep(on) { try { if (on) localStorage.setItem(CL_KEY, String(Date.now())); else localStorage.removeItem(CL_KEY); } catch (e) {} }
+  var CL_SAY_MULTI = '구글 계정이 여러 개 로그인돼 있으면 이렇게 돼요. 시크릿(개인정보 보호) 창으로 열거나, 구글에서 모두 로그아웃한 뒤 한 계정으로만 로그인해 주세요.';
+  var CL_SAY_NET = '인터넷 연결을 확인하고 잠시 뒤 새로고침해 주세요.';
+
+  /** el 에 학생 exec 주소 src 를 연다(위 「여러 계정 우회」).
+   *  @param wait  액자 뒤 「불러오는 중」(.onf-wait) — 못 열면 여기에 우리 말 · 없으면 액자만 걷는다
+   *  @param close 판이면 닫는 함수 — 안내에 [닫기](교재가 안 떴으니 교재의 ✕ 도 없다) */
+  function openExec(el, src, wait, close) {
+    var can = clCan(), cl = can && clKept(), byMemory = cl, tried = {}, done = false, tm = null;
+    function onMsg(ev) { if (!done && ev && _fromOurFrame(ev.source, el)) ok(); }   // 노크 — 깊이 무관 · 내 액자 후손의 말이면 산 화면(값은 안 본다 · load 전에 와도 여기서 끝난다)
+    function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
+    function ok() { end(); if (cl && tried.norm) clKeep(true); }   // 보통이 막혔고 credentialless 가 됐다 — 그때만 기억
+    function kids() { try { return el.contentWindow.length; } catch (e) { return 0; } }
+    function go() {
+      if (can) el.credentialless = cl;                               // 다음 탐색부터 먹는다(속성을 비추는 값)
+      try { el.contentWindow.location.replace(src); } catch (e) { el.src = src; }
+    }
+    function fail() {
+      tried[cl ? 'cl' : 'norm'] = 1;
+      if (cl && byMemory) { clKeep(false); byMemory = false; }
+      if (!tried.norm) { cl = false; console.info('[onf] credentialless 로 연 화면이 안 떴다 — 보통으로 한 번 더'); return go(); }
+      if (can && !tried.cl) { cl = true; console.info('[onf] 구글 오류 화면(여러 계정?) — credentialless 로 다시 연다'); return go(); }
+      end();
+      say(tried.cl || navigator.onLine === false ? CL_SAY_NET : CL_SAY_MULTI);
+    }
+    function say(msg) {
+      console.warn('[onf] 화면을 못 열었다 — 안내로 바꾼다');
+      el.style.visibility = 'hidden';                                // 구글 영어 오류를 걷는다 — 뒤(z 0)의 안내가 보이고 눌린다
+      if (!wait) return;
+      var box = document.createElement('div'), h = document.createElement('b'), p = document.createElement('span'), b;
+      box.className = 'onf-stuck';
+      h.textContent = '화면이 안 열렸어요'; p.textContent = msg;
+      box.appendChild(h); box.appendChild(p);
+      wait.textContent = '';                                         // 「불러오는 중」 고리·글을 걷는다(못 연 것을 여는 중처럼 보이지 않게)
+      wait.appendChild(box);
+      if (close) { b = document.createElement('button'); b.type = 'button'; b.textContent = '닫기'; b.onclick = close; box.appendChild(b); }
+    }
+    global.addEventListener('message', onMsg);
+    el.addEventListener('load', function () {
+      if (done) return;
+      try { if (el.contentWindow.location.href === 'about:blank') return; } catch (e) {}   // 처음 빈 문서(같은 출처라 읽힌다) — 진짜 화면이 아니다
+      if (kids() > 0) return ok();
+      clearTimeout(tm);
+      tm = setTimeout(function () {                                  // 그 사이 노크가 오면 onMsg 가 끝낸다
+        if (done) return;
+        if (!el.contentWindow) return end();                         // 그 사이 판이 지워졌다(bookDrop) — 판정하지 않는다(기억을 잘못 버리지 않게)
+        if (kids() > 0) ok(); else fail();
+      }, CL_GRACE);
+    });
+    if (can) el.credentialless = cl;
+    el.src = src;
   }
 
   /* iframe 에 GAS 웹앱을 띄우고, 키보드·팬 보정을 붙인다.
@@ -429,7 +505,7 @@
       p.box.appendChild(wait);
       document.body.appendChild(p.box);
       if (parked) p.idle = setTimeout(function () { bookDrop(p); }, BOOK_IDLE_MS);
-      p.el.src = parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src;
+      openExec(p.el, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, wait, bookClose);   // 🔐 여러 계정 우회(위) — 못 열면 이 판 「불러오는 중」 자리에 안내 + [닫기]
       books.push(p);
       return p;
     }
@@ -556,13 +632,14 @@
     }
     global.addEventListener('resize', sync);
 
-    frameEl.src = src;
+    openExec(frameEl, src, opts.wait || null, null);   // 🔐 여러 계정 우회(위) — 못 열면 index.html 의 「불러오는 중」 자리에 안내
   }
 
   global.ONF = global.ONF || {};
   global.ONF.frame = {
     hideToken: hideToken, mount: mount, getToken: getToken, withToken: withToken, TOKEN_KEY: TOKEN_KEY,
     tokenFromPath: tokenFromPath,
+    openExec: openExec,   // 🔐 선생님 껍데기 판도 쓴다(teacher/index.html bookMake)
     /* 검사용으로만 낸다 — 순수 판정 함수라 창 없이 잴 수 있다. 화면 코드에서 부르지 마라. */
     _fromOurFrame: _fromOurFrame };
 })(window);

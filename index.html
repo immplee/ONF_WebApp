@@ -131,7 +131,9 @@
   }
   ONF.frame.mount(document.getElementById('app'),
                   ONF.api.appUrl(token, extra.join('&')),
-                  { diag: q.get('diag') === '1', bookSrc: bookSrc, phone: phoneOn !== '0' });
+                  { diag: q.get('diag') === '1', bookSrc: bookSrc,
+                    wait: document.querySelector('.onf-wait'),   // 🔐 여러 계정 우회 — 못 열면 이 자리에 안내(onf-frame.js openExec)
+                    phone: phoneOn !== '0' });
 </script>
 </body>
 </html>

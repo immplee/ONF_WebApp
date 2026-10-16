@@ -37,9 +37,9 @@ function boot(opt) {
   const top = win('shell');
   const wrapper = win('exec', top);                    // iframe#app 의 contentWindow (구글 래퍼)
   const inner = win('userHtml', wrapper);              // 가장 안쪽 샌드박스 (GAS 겹 수는 보장이 없다 — 한 겹 더)
-  const frameEl = { contentWindow: wrapper, style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 800 }) };
+  const frameEl = { contentWindow: wrapper, style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 800 }), addEventListener() {} };   // 🔐 액자 load(여러 계정 우회 — multilogin.test.js)
   const vv = { height: 400, offsetTop: 0, scale: 1, addEventListener() {} };
-  const window_ = { addEventListener(tp, f) { (L[tp] = L[tp] || []).push(f); }, visualViewport: opt.noVV ? undefined : vv };
+  const window_ = { addEventListener(tp, f) { (L[tp] = L[tp] || []).push(f); }, removeEventListener(tp, f) { L[tp] = (L[tp] || []).filter((x) => x !== f); }, visualViewport: opt.noVV ? undefined : vv };
   const c = { window: window_, history: H, localStorage: opt.localStorage || null, document: { title: 'Ownify', addEventListener() {} },
     navigator: { userAgent: 'node' }, location: opt.location || { search: '', pathname: '/', href: 'https://class.ownify.co.kr/', hash: '' },
     URL, URLSearchParams, setTimeout: (f) => { f(); return 0; }, clearTimeout() {}, unescape, encodeURIComponent };

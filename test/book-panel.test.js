@@ -21,7 +21,8 @@ function setup(bs, o) {
   const body = { kids: [], appendChild(c) { this.kids.push(c); c.parentNode = this; }, removeChild(c) { this.kids = this.kids.filter((x) => x !== c); } };
   const mkEl = (tag) => { const el = { tag, kids: [], attrs: {}, className: '', src: '', vars: {}, style: { setProperty(k, v) { el.vars[k] = v; } },
     classList: { set: new Set(), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); }, toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } },
-    setAttribute(k, v) { el.attrs[k] = v; }, appendChild(c) { el.kids.push(c); c.parentNode = el; }, getBoundingClientRect: () => ({ top: 0, bottom: 800 }) }; return el; };
+    setAttribute(k, v) { el.attrs[k] = v; }, appendChild(c) { el.kids.push(c); c.parentNode = el; }, getBoundingClientRect: () => ({ top: 0, bottom: 800 }),
+    addEventListener() {} }; return el; };   // 🔐 액자 load(여러 계정 우회 openExec — 따로 multilogin.test.js)
   const top = win('shell');
   const timers = [];
   const g = { listeners, top, timers,
@@ -33,10 +34,11 @@ function setup(bs, o) {
   const root = { attrs: {}, setAttribute(k, v) { root.attrs[k] = v; } };
   g.document = { addEventListener() {}, body, createElement: mkEl, documentElement: root };
   g.addEventListener = (k, fn) => { (listeners[k] = listeners[k] || []).push(fn); };
+  g.removeEventListener = (k, fn) => { listeners[k] = (listeners[k] || []).filter((x) => x !== fn); };
   if (o.pre) o.pre(g, root);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-frame.js'), 'utf8'), g, { filename: 'onf-frame.js' });
   const homeWin = win('home-exec', top), homeInner = win('home-user', homeWin);
-  const frameEl = { contentWindow: homeWin, style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 800 }) };
+  const frameEl = { contentWindow: homeWin, style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 800 }), addEventListener() {} };
   const opened = [];
   g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { phone: o.phone !== false, bookSrc: bs || ((h) => { opened.push(h); const m = /-(e\d+)-/.exec(h);
     return /mode=share/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=share' + (m && m[1] !== 'e1' ? '&ep=' + m[1] : '') + '&embed=1' : /mode=mine&v/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=mine&embed=1' : null; }) });

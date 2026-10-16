@@ -69,6 +69,8 @@
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="../assets/onf-api.js"></script>
+<!-- 🔐 판(학생 exec)만 쓴다 — 여러 계정 우회 openExec. 홈 액자(/a/macros/ownify.co.kr)는 안 쓴다(아래 bookMake 주석). -->
+<script src="../assets/onf-frame.js"></script>
 <script>
 /* =====================================================================
    선생님 홈 껍데기 — 하는 일은 **둘뿐**이다: 구글 로그인 · 토큰 넘기기.
@@ -477,7 +479,11 @@ function bookMake(src, parked) {
   p.box.appendChild(wait);
   document.body.appendChild(p.box);
   if (parked) p.idle = setTimeout(function () { bookDrop(p); }, BOOK_IDLE_MS);
-  p.el.src = parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src;
+  /* 🔐 여러 계정 우회(학생 껍데기 onf-frame.js openExec 이 정본) — 선생님은 회사+개인 계정을 한 크롬에 같이 쓰는 일이 흔하다 → 판(학생 exec)이 구글 오류 화면이면 credentialless 로 한 번 더.
+     ⛔ 선생님 **홈** 액자(위 mount 의 EXEC · /a/macros/ownify.co.kr)에는 쓰지 마라 — 구글 로그인 쿠키가 있어야 열린다. onf-frame.js 를 못 받았으면 종전대로. */
+  var u = parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src;
+  if (window.ONF && ONF.frame && ONF.frame.openExec) ONF.frame.openExec(p.el, u, wait, bookClose);
+  else p.el.src = u;
   books.push(p);
   return p;
 }

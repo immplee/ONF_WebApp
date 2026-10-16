@@ -46,6 +46,10 @@ body {
   animation: onf-spin .8s linear infinite;
 }
 @keyframes onf-spin { to { transform: rotate(360deg); } }
+/* 🔐 화면이 안 열렸을 때(onf-frame.js openExec — 구글 계정 여러 개 · 연결) — 「불러오는 중」 자리에 고리 대신. 판이면 [닫기]. */
+.onf-stuck { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 32em; padding: 0 22px; text-align: center; word-break: keep-all; text-wrap: pretty; line-height: 1.6; }
+.onf-stuck b { color: var(--onf-ink); font-size: 17px; }
+.onf-stuck button { margin-top: 6px; font: inherit; font-weight: 700; padding: 8px 20px; border-radius: 10px; border: 1px solid var(--onf-line); background: var(--onf-card); color: var(--onf-ink); cursor: pointer; }
 /* 「불러오는 중」 점은 없앴다(2026-10-15 Peter 「… 늘어나는 애니메이션 대신 도는 고리만」) — 고리(.onf-spin)가 혼자 돈다. */
 
 /* 일반 화면(홈 등) */
