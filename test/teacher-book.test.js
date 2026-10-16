@@ -27,7 +27,7 @@ function run(o) {
   const L = {};
   const body = { kids: [], appendChild(c) { this.kids.push(c); c.parentNode = this; }, removeChild(c) { this.kids = this.kids.filter((x) => x !== c); } };
   const mkEl = () => { const el = { kids: [], attrs: {}, className: '', src: '', vars: {}, innerHTML: '',
-    style: { setProperty(k, v) { el.vars[k] = v; } },
+    style: { setProperty(k, v) { el.vars[k] = v; }, removeProperty(k) { delete el.vars[k]; } },
     classList: { set: new Set(), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); }, toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } },
     setAttribute(k, v) { el.attrs[k] = v; }, appendChild(c) { el.kids.push(c); c.parentNode = el; }, getBoundingClientRect: () => ({ top: 0, bottom: 800 }),
     L: {}, addEventListener(k, f) { (el.L[k] = el.L[k] || []).push(f); } }; return el; };   // 🔐 판 액자 load(우회 openExec — 아래 🔐 검사)
@@ -90,6 +90,35 @@ t('홈의 openBook → 메뉴 옆 판 · 남의 창 openBook 은 버린다 · �
     s = run(); s.send({ onf: 'openBook', href: TURL, left: bad }, s.home);
     assert.ok(!s.panel().classList.contains('beside'), '⛔ 믿지 못할 left 로 판 자리를 바꿨다: ' + bad);
   }
+});
+
+t('판 자리 B — 홈이 알린 메뉴 끝·여백·모서리(left·m·r)로 칸을 덮는다 · 남의 m·r 은 기본값 (2026-10-16 Peter 「B로 가자」)', () => {
+  const s = run();
+  s.send({ onf: 'openBook', href: TURL, left: 270, m: 22, r: 28 }, s.home);
+  const p = s.panel();
+  assert.ok(p.classList.contains('beside') && p.vars['--bl'] === '270px' && p.vars['--bm'] === '22px' && p.vars['--br'] === '28px');
+  for (const bad of [-1, 41, '22', NaN, undefined]) {
+    const s2 = run();
+    s2.send({ onf: 'openBook', href: TURL, left: 270, m: bad, r: bad }, s2.home);
+    assert.ok(s2.panel().vars['--bl'] === '270px' && !('--bm' in s2.panel().vars) && !('--br' in s2.panel().vars), '⛔ 믿지 못할 m·r 을 받았다: ' + String(bad));
+  }
+});
+t('숨긴 판(bookWarm panel:1)도 보일 때와 같은 칸 값으로 만든다', () => {
+  const s = run();
+  s.send({ onf: 'bookWarm', href: TURL, panel: 1, left: 270, m: 22, r: 28 }, s.home);
+  const p = s.panel();
+  assert.ok(p.classList.contains('park') && p.vars['--bl'] === '270px' && p.vars['--bm'] === '22px' && p.vars['--br'] === '28px');
+});
+t('bookBox — 창 크기가 바뀌면 보이는 판·숨긴 판 모두 새 칸 · 다시 안 불러옴 · 내 액자 말만', () => {
+  const s = run();
+  s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e2'), panel: 1, left: 270, m: 22, r: 28 }, s.home);
+  s.send({ onf: 'openBook', href: TURL, left: 270, m: 22, r: 28 }, s.home);
+  const before = s.panels().map((p) => [p, p.kids[0], p.kids[0].src]);
+  s.send({ onf: 'bookBox', left: 224, m: 12, r: 22 }, win('stranger', s.top));
+  assert.ok(s.panels().every((p) => p.vars['--bl'] === '270px'), '⛔ 남의 창 bookBox 로 칸을 바꿨다');
+  s.send({ onf: 'bookBox', left: 224, m: 12, r: 22 }, s.home);
+  assert.ok(s.panels().every((p) => p.vars['--bl'] === '224px' && p.vars['--bm'] === '12px' && p.vars['--br'] === '22px'), '⛔ 판 하나라도 새 칸이 아니다');
+  assert.deepStrictEqual(s.panels().map((p) => [p, p.kids[0], p.kids[0].src]), before, '⛔ 판·액자·주소가 바뀌었다(다시 불러옴)');
 });
 
 t('판 액자 — 전체 화면 · 닫기(홈에 bookClosed 한 번) · 판 안 openBook 은 판만 갈아 끼움 · 홈 액자가 보낸 bookClose 는 버린다', () => {

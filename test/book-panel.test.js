@@ -19,7 +19,7 @@ function setup(bs, o) {
   o = o || {};
   const listeners = {};
   const body = { kids: [], appendChild(c) { this.kids.push(c); c.parentNode = this; }, removeChild(c) { this.kids = this.kids.filter((x) => x !== c); } };
-  const mkEl = (tag) => { const el = { tag, kids: [], attrs: {}, className: '', src: '', vars: {}, style: { setProperty(k, v) { el.vars[k] = v; } },
+  const mkEl = (tag) => { const el = { tag, kids: [], attrs: {}, className: '', src: '', vars: {}, style: { setProperty(k, v) { el.vars[k] = v; }, removeProperty(k) { delete el.vars[k]; } },
     classList: { set: new Set(), add(c) { this.set.add(c); }, remove(c) { this.set.delete(c); }, toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } },
     setAttribute(k, v) { el.attrs[k] = v; }, appendChild(c) { el.kids.push(c); c.parentNode = el; }, getBoundingClientRect: () => ({ top: 0, bottom: 800 }),
     L: {}, addEventListener(k, f) { (el.L[k] = el.L[k] || []).push(f); } }; return el; };   // 🔐 액자 load(여러 계정 우회 openExec — 따로 multilogin.test.js · 못 연 판은 아래 🔐 검사)
@@ -147,9 +147,50 @@ t('판 자리 — 홈이 알린 왼쪽 메뉴 끝(left)부터 덮는다 · 남�
   }
   const css = fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-ui.css'), 'utf8');
   assert.ok(/\.onf-bookpanel \{[^}]*top: 16px; right: 16px; bottom: 16px;[^}]*border-radius: 28px; overflow: hidden;/.test(css)
-    && /\.onf-bookpanel\.beside \{ left: calc\(var\(--bl\) \+ 16px\); width: auto; \}/.test(css)
+    && /\.onf-bookpanel\.beside \{ top: 0; right: 0; bottom: 0; left: var\(--bl\); width: auto; padding: var\(--bm, 16px\); border: 0; border-radius: 0; box-shadow: none; background: var\(--onf-dock-bg\); \}/.test(css)   // 🅱 칸 = 메뉴 옆 빈 칸 전체(2026-10-16) · 판은 그 안의 안쪽 상자(iframe)
+    && /\.onf-bookpanel\.beside iframe \{ border-radius: var\(--br, 28px\); box-shadow: 0 0 0 1px var\(--onf-line\); \}/.test(css)
+    && /--onf-dock-bg: #F1EADE;/.test(css) && /--onf-dock-bg: #1E1611;/.test(css)
+    && css.indexOf('.onf-bookpanel.beside {') < css.indexOf('.onf-bookpanel.full {') && css.indexOf('.onf-bookpanel.full {') < css.indexOf('.onf-ph .onf-bookpanel {')   // ⤢·폰이 이긴다(같은 무게 — 뒤에 둔다)
     && /\.onf-bookpanel\.full \{ top: 0; right: 0; bottom: 0; left: 0; width: auto; padding: 10px;[^}]*background: var\(--onf-frame\); \}/.test(css) && /--onf-frame: #E9DFD0;/.test(css)   // 🌙 둘레 = 이름(밝은 값 그대로)
     && /\.onf-bookpanel\.full iframe \{ border-radius: 22px;/.test(css), '⛔ 판 모양(떠 있는 큰 판 · 메뉴 옆 · 전체 = 화면 끝까지 덮고 안은 둥근 판 — 뒤 홈이 안 보인다)');
+});
+
+t('판 자리 B — 홈이 알린 메뉴 끝·여백·모서리(left·m·r)로 칸을 덮는다 · 남의 m·r 은 기본값 (2026-10-16 Peter 「B로 가자」)', () => {
+  const s = setup();
+  s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', left: 270, m: 22, r: 28 }, s.homeInner);
+  const p = s.panel();
+  assert.ok(p.classList.contains('beside') && p.vars['--bl'] === '270px' && p.vars['--bm'] === '22px' && p.vars['--br'] === '28px');
+  for (const bad of [-1, 41, '22', NaN, undefined]) {
+    const s2 = setup();
+    s2.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', left: 270, m: bad, r: bad }, s2.homeInner);
+    assert.ok(s2.panel().vars['--bl'] === '270px' && !('--bm' in s2.panel().vars) && !('--br' in s2.panel().vars), '⛔ 믿지 못할 m·r 을 받았다: ' + String(bad));
+  }
+});
+t('숨긴 판(bookWarm panel:1)도 보일 때와 같은 칸 값으로 만든다', () => {
+  const s = setup();
+  s.send({ onf: 'bookWarm', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', panel: 1, left: 270, m: 22, r: 28 }, s.homeInner);
+  const p = s.panel();
+  assert.ok(p.classList.contains('park') && p.vars['--bl'] === '270px' && p.vars['--bm'] === '22px' && p.vars['--br'] === '28px');
+});
+t('bookBox — 창 크기가 바뀌면 보이는 판·숨긴 판 모두 새 칸 · 다시 안 불러옴 · 홈 액자 말만', () => {
+  const s = setup();
+  s.send({ onf: 'bookWarm', href: 'https://class.ownify.co.kr/a-s1-e2-b?mode=share', panel: 1, left: 270, m: 22, r: 28 }, s.homeInner);
+  s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', left: 270, m: 22, r: 28 }, s.homeInner);
+  const before = s.panels().map((p) => [p, p.kids[0], p.kids[0].src]);
+  s.send({ onf: 'bookBox', left: 224, m: 12, r: 22 }, win('stranger', s.top));
+  assert.ok(s.panels().every((p) => p.vars['--bl'] === '270px'), '⛔ 남의 창 bookBox 로 칸을 바꿨다');
+  s.send({ onf: 'bookBox', left: 224, m: 12, r: 22 }, s.homeInner);
+  assert.ok(s.panels().every((p) => p.vars['--bl'] === '224px' && p.vars['--bm'] === '12px' && p.vars['--br'] === '22px'), '⛔ 판 하나라도 새 칸이 아니다');
+  assert.deepStrictEqual(s.panels().map((p) => [p, p.kids[0], p.kids[0].src]), before, '⛔ 판·액자·주소가 바뀌었다(다시 불러옴)');
+});
+t('판 안 갈아 끼우기(left 없음)는 보이던 판의 칸 값(left·m·r)을 그대로 이어받는다', () => {
+  const s = setup();
+  s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', left: 270, m: 22, r: 28 }, s.homeInner);
+  const p = s.panel(), bookWin = win('book-exec', s.top), bookInner = win('book-user', bookWin);
+  p.kids[0].contentWindow = bookWin;
+  s.send({ onf: 'openBook', href: 'https://class.ownify.co.kr/a-s1-e2-b?mode=share' }, bookInner);
+  const q = s.panel();
+  assert.ok(q !== p && q.vars['--bl'] === '270px' && q.vars['--bm'] === '22px' && q.vars['--br'] === '28px', '⛔ 갈아 끼운 판이 칸 값(m·r)을 잃었다');
 });
 
 t('홈이 탭을 바꾸면(bookDismiss) 판을 닫는다 · 홈 액자에서 온 것만 · 판이 없으면 아무 일 없음 (2026-10-12 Peter)', () => {

@@ -8,13 +8,14 @@
   --onf-card: #fff;
   --onf-mute: #9b8877;
   --onf-frame: #E9DFD0;   /* 판 전체 화면 둘레 — GAS 쪽 --frame 과 같은 값 */
+  --onf-dock-bg: #F1EADE; /* 🅱 판이 메뉴 옆 칸을 채울 때 판 둘레 — 홈 바탕색(GAS 쪽 --bg 와 같은 값 · 2026-10-16) */
 }
 /* 🌙 다크 — 에스프레소(Peter 2026-10-12 · GAS ONF_Ui_Css 와 같은 값). 안쪽 액자가 onf:'theme' 으로 알려 주면 onf-frame.js 가 <html data-theme> 를 갈고
    localStorage onfTheme 에 둔다 → 다음에 열 때 머리 스크립트가 **그리기 전에** 단다(밝은 틀이 번쩍이지 않게). */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --onf-ink: #F3EADF; --onf-brown: #C9B39C; --onf-line: #4A3A2E; --onf-bg: #1E1611;
-  --onf-page: #1E1611; --onf-card: #2A2019; --onf-mute: #9A8571; --onf-frame: #140E0A;
+  --onf-page: #1E1611; --onf-card: #2A2019; --onf-mute: #9A8571; --onf-frame: #140E0A; --onf-dock-bg: #1E1611;
 }
 /* ⛔ 액자는 밝은 색 체계로 둔다 — 안에 드는 구글 문서(exec 래퍼 · 로그인 버튼 · 판)는 색 체계를 안 밝힌 밝은 문서다.
    액자 요소(위 dark 를 물려받음)와 안 문서의 색 체계가 다르면 브라우저가 그 액자를 **불투명 흰 종이**로 칠한다(CSS color-scheme 규약) —
@@ -66,12 +67,17 @@ body {
 
 /* 📖 홈 안 교재 판(2026-10-12 Peter 홈 리디자인 3단계 · PC 전용 — 홈이 넓은 화면에서만 연다).
    떠 있는 큰 판 — 가장자리 16px · 모서리 28(홈 블럭·왼쪽 메뉴와 같은 말) · 닫으면 액자째 지운다(onf-frame.js bookClose).
-   .beside = 홈 왼쪽 메뉴 오른쪽부터 덮는다(--bl · 2026-10-12 Peter 「창 모드는 맨 왼쪽 탭만 보이게」) ·
+   .beside = 홈 왼쪽 메뉴 오른쪽부터 덮는다(--bl · 2026-10-12 Peter 「창 모드는 맨 왼쪽 탭만 보이게」) — 2026-10-16 부터는 둥둥 뜬 판이 아니라 **메뉴 옆 빈 칸 전체**(아래 .beside · 🅱) ·
    .full = 화면 전체(메뉴까지 덮음) — 모서리는 그대로, 가장자리만 10px(Peter 「전체 화면은 각지고 창은 둥근데 통일」). */
 .onf-bookpanel { position: fixed; top: 16px; right: 16px; bottom: 16px; width: min(1100px, calc(64vw - 16px)); z-index: 5;
   background: var(--onf-bg); border: 1px solid var(--onf-line); border-radius: 28px; overflow: hidden;
   box-shadow: 0 30px 80px -30px rgba(43,29,20,.55); }
-.onf-bookpanel.beside { left: calc(var(--bl) + 16px); width: auto; }
+.onf-bookpanel.beside { top: 0; right: 0; bottom: 0; left: var(--bl); width: auto; padding: var(--bm, 16px); border: 0; border-radius: 0; box-shadow: none; background: var(--onf-dock-bg); }
+/* 🅱 .beside = 메뉴 옆 **빈 칸 전체**(2026-10-16 Peter 「B로 가자」) — 칸(상자)은 홈 바탕색으로 칠하고 안쪽 액자(iframe)가 여백(--bm)·모서리(--br)를 두고 앉는다.
+   홈이 잰 메뉴 끝(--bl)·여백(--bm)·모서리(--br)가 아니면 기본값(16px·28px) — 모서리·여백은 메뉴와 같은 말. */
+.onf-bookpanel.beside iframe { border-radius: var(--br, 28px); box-shadow: 0 0 0 1px var(--onf-line); }
+/* 「불러오는 중」도 액자 자리와 같게(.beside 판은 상자가 칸 전체라 inset 으로 여백을 둔다) */
+.onf-bookpanel.beside .onf-wait { inset: var(--bm, 16px); border-radius: var(--br, 28px); }
 .onf-bookpanel.full { top: 0; right: 0; bottom: 0; left: 0; width: auto; padding: 10px; border: 0; border-radius: 0; box-shadow: none; background: var(--onf-frame); }
 /* 전체 화면 = 화면 끝까지 덮고(뒤 홈이 안 보인다 · 2026-10-12 Peter 「테두리에 뒤 홈페이지가 다 보인다」) 그 안에 둥근 판 — 모서리 한 말은 그대로 */
 .onf-bookpanel.full iframe { border-radius: 22px; box-shadow: 0 0 0 1px var(--onf-line); }

@@ -459,15 +459,23 @@ function bookFrom(ev, el) {
 }
 function bookShown() { for (var i = 0; i < books.length; i++) if (!books[i].parked) return books[i]; return null; }
 function bookFind(src) { for (var i = 0; i < books.length; i++) if (books[i].src === src) return books[i]; return null; }
-function bookPlace(p, left) {
+function bookPlace(p, left, m, r) {
   if (typeof left !== 'number' || !isFinite(left)) return;
   var okL = left > 0 && left < (window.innerWidth || 0) * 0.6;
   p.left = left;
   p.box.classList.toggle('beside', okL);
   if (okL) p.box.style.setProperty('--bl', Math.round(left) + 'px');
+  /* 🅱 칸 안 여백(m)·판 모서리(r) — 홈이 잰 값(2026-10-16 Peter 「B로 가자」 · 학생 껍데기 onf-frame.js 와 같다). 숫자이고 0~40 일 때만 믿는다 — 아니면 변수를 지워 CSS 기본값(16px·28px). */
+  p.m = bookPx(p, '--bm', m);
+  p.r = bookPx(p, '--br', r);
+}
+function bookPx(p, name, v) {
+  var ok = typeof v === 'number' && isFinite(v) && v >= 0 && v <= 40;
+  if (ok) p.box.style.setProperty(name, Math.round(v) + 'px'); else p.box.style.removeProperty(name);
+  return ok ? v : null;
 }
 function bookMake(src, parked) {
-  var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, key: bookKey(src), parked: parked, win: null, origin: '', kb: null, ko: '', hw: null, ho: '', idle: null, left: null };
+  var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, key: bookKey(src), parked: parked, win: null, origin: '', kb: null, ko: '', hw: null, ho: '', idle: null, left: null, m: null, r: null };
   p.box.className = 'onf-bookpanel';
   if (parked) p.box.classList.add('park');
   p.el.setAttribute('allow', 'clipboard-write; microphone');
@@ -505,28 +513,29 @@ function bookPark(p, on) {
   bookTell(p);
 }
 /* p 를 보이고 보이던 판은 숨긴다 · 📱 폰이면 판 칸(histBook) · 키보드 보정 자리(bookKb). ⚠️ 새 판(bookMake)이면 books 끝이라 bookShown 은 보이던 옛 판을 먼저 찾는다. */
-function bookShow(p, left) {
+function bookShow(p, left, m, r) {
   if (p.oe && p.oe.stuck()) { bookDrop(p); p = bookMake(p.src, false); }   // 🔐 못 연 판(안내) — 지우고 새로 받는다(학생 껍데기와 같다)
   var cur = bookShown();
   if (cur && cur !== p) bookPark(cur, true);
-  bookPlace(p, (typeof left === 'number') ? left : (cur ? cur.left : null));   // 판 안 갈아 끼우기(left 없음)는 보이던 판 자리 그대로
+  if (typeof left === 'number') bookPlace(p, left, m, r);
+  else bookPlace(p, cur ? cur.left : null, cur ? cur.m : null, cur ? cur.r : null);   // 판 안 갈아 끼우기(left 없음)는 보이던 판 자리·칸 값(left·m·r) 그대로
   if (p.parked) bookPark(p, false);
   books.splice(books.indexOf(p), 1); books.push(p);   // 가장 최근
   bookRoom(bookMax());
   if (phone()) histBook(p);
   bookKb();
 }
-function bookOpen(href, left) {
+function bookOpen(href, left, m, r) {
   var src = teacherBookSrc(href);
-  if (src) bookShow(bookFind(src) || bookMake(src, false), left);
+  if (src) bookShow(bookFind(src) || bookMake(src, false), left, m, r);
 }
 /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판은 안 건드린다(books 는 오래 안 쓴 것이 앞). */
 function bookRoom(n) { for (var i = 0; books.length > n && i < books.length; ) { if (books[i].parked) bookDrop(books[i]); else i++; } }
-function bookPre(href, left) {
+function bookPre(href, left, m, r) {
   var src = teacherBookSrc(href);
   if (!src || bookFind(src)) return;
   bookRoom(bookMax() - 1);   // 자리가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 — 종전엔 안 띄웠다 · 📱 폰은 홈이 안 보낸다)
-  bookPlace(bookMake(src, true), left);
+  bookPlace(bookMake(src, true), left, m, r);
 }
 /* 📱 키보드 높이·밀림 보정 — **보이는 폰 판**에만(학생 껍데기 onf-frame.js sync 의 판 몫 · 숫자·순서는 그 파일 머리·B1~B7 주석이 정본 — 실기기에서 하나씩 깨져 가며 정한 값).
    교재가 새 탭(학생 껍데기)으로 열리던 때 받던 보정이라 판으로 옮기며 같이 가져왔다 — 없으면 아이폰에서 입력칸·화살표가 키보드에 가린다. 홈 액자는 종전대로 안 한다.
@@ -591,8 +600,10 @@ window.addEventListener('message', function (ev) {
   if (!d || typeof d.onf !== 'string') return;
   if (bookFrom(ev, frame)) {                                   // 선생님 홈(내 액자)
     if (d.onf === 'bookHello') { try { ev.source.postMessage({ onf: 'caps', book: 1, phone: BOOK_PH ? 1 : 0 }, ev.origin); } catch (e) {} return; }   // 📱 phone:1 = 폰 판도 할 줄 안다(홈은 이때만 폰에서 판으로)
-    if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left); return; }
-    if (d.onf === 'bookWarm' && d.panel === 1 && typeof d.href === 'string') { bookPre(d.href, d.left); return; }   // 지금·곧 할 수업 교재를 숨긴 판으로 미리(10-13)
+    if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left, d.m, d.r); return; }
+    if (d.onf === 'bookWarm' && d.panel === 1 && typeof d.href === 'string') { bookPre(d.href, d.left, d.m, d.r); return; }   // 지금·곧 할 수업 교재를 숨긴 판으로 미리(10-13)
+    /* 📐 창 크기가 바뀌었다(2026-10-16 · 학생 껍데기와 같다) — 홈이 다시 잰 메뉴 끝·여백·모서리를 판 전부(보이는 판·숨긴 판)에 새로 단다. 보이기·숨기기·주소는 안 건드린다. 내 액자(위 bookFrom)에서 온 말만. */
+    if (d.onf === 'bookBox') { for (i = 0; i < books.length; i++) bookPlace(books[i], d.left, d.m, d.r); bookKb(); return; }
     if (d.onf === 'bookDismiss') { bookClose(); return; }
     if (d.onf === 'theme') { onfShellTheme(d.v); return; }   // 🌙 화면 색(안쪽 선생님 홈이 알린다)
     return;
