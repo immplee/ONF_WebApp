@@ -762,7 +762,8 @@ t('판 고르기 — 보이는 판이 먼저(그보다 나중에 생긴 숨긴 �
   const s = phoneRun({ wide: true, search: '?swap=1' });
   s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
   const A = s.panel();
-  s.send({ onf: 'bookWarm', href: E3, panel: 1, left: 270 }, s.home);   // 아직 노크 전이라 판이 없다 → 종전 숨긴 판(뒤에 생김)
+  s.send({ onf: 'bookHi', views: 'line' }, knockWin(s, A, 0));          // A 는 첫 노크만(swap 전) — 판도 노크 전 후보(bookCand)도 아니다
+  s.send({ onf: 'bookWarm', href: E3, panel: 1, left: 270 }, s.home);   // 판이 없다 → 종전 숨긴 판(뒤에 생김)
   const C = s.panels().find((x) => x !== A), ai = swapKnock(s, A, 1), ci = swapKnock(s, C, 3);
   assert.ok(!A.classList.contains('park') && C.classList.contains('park'), '전제: A 보임 · C 숨김(나중에 생김)');
   s.send({ onf: 'openBook', href: E2, left: 270 }, s.home);
@@ -923,6 +924,105 @@ t('H7 — caps: 스위치 켜면 swap:1 · 꺼짐이면 칸 없음(종전 글자
   assert.strictEqual(s.g.localStorage.s.onfThSwap, '0', '⛔ 끈 것을 기억 안 했다');
   s = phoneRun({ wide: true, ls: { onfSwap: '1' } });
   assert.ok(!('swap' in caps(s)), '⛔ 기본이 끔이 아니다(또는 학생 키 onfSwap 을 봤다)');
+});
+
+/* ═══ 📖 1e 반박 검토 🟡(2026-10-17) — 홈은 판이 노크했는지 모른다(1e: 판을 띄울 첫 주소 → 20초 뒤 나머지 최대 다섯을 bookWarm panel:1).
+   판이 20초 안에 swap 노크를 안 하면(차가운 GAS · 안내 화면 · 여러 계정 우회) 그 다섯이 숨긴 판 다섯을 띄우고(무거운 doGet 동시) bookRoom 이 노크 전 P0(지금 수업 교재)까지 지웠다.
+   → 판이 될 판(홈에서 연·미리 띄운 판 · 아직 노크 전)이 있으면 미리 주소는 줄에 섰다가 그 판이 swap:1 로 노크해 판이 되면 bookFetch 로 흐른다. ═══ */
+console.log('[📖 1e 반박 — 노크 전 판 줄]');
+const E5 = TURL.replace('e1', 'e5'), E6 = TURL.replace('e1', 'e6'), E7 = TURL.replace('e1', 'e7'), E8 = TURL.replace('e1', 'e8');
+function knockWin(s, box, n) { const bw = win('book-exec' + n, s.top), bi = win('book-user' + n, win('book-sbx' + n, bw)); box.kids[0].contentWindow = bw; return bi; }
+const fetchOf = (bi) => sentOf(bi).filter((m) => m.onf === 'bookFetch').map((m) => m.src);
+const warmAll = (s, hs) => hs.forEach((h) => s.send({ onf: 'bookWarm', href: h, panel: 1, left: 270 }, s.home));
+
+t('Q1 — 노크 전 판(PC 미리 띄운 P0 · 홈에서 연 판 · 📱 폰 [열기])이 있으면 미리 주소는 숨긴 판을 안 띄우고 줄에 선다 · P0 는 그대로 · 첫 노크(swap 없음)엔 안 흐른다 · swap:1 노크 = bookFetch 차례대로 한 번씩', () => {
+  for (const how of ['warm', 'open', 'phone']) {
+    const s = phoneRun({ wide: how !== 'phone', search: '?swap=1' });
+    if (how === 'warm') s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);   // 6초 — 판 없음 → 숨긴 판 P0(곧 판)
+    else s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);                           // [열기] — 뜨는 중
+    const P0 = s.panel();
+    warmAll(s, [E2, E3, E4, E5, E6, E3]);                                                    // 26초 — P0 는 아직 노크 전
+    assert.ok(s.panels().length === 1 && s.panels()[0] === P0 && P0.parentNode, '⛔ ' + how + ' — 노크 전 판이 있는데 숨긴 판을 더 띄웠다(무거운 doGet 동시) · 또는 P0 를 지웠다: ' + s.panels().length);
+    const bi = knockWin(s, P0, 1);
+    s.send({ onf: 'bookHi', views: 'line' }, bi);
+    assert.ok(fetchOf(bi).length === 0 && s.panels().length === 1, '⛔ ' + how + ' — 첫 노크(swap 없음 — 아직 판인지 모른다)에 줄을 흘렸다');
+    s.send({ onf: 'bookHi', views: 'line', swap: 1 }, bi);
+    assert.deepStrictEqual(fetchOf(bi), [E2, E3, E4, E5, E6].map((h) => srcOf(s, h)), '⛔ ' + how + ' — 판이 된 P0 에 줄이 bookFetch 로(차례대로 · 같은 주소 한 번) 안 갔다');
+    assert.ok(jsn(bi.sent).every((x) => x[1] === ORIGIN) && s.panels().length === 1, "⛔ '*'·남의 출처로 보냈다(또는 새 판을 띄웠다)");
+    bi.sent.length = 0;
+    s.send({ onf: 'bookHi', views: 'line', swap: 1 }, bi);
+    assert.strictEqual(fetchOf(bi).length, 0, '⛔ 줄을 두 번 흘렸다');
+  }
+  //   줄 상한 6 · 판이 이미 든 주소(그 사이 [열기]로 뜬 판)는 안 흘린다 · ⭐ 내 문장은 판에 안 가니 줄에 안 서고 종전(숨긴 판 · P0 그대로)
+  const s = phoneRun({ wide: true, search: '?swap=1' });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+  const P0 = s.panel();
+  warmAll(s, [E1, E2, E3, E4, E5, E6, E7, E8]);
+  s.send({ onf: 'bookWarm', href: MYS, panel: 1, left: 270 }, s.home);
+  assert.ok(s.panels().length === 2 && s.panels().includes(P0) && s.panels()[1].kids[0].src.indexOf('mode=mine') > 0, '⛔ 내 문장 미리가 종전(숨긴 판)이 아니다 · 또는 P0 를 지웠다');
+  s.send({ onf: 'openBook', href: E2, left: 270 }, s.home);                                 // 줄에 선 E2 를 그 사이 [열기] — 판이 아직 없어 새 판
+  const bi = knockWin(s, P0, 1);
+  s.send({ onf: 'bookHi', views: 'line', swap: 1 }, bi);
+  assert.deepStrictEqual(fetchOf(bi), [E3, E4, E5, E6, E7].map((h) => srcOf(s, h)), '⛔ 줄 상한(6)·이미 뜬 주소(E2) 거르기가 틀렸다');
+});
+
+t('Q2 — 노크가 swap 없이 끝남(판 못 됨 · Lib 스위치 끔 · 옛 교재) = 줄은 안 흘린다(숨긴 판 몰림 0) · 그 뒤 미리는 종전 길 · 1분 넘게 노크 없는 판(안내 화면)은 후보가 아니다', () => {
+  let s = phoneRun({ wide: true, search: '?swap=1' });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+  const P0 = s.panel();
+  warmAll(s, [E2, E3, E4]);
+  const bi = knockWin(s, P0, 1);
+  s.send({ onf: 'bookHi', views: 'line' }, bi);
+  assert.ok(s.panels().length === 1 && fetchOf(bi).length === 0, '⛔ swap 없는 노크 뒤 줄을 숨긴 판으로 몰아 띄웠다');
+  s.send({ onf: 'bookWarm', href: E5, panel: 1, left: 270 }, s.home);
+  assert.ok(s.panels().length === 2 && s.panels().includes(P0) && s.panels()[1].classList.contains('park'), '⛔ 판 못 된 뒤 미리가 종전(숨긴 판)이 아니다');
+  //   1분 넘게 노크 없음 — 미리는 종전(줄에 갇히지 않는다 · 30분 묵은 안내 화면이 미리를 막지 않게)
+  s = phoneRun({ wide: true, search: '?swap=1' });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+  s.g.books[0].born -= 61 * 1000;
+  s.send({ onf: 'bookWarm', href: E2, panel: 1, left: 270 }, s.home);
+  assert.strictEqual(s.panels().length, 2, '⛔ 1분 넘게 노크 없는 판이 아직 미리를 줄에 세운다');
+  //   판이 못 될 판은 후보가 아니다 — ⭐ 내 문장 판 · 판 안에서 연 판(back) (줄이 1분 갇힌다)
+  s = phoneRun({ wide: true, search: '?swap=1' });
+  s.send({ onf: 'bookWarm', href: MYS, panel: 1, left: 270 }, s.home);
+  s.send({ onf: 'bookWarm', href: E2, panel: 1, left: 270 }, s.home);
+  assert.strictEqual(s.panels().length, 2, '⛔ 노크 전 ⭐ 내 문장 판을 판 후보로 봤다');
+  s = phoneRun({ wide: true, search: '?swap=1' });
+  s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
+  const A = s.panel(), ai = knockWin(s, A, 1);
+  s.send({ onf: 'bookHi', views: 'line' }, ai);
+  s.send({ onf: 'openBook', href: E2 }, ai);                                                // 판 안에서 연 판(back = A) — 노크 전
+  s.send({ onf: 'bookWarm', href: E3, panel: 1, left: 270 }, s.home);
+  assert.strictEqual(s.panels().length, 3, '⛔ 판 안에서 연 판(back)을 판 후보로 봤다');
+});
+
+t('Q3 — 판 셋 넘침(bookRoom)이 노크 전 판 후보(P0)를 안 지운다 · 1분 넘으면 종전대로 지운다', () => {
+  for (const old of [false, true]) {
+    const s = phoneRun({ wide: true, search: '?swap=1' });
+    s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+    const P0 = s.panel();
+    if (old) s.g.books[0].born -= 61 * 1000;
+    s.send({ onf: 'openBook', href: E2, left: 270 }, s.home);
+    const A = shownOf(s)[0]; s.send({ onf: 'bookHi', views: 'line' }, knockWin(s, A, 2));   // swap 없는 판(옛 교재)
+    s.send({ onf: 'openBook', href: E3, left: 270 }, s.home);
+    const B = shownOf(s)[0]; s.send({ onf: 'bookHi', views: 'line' }, knockWin(s, B, 3));
+    s.send({ onf: 'openBook', href: E4, left: 270 }, s.home);                                // 넷째 → 가장 오래 안 쓴 숨긴 판을 비킨다
+    assert.strictEqual(s.panels().length, 3, '전제: 판 셋');
+    if (!old) assert.ok(s.panels().includes(P0) && !s.panels().includes(A), '⛔ 판 셋 넘침이 노크 전 P0(지금 수업 교재 · 곧 판)를 지웠다');
+    else assert.ok(!s.panels().includes(P0) && s.panels().includes(A), '⛔ 1분 넘게 노크 없는 판을 아직 감싼다(종전 — 가장 오래 안 쓴 숨긴 판을 비킨다)');
+  }
+});
+
+t('Q4 — ⛔ 스위치 끔(swap=0 · 기억 없음)이면 종전 글자 그대로: 미리 여섯이 숨긴 판을 띄우며 셋 안에서 밀어낸다(P0 포함) · 판에 말 0', () => {
+  for (const search of ['', '?swap=0']) {
+    const s = phoneRun({ wide: true, search });
+    s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+    warmAll(s, [E2, E3, E4, E5, E6]);
+    assert.deepStrictEqual(s.panels().map((p) => p.kids[0].src), [E4, E5, E6].map((h) => srcOf(s, h) + '&park=1'), '⛔ 끔인데 종전(숨긴 판 셋 · 가장 오래 안 쓴 것부터 비킴)이 아니다: ' + search);
+    const bi = knockWin(s, s.panels()[2], 1);
+    s.send({ onf: 'bookHi', views: 'line', swap: 1 }, bi);
+    assert.ok(s.panels().every((p) => p.classList.contains('park')) && fetchOf(bi).length === 0 && !(s.g.bookQ || []).length, '⛔ 끔인데 줄·bookFetch 가 있다');
+  }
 });
 
 t('perf=1 — 갈아 끼움이 끝나면 홈에 bookPerf{ms, from}(속도표 줄 「판 갈아 끼움 Nms」 · 1e 가 그린다) · 물러나면 from:new · perf 없으면 말 0', () => {
