@@ -482,5 +482,128 @@ t('🔐 선생님 판도 우회 길 — 못 연 판(안내)을 다시 열면 지
   assert.ok(!s.panel() && s.L.message.length === n0, '⛔ 지운 선생님 판의 노크 듣기가 남았다');
 });
 
+console.log('[앞 판 규칙 — 2026-10-16 Peter 「B로 가자」 창 B안 ② (설계 4.4) · 학생 껍데기 book-panel.test.js 의 쌍둥이]');
+const MYS = 'https://class.ownify.co.kr/?mode=mine&t=STUTOK&ttok=M&tas=Peter', shownOf = (s) => s.panels().filter((p) => !p.classList.contains('park'));
+/* 판 하나에 교재 창을 붙이고 노크(bookHi)까지 — 새 교재가 뜨면 하는 일 */
+function bookKnock(s, box, n) { const bw = win('book-exec' + (n || ''), s.top), bi = win('book-user' + (n || ''), win('book-sbx' + (n || ''), bw)); box.kids[0].contentWindow = bw; s.send({ onf: 'bookHi' }, bi); bi.sent.length = 0; return bi; }
+/* 교재(E1)를 홈에서 열고 노크 → 그 안에서 내 문장(MYS)을 열고 노크. 판·안쪽 창·첫 액자 src 를 돌려준다. */
+function backRun(s) {
+  s = s || run();
+  s.send({ onf: 'openBook', href: E1, left: 270, m: 22, r: 28 }, s.home);
+  const book = s.panel(), bi = bookKnock(s, book, 1), src0 = book.kids[0].src;
+  s.send({ onf: 'openBook', href: MYS }, bi);
+  const mine = s.panels().find((p) => p !== book), mi = bookKnock(s, mine, 2);
+  return { s, book, bi, mine, mi, src0 };
+}
+
+t('판 안에서 연 판을 닫으면 앞 판이 보인다 — 같은 판·같은 액자(다시 안 불러옴) · Esc 도 같다 (설계 4.4 앞 판 규칙)', () => {
+  const { s, book, bi, mine, mi, src0 } = backRun();
+  assert.ok(book.classList.contains('park') && !mine.classList.contains('park'), '전제: 내 문장이 보이고 교재는 숨었다');
+  bi.sent.length = 0; mi.sent.length = 0; s.home.sent.length = 0;
+  s.send({ onf: 'bookClose' }, mi);
+  assert.ok(!book.classList.contains('park') && mine.classList.contains('park') && s.panels().length === 2 && s.panels().includes(book) && book.kids[0].src === src0 && book.kids[0].src.indexOf('park=1') < 0, '⛔ 닫으니 앞 판(교재)이 안 보이거나 새로 받았다(src 가 바뀌었다)');
+  assert.ok(book.vars['--bl'] === '270px' && book.vars['--bm'] === '22px' && book.vars['--br'] === '28px', '⛔ 앞 판이 보이는데 칸 값(left·m·r)이 달라졌다');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(bi.sent)), [[{ onf: 'bookPark', on: false }, ORIGIN]], '⛔ 앞 판 교재에 「보임」을 안 알렸다');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(mi.sent)), [[{ onf: 'bookPark', on: true }, ORIGIN]], '⛔ 닫힌 내 문장에 「대기」를 안 알렸다');
+  assert.strictEqual(s.home.sent.length, 0, '⛔ 창이 아직 열려 있는데 홈에 bookClosed 를 알렸다');
+  //   Esc 도 한 단계 — 앞 판 → 다시 Esc = 홈(보이는 판 없음 · 이때 bookClosed 한 번)
+  s.send({ onf: 'openBook', href: MYS }, bi);
+  assert.ok(mine === shownOf(s)[0] && shownOf(s).length === 1, '전제: 다시 내 문장');
+  s.L.keydown.forEach((f) => f({ key: 'Escape' }));
+  assert.ok(shownOf(s)[0] === book && shownOf(s).length === 1, '⛔ Esc 가 앞 판으로 안 갔다');
+  s.L.keydown.forEach((f) => f({ key: 'Escape' }));
+  assert.ok(shownOf(s).length === 0 && s.panels().length === 2, '⛔ 앞 판이 없는 판에서 Esc 가 홈으로 안 갔다');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(s.home.sent)), [[{ onf: 'bookClosed' }, ORIGIN]], '⛔ 홈으로 나갈 때 bookClosed 가 한 번이 아니다');
+});
+
+t('돌아가기 고리 — 교재 → 내 문장 → 「교재에서 보기」(같은 교재 판) → ✕ = 홈(왔다 갔다 해도 안 늘어남)', () => {
+  const { s, book, bi, mine, mi, src0 } = backRun();
+  for (let i = 0; i < 3; i++) {
+    s.send({ onf: 'openBook', href: E1 }, mi);                // 내 문장 → 교재(같은 판) = 돌아간 것
+    assert.ok(shownOf(s).length === 1 && shownOf(s)[0] === book && s.panels().length === 2 && book.kids[0].src === src0, '⛔ 「교재에서 보기」가 같은 교재 판을 안 보였다(' + i + ')');
+    s.send({ onf: 'openBook', href: MYS }, bi);               // 교재 → 내 문장
+    assert.ok(shownOf(s).length === 1 && shownOf(s)[0] === mine && s.panels().length === 2, '⛔ 다시 내 문장이 안 보였다(' + i + ')');
+  }
+  s.send({ onf: 'bookClose' }, mi);                           // 내 문장 ✕ = 교재(앞 판)
+  assert.ok(shownOf(s).length === 1 && shownOf(s)[0] === book, '⛔ 왔다 갔다 한 뒤 내 문장 ✕ 가 앞 판(교재)을 안 보였다');
+  s.send({ onf: 'bookClose' }, bi);                           // 교재 ✕ = 홈 — 교재가 내 문장을 앞 판으로 기억하면 둘이 번갈아 보인다
+  assert.ok(shownOf(s).length === 0 && s.panels().length === 2, '⛔ 왔다 갔다 한 뒤 교재 ✕ 가 홈으로 안 갔다(서로를 앞 판으로 기억한다 — 판 둘이 번갈아 보인다)');
+  //   교재에서 끝나는 쪽도 같다 — 내 문장에서 「교재에서 보기」로 돌아간 직후 ✕ = 홈
+  s.send({ onf: 'openBook', href: MYS }, bi);
+  s.send({ onf: 'openBook', href: E1 }, mi);
+  s.send({ onf: 'bookClose' }, bi);
+  assert.ok(shownOf(s).length === 0 && s.panels().length === 2, '⛔ 돌아간 직후 ✕ 가 홈으로 안 갔다');
+  s.send({ onf: 'bookClose' }, mi);                           // 숨은 판의 말은 못 가로챈다 — 그대로 홈
+  assert.ok(shownOf(s).length === 0, '⛔ 숨은 판의 ✕ 가 판을 보였다');
+});
+
+t('앞 판이 이미 지워졌으면(30분 안 씀 · 판 셋 넘침) 닫기 = 홈 · 새로 안 받는다', () => {
+  const { s, book, mine, mi } = backRun();
+  const n = s.panels().length;
+  s.timers.filter((x) => x.on && x.ms === 30 * 60 * 1000).forEach((x) => { x.on = false; x.f(); });   // 숨긴 채 BOOK_IDLE_MS — 교재 판이 지워진다
+  assert.ok(!s.panels().includes(book) && s.panels().length === n - 1, '전제: 앞 판(교재)이 30분에 지워졌다');
+  s.send({ onf: 'bookClose' }, mi);
+  assert.ok(shownOf(s).length === 0 && s.panels().length <= n - 1 && s.panels().every((p) => p === mine), '⛔ 지워진 앞 판을 다시 불러왔다(또는 홈으로 안 갔다)');
+  //   판 셋 넘침으로 밀려난 경우도 같다: 교재 → 내 문장 → E3 → E4 (네 번째가 가장 오래 안 쓴 숨긴 판 = 교재를 비킨다)
+  const c = backRun();
+  c.s.send({ onf: 'openBook', href: E3 }, c.mi);
+  const e3 = c.s.panels().find((p) => p !== c.book && p !== c.mine), i3 = bookKnock(c.s, e3, 3);
+  c.s.send({ onf: 'openBook', href: TURL.replace('e1', 'e4') }, i3);
+  assert.ok(!c.s.panels().includes(c.book) && c.s.panels().length === 3, '전제: 판 셋 넘침으로 교재가 밀려났다');
+  c.s.send({ onf: 'bookClose' }, bookKnock(c.s, shownOf(c.s)[0], 4));   // E4 닫기 → E3
+  assert.ok(shownOf(c.s)[0] === e3 && shownOf(c.s).length === 1, '⛔ E4 를 닫았는데 앞 판 E3 이 안 보인다');
+  c.s.send({ onf: 'bookClose' }, i3);                         // E3 닫기 → 내 문장
+  assert.ok(shownOf(c.s)[0] === c.mine && shownOf(c.s).length === 1, '⛔ E3 을 닫았는데 앞 판(내 문장)이 안 보인다');
+  c.s.send({ onf: 'bookClose' }, c.mi);                       // 내 문장 닫기 → 앞 판(교재)은 밀려났다 = 홈
+  assert.ok(shownOf(c.s).length === 0 && c.s.panels().length === 3 && !c.s.panels().includes(c.book), '⛔ 밀려난 앞 판을 다시 불러왔다(또는 홈으로 안 갔다)');
+});
+
+t('전부 닫기 — 판의 bookClose{all:1}(교재 「홈」)·홈의 bookDismiss(메뉴 누름)는 앞 판을 안 보인다 · 홈에서 다시 연 판은 앞 판 기억이 없다', () => {
+  let c = backRun();
+  c.s.home.sent.length = 0;
+  c.s.send({ onf: 'bookClose', all: 1 }, c.mi);
+  assert.ok(shownOf(c.s).length === 0 && c.s.panels().length === 2, '⛔ 「홈」(all:1)이 앞 판을 보였다');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.s.home.sent)), [[{ onf: 'bookClosed' }, ORIGIN]], '⛔ 전부 닫는데 홈에 bookClosed 가 한 번이 아니다');
+  c = backRun();
+  c.s.send({ onf: 'bookDismiss' }, c.s.home);
+  assert.ok(shownOf(c.s).length === 0 && c.s.panels().length === 2, '⛔ 메뉴 누름(bookDismiss)이 앞 판을 보였다');
+  c = backRun();
+  c.s.send({ onf: 'bookClose', all: 0 }, c.mi);
+  assert.ok(shownOf(c.s)[0] === c.book, '⛔ all 이 1 이 아닌데 전부 닫았다(all:1 만 전부 닫기)');
+  //   홈에서 다시 연 판은 「나를 열어 준 판」이 없다 — 내 문장을 홈에서 열면 닫을 때 교재가 아니라 홈
+  c = backRun();
+  c.s.send({ onf: 'openBook', href: MYS, left: 270 }, c.s.home);
+  assert.ok(shownOf(c.s)[0] === c.mine && shownOf(c.s).length === 1, '전제: 홈에서 내 문장을 다시 열었다');
+  c.s.send({ onf: 'bookClose' }, c.mi);
+  assert.ok(shownOf(c.s).length === 0, '⛔ 홈에서 연 판인데 닫으니 옛 앞 판(교재)이 보인다');
+});
+
+t('폰(onf-ph)에선 앞 판 규칙 없음 — 종전(닫으면 판 칸 기록을 걷고 홈)', () => {
+  const s = phoneRun();
+  s.send({ onf: 'openBook', href: E1 }, s.home);
+  const book = s.panel(), bi = s.hi(book, 1);
+  s.send({ onf: 'openBook', href: MYS }, bi);
+  const mine = s.panels().find((p) => p !== book), mi = s.hi(mine, 2);
+  assert.ok(s.root.classList.contains('onf-ph') && book.classList.contains('park') && !mine.classList.contains('park'), '전제: 폰 — 내 문장이 보인다');
+  const goes = s.H.goes.length;
+  s.send({ onf: 'bookClose' }, mi);
+  assert.ok(shownOf(s).length === 0 && s.panels().length === 2, '⛔ 폰에서 닫았는데 앞 판이 보인다(폰은 종전: 닫으면 홈)');
+  assert.ok(s.H.goes.length === goes + 1, '⛔ 폰 ✕ 가 판 칸 기록을 안 걷었다(종전)');
+});
+
+t('앞 판 기억은 한 줄로 이어진다 — 교재 → E2 → 내 문장 → 「교재에서 보기」(E1) 는 돌아간 것: ✕ 가 홈으로 간다(고리가 안 생긴다)', () => {
+  const { s, book, bi, mine, mi } = backRun();
+  s.send({ onf: 'bookClose' }, mi);                                       // 한 번 내 문장을 닫아 두고(교재가 보임)
+  s.send({ onf: 'openBook', href: E2 }, bi);                              // 교재 → E2
+  const e2 = shownOf(s)[0], i2 = bookKnock(s, e2, 5);
+  assert.ok(e2 !== book && s.panels().length === 3, '전제: E2 판이 떴다');
+  s.send({ onf: 'openBook', href: MYS }, i2);                             // E2 → 내 문장(기존 판)
+  assert.ok(shownOf(s)[0] === mine, '전제: 내 문장');
+  s.send({ onf: 'openBook', href: E1 }, mi);                              // 내 문장 → 교재 — E2 를 거쳐 교재가 열어 준 길이다 = 돌아감
+  assert.ok(shownOf(s)[0] === book && shownOf(s).length === 1, '전제: 교재가 보인다');
+  s.send({ onf: 'bookClose' }, bi);
+  assert.ok(shownOf(s).length === 0, '⛔ 교재 ✕ 가 홈으로 안 갔다 — 교재 ← 내 문장 ← E2 ← 교재 고리가 생겼다(✕ 가 끝없이 돈다)');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);

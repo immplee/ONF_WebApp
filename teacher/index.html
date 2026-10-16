@@ -475,7 +475,7 @@ function bookPx(p, name, v) {
   return ok ? v : null;
 }
 function bookMake(src, parked) {
-  var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, key: bookKey(src), parked: parked, win: null, origin: '', kb: null, ko: '', hw: null, ho: '', idle: null, left: null, m: null, r: null };
+  var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, key: bookKey(src), parked: parked, win: null, origin: '', kb: null, ko: '', hw: null, ho: '', idle: null, left: null, m: null, r: null, back: null };   // back = 나를 열어 준 판(하나만 · 없으면 null) — 아래 「앞 판 규칙」(학생 껍데기 onf-frame.js 와 같다)
   p.box.className = 'onf-bookpanel';
   if (parked) p.box.classList.add('park');
   p.el.setAttribute('allow', 'clipboard-write; microphone');
@@ -589,8 +589,16 @@ function bookHide() {
   bookKb();
   return true;
 }
-/* ✕·Esc·홈 탭 바꿈 — 숨기고, 📱 맨 위에 판 칸 줄이 있으면 걷는다(뒤로로 닫은 것과 같은 기록 · 뒤따르는 popstate 는 숨길 판이 없어 알림만). PC 는 판 칸이 없다(폰에서 넓힌 창만). */
-function bookClose() {
+/* q 가 p 를 (몇 단계 거쳐서든) 열어 준 판인가 — 판 안에서 q 를 여는 게 앞으로 간 건지 돌아간 건지(bookClose 위 앞 판 규칙). 9 = 고리가 생겨도 안 도는 안전 상한. */
+function bookOpener(p, q) { for (var a = p.back, n = 0; a && n < 9; a = a.back, n++) if (a === q) return true; return false; }
+/* ✕·Esc·홈 탭 바꿈 — 숨기고, 📱 맨 위에 판 칸 줄이 있으면 걷는다(뒤로로 닫은 것과 같은 기록 · 뒤따르는 popstate 는 숨길 판이 없어 알림만). PC 는 판 칸이 없다(폰에서 넓힌 창만).
+   🅱 앞 판 규칙(2026-10-16 Peter 「B로 가자」 · 설계 4.4 · 학생 껍데기 onf-frame.js 와 같다) — 판 안에서 연 판(교재 → ⭐ 내 문장)의 ✕·Esc 는 한 단계: 나를 열어 준 판(back)이 아직 살아 있으면 그 판을 보인다
+   (숨긴 판 보이기 = CSS 한 번 · 0초 · 액자·src 그대로). 이미 지워졌으면(30분 안 씀 · 판 셋 넘침) 새로 안 받고 홈으로 — 기억된 판이라고 지우기(bookRoom·BOOK_IDLE_MS)에서 빼 주지 않는다(홈이 미리 띄운 판을 밀어내면 안 된다). 폰은 종전(판 칸 기록을 걷고 홈).
+   「열어 준 판」은 한 줄로만 이어진다 — 판 안에서 q 를 열 때 q 가 이미 p 를 (몇 단계 거쳐서든) 열어 준 판이면(bookOpener) 앞으로 간 게 아니라 **돌아간 것**이라 q.back 을 안 바꾼다.
+   all === true 만 전부 닫기(판의 bookClose{all:1} · 홈 메뉴 bookDismiss) — ⚠️ 엄격 비교: 못 연 판 안내의 [닫기] 가 이 함수를 onclick 으로 받아 이벤트가 인자로 온다. */
+function bookClose(all) {
+  var cur = bookShown(), b = cur && cur.back;
+  if (all !== true && !phone() && b && books.indexOf(b) >= 0) { bookShow(b); return; }   // left·m·r 없이 부르면 보이던 판 칸 값 그대로(위 bookShow)
   if (!bookHide()) return;
   var r = histRun();
   if (r > 0) { try { history.go(-r); } catch (e) {} }
@@ -600,11 +608,11 @@ window.addEventListener('message', function (ev) {
   if (!d || typeof d.onf !== 'string') return;
   if (bookFrom(ev, frame)) {                                   // 선생님 홈(내 액자)
     if (d.onf === 'bookHello') { try { ev.source.postMessage({ onf: 'caps', book: 1, phone: BOOK_PH ? 1 : 0 }, ev.origin); } catch (e) {} return; }   // 📱 phone:1 = 폰 판도 할 줄 안다(홈은 이때만 폰에서 판으로)
-    if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left, d.m, d.r); return; }
+    if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left, d.m, d.r); var hq = bookShown(); if (hq) hq.back = null; return; }   // 홈에서 연 판은 앞 판 기억 없음(종전 · 4.4)
     if (d.onf === 'bookWarm' && d.panel === 1 && typeof d.href === 'string') { bookPre(d.href, d.left, d.m, d.r); return; }   // 지금·곧 할 수업 교재를 숨긴 판으로 미리(10-13)
     /* 📐 창 크기가 바뀌었다(2026-10-16 · 학생 껍데기와 같다) — 홈이 다시 잰 메뉴 끝·여백·모서리를 판 전부(보이는 판·숨긴 판)에 새로 단다. 보이기·숨기기·주소는 안 건드린다. 내 액자(위 bookFrom)에서 온 말만. */
     if (d.onf === 'bookBox') { for (i = 0; i < books.length; i++) bookPlace(books[i], d.left, d.m, d.r); bookKb(); return; }
-    if (d.onf === 'bookDismiss') { bookClose(); return; }
+    if (d.onf === 'bookDismiss') { bookClose(true); return; }   // 메뉴를 눌렀다 = 전부 닫고 홈(앞 판을 보이지 않는다)
     if (d.onf === 'theme') { onfShellTheme(d.v); return; }   // 🌙 화면 색(안쪽 선생님 홈이 알린다)
     return;
   }
@@ -615,11 +623,15 @@ window.addEventListener('message', function (ev) {
   if (d.onf === 'hist') { bookHist(p, ev); return; }           // 📱 판 안쪽 기록 다리(폰만 켠다 · 숨긴 판의 노크도 받는다)
   if (d.onf === 'frameHello') { p.kb = ev.source; p.ko = ev.origin; kbH = -1; kbTop = -1; bookKb(); return; }   // 📱 이 판 교재의 키보드 높이 받는 창
   if (p.parked) return;                                        // ⛔ 숨긴 판은 닫기·전체·갈아 끼우기를 못 부른다
-  if (d.onf === 'bookClose') bookClose();
+  if (d.onf === 'bookClose') bookClose(d.all === 1);   // all:1 = 교재 머리줄 「홈」 — 앞 판 없이 전부 닫기
   else if (d.onf === 'bookFull') p.box.classList.toggle('full', !!d.on);
-  else if (d.onf === 'openBook' && typeof d.href === 'string') bookOpen(d.href);
+  else if (d.onf === 'openBook' && typeof d.href === 'string') {
+    bookOpen(d.href);
+    var q = bookShown();                                      // 🅱 앞 판 규칙(위 bookClose) — 새로 보이게 된 판 q 의 「나를 열어 준 판」을 p 로 · 돌아간 것이면 그대로 · 폰은 종전
+    if (q && q !== p && !phone() && !bookOpener(p, q)) q.back = p;
+  }
 });
-window.addEventListener('keydown', function (e) { if (e.key === 'Escape') bookClose(); });   // 보이는 판만(숨긴 판은 Esc 를 안 먹는다)
+window.addEventListener('keydown', function (e) { if (e.key === 'Escape') bookClose(false); });   // 보이는 판만(숨긴 판은 Esc 를 안 먹는다)
 window.addEventListener('popstate', function () { bookPop(histTop()); });   // 📱 홈 칸 깊이·홈 알림은 onf-hist 블록(판 칸이 맨 위면 홈은 안 바뀌었다)
 /* 📱 폰 ↔ PC(폭이 바뀜) — 모양(<html class="onf-ph">)·자리 수를 맞추고, 폰이 되면 보이는 판에 판 칸(뒤로 = 숨김) · 폰→PC 면 남은 판 칸은 ✕ 가 걷는다. 옛 사파리는 addListener 뿐. */
 function bookMode() {
