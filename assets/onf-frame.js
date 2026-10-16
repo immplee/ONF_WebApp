@@ -391,11 +391,14 @@
        · 그 view 를 할 줄 안다고 노크(bookHi views)한 판이 있으면 그 판을 보이고 {onf:'bookView', view} 를 보낸다(새로 안 받음 · 페이지가 view 로 연 것과 같은 길로 연다).
          주소까지 같은 판에도 보낸다 — 닫아 둔 복습을 [복습 시작]으로 다시 누르면 판만 보이고 복습은 안 열렸다(복습이 떠 있으면 페이지가 그대로 둔다).
        · 할 줄 아는 판이 없으면(옛 교재 · 노크 전 · 미리 띄운 판이 아닌 교재) 종전대로 그 주소로 새 판.
-       ⛔ views 는 그 판 교재가 노크로 말한 값 그대로(글자 하나하나 같아야 맞다 · 페이지는 review·cards 만 안다) · bookView 는 bookHi 의 그 창·그 출처로만('*' 금지 — bookPark 와 같다). */
-    function bookView(src) { try { return new URL(src).searchParams.get('view') || ''; } catch (e) { return ''; } }
-    function bookBase(src) { try { var u = new URL(src); u.searchParams.delete('view'); return u.href; } catch (e) { return src; } }
-    function bookCan(p, view) { return !!(view && p && p.views.indexOf(view) >= 0); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 []
-    function bookLike(src, view) { var b = bookBase(src); for (var i = 0; i < books.length; i++) if (bookCan(books[i], view) && bookBase(books[i].src) === b) return books[i]; return null; }
+       ⛔ views 는 그 판 교재가 노크로 말한 값 그대로(글자 하나하나 같아야 맞다 · 페이지는 review·cards·line 만 안다) · bookView 는 bookHi 의 그 창·그 출처로만('*' 금지 — bookPark 와 같다).
+       📖 line 도 같은 길(검수 A3-5 2026-10-16) — 홈 「교재」 블럭 대사 줄·오늘의 표현·선생님 댓글·내 문장 「교재에서 보기」는 같은 교재 주소에 line=N 만 붙는다.
+         종전엔 주소가 달라 새 판을 받았고, 판이 넷이 되어 가장 오래 숨긴 판 = **미리 띄운 그 교재**가 쫓겨났다(기다림 = 교재 통째).
+         'line' 을 할 줄 안다고 노크한 판이면 그 판에 {onf:'bookView', line: N} — 교재가 &line= 으로 연 것과 같은 길(onfJumpOnce)로 굴린다. 줄은 숫자만(아니면 줄로 안 친다 = 종전 새 판). */
+    function bookAsk(src) { try { var q = new URL(src).searchParams, l = q.get('line') || ''; return { view: q.get('view') || '', line: /^\d{1,7}$/.test(l) ? Number(l) : 0 }; } catch (e) { return { view: '', line: 0 }; } }
+    function bookBase(src) { try { var u = new URL(src); u.searchParams.delete('view'); u.searchParams.delete('line'); return u.href; } catch (e) { return src; } }
+    function bookCan(p, a) { return !!(p && (a.view || a.line) && (!a.view || p.views.indexOf(a.view) >= 0) && (!a.line || p.views.indexOf('line') >= 0)); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 []
+    function bookLike(src, a) { var b = bookBase(src); for (var i = 0; i < books.length; i++) if (bookCan(books[i], a) && bookBase(books[i].src) === b) return books[i]; return null; }
     /* left = 홈 왼쪽 메뉴의 오른쪽 끝(px · 홈이 잰다) — 있으면 판이 그 오른쪽부터 덮는다(2026-10-12 Peter 「창 모드일 때는 맨 왼쪽 탭만 보이게」).
        없으면(옛 홈 · 판 안에서 갈아 끼울 때) 종전 자리 그대로. ⚠️ 숫자·화면 폭 60% 안만 믿는다(남의 값으로 판이 화면 밖으로 가지 않게). */
     function bookPlace(p, left) {
@@ -454,9 +457,11 @@
     function bookOpen(href, left) {
       var src = opts.bookSrc(href);
       if (!src) return;
-      var view = bookView(src), p = bookFind(src) || bookLike(src, view) || bookMake(src, false);   // 📖 view 만 다른 판이 할 줄 알면 그 판(위 bookLike)
+      var a = bookAsk(src), p = bookFind(src) || bookLike(src, a) || bookMake(src, false), m = { onf: 'bookView' };   // 📖 view·line 만 다른 판이 할 줄 알면 그 판(위 bookLike)
       bookShow(p, left);
-      if (bookCan(p, view)) { try { p.win.postMessage({ onf: 'bookView', view: view }, p.origin); } catch (e) {} }   // 보인다(bookPark) 다음에 — 페이지가 「보임」 손질 뒤 연다
+      if (a.view) m.view = a.view;
+      if (a.line) m.line = a.line;
+      if (bookCan(p, a)) { try { p.win.postMessage(m, p.origin); } catch (e) {} }   // 보인다(bookPark) 다음에 — 페이지가 「보임」 손질 뒤 연다
     }
     /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판은 안 건드린다(books 는 오래 안 쓴 것이 앞). */
     function bookRoom(n) { for (var i = 0; books.length > n && i < books.length; ) { if (books[i].parked) bookDrop(books[i]); else i++; } }

@@ -421,6 +421,55 @@ t('미리 띄운 교재(views cards) — 「카드 시작」(view=cards)은 그 
   assert.ok(js(mi.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 내 문장 판에 교재 덱 「열어」가 갔다');
 });
 
+console.log('[줄만 다른 주소 — 같은 판에 「이 줄로」(검수 A3-5 2026-10-16 · 블럭 대사 줄·오늘의 표현·선생님 댓글 · 내 문장 「교재에서 보기」)]');
+/* 진짜 index.html bookSrc — line 이 주소 가운데 낀다(fileId·sheetName·mode·back·line·view 다음 slug·embed) */
+function realSrc() {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const c = { URL, location: { href: 'https://class.ownify.co.kr/' }, token: 'TOK', ONF: { api: { appUrl: (tk, ex) => 'https://script.google.com/x/exec?t=' + tk + '&' + ex } } };
+  vm.createContext(c); vm.runInContext(html.slice(html.indexOf('var BOOK_KEYS'), html.indexOf('ONF.frame.mount(document.getElementById')), c);
+  return c.bookSrc;
+}
+const LB = 'https://script.ownify.co.kr/thegoodplace-s1-e3-sunny?mode=share&t=TOK', LM = 'https://script.ownify.co.kr/?mode=mine&t=TOK', LN = 'https://script.ownify.co.kr/thegoodplace-s1-e4-sunny?mode=share&t=TOK&back=E3_X';
+
+t('미리 띄운 교재(views line) — 줄 링크(line=17)는 새로 안 받고 그 판을 보이며 bookView{line:17} · 옆 숨긴 판(내 문장·다음 회차)이 안 쫓겨난다 · 다른 줄도 같은 판 · [이어서 하기]는 판만', () => {
+  const s = setup(realSrc());
+  [LB, LM, LN].forEach((h) => s.send({ onf: 'bookWarm', href: h, panel: 1, left: 248 }, s.homeInner));
+  const [book, mine, next] = s.panels(), src0 = book.kids[0].src;
+  const bi = hiV(s, book, 'cards,line'); hiV(s, mine, 'review'); hiV(s, next, 'line');
+  s.send({ onf: 'openBook', href: LB + '&line=17', left: 248 }, s.homeInner);
+  assert.ok(s.panels().length === 3 && [book, mine, next].every((p) => s.panels().includes(p)), '⛔ 줄 링크가 새 판을 만들어 미리 띄운 판을 쫓아냈다(A3-5): ' + s.panels().map((p) => p.kids[0].src.replace(/^.*TOK&/, '')).join(' | '));
+  assert.ok(!book.classList.contains('park') && book.kids[0].src === src0 && mine.classList.contains('park') && next.classList.contains('park'), '⛔ 미리 띄운 그 교재 판이 안 보인다(또는 주소가 바뀌었다)');
+  assert.deepStrictEqual(js(bi.sent), [[{ onf: 'bookPark', on: false }, O], [{ onf: 'bookView', line: 17 }, O]], '⛔ 「보임」 다음 「17줄로」가 노크한 창·출처로 안 갔다');
+  bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: LB + '&line=20', left: 248 }, s.homeInner);
+  assert.ok(s.panels().length === 3 && js(bi.sent).some((x) => x[0].onf === 'bookView' && x[0].line === 20), '⛔ 보이는 판에서 다른 줄을 누르니 새로 받았다(또는 「20줄로」가 안 갔다)');
+  s.send({ onf: 'bookDismiss' }, s.homeInner); bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: LB, left: 248 }, s.homeInner);
+  assert.ok(s.panels().length === 3 && !book.classList.contains('park') && js(bi.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 줄 없는 [이어서 하기]에 「열어」를 보냈다(또는 새 판)');
+});
+
+t('줄을 할 줄 모르는 판은 안 쓴다 — 노크 전 · 옛 교재(views 없음 · cards 만) · 다른 회차 줄이면 종전대로 그 주소로 새 판(그 판은 &line 으로 뜬다)', () => {
+  for (const [views, why] of [[null, '노크 전'], [undefined, '옛 교재(views 없음)'], ['cards', '옛 교재(cards 만)'], ['review', '내 문장']]) {
+    const s = setup(realSrc());
+    s.send({ onf: 'bookWarm', href: LB, panel: 1 }, s.homeInner);
+    const box = s.panel(), bi = views === null ? null : hiV(s, box, views);
+    s.send({ onf: 'openBook', href: LB + '&line=17' }, s.homeInner);
+    assert.ok(s.panels().length === 2 && /&line=17&slug=thegoodplace-s1-e3-sunny&embed=1$/.test(s.panels()[1].kids[0].src), '⛔ ' + why + ' 판에 줄 이동을 맡겼다(줄로 안 간다)');
+    assert.ok(!bi || js(bi.sent).every((x) => x[0].onf !== 'bookView'), '⛔ ' + why + ' 판에 「줄로」를 보냈다');
+  }
+  const s = setup(realSrc());
+  s.send({ onf: 'bookWarm', href: LB, panel: 1 }, s.homeInner);
+  const bi = hiV(s, s.panel(), 'cards,line');
+  s.send({ onf: 'openBook', href: LN + '&line=5' }, s.homeInner);
+  assert.ok(s.panels().length === 2 && js(bi.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 다른 회차 줄을 이 회차 판에 맡겼다');
+  //   숫자 아닌 줄은 줄로 안 친다(페이지에 이상한 값을 안 넘긴다)
+  const v = setup(realSrc());
+  v.send({ onf: 'bookWarm', href: LB, panel: 1 }, v.homeInner);
+  const vi = hiV(v, v.panel(), 'cards,line');
+  v.send({ onf: 'openBook', href: LB + '&line=1e9' }, v.homeInner);
+  assert.ok(js(vi.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 숫자 아닌 줄 값을 판에 넘겼다');
+});
+
 console.log('[📱 폰 판 — 2026-10-14 Peter 「미리 불러와서 로딩 전혀 없이 열고 되돌리고」 → 「폰 숨긴 판 1개」]');
 /* 폰 흉내 — matchMedia(넓은 화면 물음)가 거짓 · 최상위 기록(브라우저처럼 back·go 는 나중에 popstate) · <html> classList · (키보드) visualViewport */
 function phoneSetup(o) {
@@ -432,7 +481,7 @@ function phoneSetup(o) {
     replaceState(st) { this.st[this.i].state = st; },
     back() { this.backs++; this.to.push(Math.max(0, this.i - 1)); },
     go(n) { this.goes.push(n); this.to.push(Math.max(0, Math.min(this.st.length - 1, this.i + n))); } };
-  const s = setup(null, { phone: o.phone, pre(g, root) {
+  const s = setup(o.bs || null, { phone: o.phone, pre(g, root) {
     g.matchMedia = (q) => { assert.strictEqual(q, '(min-width:1100px) and (hover:hover) and (pointer:fine)', '⛔ 폰 물음이 홈 onfBookWide 와 다르다'); return mq; };
     g.history = H;
     root.classList = { set: new Set(), toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } };
@@ -448,6 +497,17 @@ function phoneSetup(o) {
   return s;
 }
 const hp = (w) => js(w.sent).filter((x) => x[0].onf === 'hist-pop').map((x) => x[0].id);
+
+t('📱 폰 — 미리 띄운 숨긴 판(views line)에 줄 링크 → 판 하나 그대로 보이며 「이 줄로」 · 판 칸 한 칸(뒤로 = 숨김) · 새로 안 받는다(검수 A3-5)', () => {
+  const s = phoneSetup({ bs: realSrc() });
+  s.send({ onf: 'bookWarm', href: LB, panel: 1 }, s.homeInner);
+  const p = s.panel(), bi = hiV(s, p, 'line');
+  s.send({ onf: 'openBook', href: LB + '&line=17', left: 0 }, s.homeInner);
+  assert.ok(s.panels().length === 1 && !p.classList.contains('park'), '⛔ 폰에서 줄 링크가 판을 새로 받았다(폰 자리 2 — 미리 띄운 판이 쫓겨난다)');
+  assert.ok(js(bi.sent).some((x) => x[0].onf === 'bookView' && x[0].line === 17) && s.H.st.length === 2 && s.H.state.onfBook === 1, '⛔ 「17줄로」가 안 갔거나 판 칸이 안 들어갔다');
+  s.browserBack();
+  assert.ok(p.classList.contains('park'), '⛔ 뒤로가 판을 안 숨겼다');
+});
 
 t('📱 폰 — 교재 누름 → 판 하나(화면 전체 <html onf-ph> · 메뉴 옆 아님) · 최상위 기록에 판 칸 한 칸 · 같은 판을 또 열면 칸 안 늘림 · PC 는 판 칸 없음(종전)', () => {
   const s = phoneSetup();
