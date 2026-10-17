@@ -1047,6 +1047,26 @@ t("H1' — 홈에서 연 판이 있으면 [열기] = bookSwap(새 액자 0 · �
   assert.ok(swapMsg(bi).length === 1 && swapMsg(bi)[0].src === RS(SE('e1')) && s.panels().length === 1, '⛔ 갈아 끼운 판을 옛 주소(E1)로 찾았다 — 판은 이제 E2 다');
 });
 
+t("H1' cur — bookSwap 은 판이 **지금 든 주소**(p.real)를 cur 로 싣는다(Ownify 판의 떠나기 전 담기 열쇠 · 2026-10-17 라이브 A→B→A 의 A 2.6초) · 처음 = 판을 연 주소 · ok 뒤 = 그 주소 · 물러남 뒤 = 되돌린 주소", () => {
+  const { s, bi } = boardRun();
+  s.send({ onf: 'openBook', href: SE('e2'), left: 270 }, s.homeInner);
+  let m = swapMsg(bi);
+  assert.strictEqual(m[0].cur, RS(SE('e1')), '⛔ 첫 갈아 끼우기에 판을 연 주소(처음 doGet 으로 그린 E1)를 안 실었다 — 판이 E1 을 담을 열쇠를 모른다');
+  s.send({ onf: 'openBook', href: SE('e4'), left: 270 }, s.homeInner);   // 앞 것(E2)이 답 전 — 판은 아직 E1 을 들고 있다
+  assert.strictEqual(swapMsg(bi)[1].cur, RS(SE('e1')), '⛔ 답 전 둘째 갈아 끼우기의 cur 가 기다리는 주소(E2)다 — 판이 든 것은 아직 E1');
+  s.send({ onf: 'openBook', href: SE('e2'), left: 270 }, s.homeInner); m = swapMsg(bi).slice(-1);
+  s.send({ onf: 'bookSwapped', id: m[0].id, ok: true, from: 'server' }, bi);
+  s.send({ onf: 'bookClose' }, bi); bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: SE('e3'), left: 270 }, s.homeInner);
+  m = swapMsg(bi);
+  assert.strictEqual(m[0].cur, RS(SE('e2')), '⛔ ok 뒤 cur 가 판이 든 E2 가 아니다');
+  s.send({ onf: 'bookSwapped', id: m[0].id, ok: false, why: 'busy' }, bi);   // 판은 E2 그대로 · E3 는 새 판
+  s.send({ onf: 'bookClose' }, bi); bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: SE('e1'), left: 270 }, s.homeInner);
+  m = swapMsg(bi);
+  assert.ok(m.length === 1 && m[0].cur === RS(SE('e2')), '⛔ 물러난(busy) 뒤 cur 가 되돌린 E2 가 아니다: ' + JSON.stringify(m.map((x) => x.cur)));
+});
+
 t("H1' 학생만 — view·line 만 다른 주소는 할 줄 아는 판이면 **먼저** bookView(갈아 끼우지 않음) · 할 줄 모르면(cards 노크 없음) 갈아 끼움 · 갈아 끼우는 중인 판엔 bookView 를 안 보낸다", () => {
   let c = boardRun({ views: 'cards,line' });
   c.s.send({ onf: 'openBook', href: SE('e1', '&line=17'), left: 270 }, c.s.homeInner);
