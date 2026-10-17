@@ -225,7 +225,8 @@ function mount() {
      ⛔ 종전엔 열고 8초였다 — 서버(doGet)가 한 번 느린 것(10-17 10:05:52 doGet 12.2초)과 진짜 막힌 액자를 못 갈라,
        느린 한 번에 열쇠를 7일 끄고 새로 읽어(다시 로그인 + 두 번째 doGet) 빈 화면이 15~20초+ 였다.
      → 느린 서버는 load 가 doGet 뒤에 온다(노크도 그 언저리) · 막힌 액자(구글 창구가 액자 안에서 거부)는 오류 화면 load 가 빨리 온다(2026-09-02 실측 279ms).
-     ⚠️ load 가 안 오면(연결 멈춤) 막힘으로 세지 않는다 — 열고 8초에 로그인 길과 같은 안내만(아래 watch).
+     ⚠️ load 가 오기 전엔 도는 원 그대로 · 안내 없음 — 서버가 느린 것뿐이다(10-17 12.2초 · 7일 doGet 최대 12.7초).
+       load 가 **열고 30초**(12.7초 + 앞단 여유)까지 안 오면(연결 멈춤) 그때 로그인 길과 같은 안내 · 막힘으로는 안 센다(아래 watch).
      ⚠️ 로그인 길(구글 창구로 받은 토큰)은 안 바꾼다 — load 를 안 듣고 종전대로 열고 8초. */
   var keyOpen = reused || String(pending).indexOf('odk1.') === 0, loaded = false, again = false;
   if (keyOpen) {
@@ -250,7 +251,7 @@ function mount() {
      구글이 자기 오류 화면을 이미 보여 준다.
      ⚠️ 진단이 필요할 땐 개발자도구 콘솔에 한 줄만 남긴다(사람은 안 본다). */
   clearTimeout(frameWatch);
-  frameWatch = setTimeout(watch, 8000);
+  frameWatch = setTimeout(watch, keyOpen ? 30000 : 8000);   // 열쇠로 연 화면은 load 를 기다린다(위) · 로그인 길은 종전 8초
   function watch() {
     if (appWin) return;
     /* 🔑 받아 둔 토큰·열쇠로(구글 창구 없이) 열어 액자는 다 읽혔는데(load) 안쪽이 안 왔다 = 이 기기는 구글 창구 없이는 액자가 안 뜰 수 있다(아이폰 실측과 같은 꼴) →

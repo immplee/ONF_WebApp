@@ -29,6 +29,7 @@ const DAY = 86400000;
 /* 껍데기 본 스크립트를 통째로 돌린다 — 시계는 손으로 돌린다(advance) · 액자 load·안쪽 노크는 손으로 쏜다. */
 function boot(store) {
   const calls = [], handlers = {}, els = {}, timers = new Map();
+  const spin = { gone: false, parentNode: { removeChild() { spin.gone = true; } } };   // #wait .onf-spin — 걷히면 gone
   let clock = 0, tid = 0;
   const el = (id) => els[id] || (els[id] = { id, hidden: id === 'app' || id === 'wait', style: {}, classList: { add() {}, remove() {}, toggle() {} },
     contentWindow: id === 'app' ? { name: 'appwin', postMessage() {} } : null, appendChild() {}, setAttribute() {}, parentNode: null, textContent: '', innerHTML: '',
@@ -38,7 +39,7 @@ function boot(store) {
     navigator: CHROME, console: { warn() {}, log() {}, info() {} }, atob: (b) => Buffer.from(b, 'base64').toString('binary'),
     URL, URLSearchParams, Date, JSON, Math,
     localStorage: { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } },
-    document: { getElementById: el, querySelector: () => null, createElement: () => el('x' + Math.random()), body: { appendChild() {} },
+    document: { getElementById: el, querySelector: (q) => (q === '#wait .onf-spin' && !spin.gone ? spin : null), createElement: () => el('x' + Math.random()), body: { appendChild() {} },
       documentElement: { setAttribute() {}, getAttribute() {} } },
     location: { search: '', href: 'https://class.ownify.co.kr/teacher', reload() { calls.push('reload'); } },
     history: { state: null, replaceState() {}, pushState() {}, go() {}, back() {} },
@@ -66,7 +67,8 @@ function boot(store) {
     load() { (app._on.load || []).forEach((f) => f({ type: 'load' })); },   // 액자 load(교차 출처 — contentWindow.location 을 못 읽는다)
     knock() { (handlers.message || []).forEach((h) => h({ data: { onf: 'auth-please', stale: false }, source: { parent: app.contentWindow, postMessage() {} }, origin: KORIGIN })); },
     opened: () => /AKfycb/.test(String(app.src || '')),
-    msg: () => String(els.waitmsg ? els.waitmsg.innerHTML : '')
+    msg: () => String(els.waitmsg ? els.waitmsg.innerHTML : ''),
+    spinning: () => !spin.gone
   };
   return R;
 }
@@ -138,13 +140,27 @@ t('⛔ 한 번만 막힘 → 안 끔 · 다음 열쇠 열기가 성공하면 기
   assert.ok(Date.now() - Number(store.onf_devkey_try) < DAY, '⛔ 오늘 막힘을 새로 기록하지 않았다');
 });
 
-t('열쇠 열기인데 load 가 영영 안 옴(연결 멈춤) — 열고 8초에 로그인 길과 같은 안내 · 열쇠를 끄지도 새로 읽지도 않는다', () => {
+t('⛔ [보강] 열쇠로 연 느린 서버(load 12초) — 8초에 안내를 안 띄우고 도는 원을 그대로 둔다(서버가 느린 것뿐 · 10-17 12.2초 · 7일 최대 12.7초)', () => {
+  for (const tok of [odk(), gtok()]) {
+    const R = boot({ onf_id_tok: tok });
+    R.advance(8000);
+    assert.strictEqual(R.msg(), '', '⛔ 느린 서버에 8초에 「화면이 안 열렸어요」를 띄웠다(곧 그려질 화면 위에 겁주는 말)');
+    assert.ok(R.spinning(), '⛔ 느린 서버에 8초에 도는 원을 걷었다');
+    R.advance(4000); R.load(); R.knock(); R.advance(60000);
+    assert.strictEqual(R.msg(), '', '⛔ 그려진 뒤에 안내가 떴다');
+    assert.strictEqual(R.reloads(), 0);
+  }
+});
+
+t('열쇠 열기인데 load 가 너무 오래 안 옴(연결 멈춤) — 열고 30초에 안내(원 걷음) · 열쇠를 끄지도 새로 읽지도 않는다', () => {
   const store = { onf_id_tok: odk() };
   const R = boot(store);
-  R.advance(7999);
-  assert.strictEqual(R.msg(), '');
+  R.advance(29999);
+  assert.strictEqual(R.msg(), '', '⛔ 30초 전에 안내가 떴다');
+  assert.ok(R.spinning());
   R.advance(1);
   assert.ok(/화면이 안 열렸어요/.test(R.msg()), '⛔ 멈춘 연결에 안내가 없다(도는 원만 영영)');
+  assert.ok(!R.spinning(), '⛔ 안내를 띄웠는데 원이 계속 돈다(「곧 됩니다」 거짓말)');
   R.advance(60000);
   assert.strictEqual(R.reloads(), 0);
   assert.ok(!('onf_devkey_off' in store) && !('onf_devkey_try' in store), '⛔ load 도 안 왔는데 막힘으로 셌다(느린 서버일 수 있다)');
@@ -165,6 +181,7 @@ t('로그인 길(받아 둔 것 없음 · 구글 토큰)은 그대로 — 열고
     assert.strictEqual(R.msg(), '', '⛔ 안내가 8초보다 일찍 떴다');
     R.advance(1);
     assert.ok(/화면이 안 열렸어요/.test(R.msg()), '⛔ 로그인 길의 8초 안내 시각이 바뀌었다(load=' + fast + ')');
+    assert.ok(!R.spinning(), '⛔ 로그인 길에서 8초에 원을 안 걷었다(종전과 다르다)');
     R.advance(60000);
     assert.strictEqual(R.reloads(), 0, '⛔ 로그인 길에서 새로 읽었다');
     assert.ok(!('onf_devkey_off' in store) && !('onf_devkey_try' in store), '⛔ 로그인 길을 열쇠 막힘으로 셌다');
