@@ -450,7 +450,7 @@ t('⛔ 열쇠를 못 쓰는 기기(아이폰·아이패드·맥 사파리 · 끈
   //   마감 시계: 열쇠로 열어 load 뒤 노크가 안 오면 표시(첫 번째 DK_TRY · 두 번째 DK_OFF) + 칸 치움 + 다시 열기(소스 단정 · 동작은 test/teacher-shell.test.js 가 vm 시계로)
   const W = src.slice(src.indexOf('frameWatch = setTimeout'), src.indexOf('var frameWatch = null'));
   assert.match(src.slice(src.indexOf('(function reuse()'), src.indexOf('(function reuse()') + 600), /if \(!t \|\| devkeyOff\(\)\) return;/, '⛔ WebKit 기기가 받아 둔 토큰으로 구글 창구 없이 연다(아이폰 앱 다시 열기 「화면이 안 열렸어요」)');
-  assert.match(W, /if \(keyOpen && loaded\) \{[\s\S]{0,80}setItem\(again \? DK_OFF : DK_TRY[\s\S]{0,80}removeItem\(TOKKEY\)[\s\S]{0,400}location\.reload\(\)/, '⛔ 열쇠로 열다 노크가 안 오면 (두 번째에) 끄고 치우고 다시 열어야 한다');
+  assert.match(W, /if \(keyOpen && loaded\) \{[\s\S]{0,80}removeItem\(TOKKEY\)[\s\S]{0,300}setItem\(again \? DK_OFF : DK_TRY[\s\S]{0,400}location\.reload\(\)/, '⛔ 열쇠로 열다 노크가 안 오면 (두 번째에) 끄고 치우고 다시 열어야 한다');
 });
 
 t('⛔ ① 위조: appWin 이 정해지기 전 · 남의 창(같은 액자의 다른 후손 포함) · source 없음 · 남의 출처(다른 googleusercontent·껍데기 자신) → 안 받는다', () => {

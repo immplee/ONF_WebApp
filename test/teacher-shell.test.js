@@ -27,7 +27,8 @@ const gtok = () => 'x.' + b64({ exp: now() + 3000, hd: 'ownify.co.kr', email: 't
 const DAY = 86400000;
 
 /* 껍데기 본 스크립트를 통째로 돌린다 — 시계는 손으로 돌린다(advance) · 액자 load·안쪽 노크는 손으로 쏜다. */
-function boot(store) {
+function boot(store, opt) {
+  opt = opt || {};
   const calls = [], handlers = {}, els = {}, timers = new Map();
   const spin = { gone: false, parentNode: { removeChild() { spin.gone = true; } } };   // #wait .onf-spin — 걷히면 gone
   let clock = 0, tid = 0;
@@ -38,12 +39,13 @@ function boot(store) {
   const g = {
     navigator: CHROME, console: { warn() {}, log() {}, info() {} }, atob: (b) => Buffer.from(b, 'base64').toString('binary'),
     URL, URLSearchParams, Date, JSON, Math,
-    localStorage: { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } },
+    localStorage: { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { if (opt.full) throw new Error('QuotaExceededError'); ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } },
     document: { getElementById: el, querySelector: (q) => (q === '#wait .onf-spin' && !spin.gone ? spin : null), createElement: () => el('x' + Math.random()), body: { appendChild() {} },
       documentElement: { setAttribute() {}, getAttribute() {} } },
     location: { search: '', href: 'https://class.ownify.co.kr/teacher', reload() { calls.push('reload'); } },
     history: { state: null, replaceState() {}, pushState() {}, go() {}, back() {} },
     addEventListener: (type, fn) => { (handlers[type] = handlers[type] || []).push(fn); },
+    removeEventListener: (type, fn) => { handlers[type] = (handlers[type] || []).filter((f) => f !== fn); },
     setTimeout: (fn, ms) => { timers.set(++tid, { fn, at: clock + (ms || 0) }); return tid; },
     clearTimeout: (id) => { timers.delete(id); }, setInterval: () => 0, clearInterval() {},
     google: { accounts: { id: { initialize() {}, renderButton() {}, prompt: () => calls.push('prompt'), cancel() {}, disableAutoSelect() {} } } }
@@ -65,7 +67,8 @@ function boot(store) {
       clock = end;
     },
     load() { (app._on.load || []).forEach((f) => f({ type: 'load' })); },   // 액자 load(교차 출처 — contentWindow.location 을 못 읽는다)
-    knock() { (handlers.message || []).forEach((h) => h({ data: { onf: 'auth-please', stale: false }, source: { parent: app.contentWindow, postMessage() {} }, origin: KORIGIN })); },
+    post(data, origin) { (handlers.message || []).slice().forEach((h) => h({ data, source: { postMessage() {} }, origin })); },   // 남의 창 말
+    knock() { (handlers.message || []).slice().forEach((h) => h({ data: { onf: 'auth-please', stale: false }, source: { parent: app.contentWindow, postMessage() {} }, origin: KORIGIN })); },
     opened: () => /AKfycb/.test(String(app.src || '')),
     msg: () => String(els.waitmsg ? els.waitmsg.innerHTML : ''),
     spinning: () => !spin.gone
@@ -186,6 +189,65 @@ t('로그인 길(받아 둔 것 없음 · 구글 토큰)은 그대로 — 열고
     assert.strictEqual(R.reloads(), 0, '⛔ 로그인 길에서 새로 읽었다');
     assert.ok(!('onf_devkey_off' in store) && !('onf_devkey_try' in store), '⛔ 로그인 길을 열쇠 막힘으로 셌다');
   }
+});
+
+t('⛔ [🟡1] 「한 번 막힘」 기록은 새로고침에 안 사라진다 — 막힘 1 → 다음 열쇠 열기 3초에 새로고침 → 그다음 막힘이 「2번째」', () => {
+  const store = { onf_id_tok: odk() };
+  const A = boot(store); A.advance(300); A.load(); A.advance(8000);
+  assert.ok(store.onf_devkey_try, '전제: 첫 막힘 기록');
+  store.onf_id_tok = odk();
+  const B = boot(store); B.advance(3000);                                   // 다음 열쇠 열기 — 판정 전에 사람이 새로고침(B 는 버려진다)
+  assert.ok(store.onf_devkey_try, '⛔ 판정도 전에(노크·막힘 없이) 「한 번 막힘」을 지웠다 — 새로고침하면 두 번 규칙이 처음부터');
+  const C = boot(store); C.advance(300); C.load(); C.advance(8000);
+  assert.ok(Number(store.onf_devkey_off) > 0, '⛔ 새로고침을 사이에 둔 두 번째 막힘을 「2번째」로 안 셌다');
+  assert.ok(!('onf_devkey_try' in store), '⛔ 끈 뒤에도 「한 번 막힘」이 남았다');
+  //   열쇠 길 노크(stale 도 — 서버가 열쇠를 거절해도 액자는 떴다)를 받으면 그때 지운다
+  delete store.onf_devkey_off; store.onf_devkey_try = String(Date.now()); store.onf_id_tok = odk();
+  const D = boot(store); D.advance(2000);
+  D.post({ onf: 'auth-please' }, 'https://evil.example'); D.post({ onf: 'x' }, KORIGIN);   // 노크 전 남의 말 — appWin 이 안 정해진다
+  assert.ok(store.onf_devkey_try, '⛔ 노크 전(남의 말)에 「한 번 막힘」을 지웠다');
+  D.knock();
+  assert.ok(!('onf_devkey_try' in store), '⛔ 열쇠 길 노크를 받았는데 「한 번 막힘」이 남았다');
+  //   로그인 길(구글 창구) 노크는 열쇠 길 성공이 아니다 — 안 지운다(진짜 막힌 기기가 영영 「첫 번째」에 머문다)
+  store.onf_devkey_try = String(Date.now()); delete store.onf_id_tok;
+  const E = boot(store); E.g.onCredential({ credential: gtok() }); E.advance(1000); E.knock();
+  assert.ok(store.onf_devkey_try, '⛔ 로그인 길 노크로 「한 번 막힘」을 지웠다 — 막힌 기기가 두 번째에 안 꺼진다');
+});
+
+t('⛔ [🟡2] 저장소가 가득 차 setItem 이 던져도 받아 둔 열쇠는 치운다 — 새로 읽기가 끝없이 돌지 않는다', () => {
+  const store = { onf_id_tok: odk() };
+  const A = boot(store, { full: true }); A.advance(300); A.load(); A.advance(8000);
+  assert.strictEqual(A.reloads(), 1, '전제: 막힘에 한 번 새로 읽는다');
+  assert.ok(!('onf_id_tok' in store), '⛔ setItem 이 던지자 열쇠를 안 치웠다 — 새로 읽어도 같은 열쇠로 또 막혀 끝없이 돈다');
+  const B = boot(store, { full: true });
+  assert.ok(!B.opened(), '⛔ 새로 읽은 뒤에도 열쇠로 다시 열었다(끝없는 새로 읽기)');
+});
+
+t('⛔ [🟡3] load 셈 가장자리 — 읽히는 빈 문서(about:blank) load 는 안 센다 · 두 번째 load 로 시계를 다시 안 세운다 · 열고 25초 load 면 30초 시계를 걷는다', () => {
+  //   ① about:blank(같은 출처라 읽힌다) load — 세면 느린 서버를 8초에 막힘으로 판다
+  const store = { onf_id_tok: odk() };
+  const A = boot(store);
+  A.els.app.contentWindow.location = { href: 'about:blank' };
+  A.advance(100); A.load();
+  delete A.els.app.contentWindow.location;
+  A.advance(8000);
+  assert.strictEqual(A.reloads(), 0, '⛔ 첫 빈 문서 load 를 진짜 load 로 셌다(8초에 막힘 판정)');
+  assert.ok(!store.onf_devkey_try);
+  A.advance(1900); A.load(); A.advance(7999);                               // 진짜 load(10초) — 그 뒤 8초
+  assert.strictEqual(A.reloads(), 0);
+  A.advance(1);
+  assert.strictEqual(A.reloads(), 1, '⛔ 빈 문서 뒤 진짜 load 를 안 셌다');
+  //   ② load 두 번 — 두 번째로 시계를 다시 세우면 막힘 판정이 밀린다
+  const B = boot({ onf_id_tok: odk() });
+  B.advance(300); B.load(); B.advance(4700); B.load(); B.advance(3300);    // 첫 load 뒤 8초 = 8.3초
+  assert.strictEqual(B.reloads(), 1, '⛔ 두 번째 load 로 시계를 다시 세웠다(막힘 판정이 늦어진다)');
+  //   ③ 열고 25초에 load — 30초 시계를 안 걷으면 load 5초 뒤(30초)에 막힘으로 판다
+  const C = boot({ onf_id_tok: odk() });
+  C.advance(25000); C.load(); C.advance(5000);
+  assert.strictEqual(C.reloads(), 0, '⛔ 30초 시계를 안 걷었다 — load 5초 만에 막힘 판정');
+  assert.strictEqual(C.msg(), '', '⛔ load 가 왔는데 30초에 안내를 띄웠다');
+  C.advance(1000); C.knock(); C.advance(30000);                             // load 6초 뒤 노크 — 정상
+  assert.strictEqual(C.reloads(), 0);
 });
 
 t('정상 열쇠 열기(노크 8초 안) — 안내도 새로 읽기도 기록도 없다(지금과 같다)', () => {
