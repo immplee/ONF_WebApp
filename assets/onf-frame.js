@@ -315,8 +315,13 @@
          옛 껍데기(답이 없다)면 종전대로 교재 화면으로 넘어간다. ⛔ 키보드 노크(frameHello)와 섞지 않는다(appWin 을 안 바꾼다).
          targetOrigin 은 노크한 출처(브라우저가 채운 값 · 위 자물쇠를 지난 googleusercontent).
          📱 phone:1 = 폰 판(전체 화면 · 뒤로 = 숨김 · 아래 「폰 판」)도 할 줄 안다(2026-10-14) — 홈은 이 칸이 있을 때만 폰에서 가로챈다(옛 껍데기 = 종전대로 넘어감). */
-      if (ev.data.onf === 'bookHello' && opts.bookSrc) { try { ev.source.postMessage({ onf: 'caps', book: 1, phone: opts.phone ? 1 : 0 }, ev.origin); } catch (eC) {} return; }
-      if (ev.data.onf === 'openBook' && opts.bookSrc && typeof ev.data.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(ev.data.href, ev.data.left, ev.data.m, ev.data.r); var hp = bookShown(); if (hp) hp.back = null; return; }   // 홈에서 연 판은 앞 판 기억 없음(종전 · 4.4)
+      if (ev.data.onf === 'bookHello' && opts.bookSrc) {   // 📖 swap:1 = 판 한 장(켰을 때만 칸이 있다 — 끔이면 종전 글자 그대로 · 홈은 이때만 미리 넷을 보낸다)
+        var cp = { onf: 'caps', book: 1, phone: opts.phone ? 1 : 0 };
+        if (BOOK_SW) cp.swap = 1;
+        try { ev.source.postMessage(cp, ev.origin); } catch (eC) {}
+        return;
+      }
+      if (ev.data.onf === 'openBook' && opts.bookSrc && typeof ev.data.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(ev.data.href, ev.data.left, ev.data.m, ev.data.r, true); var hp = bookShown(); if (hp) { hp.back = null; hp.home = true; } return; }   // 홈에서 연 판은 앞 판 기억 없음(종전 · 4.4) · 📖 판이 있으면 갈아 끼움 · home = 판 자격(아래 bookBoard)
       /* 홈이 탭을 바꿨다 → 옆 판을 닫는다(2026-10-12 Peter 「창이 켜진 채 탭을 바꾸면 자동으로 꺼져야」) — bookClose 는 판 액자만 말한다(따로 둔 이름) */
       if (ev.data.onf === 'bookDismiss') { bookClose(true); return; }   // 메뉴를 눌렀다 = 전부 닫고 홈(앞 판을 보이지 않는다) · 보이는 판만 숨긴다(없으면 아무 일 없음)
       /* 📖 홈이 「첫 교재를 미리 받아 줘」(2026-10-12 · 설계서 §1-5 · 10-13 숨긴 판) — 주소는 판과 같은 거르개(bookSrc — 교재만 · 아는 값만 · embed=1).
@@ -431,6 +436,10 @@
     var BOOK_MAX = 3, BOOK_IDLE_MS = 30 * 60 * 1000;
     var books = [], bookHome = null, bookHomeOrigin = '';   // books = 판들(오래 안 쓴 것이 앞) · { box, el, src, key, parked, win, origin, views, kb, hw, ho, idle, left }
     var warmed = {};
+    /* 📖 판 한 장 스위치(2단계 · 아래 「교재 판 한 장」) — index.html 이 주소 swap=1|0 을 기기에 기억해 넘긴다(학생 키 onfSwap · 기본 끔). 끔이면 bookBoard 가 늘 null 이라 모든 길이 종전 그대로다(caps 에도 swap 칸이 없다). */
+    var BOOK_SW = !!opts.swap, BOOK_PERF = !!opts.perf;
+    var BOOK_SWAP_MS = 14000, bookSwapN = 0, BOOK_AGE_MS = 2 * 60 * 60 * 1000;   // 갈아 끼우기 답 시한(판의 맺음 8초와 받기 10초는 같이 돈다 + 여유 4초) · 번호(나중 것이 이긴다) · 판 나이(판 ONF_BOOK_AGE_MS 와 같다 · D3)
+    var bookQ = [], BOOK_Q_MAX = 6, BOOK_HI_MS = 60 * 1000;                       // 노크 전 판 줄(아래 bookCand)
     /* ═══ 📱 폰 판(2026-10-14 Peter 「메모리를 잡아먹지 않으면서 미리 불러와서 로딩 전혀 없이 열고 되돌리고」 → 「폰 숨긴 판 1개」) ═══
        폰 = 홈의 onfBookWide 가 아닌 화면 — **같은 물음**(BOOK_WIDE_Q · Ownify ONF_Home_Html onfBookWide 와 같이 고쳐라). 홈 액자가 화면 폭 그대로라 둘이 같은 답을 낸다.
        종전 폰은 판 0 — 교재 링크를 누르면 껍데기째 교재 주소로 넘어가 매번 구글 doGet(≈2~3초)을 기다렸다. 이제 홈이 caps phone:1 을 받으면 폰에서도 openBook 을 보낸다.
@@ -481,7 +490,7 @@
     function bookPop(s) {
       var k = bookOwner(s), src = k ? bookSrcs[k - 1] : '', p = src ? bookFind(src) : null;
       if (phone()) {
-        if (src && !p) p = bookMake(src, false);
+        if (src && !p) { p = bookBoardFor(src); if (p) bookSwapTo(p, src); else p = bookMake(src, false); }   // 📖 판이 있으면 그 주소로 갈아 끼운다(새 액자 대신)
         if (p) bookShow(p); else bookHide();
       }
       (p ? [p] : k ? [] : books).forEach(function (q) {
@@ -495,7 +504,7 @@
       try { global.fetch(src, { mode: 'no-cors', credentials: 'omit', cache: 'no-store' }).catch(function () {}); } catch (e) {}
     }
     function bookShown() { for (var i = 0; i < books.length; i++) if (!books[i].parked) return books[i]; return null; }
-    function bookFind(src) { for (var i = 0; i < books.length; i++) if (books[i].src === src) return books[i]; return null; }
+    function bookFind(src) { for (var i = 0; i < books.length; i++) if (books[i].src === src && !books[i].gone) return books[i]; return null; }   // 📖 gone = 내용과 주소가 어긋날 수 있는 판(아래 bookRetire)
     /* 📖 view 만 다른 주소는 같은 판에서 연다(2026-10-14 Peter 「미리 띄워 둔 내 문장 판에 '복습/카드 열어'를 전달해서, 다시 안 불러오고 바로 열기」).
        view 는 「열자마자 무엇을 띄울까」뿐이다 — 홈 [복습 시작] = ⭐ 내 문장 view=review(🔁 오늘 복습) · 「카드 시작」 = 교재 view=cards(🗂️ 회차 덱).
        종전엔 주소가 달라 판을 하나 새로 받았다(라이브 [복습 시작] ≈4.4초 — 미리 띄운 내 문장 판이 옆에 숨어 있는데도).
@@ -508,12 +517,12 @@
          'line' 을 할 줄 안다고 노크한 판이면 그 판에 {onf:'bookView', line: N} — 교재가 &line= 으로 연 것과 같은 길(onfJumpOnce)로 굴린다. 줄은 숫자만(아니면 줄로 안 친다 = 종전 새 판). */
     function bookAsk(src) { try { var q = new URL(src).searchParams, l = q.get('line') || ''; return { view: q.get('view') || '', line: /^\d{1,7}$/.test(l) ? Number(l) : 0 }; } catch (e) { return { view: '', line: 0 }; } }
     function bookBase(src) { try { var u = new URL(src); u.searchParams.delete('view'); u.searchParams.delete('line'); return u.href; } catch (e) { return src; } }
-    function bookCan(p, a) { return !!(p && (a.view || a.line) && (!a.view || p.views.indexOf(a.view) >= 0) && (!a.line || p.views.indexOf('line') >= 0)); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 []
+    function bookCan(p, a) { return !!(p && !p.gone && !p.sw && (a.view || a.line) && (!a.view || p.views.indexOf(a.view) >= 0) && (!a.line || p.views.indexOf('line') >= 0)); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 [] · 📖 자격 내린 판(gone)·갈아 끼우는 중(sw — 아직 옛 교재)엔 「열어」를 안 보낸다
     /* 아무것도 안 묻는 열기([이어서 하기])도 **줄 링크로 연 판**(view 없음)이면 그 판(반박 검토 🟡4) — 판은 이미 그 교재다 · 할 말이 없으니 보이기만.
        ⛔ view 로 연 판(덱·복습)은 안 맡긴다 — 열자마자 그 창을 띄운 판이다(위 「view 없는 보통 열기」 검사). */
     function bookLike(src, a) {
       var b = bookBase(src), q;
-      for (var i = 0; i < books.length; i++) { q = books[i]; if (bookBase(q.src) === b && (bookCan(q, a) || (!a.view && !a.line && !bookAsk(q.src).view))) return q; }
+      for (var i = 0; i < books.length; i++) { q = books[i]; if (q.gone || q.sw || bookAged(q)) continue; if (bookBase(q.src) === b && (bookCan(q, a) || (!a.view && !a.line && !bookAsk(q.src).view))) return q; }   // 📖 늙은 판(bookAged)은 bookShow 가 그 주소로 새로 띄워 view·line 을 잃는다 — 갈아 끼우기(→ stale → 새 판)로
       return null;
     }
     /* left = 홈 왼쪽 메뉴의 오른쪽 끝(px · 홈이 잰다) — 있으면 판이 그 오른쪽부터 덮는다(2026-10-12 Peter 「창 모드일 때는 맨 왼쪽 탭만 보이게」).
@@ -535,7 +544,8 @@
       return ok ? v : null;
     }
     function bookMake(src, parked) {
-      var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, key: bookKey(src), parked: parked, win: null, origin: '', views: [], kb: null, hw: null, ho: '', idle: null, left: null, m: null, r: null, back: null };   // back = 나를 열어 준 판(하나만 · 없으면 null) — 아래 「앞 판 규칙」
+      var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, key: bookKey(src), parked: parked, win: null, origin: '', views: [], kb: null, hw: null, ho: '', idle: null, left: null, m: null, r: null, back: null,   // back = 나를 열어 준 판(하나만 · 없으면 null) — 아래 「앞 판 규칙」
+        swap: false, load: src, real: src, sw: null, ask: {}, born: Date.now(), gone: false, home: false };   // 📖 아래 「교재 판 한 장」 — swap = 노크 swap:1 · load = 액자가 처음 연 주소 · real = 판이 실제로 든 교재 · sw = 기다리는 갈아 끼우기 · ask = 보낸 번호 → 주소 · born = 만든 때 · gone = 주소로 못 찾음 · home = 홈에서 연 판(bookBoard)
       p.box.className = 'onf-bookpanel';
       if (parked) p.box.classList.add('park');
       p.el.setAttribute('allow', 'clipboard-write; microphone');
@@ -548,7 +558,7 @@
       wait.innerHTML = '<div class="onf-spin"></div><span>불러오는 중</span>';
       p.box.appendChild(wait);
       document.body.appendChild(p.box);
-      if (parked) p.idle = setTimeout(function () { bookDrop(p); }, BOOK_IDLE_MS);
+      if (parked) p.idle = setTimeout(function () { bookIdle(p); }, BOOK_IDLE_MS);
       p.oe = openExec(p.el, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, wait, bookClose);   // 🔐 여러 계정 우회(위) — 못 열면 이 판 「불러오는 중」 자리에 안내 + [닫기] · 기억은 읽기만
       books.push(p);
       return p;
@@ -558,6 +568,7 @@
       if (i < 0) return;
       books.splice(i, 1);
       if (p.idle) clearTimeout(p.idle);
+      if (p.sw) clearTimeout(p.sw.tm);                    // 📖 지운 판의 갈아 끼우기 시한은 걷는다
       if (p.oe) p.oe.stop();                              // 🔐 load 전에 지우는 판 — 노크 듣기를 걷는다
       if (p.box.parentNode) p.box.parentNode.removeChild(p.box);
     }
@@ -567,12 +578,15 @@
       p.parked = on;
       p.box.classList.toggle('park', on);
       if (p.idle) { clearTimeout(p.idle); p.idle = null; }
-      if (on) { p.idle = setTimeout(function () { bookDrop(p); }, BOOK_IDLE_MS); try { p.el.blur(); } catch (e) {} }
+      if (on) { p.idle = setTimeout(function () { bookIdle(p); }, BOOK_IDLE_MS); try { p.el.blur(); } catch (e) {} }
       bookTell(p);
     }
+    /* 숨긴 채 30분 — 지운다. 📖 판(bookBoard)은 빼 준다(하루 종일 한 판 · 판 나이 2시간은 판이 stale 로 말한다). */
+    function bookIdle(p) { p.idle = null; if (p !== bookBoard()) bookDrop(p); }
     /* p 를 보이고 보이던 판은 숨긴다 · 폰이면 판 칸(histBook) · 키보드 보정 자리(sync). ⚠️ 새 판(bookMake 가 보이게 만든)이면 books 끝이라 bookShown 은 보이던 옛 판을 먼저 찾는다. */
     function bookShow(p, left, m, r) {
       if (p.oe && p.oe.stuck()) { bookDrop(p); p = bookMake(p.src, false); }   // 🔐 못 연 판(안내) — 지우고 새로 받는다(반박 검토 🟡4 · 종전: 안내 그대로 · [닫기] 해야 새로)
+      if (bookAged(p)) { var old = p; p = bookMake(old.src, false); p.home = old.home; bookRetire(old); }   // 📖 2시간 넘은 숨긴 판(판은 30분 지우기에서 빠진다) — 옛 코드 그대로 안 띄우고 새로 · 옛 판은 저장 중일 수 있어 안 지운다
       var cur = bookShown();
       if (cur && cur !== p) bookPark(cur, true);
       if (typeof left === 'number') bookPlace(p, left, m, r);
@@ -583,22 +597,86 @@
       if (phone()) histBook(p);
       sync();
     }
-    function bookOpen(href, left, bm, br) {   // ⚠️ 칸 값 m·r 은 이 안의 지역 m(bookView 말)과 겹쳐 bm·br 로 받는다
-      var src = opts.bookSrc(href);
+    /* home === true = 홈에서 온 openBook — 📖 같은 주소·할 줄 아는 판(bookLike)이 없고 판(bookBoard)이 있으면 새 판 대신 갈아 끼운다(아래 「교재 판 한 장」).
+       ⛔ 판 안에서 온 openBook(⭐ → 「교재에서 보기」 · 판 안 링크)은 종전 새 판(창 B안 앞 판 0초). */
+    function bookOpen(href, left, bm, br, home) {   // ⚠️ 칸 값 m·r 은 이 안의 지역 m(bookView 말)과 겹쳐 bm·br 로 받는다
+      var src = opts.bookSrc(href), b;
       if (!src) return;
-      var a = bookAsk(src), p = bookFind(src) || bookLike(src, a) || bookMake(src, false), m = { onf: 'bookView' };   // 📖 view·line 만 다른 판이 할 줄 알면 그 판(위 bookLike)
+      var a = bookAsk(src), p = bookFind(src) || bookLike(src, a), m = { onf: 'bookView' };   // 📖 view·line 만 다른 판이 할 줄 알면 그 판(위 bookLike) — 갈아 끼우기보다 **먼저**(0초 길)
+      if (!p && home && (b = bookBoardFor(src))) { bookSwapTo(b, src, left, bm, br); return; }
+      p = p || bookMake(src, false);
       bookShow(p, left, bm, br);   // 🔐 못 연 판이면 bookShow 가 새 판으로 바꾼다 — 새 판은 노크 전이라 아래 bookCan 이 거짓(말 안 보냄)
       if (a.view) m.view = a.view;
       if (a.line) m.line = a.line;
       if (bookCan(p, a)) { try { p.win.postMessage(m, p.origin); } catch (e) {} }   // 보인다(bookPark) 다음에 — 페이지가 「보임」 손질 뒤 연다
     }
-    /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판은 안 건드린다(books 는 오래 안 쓴 것이 앞). */
-    function bookRoom(n) { for (var i = 0; books.length > n && i < books.length; ) { if (books[i].parked) bookDrop(books[i]); else i++; } }
+    /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판·📖 판(bookBoard)·📖 노크 전 판 후보(bookCand)는 안 건드린다(books 는 오래 안 쓴 것이 앞). */
+    function bookRoom(n) { var bd = bookBoard(); for (var i = 0; books.length > n && i < books.length; ) { if (books[i].parked && books[i] !== bd && !bookCand(books[i])) bookDrop(books[i]); else i++; } }
     function bookPre(href, left, m, r) {
-      var src = opts.bookSrc(href);
+      var src = opts.bookSrc(href), b;
       if (!src || bookFind(src)) return;
+      b = bookBoardFor(src);
+      if (b) { bookFetch(b, src); return; }   // 📖 판이 값만 받아 둔다(새 판 0 · 접속 표시 0 · 판이 차례를 맡는다)
+      if (!bookMine(src) && books.some(bookCand)) { if (bookQ.length < BOOK_Q_MAX && bookQ.indexOf(src) < 0) bookQ.push(src); return; }   // 📖 곧 판이 될 판이 노크 전 — 줄에 세운다(아래 bookCand)
+      //   ⚠️ 선생님 껍데기의 D1(폰은 미리 판 없음)은 안 가져온다 — 학생 폰은 숨긴 미리 판 하나가 종전 그대로다(설계 §7.2 · 그 판이 곧 판이 된다)
       bookRoom(bookMax() - 1);   // 자리가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 — 종전엔 안 띄웠다 · 📱 폰은 자리 2)
-      bookPlace(bookMake(src, true), left, m, r);
+      var np = bookMake(src, true); np.home = true;   // 📖 홈이 미리 띄운 판 — 노크하면 판이 된다
+      bookPlace(np, left, m, r);
+    }
+    /* ═══ 📖 교재 판 한 장 2단계(학생 · 2026-10-17 · 설계 ONF_SlackBot docs/2026-10-15-교재판-한장-설계.md §5.2 · §7.2 갈래 표 4) ═══
+       ⚠️ 쌍둥이: teacher/index.html 「📖 교재 판 한 장 1d」 블록이 정본이다 — 같은 반박 검토 교훈(stale·14초는 자격만 내림 · 진 번호 시한 걷기 · 실패면 주소 되돌리고 새 판 · 2시간 숨긴 판은 보일 때 새로 ·
+          노크 전 판 줄 · bookRoom 이 후보를 안 지움)을 그대로 옮겼다 · 까닭 주석은 거기. 판 쪽 약속은 Ownify ONF_Share_WebApp_Html onfBookSwap.
+       홈에서 연 판 하나(판)가 다른 교재로 **갈아 끼운다** — 새 판(GAS doGet ≈5초) 대신 판이 값만 받아 표를 바꾼다(받아 둔 값 ≤0.5초 · 서버 ≈2.5~3.2초).
+       학생만의 점: ① view·line 만 다른 주소는 bookLike → bookView 를 먼저(위 bookOpen) ② 폰도 숨긴 미리 판 하나는 종전(위 bookPre) ③ 2시간 나이는 판 자격 있는 판만(⭐ 내 문장 판은 종전 — bookAged).
+         ④ 판 = **홈에서 연 판(home)** — 선생님 껍데기는 back === null 로 본다. 학생은 ⭐ 판 안 「교재에서 보기」가 bookLike 로 판을 그대로 다시 보이며 back = ⭐ 를 단다(✕ = ⭐ 0초 · 종전 앞 판 규칙) —
+            back 으로 보면 판이 자격을 잃어 다음 홈 [열기]가 새 판이 되고 판 셋 넘침이 그 판(안 보낸 글)을 쫓아냈다(크롬 실측 2026-10-17). 판 안에서 처음 연 판은 home 이 없어 종전대로 판이 아니다.
+       ⛔ 학생 토큰은 판 주소(src — 판의 fetch 주소)에만 있다. 기록 칸엔 판 번호(key)뿐이다(histBook). */
+    function bookBoard() {
+      var b = null, p, i;
+      if (!BOOK_SW) return null;
+      for (i = 0; i < books.length; i++) { p = books[i]; if (p.swap && p.win && p.home) { if (!p.parked) return p; b = p; } }
+      return b;
+    }
+    function bookMine(src) { return /[?&]mode=mine(&|$)/.test(src); }
+    function bookBoardFor(src) { return bookMine(src) ? null : bookBoard(); }   // ⭐ 내 문장 주소는 교재 판에 안 끼운다(설계 §5.4 — 내 문장 판은 따로)
+    function bookFetch(b, src) { try { b.win.postMessage({ onf: 'bookFetch', src: src }, b.origin); } catch (e) {} }
+    /* 노크 전 판 후보 = 홈에서 연·미리 띄운 판(home) · 아직 노크 전(!win) · 내 문장 아님 · 만든 지 1분 안. 있으면 미리(교재) 주소는 줄에 선다 — 학생 홈은 2초 뒤 넷을 한꺼번에 보낸다(첫 교재 판은 그때 노크 전).
+       그 판이 swap:1 로 노크해 판이 되면 줄을 bookFetch 로 흘린다(아래 bookHi) · swap 없이 끝나면 안 흘린다. ponytail: 1분 = 노크 기다림 짐작(선생님 껍데기와 같다). */
+    function bookCand(p) { return BOOK_SW && p.home && !p.win && !bookMine(p.src) && Date.now() - p.born < BOOK_HI_MS; }
+    function bookAged(p) { return BOOK_SW && p.swap && p.parked && Date.now() - p.born > BOOK_AGE_MS; }
+    function bookSwapTo(p, src, left, m, r) {
+      var id = ++bookSwapN, sw, i;
+      if (p.sw) clearTimeout(p.sw.tm);
+      p.ask[id] = src;
+      try { p.win.postMessage({ onf: 'bookSwap', id: id, src: src }, p.origin); } catch (e) {}
+      sw = p.sw = { id: id, src: src, left: left, m: m, r: r, t0: Date.now(), tm: 0 };
+      sw.tm = setTimeout(function () { if (p.sw === sw) bookSwapEnd(p, sw, false, 'time', ''); }, BOOK_SWAP_MS);
+      p.src = src; p.key = bookKey(src);
+      for (i = 0; i < books.length; i++) if (books[i].back === p) books[i].back = null;   // 그 판은 이제 다른 교재다
+      bookShow(p, left, m, r);
+    }
+    function bookSwapped(p, d) {   // 판의 답 — 이 판에 보낸 번호만
+      var src = p.ask[d.id];
+      if (typeof src !== 'string') return;
+      delete p.ask[d.id];
+      if (d.ok === true) p.real = src;
+      if (p.sw && p.sw.id === d.id) bookSwapEnd(p, p.sw, d.ok === true, String(d.why || 'fail'), d.from);
+    }
+    function bookSwapEnd(p, sw, ok, why, from) {
+      var shown = !p.parked;
+      clearTimeout(sw.tm); p.sw = null;
+      bookPerf(sw, ok ? String(from || '') : 'new', ok ? '' : why);
+      if (ok) return;
+      p.src = p.real; p.key = bookKey(p.real);
+      if (why === 'stale' || why === 'time') bookRetire(p);   // ⛔ 지우지 않는다 — 안 보낸 글·저장 중일 수 있다
+      if (shown) { var np = bookMake(sw.src, false); np.home = true; bookShow(np, sw.left, sw.m, sw.r); }   // 종전 길 그대로(판은 숨김 — bookShow 가 숨긴다) · 그 사이 사람이 닫았으면 안 띄운다 · 홈에서 연 것이라 다음 판
+    }
+    function bookRetire(p) { p.swap = false; p.gone = true; if (p.parked) bookPark(p, true); }   // 판 자격만 내린다 — 액자는 안 지운다 · 숨긴 판이면 30분 시계를 다시 건다
+    function bookPerf(sw, from, why) {   // perf=1 — 「판 갈아 끼움 Nms(받아 둔 값|서버)」 · 물러남은 from:'new'(why) · 콘솔 한 줄 + 홈에 bookPerf(모르는 홈은 버린다)
+      if (!BOOK_PERF) return;
+      var ms = Date.now() - sw.t0;
+      try { console.log('[onf 속도] 판 갈아 끼움 ' + ms + 'ms(' + (from === 'cache' ? '받아 둔 값' : from === 'server' ? '서버' : '물러남 → 새 판 · ' + why) + ')'); } catch (e) {}
+      if (bookHome && bookHomeOrigin) { try { bookHome.postMessage({ onf: 'bookPerf', ms: ms, from: from, why: why }, bookHomeOrigin); } catch (e2) {} }
     }
     /* 🌙 교재(다크 모드 2단계 · 2026-10-13)가 「무슨 색?」(themeAsk) → 지금 틀 색을 답하고, 홈이 색을 바꾸면 물었던 창에도 알린다.
        교재는 따르기만 한다(색을 알리지 않는다) — 선생님 홈처럼 액자 저장소가 다른 곳에서 연 교재도 홈과 같은 색이 된다.
@@ -649,9 +727,14 @@
         if (!/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(String(ev.origin))) return;
         p.win = ev.source; p.origin = ev.origin;
         p.views = typeof d.views === 'string' ? d.views.split(',') : [];   // 📖 할 줄 아는 view(위 bookLike) — 옛 교재는 안 싣는다 = 없음
+        p.swap = d.swap === 1;   // 📖 swap:1 은 둘째 노크에 온다 — 첫 노크(없음)가 다시 오면 판이 다시 읽힌 것
+        if (p.real !== p.load || p.sw) { p.real = p.load; if (p.sw) bookSwapEnd(p, p.sw, false, 'fail', ''); p.src = p.load; p.key = bookKey(p.load); }   // 다시 읽힌 판 = 처음 주소
         bookTell(p);
+        var bd = bookBoard(), bq = bookQ;   // 📖 판이 생겼다 — 노크 전에 줄 선 미리 주소를 흘린다(위 bookCand)
+        if (bd && bq.length) { bookQ = []; bq.forEach(function (x) { if (!bookFind(x)) bookFetch(bd, x); }); }
         return;
       }
+      if (d.onf === 'bookSwapped') { bookSwapped(p, d); return; }   // 📖 판의 답 — 숨긴 판도(답을 기다리는 사이 사람이 닫을 수 있다)
       if (d.onf === 'themeAsk') { themeAsk(ev); return; }   // 🌙 판 안 교재가 묻는다(2단계) — 숨긴 판도(보일 때 색이 맞게)
       /* 📱 판 안쪽 기록 다리(폰 · 위 bookHist — 숨긴 판의 노크도 받는다: 미리 띄운 판은 숨긴 채 뜬다) · 키보드 노크 = 이 판의 키보드 높이 받는 창(kbAt) */
       if (d.onf === 'hist') { bookHist(p, ev); return; }
@@ -693,6 +776,7 @@
     global.addEventListener('resize', sync);
 
     openExec(frameEl, src, opts.wait || null, null, true);   // 🔐 여러 계정 우회(위) — 못 열면 index.html 의 「불러오는 중」 자리에 안내 · 기억은 홈 액자만 정한다
+    return { _books: books, _drop: bookDrop };   // 검사용으로만(test/book-panel.test.js 가 판 자격·back 을 본다) — 화면 코드에서 쓰지 마라
   }
 
   global.ONF = global.ONF || {};
