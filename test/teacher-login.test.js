@@ -33,7 +33,7 @@ const jwt = (p) => 'x.' + Buffer.from(JSON.stringify(p)).toString('base64').repl
 function boot(nav, store) {
   const calls = [], handlers = {}, els = {};
   const el = (id) => els[id] || (els[id] = { id, hidden: id === 'app' || id === 'wait', style: {}, classList: { add() {}, remove() {}, toggle() {} },
-    contentWindow: id === 'app' ? { name: 'appwin' } : null, appendChild() {}, setAttribute() {}, parentNode: null, textContent: '', innerHTML: '' });
+    contentWindow: id === 'app' ? { name: 'appwin' } : null, appendChild() {}, setAttribute() {}, addEventListener() {}, parentNode: null, textContent: '', innerHTML: '' });
   const ls = store || {};
   const g = {
     navigator: nav, console: { warn() {}, log() {} }, atob: (b) => Buffer.from(b, 'base64').toString('binary'),

@@ -165,9 +165,13 @@ function tokLoad() {
 /* ═══ 🔑 기기 열쇠를 못 쓰는 기기 (2026-10-12 Peter 아이폰 실측) ═══
    아이폰·아이패드·맥 사파리(WebKit)는 앱을 다시 열면 구글 창구를 거치기 **전엔** 끼운 구글 화면(exec)에 로그인 쿠키를
    안 실어 안쪽이 안 뜬다 — 열쇠로 구글 창구를 건너뛰면 「화면이 안 열렸어요」 에 갇힌다(10분 시험 열쇠로 실측).
-   → 이 기기들은 열쇠를 **받아 두지도 꺼내 쓰지도 않는다**(지금처럼 구글 창구). 그 밖의 기기도 열쇠로 열다 노크가 안 오면
+   → 이 기기들은 열쇠를 **받아 두지도 꺼내 쓰지도 않는다**(지금처럼 구글 창구). 그 밖의 기기도 열쇠로 열다 노크가 안 오면(액자 load 뒤 8초 · 두 번 잇달아)
      DK_OFF 를 찍어 7일 동안 끈다(아래 mount 의 마감 시계). ⚠️ 크롬(맥·윈도) 은 그대로 쓴다. */
 var DK_OFF = 'onf_devkey_off';
+/* 🔑 [2026-10-17] 「한 번 막힘」 표시 — 7일 끄기는 **두 번 잇달아** 막혔을 때만(학생 껍데기 onf-frame.js 의 onfClTry → onfCl 과 같은 두 번 규칙).
+   첫 막힘 = 이 표시만 · 다음 열쇠 열기가 또 막히면 DK_OFF · 그 사이 열쇠 열기가 뜨면 지운다(mount 가 열 때 읽고 지운다 — 노크가 오면 지운 채로 남는다). */
+var DK_TRY = 'onf_devkey_try';
+function dkAt(k) { try { var t = Number(localStorage.getItem(k) || 0); return !!t && (Date.now() - t) < 7 * 86400000; } catch (e) { return false; } }
 /* WebKit(아이폰·아이패드·맥 사파리)인가 — 기기 열쇠(아래)와 One Tap(맨 아래 start) 두 곳이 같이 본다. */
 function webkitOnly() {
   var ua = (typeof navigator !== 'undefined' && navigator.userAgent) || '';
@@ -176,8 +180,7 @@ function webkitOnly() {
   return typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;   // 데스크톱 UA 를 쓰는 아이패드
 }
 function devkeyOff() {
-  if (webkitOnly()) return true;
-  try { var t = Number(localStorage.getItem(DK_OFF) || 0); return !!t && (Date.now() - t) < 7 * 86400000; } catch (e) { return false; }
+  return webkitOnly() || dkAt(DK_OFF);
 }
 
 function say(msg) { document.getElementById('why').textContent = msg || ''; }
@@ -218,6 +221,24 @@ function mount() {
   //   느린 구간 표(선생님 홈 `perf=1` — 2026-09-28)도 넘긴다. 값은 「1」 하나만 안다.
   if (q.get('perf') === '1') pass.set('perf', '1');
   var qs = pass.toString();
+  /* 🔑 [2026-10-17] 받아 둔 것(열쇠·구글 토큰)으로 연 화면의 「막힘」 판정은 **액자 load 부터** 8초를 센다.
+     ⛔ 종전엔 열고 8초였다 — 서버(doGet)가 한 번 느린 것(10-17 10:05:52 doGet 12.2초)과 진짜 막힌 액자를 못 갈라,
+       느린 한 번에 열쇠를 7일 끄고 새로 읽어(다시 로그인 + 두 번째 doGet) 빈 화면이 15~20초+ 였다.
+     → 느린 서버는 load 가 doGet 뒤에 온다(노크도 그 언저리) · 막힌 액자(구글 창구가 액자 안에서 거부)는 오류 화면 load 가 빨리 온다(2026-09-02 실측 279ms).
+     ⚠️ load 가 안 오면(연결 멈춤) 막힘으로 세지 않는다 — 열고 8초에 로그인 길과 같은 안내만(아래 watch).
+     ⚠️ 로그인 길(구글 창구로 받은 토큰)은 안 바꾼다 — load 를 안 듣고 종전대로 열고 8초. */
+  var keyOpen = reused || String(pending).indexOf('odk1.') === 0, loaded = false, again = false;
+  if (keyOpen) {
+    again = dkAt(DK_TRY);                                         // 지난 열쇠 열기도 막혔나(두 번 규칙)
+    try { localStorage.removeItem(DK_TRY); } catch (e) {}         // 이번에 뜨면(노크) 지운 채로 = 기록 지움 · 또 막히면 아래 watch 가 정한다
+    frame.addEventListener('load', function () {
+      if (appWin || loaded) return;                               // 노크가 먼저 왔다(안쪽 스크립트는 바깥 load 전에 돈다) · 두 번째 load 는 안 센다
+      try { if (frame.contentWindow.location.href === 'about:blank') return; } catch (e) {}   // 처음 빈 문서(같은 출처라 읽힌다) — 진짜 화면이 아니다
+      loaded = true;
+      clearTimeout(frameWatch);
+      frameWatch = setTimeout(watch, 8000);
+    });
+  }
   frame.src = EXEC + (qs ? '?' + qs : '');
   /* ⛔ 프레임이 **막혔는지**를 화면이 말해야 한다. 안쪽이 살아 있으면 몇백 ms 안에 노크가 온다.
      안 오면 구글이 문 앞에서 자른 것이다(회사 계정이 아니거나 로그인이 안 된 것) —
@@ -229,13 +250,15 @@ function mount() {
      구글이 자기 오류 화면을 이미 보여 준다.
      ⚠️ 진단이 필요할 땐 개발자도구 콘솔에 한 줄만 남긴다(사람은 안 본다). */
   clearTimeout(frameWatch);
-  frameWatch = setTimeout(function () {
+  frameWatch = setTimeout(watch, 8000);
+  function watch() {
     if (appWin) return;
-    /* 🔑 받아 둔 토큰·열쇠로(구글 창구 없이) 열었는데 안쪽이 안 왔다 = 이 기기는 구글 창구 없이는 액자가 안 뜬다(아이폰 실측과 같은 꼴) →
-       이 기기에서 7일 동안 「받아 둔 것으로 바로 열기」를 끄고 칸을 치운 뒤 한 번 다시 연다(그때는 구글 창구로 · 끈 표시가 있으니 다시 안 돈다). */
-    if (reused || String(pending).indexOf('odk1.') === 0) {
-      try { localStorage.setItem(DK_OFF, String(Date.now())); localStorage.removeItem(TOKKEY); } catch (e) {}
-      console.warn('[onf] 기기 열쇠로 열었는데 안쪽이 안 왔다 — 이 기기에선 7일 동안 열쇠를 안 쓴다(구글 창구로 다시 연다).');
+    /* 🔑 받아 둔 토큰·열쇠로(구글 창구 없이) 열어 액자는 다 읽혔는데(load) 안쪽이 안 왔다 = 이 기기는 구글 창구 없이는 액자가 안 뜰 수 있다(아이폰 실측과 같은 꼴) →
+       칸을 치우고 한 번 다시 연다(그때는 구글 창구로). 7일 끄기(DK_OFF)는 **두 번째 잇단 막힘**에서만 — 첫 번째는 DK_TRY 표시만(구글 일시 오류 한 번으로 7일 로그인하지 않게). */
+    if (keyOpen && loaded) {
+      try { localStorage.setItem(again ? DK_OFF : DK_TRY, String(Date.now())); localStorage.removeItem(TOKKEY); } catch (e) {}
+      console.warn(again ? '[onf] 기기 열쇠로 열다 두 번 잇달아 안쪽이 안 왔다 — 이 기기에선 7일 동안 열쇠를 안 쓴다(구글 창구로 다시 연다).'
+        : '[onf] 기기 열쇠로 열다 안쪽이 안 왔다(한 번) — 구글 창구로 다시 연다 · 다음 열쇠 열기도 막히면 7일 끈다.');
       location.reload();
       return;
     }
@@ -259,7 +282,7 @@ function mount() {
        ⛔ 원인은 여전히 단정하지 않는다(2026-08-14 교훈) — 「확인해 보라」까지만 말한다. */
     if (w) w.innerHTML = '화면이 안 열렸어요.'
       + '<br>@ownify.co.kr 계정으로 로그인했는지 확인하고 새로고침해 주세요.';
-  }, 8000);
+  }
 }
 var frameWatch = null;
 
