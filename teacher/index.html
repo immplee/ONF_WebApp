@@ -467,7 +467,7 @@ function bookHist(p, ev) {
 function bookPop(s) {
   var k = bookOwner(s), src = k ? bookSrcs[k - 1] : '', p = src ? bookFind(src) : null;
   if (phone()) {
-    if (src && !p) { p = bookBoardFor(src); if (p) bookSwapTo(p, src); else p = bookMake(src, false); }   // 📖 판이 있으면 그 주소로 갈아 끼운다(새 액자 대신)
+    if (src && !p) { p = bookBoardFor(src); if (p) { bookSwapTo(p, src); p = bookShown(); } else p = bookMake(src, false); }   // 📖 판이 있으면 그 주소로 갈아 끼운다(새 액자 대신) · 보인 판을 다시 집는다 — 판이 늙었으면 bookSwapTo 안 bookShow 가 새 판으로 바꿨다(옛 p 로 또 보이면 고아 액자 · 2단계 반박 🟡)
     if (p) bookShow(p); else bookHide();
   }
   (p ? [p] : k ? [] : books).forEach(function (q) {
@@ -579,7 +579,8 @@ function bookOpen(href, left, m, r, home) {
   bookShow(p || bookMake(src, false), left, m, r);
 }
 /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판·📖 판(bookBoard)·📖 노크 전 판 후보(bookCand)는 안 건드린다(books 는 오래 안 쓴 것이 앞). */
-function bookRoom(n) { var bd = bookBoard(); for (var i = 0; books.length > n && i < books.length; ) { if (books[i].parked && books[i] !== bd && !bookCand(books[i])) bookDrop(books[i]); else i++; } }
+/* ⛔ 자격 내린 판(gone — 늙음·stale·답 없음)은 **세지도 지우지도 않는다**(2단계 반박 🟠 2026-10-17) — 맺음(안 보낸 칸·실패 카드·오프라인 백업)이 끝나기 전에 지우면 그 글이 사라진다 · 30분 지우기(bookIdle)가 치운다. */
+function bookRoom(n) { var bd = bookBoard(), c = 0, i, q; for (i = 0; i < books.length; i++) if (!books[i].gone) c++; for (i = 0; c > n && i < books.length; ) { q = books[i]; if (q.parked && q !== bd && !q.gone && !bookCand(q)) { bookDrop(q); c--; } else i++; } }
 function bookPre(href, left, m, r) {
   var src = teacherBookSrc(href), b;
   if (!src || bookFind(src)) return;

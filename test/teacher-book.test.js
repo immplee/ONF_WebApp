@@ -1042,5 +1042,43 @@ t('perf=1 — 갈아 끼움이 끝나면 홈에 bookPerf{ms, from}(속도표 줄
   assert.ok(!sentOf(c.s.home).some((m) => m.onf === 'bookPerf'), '⛔ perf 없이 bookPerf 를 보냈다');
 });
 
+
+/* ═══ 2단계 반박 검토(2026-10-17) — 쌍둥이 둘 다 ═══ */
+console.log('[📖 2단계 반박 — 늙은 판 · 폰 뒤로]');
+t('🟠 늙은 판(2시간)을 다시 보이면 자격만 내린 옛 판은 판 셋 넘침이 **세지도 지우지도 않는다** — 맺음(안 보낸 칸·실패 카드)이 끝날 때까지 남고 30분 지우기가 치운다', () => {
+  const { s, P, bi } = boardRun();
+  s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
+  s.send({ onf: 'openBook', href: E2 }, bi);                                   // 판 안에서 연 판 둘(숨김) — 판 셋을 채운다
+  const q2 = shownOf(s)[0], i2 = swapKnock(s, q2, 2);
+  s.send({ onf: 'openBook', href: E3 }, i2);
+  const q3 = shownOf(s)[0];
+  swapKnock(s, q3, 3);
+  s.send({ onf: 'bookDismiss' }, s.home);
+  assert.ok(s.panels().length === 3 && s.panels().every((x) => x.classList.contains('park')), '전제: 숨긴 판 셋(P · q2 · q3)');
+  s.g.books.find((b) => b.box === P).born -= 2 * 60 * 60 * 1000 + 1000;
+  s.send({ onf: 'openBook', href: E4, left: 270 }, s.home);                   // 홈 [열기] → 판 P(늙음) → 새 판 + P 자격 내림
+  assert.ok(s.panels().includes(P) && P.parentNode && P.classList.contains('park'), '⛔ 자격 내린 늙은 판을 판 셋 넘침이 바로 지웠다(맺음 안 돎 → 안 보낸 칸·실패 카드 잃음)');
+  assert.ok(shownOf(s).length === 1 && shownOf(s)[0] !== P, '전제: 새 판이 보인다');
+  assert.ok(s.panels().includes(q2) && s.panels().includes(q3) && s.panels().length === 4, '⛔ 자격 내린 판을 판 셋에 셌다 — 멀쩡한 숨긴 판(q2·q3)이 밀려났다');
+  const N = shownOf(s)[0], ni = swapKnock(s, N, 4);
+  s.send({ onf: 'openBook', href: E5 }, ni);                                   // 판 안 링크 → 넷째(자격 내린 판 빼고) → 가장 오래 안 쓴 「멀쩡한」 숨긴 판을 비킨다
+  assert.ok(s.panels().includes(P) && !s.panels().includes(q2), '⛔ 판 셋 넘침이 자격 내린 판(가장 오래된 숨긴 판)을 지웠다 — 맺음 전이다');
+  s.timers.filter((x) => x.on && x.ms === 30 * 60 * 1000).forEach((x) => { x.on = false; x.f(); });
+  assert.ok(!s.panels().includes(P), '⛔ 30분 뒤에도 자격 내린 판이 남았다');
+});
+t('🟡 📱 폰 뒤로로 판을 갈아 끼울 때 판이 늙었으면(새 판으로 바뀜) 고아 액자·두 번째 새 판이 안 생긴다 — 판 목록 밖 DOM 판 0 · 보이는 판 = 그 칸 주소 하나', () => {
+  const { s, P } = boardRun({ phone: true });
+  s.g.books.find((b) => b.box === P).born -= 2.5 * 60 * 60 * 1000;
+  s.H.st = [{ state: null }, { state: { onfBook: s.g.bookKey(srcOf(s, E2)), n: 0, bd: 1 } }, { state: { onfBook: s.g.bookKey(srcOf(s, E1)), n: 0, bd: 1 } }]; s.H.i = 2;
+  const made = [], ap = s.g.document.body.appendChild;
+  s.g.document.body.appendChild = function (c) { made.push(c); return ap.call(this, c); };
+  s.browserBack();                                                              // E2 칸 — 판이 없다 → 판(P · 늙음)을 E2 로 → 새 판
+  assert.strictEqual(made.length, 1, '⛔ 새 판을 둘 띄웠다(옛 p 로 bookShow 를 또 불러 늙은 판을 또 갈았다 — 하나는 노크 전이라 지워진다 · doGet 헛걸음)');
+  const orphan = s.panels().filter((x) => !s.g.books.some((b) => b.box === x));
+  assert.strictEqual(orphan.length, 0, '⛔ 판 목록 밖에 남은 액자(고아)가 있다');
+  assert.ok(s.g.books.every((b) => b.box.parentNode), '⛔ 판 목록에 DOM 밖 판이 있다(엉뚱한 판을 뺐다)');
+  assert.ok(shownOf(s).length === 1 && shownOf(s)[0] !== P && shownOf(s)[0].kids[0].src === srcOf(s, E2) && s.panels().length === 2, '⛔ 보이는 판이 E2 새 판 하나가 아니다(늙은 판을 또 보였거나 새 판을 둘 띄웠다): ' + s.panels().map((x) => x.kids[0].src.slice(-30)).join(' | '));
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);

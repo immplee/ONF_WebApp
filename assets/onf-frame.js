@@ -490,7 +490,7 @@
     function bookPop(s) {
       var k = bookOwner(s), src = k ? bookSrcs[k - 1] : '', p = src ? bookFind(src) : null;
       if (phone()) {
-        if (src && !p) { p = bookBoardFor(src); if (p) bookSwapTo(p, src); else p = bookMake(src, false); }   // 📖 판이 있으면 그 주소로 갈아 끼운다(새 액자 대신)
+        if (src && !p) { p = bookBoardFor(src); if (p) { bookSwapTo(p, src); p = bookShown(); } else p = bookMake(src, false); }   // 📖 판이 있으면 그 주소로 갈아 끼운다(새 액자 대신) · 보인 판을 다시 집는다 — 판이 늙었으면 bookSwapTo 안 bookShow 가 새 판으로 바꿨다(옛 p 로 또 보이면 고아 액자 · 2단계 반박 🟡)
         if (p) bookShow(p); else bookHide();
       }
       (p ? [p] : k ? [] : books).forEach(function (q) {
@@ -611,7 +611,8 @@
       if (bookCan(p, a)) { try { p.win.postMessage(m, p.origin); } catch (e) {} }   // 보인다(bookPark) 다음에 — 페이지가 「보임」 손질 뒤 연다
     }
     /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판·📖 판(bookBoard)·📖 노크 전 판 후보(bookCand)는 안 건드린다(books 는 오래 안 쓴 것이 앞). */
-    function bookRoom(n) { var bd = bookBoard(); for (var i = 0; books.length > n && i < books.length; ) { if (books[i].parked && books[i] !== bd && !bookCand(books[i])) bookDrop(books[i]); else i++; } }
+    /* ⛔ 자격 내린 판(gone — 늙음·stale·답 없음)은 **세지도 지우지도 않는다**(2단계 반박 🟠 2026-10-17) — 맺음(안 보낸 칸·실패 카드·오프라인 백업)이 끝나기 전에 지우면 그 글이 사라진다 · 30분 지우기(bookIdle)가 치운다. */
+    function bookRoom(n) { var bd = bookBoard(), c = 0, i, q; for (i = 0; i < books.length; i++) if (!books[i].gone) c++; for (i = 0; c > n && i < books.length; ) { q = books[i]; if (q.parked && q !== bd && !q.gone && !bookCand(q)) { bookDrop(q); c--; } else i++; } }
     function bookPre(href, left, m, r) {
       var src = opts.bookSrc(href), b;
       if (!src || bookFind(src)) return;
@@ -643,7 +644,7 @@
     /* 노크 전 판 후보 = 홈에서 연·미리 띄운 판(home) · 아직 노크 전(!win) · 내 문장 아님 · 만든 지 1분 안. 있으면 미리(교재) 주소는 줄에 선다 — 학생 홈은 2초 뒤 넷을 한꺼번에 보낸다(첫 교재 판은 그때 노크 전).
        그 판이 swap:1 로 노크해 판이 되면 줄을 bookFetch 로 흘린다(아래 bookHi) · swap 없이 끝나면 안 흘린다. ponytail: 1분 = 노크 기다림 짐작(선생님 껍데기와 같다). */
     function bookCand(p) { return BOOK_SW && p.home && !p.win && !bookMine(p.src) && Date.now() - p.born < BOOK_HI_MS; }
-    function bookAged(p) { return BOOK_SW && p.swap && p.parked && Date.now() - p.born > BOOK_AGE_MS; }
+    function bookAged(p) { return BOOK_SW && p.home && p.swap && p.parked && Date.now() - p.born > BOOK_AGE_MS; }   // 홈 판만(판 안에서 연 판은 30분 지우기가 있어 종전 · 2단계 반박 🟡)
     function bookSwapTo(p, src, left, m, r) {
       var id = ++bookSwapN, sw, i;
       if (p.sw) clearTimeout(p.sw.tm);

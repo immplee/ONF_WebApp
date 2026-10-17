@@ -1471,5 +1471,68 @@ t("perf=1' — 갈아 끼움이 끝나면 홈에 bookPerf{ms, from} · 물러나
   assert.ok(!sentOf(c.s.homeInner).some((m) => m.onf === 'bookPerf'), '⛔ perf 없이 bookPerf 를 보냈다');
 });
 
+
+/* ═══ 2단계 반박 검토(2026-10-17) ═══ */
+console.log('[📖 2단계 반박 — 늙은 판 · 폰 뒤로 · 2시간은 홈 판만 · 속도 말 · 줄 거름]');
+t("🟠 늙은 판(2시간)을 다시 보이면 자격만 내린 옛 판은 판 셋 넘침이 **세지도 지우지도 않는다**(맺음이 끝날 때까지 남고 30분 지우기가 치운다)", () => {
+  const { s, P, bi } = boardRun();
+  s.send({ onf: 'bookWarm', href: SM, panel: 1, left: 184 }, s.homeInner);
+  const M = s.panels()[1], mi = swapKnock(s, M, 2, false, 'review');
+  s.send({ onf: 'openBook', href: SM, left: 184 }, s.homeInner);
+  s.send({ onf: 'openBook', href: SE('e7', '&line=3') }, mi);                     // ⭐ → 「교재에서 보기」(다른 교재 = 새 판 X)
+  swapKnock(s, shownOf(s)[0], 3);
+  s.send({ onf: 'bookDismiss' }, s.homeInner);
+  assert.ok(s.panels().length === 3, '전제: 숨긴 판 셋(P · ⭐ · X)');
+  s.g.T += 2.2 * 60 * 60 * 1000;
+  s.send({ onf: 'openBook', href: SE('e2'), left: 184 }, s.homeInner);
+  assert.ok(s.panels().includes(P) && P.parentNode && P.classList.contains('park') && s.obj(P).gone, '⛔ 자격 내린 늙은 판을 판 셋 넘침이 바로 지웠다(맺음 안 돎 → 안 보낸 칸·실패 카드 잃음)');
+  const X = s.panels().find((x) => /e7/.test(x.kids[0].src));
+  assert.ok(s.panels().includes(M) && X && s.panels().length === 4, '⛔ 자격 내린 판을 판 셋에 셌다 — 멀쩡한 숨긴 판(⭐·X)이 밀려났다');
+  const N = shownOf(s)[0], ni = swapKnock(s, N, 4);
+  s.send({ onf: 'openBook', href: SE('e9') }, ni);                                // 판 안 링크 → 넷째 → 가장 오래 안 쓴 「멀쩡한」 숨긴 판을 비킨다
+  assert.ok(s.panels().includes(P) && s.panels().filter((x) => !s.obj(x).gone).length === 3, '⛔ 판 셋 넘침이 자격 내린 판(가장 오래된 숨긴 판)을 지웠다 — 맺음 전이다');
+  T30(s).forEach((x) => { x.on = false; x.f(); });
+  assert.ok(!s.panels().includes(P), '⛔ 30분 뒤에도 자격 내린 판이 남았다');
+});
+t("🟡 📱 폰 뒤로로 판을 갈아 끼울 때 판이 늙었으면(새 판으로 바뀜) 고아 액자가 안 생긴다 — 판 목록 밖 DOM 판 0 · 보이는 판 하나", () => {
+  const { s, P, bi } = boardRun({ phone: true });
+  s.send({ onf: 'openBook', href: SE('e1') }, s.homeInner);
+  s.send({ onf: 'openBook', href: SE('e2') }, bi);
+  const q = shownOf(s)[0], qi = swapKnock(s, q, 2);
+  s.send({ onf: 'openBook', href: SE('e3') }, qi);
+  swapKnock(s, shownOf(s)[0], 3);
+  s.g.T += 2.5 * 60 * 60 * 1000;
+  s.browserBack();
+  const bs = s.panels().filter((x) => !s.obj(x));
+  assert.strictEqual(bs.length, 0, '⛔ 판 목록 밖에 남은 액자(고아)가 있다');
+  assert.ok(shownOf(s).length === 1 && shownOf(s)[0] !== P && shownOf(s)[0].kids[0].src === RS(SE('e2')), '⛔ 보이는 판이 그 칸 주소(E2) 새 판 하나가 아니다');
+});
+t("🟡 2시간 규칙은 홈에서 연 판만 — 판 안에서 연 교재 판(swap 노크 · 홈 아님)은 늙어도 종전(그대로 0초)", () => {
+  const { s, P, bi } = boardRun();
+  s.send({ onf: 'openBook', href: SE('e1'), left: 270 }, s.homeInner);
+  s.send({ onf: 'openBook', href: SE('e2') }, bi);
+  const Q = shownOf(s)[0], qi = swapKnock(s, Q, 2);
+  s.send({ onf: 'bookClose' }, qi);                                              // ✕ = 앞 판 P
+  s.g.T += AGE;
+  s.send({ onf: 'openBook', href: SE('e2') }, bi);                               // P 안 링크 → Q(숨김 · 늙음) 다시
+  assert.ok(shownOf(s)[0] === Q && s.panels().length === 2, '⛔ 홈 판이 아닌 교재 판을 나이로 갈았다(종전 0초가 아니다)');
+});
+t("🟡 속도 말(bookPerf)에는 주소·토큰이 없다 — {onf, ms, from, why} 뿐 · 줄 흘리기는 이미 판(액자)이 든 주소를 bookFetch 로 안 보낸다", () => {
+  const c = boardRun({ perf: true });
+  c.s.send({ onf: 'openBook', href: SE('e2'), left: 270 }, c.s.homeInner);
+  c.s.send({ onf: 'bookSwapped', id: swapMsg(c.bi)[0].id, ok: false, why: 'busy' }, c.bi);
+  const pf = js(c.s.homeInner.sent).filter((x) => x[0].onf === 'bookPerf');
+  assert.ok(pf.length === 1 && pf.every((x) => JSON.stringify(Object.keys(x[0]).sort()) === JSON.stringify(['from', 'ms', 'onf', 'why']) && !/TOK|exec|script/.test(JSON.stringify(x[0]))), '⛔ 속도 말에 주소·토큰·모르는 칸이 실렸다: ' + JSON.stringify(pf));
+  //   줄 — 노크 전 판 P0 · 줄에 E2·E3 · 그 사이 E2 를 [열기](새 판 · 판이 없다) → 노크 swap:1 = E3 만
+  const s = setup(RS, { swap: true });
+  s.send({ onf: 'bookWarm', href: SE('e1'), panel: 1, left: 184 }, s.homeInner);
+  const P0 = s.panel();
+  [SE('e2'), SE('e3')].forEach((h) => s.send({ onf: 'bookWarm', href: h, panel: 1, left: 184 }, s.homeInner));
+  s.send({ onf: 'openBook', href: SE('e2'), left: 184 }, s.homeInner);
+  const bi = kwin(s, P0, 1);
+  s.send({ onf: 'bookHi', views: 'cards,line', swap: 1 }, bi);
+  assert.deepStrictEqual(fetchOf(bi), [RS(SE('e3'))], '⛔ 이미 판이 든 주소(E2)를 줄에서 bookFetch 로 보냈다');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);
