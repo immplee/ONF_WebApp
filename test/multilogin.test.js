@@ -64,7 +64,7 @@ function mkFrame(s) {
     set src(v) { this._src = v; nav.push(['src', v, !!this.credentialless]); doc.blank = true; } };
   const cw = win('exec', s.top);
   Object.defineProperty(cw, 'length', { get: () => doc.kids });
-  Object.defineProperty(cw, '0', { get: () => (doc.kids > 0 ? { length: doc.app } : undefined) });   // 래퍼 sandboxFrame — 그 자식 = 앱 프레임(userHtmlFrame)
+  Object.defineProperty(cw, '0', { configurable: true, get: () => (doc.kids > 0 ? { length: doc.app } : undefined) });   // 래퍼 sandboxFrame — 그 자식 = 앱 프레임(userHtmlFrame)
   cw.location = { get href() { if (doc.blank) return 'about:blank'; throw new Error('SecurityError: cross-origin'); },
     replace(u) { nav.push(['replace', u, !!el.credentialless]); doc.blank = true; } };
   el.contentWindow = cw; el.doc = doc;
