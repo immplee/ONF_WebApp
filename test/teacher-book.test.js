@@ -686,6 +686,24 @@ t('H1 ☁️ 사본 힌트(2026-10-21) — 홈 openBook 의 cf 는 꼴이 맞을
   assert.ok(swapMsg(m.bi)[0].cf && swapMsg(m.bi)[0].cf.extra === 'x', '⛔ 변이(꼴 검사 뺌)가 안 먹었다');
 });
 
+t('H1 ☁️ 반박 — 마지막 갈아 끼우기가 끝나 주소를 되돌린 뒤 늦게 온 앞 번호 ok 는 주소(real·src)를 다시 안 바꾼다 · 자격 내린 판(gone)도 · 기다리는 동안 온 ok 는 종전대로 real', () => {
+  const { s, bi, obj } = boardRun();
+  s.send({ onf: 'openBook', href: E2, left: 270 }, s.home);
+  s.send({ onf: 'openBook', href: E3, left: 270 }, s.home);
+  const [m1, m2] = swapMsg(bi);
+  s.send({ onf: 'bookSwapped', id: m2.id, ok: false, why: 'busy' }, bi);
+  const p = obj();
+  assert.strictEqual(p.real, srcOf(s, E1), '전제: 되돌림');
+  s.send({ onf: 'bookSwapped', id: m1.id, ok: true, from: 'cf' }, bi);
+  assert.deepStrictEqual([p.real, p.src], [srcOf(s, E1), srcOf(s, E1)], '⛔ 늦은 ok 가 되돌린 주소를 바꿨다(주소 A · 내용 B)');
+  //   기다리는 동안 온 앞 번호 ok — 종전대로 real 만(마지막이 실패하면 거기로 되돌린다)
+  const b = boardRun();
+  b.s.send({ onf: 'openBook', href: E2, left: 270 }, b.s.home); b.s.send({ onf: 'openBook', href: E3, left: 270 }, b.s.home);
+  const [n1] = swapMsg(b.bi);
+  b.s.send({ onf: 'bookSwapped', id: n1.id, ok: true, from: 'server' }, b.bi);
+  assert.strictEqual(b.obj().real, srcOf(b.s, E2), '⛔ 기다리는 동안 온 앞 번호 ok 를 버렸다(종전 동작)');
+});
+
 t('H1 cur — bookSwap 은 판이 **지금 든 주소**(p.real)를 cur 로 싣는다(Ownify 판의 떠나기 전 담기 열쇠 · 학생 껍데기와 같다) · 처음 = 판을 연 주소 · ok 뒤 = 그 주소 · 물러남 뒤 = 되돌린 주소', () => {
   const { s, bi } = boardRun();
   s.send({ onf: 'openBook', href: E2, left: 270 }, s.home);

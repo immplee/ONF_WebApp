@@ -1051,6 +1051,20 @@ t("H1' ☁️ 사본 힌트(2026-10-21 · 선생님 껍데기 쌍둥이) — 홈
   assert.ok(swapMsg(mu.bi)[0].cf && swapMsg(mu.bi)[0].cf.extra === 'x', '⛔ 변이(꼴 검사 뺌)가 안 먹었다');
 });
 
+t("H1' ☁️ 반박 — 마지막 갈아 끼우기가 끝나 되돌린 뒤 늦은 앞 번호 ok 는 주소를 안 바꾼다 · 기다리는 동안 온 ok 는 종전대로 real", () => {
+  const r = boardRun();
+  r.s.send({ onf: 'openBook', href: SE('e2'), left: 270 }, r.s.homeInner); r.s.send({ onf: 'openBook', href: SE('e3'), left: 270 }, r.s.homeInner);
+  const [m1, m2] = swapMsg(r.bi), p = r.s.obj(r.P), src1 = p.real;
+  r.s.send({ onf: 'bookSwapped', id: m2.id, ok: false, why: 'busy' }, r.bi);
+  r.s.send({ onf: 'bookSwapped', id: m1.id, ok: true, from: 'cf' }, r.bi);
+  assert.deepStrictEqual([p.real, p.src], [src1, src1], '⛔ 늦은 ok 가 되돌린 주소를 바꿨다');
+  const b = boardRun();
+  b.s.send({ onf: 'openBook', href: SE('e2'), left: 270 }, b.s.homeInner); b.s.send({ onf: 'openBook', href: SE('e3'), left: 270 }, b.s.homeInner);
+  const [n1] = swapMsg(b.bi), q = b.s.obj(b.P), want = q.ask[n1.id];
+  b.s.send({ onf: 'bookSwapped', id: n1.id, ok: true, from: 'server' }, b.bi);
+  assert.strictEqual(q.real, want, '⛔ 기다리는 동안 온 앞 번호 ok 를 버렸다(종전)');
+});
+
 t("H1' — 홈에서 연 판이 있으면 [열기] = bookSwap(새 액자 0 · 같은 액자 · 그 창·그 출처로) · 같은 주소 다시 = 말 0 · 갈아 끼운 판은 옛 주소로 안 찾는다", () => {
   const { s, P, bi, src0 } = boardRun();
   assert.ok(P.classList.contains('park') && s.panels().length === 1, '전제: P 숨김');

@@ -642,7 +642,7 @@ function bookSwapped(p, d) {
   var src = p.ask[d.id];
   if (typeof src !== 'string') return;
   delete p.ask[d.id];
-  if (d.ok === true) p.real = src;
+  if (d.ok === true && p.sw && !p.gone) p.real = src;   // 📖 ☁️ 반박: 마지막 갈아 끼우기가 끝나(주소 되돌림 · 자격 내림) 뒤 늦은 ok 는 주소를 안 바꾼다 — 기다리는 동안 온 것만 real
   if (p.sw && p.sw.id === d.id && typeof d.vis === 'number' && isFinite(d.vis) && d.vis >= 0) p.sw.vis = Math.round(d.vis);
   if (p.sw && p.sw.id === d.id) bookSwapEnd(p, p.sw, d.ok === true, String(d.why || 'fail'), d.from);
 }
