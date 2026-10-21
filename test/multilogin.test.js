@@ -437,6 +437,14 @@ t('R6 🟠3 노크 없는 우리 안내 한 장(Lib _onfNoticePage · PIN 칸 �
   assert.strictEqual(w.el.nav.length, 1, '⛔ 기다리는 사이 앱 프레임이 생긴 판을 다시 열었다');
 });
 
+t('R6-c 앱 프레임 수를 못 읽으면(브라우저가 던짐) 안전한 쪽 — 다시 안 연다(선생님 appN 과 같은 방향)', () => {
+  const s = open();
+  Object.defineProperty(s.el.contentWindow, '0', { get: () => ({ get length() { throw new Error('SecurityError'); } }) });
+  s.el.load(1);
+  s.tick(10 * APP());
+  assert.strictEqual(s.el.nav.length, 1, '⛔ 앱 프레임 수를 못 읽었는데 다시 열었다(doGet 하나 더 · 정상 판일 수 있다)');
+});
+
 t('R7 늦게 그린 래퍼(여유 안에 자식이 생김) — 앱 있으면 끝 · 앱 없으면 한 번', () => {
   const s = open();
   s.el.load(0); s.el.doc.kids = 1; s.el.doc.app = 1; s.tick(GRACE());

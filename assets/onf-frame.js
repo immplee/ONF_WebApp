@@ -162,7 +162,7 @@
       if (clAt(CL_TRY)) { clSet(CL_KEY, true); clSet(CL_TRY, false); } else clSet(CL_TRY, true);   // 두 번째면 기억 · 첫 번째면 표시만
     }
     function kids() { try { return el.contentWindow.length; } catch (e) { return 0; } }
-    function app() { try { var w = el.contentWindow[0]; return w ? w.length : 0; } catch (e) { return 0; } }   // 🔁 래퍼 sandboxFrame 의 자식(userHtmlFrame = 우리 앱) 수 — 교차 출처여도 읽힌다
+    function app() { try { var w = el.contentWindow[0]; return w ? w.length : 0; } catch (e) { return 1; } }   // 🔁 래퍼 sandboxFrame 의 자식(userHtmlFrame = 우리 앱) 수 — 교차 출처여도 읽힌다
     function go() {
       re++; nav = true;
       el.style.visibility = 'hidden';                                // 🔁 다시 여는 동안 구글 오류 화면을 걷는다 — 뒤 「불러오는 중」이 보인다(뜨면 ok 가 되돌린다 · 또 실패면 say 가 그대로 둔다)
