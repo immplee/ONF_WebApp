@@ -427,12 +427,12 @@ var BOOK_PH = (function () {   // 📱 스위치 — 주소 phonepanel=1|0 이�
   try { v = new URLSearchParams(location.search).get('phonepanel'); if (v === '1' || v === '0') localStorage.setItem('onfThPhonePanel', v); else v = localStorage.getItem('onfThPhonePanel'); } catch (e) {}
   return v !== '0';
 })();
-/* 📖 판 한 장 스위치(1d · 2026-10-16) — 주소 swap=1|0 이면 이 기기에 기억(선생님 키 onfThSwap) · 없으면 기억값 · 그것도 없으면 **끔**(Peter 기기 확인 뒤 기본 켬).
+/* 📖 판 한 장 스위치(1d · 2026-10-16) — 주소 swap=1|0 이면 이 기기에 기억(선생님 키 onfThSwap) · 없으면 기억값 · 그것도 없으면 **켬**(2026-10-21 Peter 「너가 테스트 해보고 전체 켜줘」 — 라이브 A→B→A 처음 연 판도 받아 둔 값 12~20ms · 이 기기만 끄기 = swap=0).
    꺼져 있으면 아래 bookBoard 가 늘 null 이라 모든 길이 종전 그대로다(caps 에도 swap 칸이 없다). perf=1 이면 갈아 끼움 시간을 홈 속도표로(bookPerf). */
 var BOOK_SW = (function () {
   var v = null;
   try { v = new URLSearchParams(location.search).get('swap'); if (v === '1' || v === '0') localStorage.setItem('onfThSwap', v); else v = localStorage.getItem('onfThSwap'); } catch (e) {}
-  return v === '1';
+  return v !== '0';
 })();
 var BOOK_PERF = (function () { try { return new URLSearchParams(location.search).get('perf') === '1'; } catch (e) { return false; } })();
 var BOOK_SWAP_MS = 14000, bookSwapN = 0, BOOK_AGE_MS = 2 * 60 * 60 * 1000;   // 갈아 끼우기 답 시한(판의 맺음 8초와 받기 10초는 같이 돈다 + 여유 4초) · 번호(나중 것이 이긴다) · 판 나이(판 ONF_BOOK_AGE_MS 와 같다 · D3)

@@ -22,6 +22,7 @@ const ORIGIN = 'https://n-abc-script.googleusercontent.com';
 const EXEC = 'https://script.google.com/macros/s/BOOKAPP/exec';
 function win(name, parent) { const w = { name, sent: [] }; w.parent = parent || w; w.postMessage = (m, o) => w.sent.push([m, o]); return w; }
 
+/* 📖 o.lsRaw — 빈 localStorage 로 시작(새 기기). 없으면 onfThSwap '0'(판 한 장 끔) — 종전 길 검사들이 끔을 전제로 쓰였다(2026-10-21 기본 켬) · 기본 켬 자체는 H7 이 잰다. */
 function run(o) {
   o = o || {};
   const L = {};
@@ -34,9 +35,9 @@ function run(o) {
   const top = win('shell');
   const homeExec = win('home-exec', top), home = win('home-user', win('home-sbx', homeExec));
   const frame = { contentWindow: homeExec };
-  const g = { URL, top, frame, innerWidth: 1440, location: { href: 'https://class.ownify.co.kr/teacher/' },
+  const g = { URL, URLSearchParams, top, frame, innerWidth: 1440, location: { href: 'https://class.ownify.co.kr/teacher/' },
     document: { body, createElement: mkEl, documentElement: { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; },
-      classList: { set: new Set(), toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } } } }, ONF: { api: { EXEC } }, localStorage: { s: {}, getItem(k) { return k in this.s ? this.s[k] : null; }, setItem(k, v) { this.s[k] = String(v); } },
+      classList: { set: new Set(), toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } } } }, ONF: { api: { EXEC } }, localStorage: { s: o.lsRaw ? {} : { onfThSwap: '0' }, getItem(k) { return k in this.s ? this.s[k] : null; }, setItem(k, v) { this.s[k] = String(v); } },
     addEventListener: (k, f) => { (L[k] = L[k] || []).push(f); }, removeEventListener: (k, f) => { L[k] = (L[k] || []).filter((x) => x !== f); } };
   const timers = [];
   g.setTimeout = (f, ms) => { timers.push({ f, ms, on: true }); return timers.length; };
@@ -266,7 +267,7 @@ function phoneRun(o) {
     back() { this.backs++; this.to.push(Math.max(0, this.i - 1)); },
     go(n) { this.goes.push(n); this.to.push(Math.max(0, Math.min(this.st.length - 1, this.i + n))); } };
   const mq = { matches: !!o.wide, fns: [], addEventListener(k, f) { if (k === 'change') this.fns.push(f); } };
-  const s = run({ hist: true, pre(g, home) {
+  const s = run({ hist: true, lsRaw: o.lsRaw, pre(g, home) {
     g.history = H; g.URLSearchParams = URLSearchParams; g.location.search = o.search || '';
     g.matchMedia = (q) => { assert.strictEqual(q, WIDE_Q, '⛔ 폰 물음이 선생님 홈 dhBookWide 와 다르다'); return mq; };
     Object.assign(g.localStorage.s, o.ls || {});
@@ -942,8 +943,9 @@ t('H7 — caps: 스위치 켜면 swap:1 · 꺼짐이면 칸 없음(종전 글자
   s = phoneRun({ wide: true, ls: { onfThSwap: '1' }, search: '?swap=0' });
   assert.deepStrictEqual(caps(s), { onf: 'caps', book: 1, phone: 1 }, '⛔ swap=0 인데 swap 칸이 있다');
   assert.strictEqual(s.g.localStorage.s.onfThSwap, '0', '⛔ 끈 것을 기억 안 했다');
-  s = phoneRun({ wide: true, ls: { onfSwap: '1' } });
-  assert.ok(!('swap' in caps(s)), '⛔ 기본이 끔이 아니다(또는 학생 키 onfSwap 을 봤다)');
+  s = phoneRun({ wide: true, lsRaw: true, ls: { onfSwap: '0' } });   // 빈 저장소(새 기기) — 검사 장치 기본 끔(onfThSwap '0')을 안 깐다
+  assert.strictEqual(caps(s).swap, 1, '⛔ 기본이 켬이 아니다(2026-10-21 Peter 「전체 켜줘」 · 또는 학생 키 onfSwap 을 봤다)');
+  assert.ok(!('onfThSwap' in s.g.localStorage.s), '⛔ 기본 켬을 이 기기에 괜히 기억했다');
 });
 
 /* ═══ 📖 1e 반박 검토 🟡(2026-10-17) — 홈은 판이 노크했는지 모른다(1e: 판을 띄울 첫 주소 → 20초 뒤 나머지 최대 다섯을 bookWarm panel:1).
