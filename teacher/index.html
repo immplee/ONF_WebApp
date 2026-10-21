@@ -571,11 +571,11 @@ function bookShow(p, left, m, r) {
   bookKb();
 }
 /* home === true = 홈에서 온 openBook — 판(bookBoard)이 있으면 새 판 대신 갈아 끼운다. ⛔ 판 안에서 온 openBook(⭐ → 「교재에서 보기」 · 판 안 링크)은 종전 새 판(창 B안 앞 판 0초). */
-function bookOpen(href, left, m, r, home) {
+function bookOpen(href, left, m, r, home, cf) {   // cf = 📖 ☁️ 홈이 실은 사본 힌트(홈 openBook 만 · 아래 bookCfOk)
   var src = teacherBookSrc(href), p, b;
   if (!src) return;
   p = bookFind(src);
-  if (!p && home && (b = bookBoardFor(src))) { bookSwapTo(b, src, left, m, r); return; }
+  if (!p && home && (b = bookBoardFor(src))) { bookSwapTo(b, src, left, m, r, cf); return; }
   bookShow(p || bookMake(src, false), left, m, r);
 }
 /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판·📖 판(bookBoard)·📖 노크 전 판 후보(bookCand)는 안 건드린다(books 는 오래 안 쓴 것이 앞). */
@@ -618,11 +618,19 @@ function bookFetch(b, src) { try { b.win.postMessage({ onf: 'bookFetch', src: sr
    ⛔ 스위치 끔이면 후보가 없다(줄 0 · bookRoom 종전). */
 var bookQ = [], BOOK_Q_MAX = 6, BOOK_HI_MS = 60 * 1000;
 function bookCand(p) { return BOOK_SW && p.back === null && !p.win && !bookMine(p.src) && Date.now() - p.born < BOOK_HI_MS; }
-function bookSwapTo(p, src, left, m, r) {
-  var id = ++bookSwapN, sw, i;
+/* 📖 ☁️ 다른 교재 갈아 끼우기도 사본으로(2026-10-21 · 설계 ONF_SlackBot docs/2026-10-21-교재-갈아끼우기-사본-설계초안.md §9.2 · 판 쪽은 Ownify onfSwapCfHint 가 같은 꼴을 다시 본다)
+   홈 openBook 의 cf {f 교재, s 지금 회차, k 입장권} — 꼴이 맞을 때만 그 세 칸 그대로 bookSwap 에 싣는다(판이 GAS boot 와 Worker 사본을 같이 묻는다).
+   ⛔ 홈에서 온 openBook 만(판 안 openBook·bookWarm·뒤로 bookPop 은 안 실음) · 기록 칸·주소엔 안 남는다(판에 보내는 말뿐) · 꼴이 틀리면 뺀다(종전 말 그대로). */
+function bookCfOk(c) {
+  return (c && typeof c === 'object' && typeof c.f === 'string' && /^[A-Za-z0-9_-]{10,200}$/.test(c.f) && typeof c.s === 'string' && c.s.length >= 1 && c.s.length <= 100
+    && typeof c.k === 'string' && c.k.length <= 700 && /^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(c.k)) ? { f: c.f, s: c.s, k: c.k } : null;
+}
+function bookSwapTo(p, src, left, m, r, cf) {
+  var id = ++bookSwapN, sw, i, msg = { onf: 'bookSwap', id: id, src: src, cur: p.real }, c = bookCfOk(cf);
   if (p.sw) clearTimeout(p.sw.tm);
   p.ask[id] = src;
-  try { p.win.postMessage({ onf: 'bookSwap', id: id, src: src, cur: p.real }, p.origin); } catch (e) {}   // cur = 판이 지금 든 주소 — 판이 떠나기 전 지금 표를 그 열쇠로 담는다(Ownify onfBootsKeep · A→B→A 의 A 가 서버를 안 기다린다)
+  if (c) msg.cf = c;
+  try { p.win.postMessage(msg, p.origin); } catch (e) {}   // cur = 판이 지금 든 주소 — 판이 떠나기 전 지금 표를 그 열쇠로 담는다(Ownify onfBootsKeep · A→B→A 의 A 가 서버를 안 기다린다)
   sw = p.sw = { id: id, src: src, left: left, m: m, r: r, t0: Date.now(), tm: 0 };
   sw.tm = setTimeout(function () { if (p.sw === sw) bookSwapEnd(p, sw, false, 'time', ''); }, BOOK_SWAP_MS);
   p.src = src; p.key = bookKey(src);
@@ -635,6 +643,7 @@ function bookSwapped(p, d) {
   if (typeof src !== 'string') return;
   delete p.ask[d.id];
   if (d.ok === true) p.real = src;
+  if (p.sw && p.sw.id === d.id && typeof d.vis === 'number' && isFinite(d.vis) && d.vis >= 0) p.sw.vis = Math.round(d.vis);
   if (p.sw && p.sw.id === d.id) bookSwapEnd(p, p.sw, d.ok === true, String(d.why || 'fail'), d.from);
 }
 function bookSwapEnd(p, sw, ok, why, from) {
@@ -654,8 +663,10 @@ function bookRetire(p) { p.swap = false; p.gone = true; if (p.parked) bookPark(p
 function bookPerf(sw, from, why) {
   if (!BOOK_PERF) return;
   var ms = Date.now() - sw.t0;
-  try { console.log('[onf 속도] 판 갈아 끼움 ' + ms + 'ms(' + (from === 'cache' ? '받아 둔 값' : from === 'server' ? '서버' : '물러남 → 새 판 · ' + why) + ')'); } catch (e) {}
-  if (bookHome && bookHomeOrigin) { try { bookHome.postMessage({ onf: 'bookPerf', ms: ms, from: from, why: why }, bookHomeOrigin); } catch (e2) {} }
+  try { console.log('[onf 속도] 판 갈아 끼움 ' + ms + 'ms(' + (from === 'cache' ? '받아 둔 값' : from === 'server' ? '서버' : from === 'cf' ? '사본 · 보임 ' + sw.vis + 'ms' : '물러남 → 새 판 · ' + why) + ')'); } catch (e) {}
+  var pm = { onf: 'bookPerf', ms: ms, from: from, why: why };
+  if (typeof sw.vis === 'number') pm.vis = sw.vis;   // 📖 ☁️ 사본으로 보인 ms(ms 는 쓰기가 풀린 때)
+  if (bookHome && bookHomeOrigin) { try { bookHome.postMessage(pm, bookHomeOrigin); } catch (e2) {} }
 }
 /* 📱 키보드 높이·밀림 보정 — **보이는 폰 판**에만(학생 껍데기 onf-frame.js sync 의 판 몫 · 숫자·순서는 그 파일 머리·B1~B7 주석이 정본 — 실기기에서 하나씩 깨져 가며 정한 값).
    교재가 새 탭(학생 껍데기)으로 열리던 때 받던 보정이라 판으로 옮기며 같이 가져왔다 — 없으면 아이폰에서 입력칸·화살표가 키보드에 가린다. 홈 액자는 종전대로 안 한다.
@@ -733,7 +744,7 @@ window.addEventListener('message', function (ev) {
       try { ev.source.postMessage(cp, ev.origin); } catch (e) {}
       return;
     }
-    if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left, d.m, d.r, true); var hq = bookShown(); if (hq) hq.back = null; return; }   // 홈에서 연 판은 앞 판 기억 없음(종전 · 4.4) · 📖 판이 있으면 갈아 끼움
+    if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left, d.m, d.r, true, d.cf); var hq = bookShown(); if (hq) hq.back = null; return; }   // 홈에서 연 판은 앞 판 기억 없음(종전 · 4.4) · 📖 판이 있으면 갈아 끼움
     if (d.onf === 'bookWarm' && d.panel === 1 && typeof d.href === 'string') { bookPre(d.href, d.left, d.m, d.r); return; }   // 지금·곧 할 수업 교재를 숨긴 판으로 미리(10-13)
     /* 📐 창 크기가 바뀌었다(2026-10-16 · 학생 껍데기와 같다) — 홈이 다시 잰 메뉴 끝·여백·모서리를 판 전부(보이는 판·숨긴 판)에 새로 단다. 보이기·숨기기·주소는 안 건드린다. 내 액자(위 bookFrom)에서 온 말만. */
     if (d.onf === 'bookBox') { for (i = 0; i < books.length; i++) bookPlace(books[i], d.left, d.m, d.r); bookKb(); return; }

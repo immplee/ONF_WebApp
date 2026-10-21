@@ -47,7 +47,9 @@ function run(o) {
   vm.createContext(g);
   //   🔐 o.frame — 진짜 onf-frame.js 를 먼저 싣는다(선생님 껍데기가 <script> 로 싣는 그것 · 판 우회 openExec)
   if (o.frame) { g.navigator = { userAgent: 'node' }; vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-frame.js'), 'utf8'), g, { filename: 'onf-frame.js' }); }
-  vm.runInContext(src.slice(A, B) + (o.hist ? src.slice(HA, HB) : ''), g, { filename: 'teacher-book' });
+  const blk = src.slice(A, B), mblk = o.mut ? o.mut(blk) : blk;   // o.mut = 판 블록 변이(☁️ 사본 힌트 검사)
+  if (o.mut) assert.notStrictEqual(mblk, blk, '변이 자리');
+  vm.runInContext(mblk + (o.hist ? src.slice(HA, HB) : ''), g, { filename: 'teacher-book' });
   const send = (data, source, origin) => (L.message || []).forEach((f) => f({ data, source, origin: origin || ORIGIN }));
   const panel = () => body.kids.find((k) => k.className === 'onf-bookpanel');
   const panels = () => body.kids.filter((k) => k.className === 'onf-bookpanel');
@@ -267,7 +269,7 @@ function phoneRun(o) {
     back() { this.backs++; this.to.push(Math.max(0, this.i - 1)); },
     go(n) { this.goes.push(n); this.to.push(Math.max(0, Math.min(this.st.length - 1, this.i + n))); } };
   const mq = { matches: !!o.wide, fns: [], addEventListener(k, f) { if (k === 'change') this.fns.push(f); } };
-  const s = run({ hist: true, lsRaw: o.lsRaw, pre(g, home) {
+  const s = run({ hist: true, lsRaw: o.lsRaw, mut: o.mut, pre(g, home) {
     g.history = H; g.URLSearchParams = URLSearchParams; g.location.search = o.search || '';
     g.matchMedia = (q) => { assert.strictEqual(q, WIDE_Q, '⛔ 폰 물음이 선생님 홈 dhBookWide 와 다르다'); return mq; };
     Object.assign(g.localStorage.s, o.ls || {});
@@ -626,7 +628,7 @@ function swapKnock(s, box, n, swap) {
 /* S1(갈래 표 2): PC · 스위치 켬 · 홈에서 연 판 P(E1)가 노크 swap:1 뒤 닫혀 숨김. o.search 로 주소 질의를 바꾼다(기본 ?swap=1). */
 function boardRun(o) {
   o = o || {};
-  const s = phoneRun({ wide: !o.phone, search: o.search != null ? o.search : '?swap=1', ls: o.ls });
+  const s = phoneRun({ wide: !o.phone, search: o.search != null ? o.search : '?swap=1', ls: o.ls, mut: o.mut });
   s.send({ onf: 'openBook', href: E1, left: 270, m: 22, r: 28 }, s.home);
   const P = s.panel(), src0 = P.kids[0].src, bi = swapKnock(s, P, 1, o.swap);
   if (o.phone) s.browserBack(); else s.send({ onf: 'bookClose' }, bi);
@@ -651,6 +653,37 @@ t('H1 — 홈에서 연 판이 있으면 [열기] = bookSwap(새 액자 0 · 같
   s.send({ onf: 'bookClose' }, bi);
   s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
   assert.ok(swapMsg(bi).length === 1 && swapMsg(bi)[0].src === srcOf(s, E1) && s.panels().length === 1, '⛔ 갈아 끼운 판을 옛 주소(E1)로 찾았다 — 판은 이제 E2 다');
+});
+
+t('H1 ☁️ 사본 힌트(2026-10-21) — 홈 openBook 의 cf 는 꼴이 맞을 때만 세 칸 그대로 bookSwap 에 · 꼴 틀림·없음 = 종전 말 · bookWarm(→ bookFetch)·판 안 openBook·뒤로엔 안 실음 · 기록 칸에 없음 · 답 vis → 홈 속도표 · 변이로', () => {
+  const CF = { f: 'F_th_000001', s: 'E2_x', k: 'v1.eyJmIjoiRiJ9.sig-test-not-live', extra: 'x' };
+  const go = (o) => {
+    const b = boardRun(Object.assign({ search: '?swap=1&perf=1' }, o || {}));
+    b.s.send({ onf: 'openBook', href: E2, left: 270, cf: CF }, b.s.home);
+    return Object.assign(b, { m: swapMsg(b.bi) });
+  };
+  const r = go();
+  assert.deepStrictEqual(r.m.map((x) => x.cf), [{ f: CF.f, s: CF.s, k: CF.k }], '⛔ 꼴 맞는 힌트를 세 칸 그대로 안 실었다(또는 딴 칸까지 실었다)');
+  r.s.send({ onf: 'bookSwapped', id: r.m[0].id, ok: true, from: 'cf', ms: 2600, vis: 310 }, r.bi);
+  const pf = sentOf(r.s.home).filter((x) => x.onf === 'bookPerf');
+  assert.deepStrictEqual(pf.map((x) => [x.from, x.vis]), [['cf', 310]], '⛔ 홈 속도표에 사본·보인 ms 가 안 갔다: ' + JSON.stringify(pf));
+  assert.ok(!JSON.stringify(r.s.H.st).includes(CF.k), '⛔ 입장권이 기록 칸에 남았다');
+  //   꼴 틀림 — 각각 칸 없음(종전 말)
+  for (const bad of [{ f: 'short', s: 'E1', k: CF.k }, { f: CF.f, s: '', k: CF.k }, { f: CF.f, s: 'x'.repeat(101), k: CF.k }, { f: CF.f, s: 'E1', k: 'v2.a.b' }, { f: CF.f, s: 'E1', k: 'v1.' + 'a'.repeat(700) + '.b' }, 'str', null]) {
+    const b = boardRun(); b.s.send({ onf: 'openBook', href: E2, left: 270, cf: bad }, b.s.home);
+    assert.ok(swapMsg(b.bi).length === 1 && !('cf' in swapMsg(b.bi)[0]), '⛔ 꼴 틀린 힌트를 실었다: ' + JSON.stringify(bad));
+  }
+  //   미리 받기(bookWarm → 판 bookFetch)엔 안 싣는다
+  const w = boardRun(); w.s.send({ onf: 'bookWarm', href: E3, panel: 1, left: 270, cf: CF }, w.s.home);
+  assert.ok(sentOf(w.bi).filter((x) => x.onf === 'bookFetch').every((x) => !('cf' in x)), '⛔ bookFetch 에 힌트를 실었다');
+  //   판 안에서 온 openBook(cf 를 실어도) — 판으로 안 갈아 끼우니 힌트도 없다
+  const ins = boardRun(); ins.s.send({ onf: 'openBook', href: E1, left: 270 }, ins.s.home); ins.bi.sent.length = 0;
+  ins.s.send({ onf: 'openBook', href: E3, cf: CF }, ins.bi);
+  assert.ok(swapMsg(ins.bi).every((x) => !('cf' in x)), '⛔ 판 안 openBook 의 힌트를 실었다');
+  //   변이 — 꼴 검사 빼고 그대로 싣기
+  const m = boardRun({ mut: (x) => x.replace('if (c) msg.cf = c;', 'if (cf) msg.cf = cf;') });
+  m.s.send({ onf: 'openBook', href: E2, left: 270, cf: CF }, m.s.home);
+  assert.ok(swapMsg(m.bi)[0].cf && swapMsg(m.bi)[0].cf.extra === 'x', '⛔ 변이(꼴 검사 뺌)가 안 먹었다');
 });
 
 t('H1 cur — bookSwap 은 판이 **지금 든 주소**(p.real)를 cur 로 싣는다(Ownify 판의 떠나기 전 담기 열쇠 · 학생 껍데기와 같다) · 처음 = 판을 연 주소 · ok 뒤 = 그 주소 · 물러남 뒤 = 되돌린 주소', () => {
