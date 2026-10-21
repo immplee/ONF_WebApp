@@ -476,8 +476,10 @@ t('🔐 선생님 판도 우회 길 — 못 연 판(안내)을 다시 열면 지
   assert.strictEqual(s.L.message.length, n0 + 1, '⛔ 선생님 판이 우회 길(openExec)을 안 탄다');
   el.contentWindow = { length: 0, location: { get href() { throw new Error('cross-origin'); }, replace() {} } };
   el.contentWindow.parent = el.contentWindow;
-  (el.L.load || []).forEach((f) => f({}));
-  s.timers.filter((x) => x.on && x.ms === 1500).forEach((x) => { x.on = false; x.f(); });
+  for (let i = 0; i < 2; i++) {   // 🔁 한 번 다시 연 뒤에도 안 됨(2026-10-22)
+    (el.L.load || []).forEach((f) => f({}));
+    s.timers.filter((x) => x.on && x.ms === 1500).forEach((x) => { x.on = false; x.f(); });
+  }
   assert.ok(box.kids[1].kids.some((k) => k.className === 'onf-stuck'), '못 연 판 안내(대역 확인)');
   s.send({ onf: 'openBook', href: TURL }, s.home);
   assert.ok(s.panels().length === 1 && s.panel() !== box, '⛔ 못 연 선생님 판을 다시 보였다(안내 그대로)');

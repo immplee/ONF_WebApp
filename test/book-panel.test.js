@@ -804,13 +804,15 @@ t('📱 폰 판 스위치 — 꺼져 있으면(opts.phone 없음) caps 에 phone
 });
 
 console.log('[🔐 못 연 판 — 여러 계정 우회 반박 검토 🟡4 2026-10-16]');
-/* 판 액자를 「구글 오류 화면(자식 0)」으로 다 읽히게 하고 여유를 흘린다 → 안내 판(이 대역엔 credentialless 가 없다 = 다시 안 열고 바로 안내) */
+/* 판 액자를 「구글 오류 화면(자식 0)」으로 다 읽히게 하고 여유를 흘린다 — 두 번(이 대역엔 credentialless 가 없다 = 🔁 보통으로 한 번 다시 연 뒤에도 안 됨 · 2026-10-22) → 안내 판 */
 function stuckLoad(s, box) {
   const el = box.kids[0];
   el.contentWindow = { length: 0, parent: null, location: { get href() { throw new Error('cross-origin'); }, replace() {} } };
   el.contentWindow.parent = el.contentWindow;
-  (el.L.load || []).forEach((f) => f({}));
-  s.timers.filter((x) => x.on && x.ms === 1500).forEach((x) => { x.on = false; x.f(); });
+  for (let i = 0; i < 2; i++) {
+    (el.L.load || []).forEach((f) => f({}));
+    s.timers.filter((x) => x.on && x.ms === 1500).forEach((x) => { x.on = false; x.f(); });
+  }
   assert.ok(box.kids[1].kids.some((k) => k.className === 'onf-stuck'), '안내가 안 떴다(대역 확인)');
 }
 t('🔐 못 연 판(안내)을 다시 열면 지우고 **새로 받는다** — 보이던 판·숨긴 미리 판 둘 다(종전: 안내가 그대로 · [닫기] 해야 새로)', () => {

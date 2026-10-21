@@ -13,7 +13,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
-const FRAME_JS = fs.readFileSync(path.join(ROOT, 'assets', 'onf-frame.js'), 'utf8');
+const FRAME_JS = fs.readFileSync(process.env.FRAME_JS || path.join(ROOT, 'assets', 'onf-frame.js'), 'utf8');   // FRAME_JS = 옛 판·변이 판으로 돌려 빨강을 본다
 const DAY = 86400000;
 let pass = 0, fail = 0;
 function t(label, fn) {
@@ -70,6 +70,8 @@ function mkFrame(s) {
   /* 다 읽혔다 — kids = 자식 프레임 수(정상 GAS 바깥 문서 1 · 구글 오류 화면 0) · blank = 처음 빈 문서(같은 출처) */
   el.load = (kids, blank) => { doc.kids = kids; doc.blank = !!blank; (L.load || []).forEach((f) => f({})); };
   el.inner = () => win('user', win('sandbox', cw));   // 안쪽 창(깊이 2 — exec → sandboxFrame → userHtmlFrame)
+  /* 우리 화면이 떴다 — 래퍼(자식 1) load 뒤 안쪽 노크(라이브 실측 2026-10-22: load 뒤 18~43ms · ONF_Shell_Js hist hi) */
+  el.up = () => { el.load(1); (s.L.message || []).slice().forEach((f) => f({ data: { onf: 'hist', op: 'hi' }, source: el.inner(), origin: 'https://n-abc-0lu-script.googleusercontent.com' })); };
   return el;
 }
 const SRC = 'https://script.google.com/macros/s/APP/exec?t=T';
@@ -88,7 +90,7 @@ function open(o) {
   return Object.assign(s, { el, wait, closed, reloads, h, btn, text: () => txt(wait) });
 }
 /* 막혔다 → 여유 → credentialless 로 다시 → 뜬다 */
-function bypass(s) { s.el.load(0); s.tick(GRACE()); assert.deepStrictEqual(s.el.nav[s.el.nav.length - 1], ['replace', SRC, true], '우회 다시 열기가 아니다'); s.el.load(1); }
+function bypass(s) { s.el.load(0); s.tick(GRACE()); assert.deepStrictEqual(s.el.nav[s.el.nav.length - 1], ['replace', SRC, true], '우회 다시 열기가 아니다'); s.el.up(); }
 const GRACE = () => { const m = /CL_GRACE = (\d+)/.exec(FRAME_JS); assert.ok(m, 'CL_GRACE 를 못 찾았다'); return Number(m[1]); };
 
 console.log('[여러 계정 우회 — 판별 · 다시 열기 · 기억]');
@@ -100,9 +102,9 @@ t('openExec 가 나와 있다 · 처음 열 땐 src 대입(보통) — 기억이
   assert.ok(s.h && typeof s.h.stop === 'function' && s.h.stuck() === false, '⛔ 손잡이가 없다(판이 지울 때 노크 듣기를 못 걷는다 · 못 연 판을 못 가린다)');
 });
 
-t('① 보통 화면(자식 프레임 1)이면 아무것도 안 한다 — 다시 열지 않고 기억도 안 한다', () => {
+t('① 보통 화면(자식 프레임 1 + 노크)이면 아무것도 안 한다 — 다시 열지 않고 기억도 안 한다', () => {
   const s = open();
-  s.el.load(1);
+  s.el.up();
   s.tick(10 * GRACE());
   assert.strictEqual(s.el.nav.length, 1, '⛔ 멀쩡한 화면을 다시 열었다');
   assert.ok(!('onfCl' in s.ls) && !('onfClTry' in s.ls), '⛔ 멀쩡한 기기를 우회 기기로 기억했다');
@@ -147,7 +149,7 @@ t('④-b 「두 번」은 잇달아야 — 한 번 걸린 뒤 보통으로 뜨�
   const s = open();
   bypass(s);
   const s2 = open({ ls: s.ls, now: s.now.v + 1000 });
-  s2.el.load(1);
+  s2.el.up();
   assert.ok(!('onfClTry' in s2.ls), '⛔ 보통으로 떴는데 「한 번 걸림」이 남았다(띄엄띄엄 일시 오류 둘로 7일 갇힌다)');
   const s3 = open({ ls: { onfClTry: String(1760000000000 - 8 * DAY) } });
   bypass(s3);
@@ -183,7 +185,7 @@ t('④-2 기억으로 처음부터 연 credentialless 가 되면 기억 시각�
   const t0 = 1760000000000 - 3 * DAY;
   const s = open({ ls: { onfCl: String(t0) } });
   assert.deepStrictEqual(s.el.nav, [['src', SRC, true]]);
-  s.el.load(1);
+  s.el.up();
   assert.strictEqual(Number(s.ls.onfCl), t0, '⛔ 기억으로 연 것에 기억을 덧씌웠다 — 영영 보통으로 안 돌아간다');
   assert.ok(!('onfClTry' in s.ls), '⛔ 기억으로 연 것을 「한 번 걸림」으로 셌다(보통이 막힌 적이 없다)');
 });
@@ -204,10 +206,13 @@ t('⑤ 기억으로 연 credentialless 가 안 되면 홈은 기억을 버리고
   assert.deepStrictEqual(p.el.nav[1], ['replace', SRC, false], '⛔ 판이 보통으로 다시 안 열었다');
 });
 
-t('⑥ 🟡 credentialless 를 모르는 브라우저(사파리·iOS·파이어폭스 — 이 버그가 거의 없다)의 실패 = 연결 안내(여러 계정 탓을 단정하지 않는다) · 액자를 걷는다 · 홈엔 [다시 열기](새로고침)', () => {
+t('⑥ 🟡 credentialless 를 모르는 브라우저(사파리·iOS·파이어폭스 — 이 버그가 거의 없다) — 🔁 한 번은 보통으로 다시 열고(구글 일시 오류 · 10-22) · 또 실패면 연결 안내(여러 계정 탓을 단정하지 않는다) · 액자를 걷는다 · 홈엔 [다시 열기](새로고침)', () => {
   const s = open({ cl: false });
   s.el.load(0); s.tick(GRACE());
-  assert.strictEqual(s.el.nav.length, 1, '⛔ 모르는 브라우저에서 다시 열었다');
+  assert.deepStrictEqual(s.el.nav[1], ['replace', SRC, false], '⛔ 모르는 브라우저에서 구글 오류 화면을 한 번도 다시 안 열었다(일시 오류에 바로 막다른 안내)');
+  assert.ok(/불러오는 중/.test(s.text()) && s.h.stuck() === false, '⛔ 다시 여는 중인데 안내를 띄웠다');
+  s.el.load(0); s.tick(GRACE());
+  assert.strictEqual(s.el.nav.length, 2, '⛔ 두 번 넘게 열었다(빙빙 돈다)');
   assert.strictEqual(s.el.style.visibility, 'hidden');
   assert.ok(/화면이 안 열렸어요/.test(s.text()) && /인터넷 연결/.test(s.text()) && !/여러 개/.test(s.text()), '⛔ 사파리 일시 오류를 여러 계정 탓으로 말했다(R2): ' + s.text());
   assert.ok(!('onfCl' in s.ls) && !('onfClTry' in s.ls));
@@ -220,7 +225,7 @@ t('⑥ 🟡 credentialless 를 모르는 브라우저(사파리·iOS·파이어�
 
 t('⑥-3 판이면 안내에 [닫기] — 누르면 부르는 쪽 닫기', () => {
   const s = open({ cl: false, panel: true });
-  s.el.load(0); s.tick(GRACE());
+  s.el.load(0); s.tick(GRACE()); s.el.load(0); s.tick(GRACE());   // 🔁 한 번 다시 연 뒤에도 안 됨
   const b = s.btn();
   assert.ok(b && b.textContent === '닫기' && typeof b.onclick === 'function', '⛔ 판 안내에 [닫기]가 없다(교재가 안 떴으니 교재의 ✕ 도 없다 — 막다른 골목)');
   b.onclick();
@@ -273,7 +278,7 @@ t('⑦-2 여유 동안 자식 프레임이 생기면(늦게 그리는 래퍼) �
 t('⑦-3 판정이 끝나면 노크 듣기를 걷는다(판이 오갈 때마다 리스너가 쌓이지 않게)', () => {
   const s = open();
   const n0 = (s.L.message || []).length;
-  s.el.load(1);
+  s.el.up();
   assert.strictEqual((s.L.message || []).length, n0 - 1, '⛔ 판정 뒤에도 노크 듣기가 남았다');
 });
 
@@ -292,7 +297,7 @@ t('저장소가 막힌 창(사생활 보호 · localStorage 없음)에서도 죽
   const s = open({ noStore: true });
   s.el.load(0); s.tick(GRACE());
   assert.deepStrictEqual(s.el.nav[1], ['replace', SRC, true]);
-  s.el.load(1);
+  s.el.up();
 });
 
 t('location.replace 를 못 부르면(던짐) src 대입으로라도 연다', () => {
@@ -300,6 +305,104 @@ t('location.replace 를 못 부르면(던짐) src 대입으로라도 연다', ()
   s.el.contentWindow.location.replace = () => { throw new Error('x'); };
   s.el.load(0); s.tick(GRACE());
   assert.deepStrictEqual(s.el.nav[1], ['src', SRC, true]);
+});
+
+console.log('\n[🔁 구글 일시 오류 — 노크 없는 판은 한 번 저절로 다시 연다 (2026-10-22 Peter 「A+B」 중 B)]');
+const KNOCK = () => { const m = /KNOCK_MS = (\d+)/.exec(FRAME_JS); assert.ok(m, 'KNOCK_MS 를 못 찾았다(래퍼는 떴는데 노크 없는 화면을 안 본다)'); return Number(m[1]); };
+
+t('R1 정상(래퍼 load → 노크 · 라이브 18~43ms 뒤) — 다시 안 열고 시계·듣기도 안 남는다(정상 길 시간·호출 0)', () => {
+  const s = open();
+  const n0 = (s.L.message || []).length;
+  s.el.up();
+  s.tick(60000);
+  assert.strictEqual(s.el.nav.length, 1, '⛔ 노크한 화면을 다시 열었다');
+  assert.strictEqual((s.L.message || []).length, n0 - 1, '⛔ 노크 뒤에도 듣기가 남았다');
+  assert.strictEqual(s.timers.filter((x) => x.on).length, 0, '⛔ 노크 뒤에도 시계가 남았다');
+  assert.strictEqual(s.el.style.visibility, undefined, '⛔ 정상 액자를 만졌다');
+});
+
+t('R2 래퍼는 떴는데(자식 1) 노크가 없다(구글이 래퍼 안에 그린 INTERNAL 오류) → KNOCK_MS 뒤 같은 주소를 같은 길로 한 번 다시(replace · 그동안 액자를 걷어 「불러오는 중」) → 뜨면 액자를 되돌린다', () => {
+  const s = open();
+  s.el.load(1);
+  s.tick(KNOCK() - 1);
+  assert.strictEqual(s.el.nav.length, 1, '⛔ 노크를 다 안 기다리고 다시 열었다');
+  s.tick(1);
+  assert.deepStrictEqual(s.el.nav[1], ['replace', SRC, false], '⛔ 노크 없는 래퍼를 같은 주소로 다시 안 열었다(구글 오류가 그대로 남는다)');
+  assert.strictEqual(s.el.style.visibility, 'hidden', '⛔ 다시 여는 동안 구글 오류 화면을 그대로 보인다');
+  assert.ok(/불러오는 중/.test(s.text()) && !s.h.stuck(), '⛔ 다시 여는 중에 안내를 띄웠다(사람에게 안내 없이)');
+  s.el.up();
+  assert.strictEqual(s.el.style.visibility, '', '⛔ 다시 연 화면이 떴는데 액자를 안 되돌렸다(빈 「불러오는 중」에 갇힌다)');
+  s.tick(60000);
+  assert.strictEqual(s.el.nav.length, 2);
+  assert.ok(!('onfCl' in s.ls) && !('onfClTry' in s.ls), '⛔ 래퍼 오류를 여러 계정 기억으로 셌다');
+});
+
+t('R2-b 사파리(credentialless 모름) 구글 오류 화면(자식 0) → 한 번 보통으로 다시 → 뜬다', () => {
+  const s = open({ cl: false });
+  s.el.load(0); s.tick(GRACE());
+  assert.deepStrictEqual(s.el.nav[1], ['replace', SRC, false]);
+  s.el.up();
+  assert.strictEqual(s.el.style.visibility, '', '⛔ 떴는데 액자를 안 되돌렸다');
+  assert.ok(!s.h.stuck());
+});
+
+t('R3 두 번 다 노크 없음 — 래퍼 둘이면 그대로 둔다(종전 · 안내 없음 · 액자 보임 · 세 번째 없음) / 다시 연 뒤 오류 화면(자식 0)이면 안내(크롬도 credentialless 를 또 열지 않는다 = 판 하나당 한 번)', () => {
+  const s = open();
+  s.el.load(1); s.tick(KNOCK());
+  s.el.load(1); s.tick(10 * KNOCK());
+  assert.strictEqual(s.el.nav.length, 2, '⛔ 두 번 넘게 열었다(빙빙 돈다 · GAS 몫을 먹는다)');
+  assert.strictEqual(s.el.style.visibility, '', '⛔ 그대로 둘 화면을 걷은 채 뒀다(빈 화면)');
+  assert.ok(!s.h.stuck() && /불러오는 중/.test(s.text()), '⛔ 자식 있는 화면에 안내를 띄웠다(노크만 놓친 멀쩡한 화면일 수 있다)');
+  assert.strictEqual(s.timers.filter((x) => x.on).length, 0, '⛔ 판정 뒤 시계가 남았다');
+  const c = open();
+  c.el.load(1); c.tick(KNOCK());
+  c.el.load(0); c.tick(GRACE());
+  assert.strictEqual(c.el.nav.length, 2, '⛔ 노크 없는 래퍼로 한 번 다시 연 판을 또 열었다(credentialless 두 번째)');
+  assert.ok(c.h.stuck() && /화면이 안 열렸어요/.test(c.text()), '⛔ 두 번째도 실패인데 종전 안내가 없다');
+});
+
+t('R4 ⛔ 노크한 판(안 보낸 글·저장 중일 수 있다)은 다시 안 연다 — 노크가 KNOCK_MS 끝 직전에 와도 · 노크 뒤 액자가 다시 읽혀 노크 없는 화면이 돼도', () => {
+  const s = open();
+  s.el.load(1); s.tick(KNOCK() - 1);
+  s.send({ onf: 'hist', op: 'hi' }, s.el.inner());
+  s.tick(60000);
+  assert.strictEqual(s.el.nav.length, 1, '⛔ 늦게라도 노크한 화면을 다시 열었다');
+  s.el.load(1); s.tick(60000); s.el.load(0); s.tick(60000);
+  assert.strictEqual(s.el.nav.length, 1, '⛔ 노크했던 판을 뒤 load 로 다시 열었다(글을 잃는다)');
+  assert.strictEqual(s.el.style.visibility, undefined);
+});
+
+t('R5 숨긴 판(park=1 · 판 = 기억 안 정함) — 노크 없는 래퍼면 그 판만 한 번 · 주소(park=1) 그대로 · 기기 기억 안 씀 · 지운 판(stop)은 안 연다', () => {
+  const s = env();
+  const el = mkFrame(s), P = SRC + '&park=1';
+  const h = s.g.ONF.frame.openExec(el, P, null, () => {}, false);
+  el.load(1); s.tick(KNOCK());
+  assert.deepStrictEqual(el.nav, [['src', P, false], ['replace', P, false]], '⛔ 숨긴 판을 다른 주소(park 빠짐)로 다시 열었거나 안 열었다');
+  el.load(1); s.tick(10 * KNOCK());
+  assert.strictEqual(el.nav.length, 2, '⛔ 숨긴 판을 두 번 넘게 열었다(미리 띄우기 몫)');
+  assert.ok(!('onfCl' in s.ls) && !('onfClTry' in s.ls));
+  const el2 = mkFrame(s), h2 = s.g.ONF.frame.openExec(el2, P, null, () => {}, false);
+  el2.load(1); h2.stop(); s.tick(10 * KNOCK());
+  assert.strictEqual(el2.nav.length, 1, '⛔ 지운 판을 다시 열었다');
+  void h;
+});
+
+t('R7 KNOCK_MS 는 근거 안 — 잰 노크(load 뒤 18~43ms)의 수십 배 이상 · 사람이 글을 쓰기 전(5초 이하)', () => {
+  const k = KNOCK();
+  assert.ok(k >= 1000, '⛔ 노크 기다림이 너무 짧다(' + k + 'ms) — 느린 폰의 멀쩡한 화면을 다시 연다');
+  assert.ok(k <= 5000, '⛔ 노크 기다림이 너무 길다(' + k + 'ms) — 노크 놓친 화면이면 사람이 이미 쓰고 있을 수 있다 · 오류 화면에 오래 머문다');
+});
+
+t('R6 늦게 그린 래퍼(여유 안에 자식이 생김)도 노크를 기다린다 — 노크 오면 끝 · 안 오면 한 번', () => {
+  const s = open();
+  s.el.load(0); s.el.doc.kids = 1; s.tick(GRACE());
+  assert.strictEqual(s.el.nav.length, 1);
+  s.send({ onf: 'title', t: 'x' }, s.el.inner());
+  s.tick(10 * KNOCK());
+  assert.strictEqual(s.el.nav.length, 1, '⛔ 노크한 늦은 래퍼를 다시 열었다');
+  const q = open();
+  q.el.load(0); q.el.doc.kids = 1; q.tick(GRACE()); q.tick(KNOCK());
+  assert.deepStrictEqual(q.el.nav[1], ['replace', SRC, false], '⛔ 노크 없는 늦은 래퍼를 그대로 뒀다');
 });
 
 console.log('\n[껍데기 셋이 이 길을 탄다]');

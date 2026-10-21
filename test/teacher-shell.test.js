@@ -259,5 +259,58 @@ t('정상 열쇠 열기(노크 8초 안) — 안내도 새로 읽기도 기록�
   assert.ok(!('onf_devkey_off' in store) && !('onf_devkey_try' in store));
 });
 
+console.log('\n[🔁 선생님 홈 — 구글 오류 화면이면 한 번 저절로 다시 연다 (2026-10-22 Peter 「A+B」 중 B)]');
+/* 액자 창 대역 — 자식 프레임 수(length)와 location.replace 를 적는다 */
+function cw(R, kids) {
+  const w = R.els.app.contentWindow, nav = [];
+  w.length = kids;
+  w.location = { get href() { throw new Error('cross-origin'); }, replace(u) { nav.push(u); } };
+  return nav;
+}
+function loginOpen() { const R = boot({}); R.g.onCredential({ credential: gtok() }); return R; }
+
+t('T1 로그인 길 · 구글 오류 화면(load · 자식 0 · 노크 없음) → 1.5초 뒤 같은 주소로 한 번(replace — 기록 칸 안 쌓음) · 다시 연 것도 오류면 또 안 연다(8초 안내는 종전 시각)', () => {
+  const R = loginOpen(), nav = cw(R, 0), src = R.els.app.src;
+  R.advance(300); R.load(); R.advance(1499);
+  assert.strictEqual(nav.length, 0, '⛔ 1.5초를 안 기다렸다');
+  R.advance(1);
+  assert.deepStrictEqual(nav, [src], '⛔ 구글 오류 화면을 같은 주소로 다시 안 열었다');
+  R.advance(500); R.load(); R.advance(60000);
+  assert.strictEqual(nav.length, 1, '⛔ 두 번 넘게 열었다');
+  assert.strictEqual(R.reloads(), 0);
+  assert.ok(/화면이 안 열렸어요/.test(R.msg()), '⛔ 두 번째도 안 되는데 종전 8초 안내가 없다');
+});
+
+t('T2 정상(load 때 자식 1 · 노크) · 노크만 놓친 화면(자식 1 · 노크 없음 — 2026-08-14 Mary) · 노크 뒤 load — 다시 안 연다', () => {
+  for (const knock of [true, false]) {
+    const R = loginOpen(), nav = cw(R, 1);
+    R.advance(2500); R.load(); if (knock) R.knock(); R.advance(60000);
+    assert.strictEqual(nav.length, 0, '⛔ 래퍼가 뜬 화면(노크를 놓쳐도 도는 화면)을 다시 열었다');
+  }
+  const R = loginOpen(), nav = cw(R, 0);
+  R.advance(2000); R.knock(); R.load(); R.advance(60000);
+  assert.strictEqual(nav.length, 0, '⛔ 노크한 화면(안 보낸 글이 있을 수 있다)을 다시 열었다');
+  const Q = loginOpen(), nq = cw(Q, 0);
+  Q.advance(300); Q.load(); Q.advance(1000); Q.knock(); Q.advance(60000);
+  assert.strictEqual(nq.length, 0, '⛔ 여유 안에 노크한 화면을 다시 열었다');
+});
+
+t('T3 로그인 기다림 — 잠금 화면(토큰 전)엔 액자가 없어 아무것도 안 연다 · 느린 서버(load 전 12초)도 안 연다', () => {
+  const R = boot({}), nav = cw(R, 0);
+  R.advance(120000);
+  assert.ok(!R.opened() && nav.length === 0, '⛔ 로그인 전에 액자를 열었다');
+  const S = loginOpen(), ns = cw(S, 1);
+  S.advance(12000); S.load(); S.knock(); S.advance(60000);
+  assert.strictEqual(ns.length, 0, '⛔ 느린 서버를 다시 열었다(doGet 두 번)');
+});
+
+t('T4 열쇠 길은 안 탄다 — 8초 덫이 그 한 번(구글 창구로 새로 읽기)이다 · 겹쳐 다시 열지 않는다', () => {
+  const store = { onf_id_tok: odk() };
+  const R = boot(store), nav = cw(R, 0);
+  R.advance(300); R.load(); R.advance(8000);
+  assert.strictEqual(nav.length, 0, '⛔ 열쇠 길에서 덫 말고 따로 다시 열었다');
+  assert.strictEqual(R.reloads(), 1, '전제: 덫은 종전대로');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);

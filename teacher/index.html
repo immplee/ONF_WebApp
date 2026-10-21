@@ -246,6 +246,29 @@ function mount() {
       frameWatch = setTimeout(watch, 8000);
     });
   }
+  var once = false;
+  /* 🔁 [2026-10-22 Peter 「A+B」 중 B] 로그인 길(구글 창구로 받은 토큰)의 액자가 **구글 오류 화면**이면 한 번만 같은 주소로 다시 연다 —
+     Lib 배포 순간 「스토리지에서 읽는 중 서버 오류 INTERNAL」·동시 실행 한도 같은 일시 오류는 다시 열면 뜬다.
+     · 판별 = 학생 껍데기(onf-frame.js) 판과 같다: 다 읽혔는데(load) 자식 프레임 0(정상 GAS 래퍼는 sandboxFrame 을 HTML 에 박아 1 · 구글 오류 화면 0 —
+       2026-10-22 라이브 실측 학생 홈·교재 판 여섯 번 다 load 때 자식 1 · 노크 load 뒤 18~43ms) + CL_GRACE(1.5초) 안에 노크·자식이 없다.
+     · ⛔ 자식이 있는 화면은 노크가 없어도 손대지 않는다 — 노크를 놓치고도 멀쩡히 도는 컴퓨터가 있었다(2026-08-14 Mary · 위 watch 주석).
+     · ⛔ 노크(appWin)가 온 화면은 안 연다 — 안 보낸 글이 있을 수 있다. 첫 진짜 load 한 번만 본다(다시 연 화면의 load 는 안 센다 = 판 하나당 한 번).
+     · ⚠️ 열쇠 길(keyOpen)은 안 탄다 — 위 8초 덫이 load 뒤 노크 없으면 이미 구글 창구로 한 번 다시 연다(겹치면 덫의 「막힘」 셈이 흐려진다).
+     · 로그인 기다림(잠금 화면 · 구글 창구)은 액자를 열기 **전**이라 여기 안 온다. 그래도 액자 안에 구글 「액세스 권한 필요」 화면(자식 0)이 뜨면
+       한 번 다시 열린다 — 그 화면은 로그인 받는 곳이 아니라(로그인 창은 액자에 못 뜬다) 다시 열어도 잃는 것이 없다 · doGet 도 안 돈다.
+     · 시간: 정상 길은 load 때 자식 1 이라 그 자리에서 끝(시계 0) · 8초 안내 시계는 그대로 둔다(액자 뒤 글이라 다시 여는 동안엔 안 보인다). */
+  if (!keyOpen) frame.addEventListener('load', function () {
+    if (appWin || once) return;
+    try { if (frame.contentWindow.location.href === 'about:blank') return; } catch (e) {}   // 처음 빈 문서
+    once = true;
+    setTimeout(function () {
+      if (appWin || kidsN() > 0) return;
+      console.info('[onf] 구글 오류 화면(자식 0 · 노크 없음) — 한 번 더 연다');
+      var u = frame.src;
+      try { frame.contentWindow.location.replace(u); } catch (e) { frame.src = u; }   // 같은 주소 · replace — 기록 칸을 안 쌓는다(onf-hist 의 go(-n) 전제)
+    }, 1500);
+  });
+  function kidsN() { try { return frame.contentWindow.length || 0; } catch (e) { return 0; } }
   frame.src = EXEC + (qs ? '?' + qs : '');
   /* ⛔ 프레임이 **막혔는지**를 화면이 말해야 한다. 안쪽이 살아 있으면 몇백 ms 안에 노크가 온다.
      안 오면 구글이 문 앞에서 자른 것이다(회사 계정이 아니거나 로그인이 안 된 것) —
