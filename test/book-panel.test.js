@@ -1371,7 +1371,7 @@ t("H4' — 📱 폰: [열기] → bookSwap · 판 칸 push {onfBook:key(B)} · �
   assert.ok(!/TOK/.test(JSON.stringify(s.H.st)), '⛔ 기록 칸에 학생 토큰이 실렸다');
 });
 
-t("H7' — caps: 스위치 켜면 swap:1 · 꺼짐이면 칸 없음(종전 글자 그대로) · index.html: 주소 swap=1|0 을 이 기기에 기억(학생 키 onfSwap · 선생님 onfThSwap 아님) · 기본 끔 · perf 넘김", () => {
+t("H7' — caps: 스위치 켜면 swap:1 · 꺼짐이면 칸 없음(종전 글자 그대로) · index.html: 주소 swap=1|0 을 이 기기에 기억(학생 키 onfSwap · 선생님 onfThSwap 아님) · 기본 켬(2026-10-21 Peter 「전체 켜줘」) · perf 넘김", () => {
   const caps = (s) => { s.send({ onf: 'bookHello' }, s.homeInner); return js(s.homeInner.sent.find((x) => x[0].onf === 'caps')[0]); };
   assert.deepStrictEqual(caps(setup(null, { swap: true })), { onf: 'caps', book: 1, phone: 1, swap: 1 }, '⛔ 켰는데 caps 에 swap:1 이 없다');
   assert.deepStrictEqual(caps(setup()), { onf: 'caps', book: 1, phone: 1 }, '⛔ 끔인데 caps 글자가 종전과 다르다');
@@ -1386,15 +1386,15 @@ t("H7' — caps: 스위치 켜면 swap:1 · 꺼짐이면 칸 없음(종전 글�
     return { opts, st };
   };
   let r = run('');
-  assert.ok(r.opts.swap === false && !('onfSwap' in r.st), '⛔ 기본이 끔이 아니다');
+  assert.ok(r.opts.swap === true && !('onfSwap' in r.st), '⛔ 기본이 켬이 아니다(또는 이 기기에 괜히 기억했다)');
   r = run('?swap=1');
   assert.ok(r.opts.swap === true && r.st.onfSwap === '1', '⛔ swap=1 을 안 켰다(또는 이 기기에 안 기억했다)');
   r = run('', { onfSwap: '1' });
   assert.strictEqual(r.opts.swap, true, '⛔ 기억한 켬을 안 따랐다');
   r = run('?swap=0', { onfSwap: '1' });
   assert.ok(r.opts.swap === false && r.st.onfSwap === '0', '⛔ swap=0 이 안 끈다');
-  r = run('', { onfThSwap: '1' });
-  assert.strictEqual(r.opts.swap, false, '⛔ 선생님 키(onfThSwap)를 봤다');
+  r = run('', { onfThSwap: '0' });
+  assert.strictEqual(r.opts.swap, true, '⛔ 선생님 키(onfThSwap)를 봤다');
   assert.ok(run('?perf=1').opts.perf === true && run('').opts.perf === false, '⛔ perf=1 을 판 갈아 끼움 속도표로 안 넘긴다');
 });
 

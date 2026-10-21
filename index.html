@@ -106,7 +106,7 @@
      phonepanel=1 이면 다시 켠다. 아무것도 없으면 켬. ⚠️ 저장소가 막힌 창(사생활 보호)이면 주소로 연 그 한 번만. */
   var phoneOn = q.get('phonepanel');
   try { if (phoneOn === '1' || phoneOn === '0') localStorage.setItem('onfPhonePanel', phoneOn); else phoneOn = localStorage.getItem('onfPhonePanel'); } catch (eP) {}
-  /* 📖 판 한 장 스위치(2단계 · 2026-10-17) — 주소 swap=1|0 이면 이 기기에 기억(학생 키 onfSwap · 선생님 껍데기는 onfThSwap) · 없으면 기억값 · 그것도 없으면 **끔**(Peter 기기 확인 뒤 기본 켬).
+  /* 📖 판 한 장 스위치(2단계 · 2026-10-17) — 주소 swap=1|0 이면 이 기기에 기억(학생 키 onfSwap · 선생님 껍데기는 onfThSwap) · 없으면 기억값 · 그것도 없으면 **켬**(2026-10-21 Peter 「너가 테스트 해보고 전체 켜줘」 — A→B→A 받아 둔 값 12ms 라이브 확인 뒤 · 이 기기만 끄기 = swap=0).
      끔이면 onf-frame.js 의 갈아 끼우기가 하나도 안 돈다(종전 그대로). perf=1 이면 갈아 끼움 시간을 콘솔·홈에 한 줄(bookPerf). */
   var swapOn = q.get('swap');
   try { if (swapOn === '1' || swapOn === '0') localStorage.setItem('onfSwap', swapOn); else swapOn = localStorage.getItem('onfSwap'); } catch (eS) {}
@@ -137,7 +137,7 @@
                   ONF.api.appUrl(token, extra.join('&')),
                   { diag: q.get('diag') === '1', bookSrc: bookSrc,
                     wait: document.querySelector('.onf-wait'),   // 🔐 여러 계정 우회 — 못 열면 이 자리에 안내(onf-frame.js openExec)
-                    swap: swapOn === '1', perf: q.get('perf') === '1',
+                    swap: swapOn !== '0', perf: q.get('perf') === '1',
                     phone: phoneOn !== '0' });
 </script>
 </body>
