@@ -137,7 +137,7 @@
    *     교재 오프라인 백업(저장 못 한 수정)·사전 기기 사본·테마·카드 크기 고름이 안 남는다. 교재 저장 실패 카드는 그 창에선 「닫으면 사라져요」를 말하고
    *     (Ownify `window.credentialless`) · 과제 끝맺음 미룬 것은 이 껍데기 저장소에 맡긴다(아래 mount 의 hwFin). 껍데기 저장소(onfTok·onfTheme·이 기억)는 그대로다.
    *   ⛔ 학생 exec(ONF.api.EXEC)에만 쓴다. 선생님 홈 액자(`/a/macros/ownify.co.kr`)는 구글 로그인이 있어야 열린다 — credentialless 면 쿠키가 없어 문에서 잘린다. */
-  var CL_KEY = 'onfCl', CL_TRY = 'onfClTry', CL_MS = 7 * 86400000, CL_GRACE = 1500, clPage = false, KNOCK_MS = 3000;   // KNOCK_MS = 래퍼 뜬 뒤 노크 기다림(아래 quiet)
+  var CL_KEY = 'onfCl', CL_TRY = 'onfClTry', CL_MS = 7 * 86400000, CL_GRACE = 1500, clPage = false, APP_MS = 3000;   // APP_MS = 래퍼는 떴는데 앱 프레임이 없을 때 더 기다리는 시간(아래 quiet)
   function clCan() { try { return 'credentialless' in HTMLIFrameElement.prototype; } catch (e) { return false; } }
   function clAt(k) { try { var t = Number(localStorage.getItem(k) || 0); return t > 0 && Date.now() - t < CL_MS; } catch (e) { return false; } }
   function clSet(k, on) { try { if (on) localStorage.setItem(k, String(Date.now())); else localStorage.removeItem(k); } catch (e) {} }
@@ -149,8 +149,8 @@
    *  @param keep  홈 액자만 true — 이 기기 기억(onfClTry·onfCl)을 정한다 · 판은 읽기만
    *  @return { stop: 판정을 그만두고 노크 듣기를 걷는다(판을 지울 때) · stuck: 못 열어 안내를 띄웠나 } */
   function openExec(el, src, wait, close, keep) {
-    var can = clCan(), cl = can && (clPage || clAt(CL_KEY)), byMemory = cl, tried = {}, done = false, stuck = false, tm = null, re = 0;   // re = 다시 연 횟수
-    function onMsg(ev) { if (!done && ev && _fromOurFrame(ev.source, el)) ok(); }   // 노크 — 깊이 무관 · 내 액자 후손의 말이면 산 화면(값은 안 본다 · load 전에 와도 여기서 끝난다)
+    var can = clCan(), cl = can && (clPage || clAt(CL_KEY)), byMemory = cl, tried = {}, done = false, stuck = false, tm = null, re = 0, nav = false;   // re = 다시 연 횟수 · nav = 다시 여는 중(다음 load 전)
+    function onMsg(ev) { if (!done && !nav && ev && _fromOurFrame(ev.source, el)) ok(); }   // 🔁 다시 여는 중엔 안 받는다 — replace 는 새 응답까지 옛 문서를 살려 둬 옛 문서의 늦은 말이 올 수 있다(반박 🟠1)   // 노크 — 깊이 무관 · 내 액자 후손의 말이면 산 화면(값은 안 본다 · load 전에 와도 여기서 끝난다)
     function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
     function ok() {
       end();
@@ -162,8 +162,9 @@
       if (clAt(CL_TRY)) { clSet(CL_KEY, true); clSet(CL_TRY, false); } else clSet(CL_TRY, true);   // 두 번째면 기억 · 첫 번째면 표시만
     }
     function kids() { try { return el.contentWindow.length; } catch (e) { return 0; } }
+    function app() { try { var w = el.contentWindow[0]; return w ? w.length : 0; } catch (e) { return 0; } }   // 🔁 래퍼 sandboxFrame 의 자식(userHtmlFrame = 우리 앱) 수 — 교차 출처여도 읽힌다
     function go() {
-      re++;
+      re++; nav = true;
       el.style.visibility = 'hidden';                                // 🔁 다시 여는 동안 구글 오류 화면을 걷는다 — 뒤 「불러오는 중」이 보인다(뜨면 ok 가 되돌린다 · 또 실패면 say 가 그대로 둔다)
       if (can) el.credentialless = cl;                               // 다음 탐색부터 먹는다(속성을 비추는 값)
       try { el.contentWindow.location.replace(src); } catch (e) { el.src = src; }
@@ -181,19 +182,21 @@
       end();
       say();
     }
-    /* 🔁 래퍼(자식 프레임)는 떴는데 KNOCK_MS 안에 노크가 없다(2026-10-22 Peter 「A+B」 중 B) — 구글이 래퍼 안에 오류를 그린 화면
-         (Lib 배포 순간 「스토리지에서 읽는 중 서버 오류 INTERNAL」 · 선생님 홈 판 07:27 — 구글 글이 그대로 남았다 = 자식 0 판정에 안 걸린 꼴로 **추정** · 구조는 못 잼)으로 보고 **한 번** 같은 주소로 다시 연다.
-       · 근거(2026-10-22 라이브 실측 · 김가상 홈 셋·숨긴 교재 판 셋): load 3.1~5.2초 · 노크(hist hi·bookHi·title…)는 **load 뒤 18~43ms** · load 때 자식 1.
-         우리 화면은 전부 스크립트를 읽는 순간 노크한다(Ownify ONF_Shell_Js hist hi · 교재 themeAsk) → 3초 = 잰 값의 70배 여유 · 사람이 아직 글을 못 쓴 때.
-       · ⛔ 노크한 판은 여기 안 온다(onMsg → ok → end) — 안 보낸 글·저장 중인 판은 다시 열리지 않는다.
-       · 두 번째도 노크가 없으면 종전대로 그대로 둔다(ok — 자식 있는 화면 · 안내 안 띄움 · 기억은 종전 「떴다」). 정상 길은 노크가 먼저 와 이 시계가 안 돈다(시간·호출 0).
-       ⚠️ 노크가 없는 우리 안내 한 장(Lib _onfNoticePage — 수강 끝·없는 주소·doGet 실패)도 한 번 다시 열린다(doGet 하나 더 · 드문 길). */
+    /* 🔁 래퍼(자식 프레임)는 떴는데 그 안에 **앱 프레임이 없다**(sandboxFrame 의 자식 userHtmlFrame 0) — 구글이 래퍼 안에 오류를 그린 화면으로 보고
+         APP_MS 더 기다려도 없으면 **한 번** 같은 주소로 다시 연다(2026-10-22 Peter 「A+B」 중 B · Lib 배포 순간 「스토리지에서 읽는 중 서버 오류 INTERNAL」 ·
+         선생님 홈 판 07:27 — 구글 글이 그대로 남았다 = 자식 0 판정에 안 걸린 꼴로 **추정** · 오류 화면 구조 자체는 못 잼).
+       · 판별을 노크 시각이 아니라 **구조**로 한다(반박 🟠3) — 노크는 이웃 긴 작업(같은 출처 액자는 한 렌더러 · 안드로이드는 껍데기까지 한 스레드)에 밀리고
+         노크 없는 우리 안내 한 장(Lib _onfNoticePage · PIN 칸)도 있다. 앱 프레임은 **load 때 이미 있다**:
+         2026-10-22 헤드리스 실측(사이트 격리 끔 = 한 렌더러) 홈·내 문장·안내 한 장 셋을 한꺼번에 · 보통 9 · CPU×6 9 · CPU×6 + 껍데기 200ms 긴 작업 9 —
+         27번 모두 load 처리기 안에서 앱 프레임 1(노크 없는 안내 한 장 포함). 라이브(김가상 홈 3·숨긴 판 3)도 노크 load 뒤 18~43ms.
+       · 그래서 정상 길은 load 그 자리에서 끝(시계·호출 0) · 노크가 늦어도·없어도 앱 프레임이 있으면 안 다시 연다.
+       · ⛔ 노크한 판은 여기 안 온다(onMsg → ok → end) · 앱 프레임이 없는 문서는 우리 스크립트가 없어 쓴 글이 있을 수 없다.
+       · 두 번째도 앱 프레임이 없으면 종전대로 그대로 둔다(ok — 안내 안 띄움 · 기억은 종전 「떴다」). */
     function quiet() {
-      if (done) return;
       if (!el.contentWindow) return end();                           // 그 사이 액자가 지워졌다
-      if (re) return ok();                                           // 이미 한 번 다시 열었다 — 그대로 둔다
+      if (app() > 0 || re) return ok();                              // 앱이 생겼다 · 이미 한 번 다시 열었다 — 그대로 둔다
       tried.quiet = 1;
-      console.info('[onf] 화면은 떴는데 노크가 없다(구글 오류?) — 한 번 더 연다');
+      console.info('[onf] 래퍼는 떴는데 앱 프레임이 없다(구글 오류?) — 한 번 더 연다');
       go();
     }
     function say() {
@@ -214,12 +217,13 @@
     el.addEventListener('load', function () {
       if (done) return;
       try { if (el.contentWindow.location.href === 'about:blank') return; } catch (e) {}   // 처음 빈 문서(같은 출처라 읽힌다) — 진짜 화면이 아니다
+      nav = false;                                                   // 🔁 새 문서가 섰다 — 이제 노크를 받는다
       clearTimeout(tm);
-      if (kids() > 0) { tm = setTimeout(quiet, KNOCK_MS); return; }   // 🔁 래퍼는 떴다 — 노크를 KNOCK_MS 기다린다(아래)
+      if (kids() > 0) { if (app() > 0 || re) return ok(); tm = setTimeout(quiet, APP_MS); return; }   // 🔁 래퍼 + 앱 프레임 = 산 화면(종전처럼 그 자리) · 앱 없으면 아래 quiet
       tm = setTimeout(function () {                                  // 그 사이 노크가 오면 onMsg 가 끝낸다
         if (done) return;
         if (!el.contentWindow) return end();                         // 그 사이 액자가 지워졌다 — 판정하지 않는다(기억을 잘못 버리지 않게)
-        if (kids() > 0) tm = setTimeout(quiet, KNOCK_MS); else fail();   // 여유 안에 래퍼가 생겼다 — 노크를 기다린다(quiet)
+        if (kids() > 0) quiet(); else fail();                        // 여유 안에 래퍼가 생겼다 — 앱 프레임을 본다(없으면 한 번 · quiet)
       }, CL_GRACE);
     });
     if (can) el.credentialless = cl;

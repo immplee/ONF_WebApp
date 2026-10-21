@@ -57,18 +57,20 @@ function mkEl(tag) {
 /* 가짜 iframe — src 대입·location.replace 를 그때의 credentialless 값과 함께 적는다. load(쪽) 로 「다 읽혔다」를 쏜다. */
 function mkFrame(s) {
   const nav = [], L = {};
-  const doc = { kids: 0, blank: true, win: null };
+  const doc = { kids: 0, app: 0, blank: true, win: null };
   const el = { style: {}, credentialless: false, nav, L,
     addEventListener(k, f) { (L[k] = L[k] || []).push(f); },
     get src() { return this._src || ''; },
     set src(v) { this._src = v; nav.push(['src', v, !!this.credentialless]); doc.blank = true; } };
   const cw = win('exec', s.top);
   Object.defineProperty(cw, 'length', { get: () => doc.kids });
+  Object.defineProperty(cw, '0', { get: () => (doc.kids > 0 ? { length: doc.app } : undefined) });   // 래퍼 sandboxFrame — 그 자식 = 앱 프레임(userHtmlFrame)
   cw.location = { get href() { if (doc.blank) return 'about:blank'; throw new Error('SecurityError: cross-origin'); },
     replace(u) { nav.push(['replace', u, !!el.credentialless]); doc.blank = true; } };
   el.contentWindow = cw; el.doc = doc;
   /* 다 읽혔다 — kids = 자식 프레임 수(정상 GAS 바깥 문서 1 · 구글 오류 화면 0) · blank = 처음 빈 문서(같은 출처) */
-  el.load = (kids, blank) => { doc.kids = kids; doc.blank = !!blank; (L.load || []).forEach((f) => f({})); };
+  /*   app = 래퍼 안 앱 프레임 수(정상 1 — 2026-10-22 헤드리스 27번·라이브 6번 모두 load 때 1 · 구글이 래퍼 안에 그린 오류 0) */
+  el.load = (kids, blank, app) => { doc.kids = kids; doc.app = app === undefined ? (kids > 0 ? 1 : 0) : app; doc.blank = !!blank; (L.load || []).forEach((f) => f({})); };
   el.inner = () => win('user', win('sandbox', cw));   // 안쪽 창(깊이 2 — exec → sandboxFrame → userHtmlFrame)
   /* 우리 화면이 떴다 — 래퍼(자식 1) load 뒤 안쪽 노크(라이브 실측 2026-10-22: load 뒤 18~43ms · ONF_Shell_Js hist hi) */
   el.up = () => { el.load(1); (s.L.message || []).slice().forEach((f) => f({ data: { onf: 'hist', op: 'hi' }, source: el.inner(), origin: 'https://n-abc-0lu-script.googleusercontent.com' })); };
@@ -269,7 +271,7 @@ t('⑦-2 여유 동안 자식 프레임이 생기면(늦게 그리는 래퍼) �
   const s = open();
   s.el.load(0);
   s.el.contentWindow.location.replace = () => { throw new Error('부르면 안 된다'); };
-  s.el.doc.kids = 1;
+  s.el.doc.kids = 1; s.el.doc.app = 1;
   s.tick(GRACE());
   assert.strictEqual(s.el.nav.length, 1, '⛔ 늦게 그린 래퍼(여유 안에 자식이 생김)를 다시 열었다');
   assert.strictEqual(s.el.style.visibility, undefined);
@@ -307,27 +309,28 @@ t('location.replace 를 못 부르면(던짐) src 대입으로라도 연다', ()
   assert.deepStrictEqual(s.el.nav[1], ['src', SRC, true]);
 });
 
-console.log('\n[🔁 구글 일시 오류 — 노크 없는 판은 한 번 저절로 다시 연다 (2026-10-22 Peter 「A+B」 중 B)]');
-const KNOCK = () => { const m = /KNOCK_MS = (\d+)/.exec(FRAME_JS); assert.ok(m, 'KNOCK_MS 를 못 찾았다(래퍼는 떴는데 노크 없는 화면을 안 본다)'); return Number(m[1]); };
+console.log('\n[🔁 구글 일시 오류 — 앱 프레임 없는 판은 한 번 저절로 다시 연다 (2026-10-22 Peter 「A+B」 중 B · 반박 🟠1·🟠3 반영)]');
+const APP = () => { const m = /APP_MS = (\d+)/.exec(FRAME_JS); assert.ok(m, 'APP_MS 를 못 찾았다(래퍼는 떴는데 앱 프레임 없는 화면을 안 본다)'); return Number(m[1]); };
+const ERR = 0;   // load(1, false, ERR) = 래퍼는 떴는데 앱 프레임 0(구글이 래퍼 안에 그린 오류)
 
-t('R1 정상(래퍼 load → 노크 · 라이브 18~43ms 뒤) — 다시 안 열고 시계·듣기도 안 남는다(정상 길 시간·호출 0)', () => {
+t('R1 정상(래퍼 + 앱 프레임 load) — load 그 자리에서 끝 · 다시 안 열고 시계·듣기 안 남음(정상 길 시간·호출 0) · 노크가 그 뒤에 와도 같다', () => {
   const s = open();
   const n0 = (s.L.message || []).length;
-  s.el.up();
-  s.tick(60000);
-  assert.strictEqual(s.el.nav.length, 1, '⛔ 노크한 화면을 다시 열었다');
-  assert.strictEqual((s.L.message || []).length, n0 - 1, '⛔ 노크 뒤에도 듣기가 남았다');
-  assert.strictEqual(s.timers.filter((x) => x.on).length, 0, '⛔ 노크 뒤에도 시계가 남았다');
+  s.el.load(1);
+  assert.strictEqual((s.L.message || []).length, n0 - 1, '⛔ 앱 프레임이 있는데 판정을 미뤘다(듣기가 남았다)');
+  assert.strictEqual(s.timers.filter((x) => x.on).length, 0, '⛔ 정상 길에 시계를 걸었다');
+  s.send({ onf: 'hist', op: 'hi' }, s.el.inner()); s.tick(60000);
+  assert.strictEqual(s.el.nav.length, 1, '⛔ 정상 화면을 다시 열었다');
   assert.strictEqual(s.el.style.visibility, undefined, '⛔ 정상 액자를 만졌다');
 });
 
-t('R2 래퍼는 떴는데(자식 1) 노크가 없다(구글이 래퍼 안에 그린 INTERNAL 오류) → KNOCK_MS 뒤 같은 주소를 같은 길로 한 번 다시(replace · 그동안 액자를 걷어 「불러오는 중」) → 뜨면 액자를 되돌린다', () => {
+t('R2 래퍼는 떴는데 앱 프레임 0(래퍼 안 INTERNAL 오류) → APP_MS 뒤에도 0 이면 같은 주소·같은 길로 한 번(replace · 그동안 액자를 걷어 「불러오는 중」) → 새 문서가 뜨면 되돌린다', () => {
   const s = open();
-  s.el.load(1);
-  s.tick(KNOCK() - 1);
-  assert.strictEqual(s.el.nav.length, 1, '⛔ 노크를 다 안 기다리고 다시 열었다');
+  s.el.load(1, false, ERR);
+  s.tick(APP() - 1);
+  assert.strictEqual(s.el.nav.length, 1, '⛔ 다 안 기다리고 다시 열었다');
   s.tick(1);
-  assert.deepStrictEqual(s.el.nav[1], ['replace', SRC, false], '⛔ 노크 없는 래퍼를 같은 주소로 다시 안 열었다(구글 오류가 그대로 남는다)');
+  assert.deepStrictEqual(s.el.nav[1], ['replace', SRC, false], '⛔ 앱 없는 래퍼를 같은 주소로 다시 안 열었다(구글 오류가 그대로 남는다)');
   assert.strictEqual(s.el.style.visibility, 'hidden', '⛔ 다시 여는 동안 구글 오류 화면을 그대로 보인다');
   assert.ok(/불러오는 중/.test(s.text()) && !s.h.stuck(), '⛔ 다시 여는 중에 안내를 띄웠다(사람에게 안내 없이)');
   s.el.up();
@@ -346,63 +349,107 @@ t('R2-b 사파리(credentialless 모름) 구글 오류 화면(자식 0) → 한 
   assert.ok(!s.h.stuck());
 });
 
-t('R3 두 번 다 노크 없음 — 래퍼 둘이면 그대로 둔다(종전 · 안내 없음 · 액자 보임 · 세 번째 없음) / 다시 연 뒤 오류 화면(자식 0)이면 안내(크롬도 credentialless 를 또 열지 않는다 = 판 하나당 한 번)', () => {
+t('R3 두 번 다 앱 없음 — 래퍼면 그대로 둔다(종전 · 안내 없음 · 액자 보임 · 세 번째 없음) / 다시 연 뒤 오류 화면(자식 0)이면 안내(크롬도 credentialless 를 또 열지 않는다 = 판 하나당 한 번)', () => {
   const s = open();
-  s.el.load(1); s.tick(KNOCK());
-  s.el.load(1); s.tick(10 * KNOCK());
+  s.el.load(1, false, ERR); s.tick(APP());
+  s.el.load(1, false, ERR);
+  assert.strictEqual(s.el.style.visibility, '', '⛔ 다시 연 것도 앱이 없는데 바로 되돌리지 않고 걷은 채 더 기다렸다(빈 화면 3초)');
+  s.tick(10 * APP());
   assert.strictEqual(s.el.nav.length, 2, '⛔ 두 번 넘게 열었다(빙빙 돈다 · GAS 몫을 먹는다)');
   assert.strictEqual(s.el.style.visibility, '', '⛔ 그대로 둘 화면을 걷은 채 뒀다(빈 화면)');
-  assert.ok(!s.h.stuck() && /불러오는 중/.test(s.text()), '⛔ 자식 있는 화면에 안내를 띄웠다(노크만 놓친 멀쩡한 화면일 수 있다)');
+  assert.ok(!s.h.stuck() && /불러오는 중/.test(s.text()), '⛔ 래퍼 화면에 안내를 띄웠다');
   assert.strictEqual(s.timers.filter((x) => x.on).length, 0, '⛔ 판정 뒤 시계가 남았다');
   const c = open();
-  c.el.load(1); c.tick(KNOCK());
+  c.el.load(1, false, ERR); c.tick(APP());
   c.el.load(0); c.tick(GRACE());
-  assert.strictEqual(c.el.nav.length, 2, '⛔ 노크 없는 래퍼로 한 번 다시 연 판을 또 열었다(credentialless 두 번째)');
+  assert.strictEqual(c.el.nav.length, 2, '⛔ 앱 없는 래퍼로 한 번 다시 연 판을 또 열었다(credentialless 두 번째)');
   assert.ok(c.h.stuck() && /화면이 안 열렸어요/.test(c.text()), '⛔ 두 번째도 실패인데 종전 안내가 없다');
 });
 
-t('R4 ⛔ 노크한 판(안 보낸 글·저장 중일 수 있다)은 다시 안 연다 — 노크가 KNOCK_MS 끝 직전에 와도 · 노크 뒤 액자가 다시 읽혀 노크 없는 화면이 돼도', () => {
+t('R4 ⛔ 노크한 판(안 보낸 글·저장 중일 수 있다)은 다시 안 연다 — 앱 없는 래퍼여도 APP_MS 안에 노크했으면 · 노크 뒤 다시 읽혀 오류가 돼도', () => {
   const s = open();
-  s.el.load(1); s.tick(KNOCK() - 1);
+  s.el.load(1, false, ERR); s.tick(APP() - 1);
   s.send({ onf: 'hist', op: 'hi' }, s.el.inner());
   s.tick(60000);
-  assert.strictEqual(s.el.nav.length, 1, '⛔ 늦게라도 노크한 화면을 다시 열었다');
-  s.el.load(1); s.tick(60000); s.el.load(0); s.tick(60000);
+  assert.strictEqual(s.el.nav.length, 1, '⛔ 노크한 화면을 다시 열었다');
+  s.el.load(1, false, ERR); s.tick(60000); s.el.load(0); s.tick(60000);
   assert.strictEqual(s.el.nav.length, 1, '⛔ 노크했던 판을 뒤 load 로 다시 열었다(글을 잃는다)');
   assert.strictEqual(s.el.style.visibility, undefined);
 });
 
-t('R5 숨긴 판(park=1 · 판 = 기억 안 정함) — 노크 없는 래퍼면 그 판만 한 번 · 주소(park=1) 그대로 · 기기 기억 안 씀 · 지운 판(stop)은 안 연다', () => {
+t('R4-b 🟠1 다시 여는 중(replace 는 새 응답까지 옛 문서를 살려 둔다) 옛 문서의 늦은 노크는 안 받는다 — 액자를 안 되돌리고(옛 화면에 못 쓴다) · 듣기를 안 걷는다 · 새 문서 load 뒤 노크·앱으로 끝', () => {
+  const s = open();
+  s.el.load(1, false, ERR); s.tick(APP());
+  assert.strictEqual(s.el.nav.length, 2, '전제: 다시 여는 중');
+  const n0 = (s.L.message || []).length;
+  s.send({ onf: 'hist', op: 'hi' }, s.el.inner());   // 옛 문서의 늦은 말
+  assert.strictEqual(s.el.style.visibility, 'hidden', '⛔ 다시 여는 중 옛 문서의 늦은 노크로 옛 화면을 다시 보였다(새 문서가 갈아 끼우며 쓴 글이 사라진다)');
+  assert.strictEqual((s.L.message || []).length, n0, '⛔ 옛 문서의 늦은 노크로 판정을 끝냈다');
+  s.el.load(1);
+  assert.strictEqual(s.el.style.visibility, '', '⛔ 새 문서가 떴는데 안 되돌렸다');
+  assert.strictEqual((s.L.message || []).length, n0 - 1, '⛔ 새 문서가 떴는데 판정을 안 끝냈다');
+});
+
+t('R4-c 다시 연 새 문서의 노크는 받는다 — 새 문서가 자식 0 으로 load 된 뒤 여유 안에 노크하면 산 화면(안내 아님)', () => {
+  const s = open();
+  s.el.load(1, false, ERR); s.tick(APP());
+  s.el.load(0); s.send({ onf: 'hist', op: 'hi' }, s.el.inner()); s.tick(10 * GRACE());
+  assert.ok(!s.h.stuck() && s.el.style.visibility === '', '⛔ 새 문서의 노크를 버려 산 화면에 안내를 띄웠다');
+  const q = open();   // 다시 연 새 문서가 늦게 그린 래퍼(여유 안에 자식)인데 앱 없음 — 세 번째는 없다
+  q.el.load(1, false, ERR); q.tick(APP());
+  q.el.load(0); q.el.doc.kids = 1; q.el.doc.app = 0; q.tick(10 * APP());
+  assert.strictEqual(q.el.nav.length, 2, '⛔ 늦은 래퍼 길로 두 번째 다시 열기를 했다(판 하나당 한 번)');
+});
+
+t('R5 숨긴 판(park=1 · 판 = 기억 안 정함) — 앱 없는 래퍼면 그 판만 한 번 · 주소(park=1) 그대로 · 기기 기억 안 씀 · 지운 판(stop)은 안 연다', () => {
   const s = env();
   const el = mkFrame(s), P = SRC + '&park=1';
-  const h = s.g.ONF.frame.openExec(el, P, null, () => {}, false);
-  el.load(1); s.tick(KNOCK());
+  s.g.ONF.frame.openExec(el, P, null, () => {}, false);
+  el.load(1, false, ERR); s.tick(APP());
   assert.deepStrictEqual(el.nav, [['src', P, false], ['replace', P, false]], '⛔ 숨긴 판을 다른 주소(park 빠짐)로 다시 열었거나 안 열었다');
-  el.load(1); s.tick(10 * KNOCK());
+  el.load(1, false, ERR); s.tick(10 * APP());
   assert.strictEqual(el.nav.length, 2, '⛔ 숨긴 판을 두 번 넘게 열었다(미리 띄우기 몫)');
   assert.ok(!('onfCl' in s.ls) && !('onfClTry' in s.ls));
   const el2 = mkFrame(s), h2 = s.g.ONF.frame.openExec(el2, P, null, () => {}, false);
-  el2.load(1); h2.stop(); s.tick(10 * KNOCK());
+  el2.load(1, false, ERR); h2.stop(); s.tick(10 * APP());
   assert.strictEqual(el2.nav.length, 1, '⛔ 지운 판을 다시 열었다');
-  void h;
 });
 
-t('R7 KNOCK_MS 는 근거 안 — 잰 노크(load 뒤 18~43ms)의 수십 배 이상 · 사람이 글을 쓰기 전(5초 이하)', () => {
-  const k = KNOCK();
-  assert.ok(k >= 1000, '⛔ 노크 기다림이 너무 짧다(' + k + 'ms) — 느린 폰의 멀쩡한 화면을 다시 연다');
-  assert.ok(k <= 5000, '⛔ 노크 기다림이 너무 길다(' + k + 'ms) — 노크 놓친 화면이면 사람이 이미 쓰고 있을 수 있다 · 오류 화면에 오래 머문다');
-});
-
-t('R6 늦게 그린 래퍼(여유 안에 자식이 생김)도 노크를 기다린다 — 노크 오면 끝 · 안 오면 한 번', () => {
+t('R5-b 🟡6 앱을 기다리는 사이 액자가 지워지면(액자 창 없음) 다시 안 연다 · 듣기를 걷는다', () => {
   const s = open();
-  s.el.load(0); s.el.doc.kids = 1; s.tick(GRACE());
-  assert.strictEqual(s.el.nav.length, 1);
-  s.send({ onf: 'title', t: 'x' }, s.el.inner());
-  s.tick(10 * KNOCK());
-  assert.strictEqual(s.el.nav.length, 1, '⛔ 노크한 늦은 래퍼를 다시 열었다');
+  s.el.load(1, false, ERR);
+  s.el.contentWindow = null;
+  s.tick(10 * APP());
+  assert.strictEqual(s.el.nav.length, 1, '⛔ 지워진 액자를 다시 열었다(없는 판에 src 대입)');
+  assert.strictEqual((s.L.message || []).length, 0, '⛔ 노크 듣기를 안 걷었다');
+});
+
+t('R6 🟠3 노크 없는 우리 안내 한 장(Lib _onfNoticePage · PIN 칸 — 앱 프레임 있음)·노크가 아주 늦은 판(이웃 긴 작업)은 다시 안 연다', () => {
+  const s = open();
+  s.el.load(1);                                   // 안내 한 장 — 노크 없음
+  s.tick(60000);
+  assert.strictEqual(s.el.nav.length, 1, '⛔ 노크 없는 안내 한 장을 다시 열었다(doGet 하나 더 · 깜빡임)');
   const q = open();
-  q.el.load(0); q.el.doc.kids = 1; q.tick(GRACE()); q.tick(KNOCK());
-  assert.deepStrictEqual(q.el.nav[1], ['replace', SRC, false], '⛔ 노크 없는 늦은 래퍼를 그대로 뒀다');
+  q.el.load(1); q.tick(30000); q.send({ onf: 'hist', op: 'hi' }, q.el.inner()); q.tick(60000);
+  assert.strictEqual(q.el.nav.length, 1, '⛔ 노크가 늦은(30초) 판을 다시 열었다');
+  const w = open();
+  w.el.load(1, false, ERR); w.tick(APP() - 1); w.el.doc.app = 1; w.tick(10 * APP());   // 앱 프레임이 기다리는 사이 생김(노크 없음)
+  assert.strictEqual(w.el.nav.length, 1, '⛔ 기다리는 사이 앱 프레임이 생긴 판을 다시 열었다');
+});
+
+t('R7 늦게 그린 래퍼(여유 안에 자식이 생김) — 앱 있으면 끝 · 앱 없으면 한 번', () => {
+  const s = open();
+  s.el.load(0); s.el.doc.kids = 1; s.el.doc.app = 1; s.tick(GRACE());
+  s.tick(10 * APP());
+  assert.strictEqual(s.el.nav.length, 1, '⛔ 앱 있는 늦은 래퍼를 다시 열었다');
+  const q = open();
+  q.el.load(0); q.el.doc.kids = 1; q.el.doc.app = 0; q.tick(GRACE());
+  assert.deepStrictEqual(q.el.nav[1], ['replace', SRC, false], '⛔ 앱 없는 늦은 래퍼를 그대로 뒀다');
+});
+
+t('R8 APP_MS 는 근거 안 — 앱 프레임은 load 때 이미 있다(27+6번) · 앱 생김 여유 1초 이상 · 오류에 오래 머물지 않게 5초 이하', () => {
+  const k = APP();
+  assert.ok(k >= 1000 && k <= 5000, '⛔ APP_MS ' + k + 'ms 가 근거 밖');
 });
 
 console.log('\n[껍데기 셋이 이 길을 탄다]');
