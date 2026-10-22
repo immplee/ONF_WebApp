@@ -173,22 +173,34 @@ t('열쇠 열기인데 load 가 너무 오래 안 옴(연결 멈춤) — 열고 
   assert.ok(store.onf_devkey_try && !('onf_devkey_off' in store));
 });
 
-t('로그인 길(받아 둔 것 없음 · 구글 토큰)은 그대로 — 열고 8초에 안내 · load 가 빨라도 같은 시각 · 새로 읽지도 기록하지도 않는다', () => {
-  for (const fast of [false, true]) {
+t('⛔ [2026-10-22 사고] 로그인 길(구글 토큰)도 load 부터 8초 — 느린 doGet(load 12초)에 8초 안내·원 걷기 없음 · load 빠르면 load+8초 · load 없으면 열고 30초 · 새로 읽지도 기록하지도 않는다', () => {
+  for (const loadAt of [12000, 300, null]) {
     const store = {};
     const R = boot(store);
     assert.ok(!R.opened(), '전제: 받아 둔 것이 없으면 바로 안 연다');
     R.g.onCredential({ credential: gtok() });
     assert.ok(R.opened(), '전제: 구글 토큰으로 연다');
-    if (fast) { R.advance(300); R.load(); R.advance(7699); } else R.advance(7999);
-    assert.strictEqual(R.msg(), '', '⛔ 안내가 8초보다 일찍 떴다');
+    const due = loadAt === null ? 30000 : loadAt + 8000;
+    if (loadAt !== null) { R.advance(Math.min(loadAt, 8000)); }
+    if (loadAt === 12000) {
+      assert.strictEqual(R.msg(), '', '⛔ 아직 읽는 중(load 전)인 액자에 8초에 「화면이 안 열렸어요」를 띄웠다(2026-10-22 Peter 사고)');
+      assert.ok(R.spinning(), '⛔ 아직 읽는 중인데 8초에 원을 걷었다');
+      R.advance(loadAt - 8000);
+    }
+    if (loadAt !== null) R.load();
+    R.advance(due - (loadAt === null ? 0 : loadAt) - 1);
+    assert.strictEqual(R.msg(), '', '⛔ 안내가 ' + due + 'ms 보다 일찍 떴다(load=' + loadAt + ')');
     R.advance(1);
-    assert.ok(/화면이 안 열렸어요/.test(R.msg()), '⛔ 로그인 길의 8초 안내 시각이 바뀌었다(load=' + fast + ')');
-    assert.ok(!R.spinning(), '⛔ 로그인 길에서 8초에 원을 안 걷었다(종전과 다르다)');
+    assert.ok(/화면이 안 열렸어요/.test(R.msg()), '⛔ 로그인 길 안내가 ' + due + 'ms 에 안 떴다(load=' + loadAt + ')');
+    assert.ok(!R.spinning(), '⛔ 안내를 띄웠는데 원이 계속 돈다');
     R.advance(60000);
     assert.strictEqual(R.reloads(), 0, '⛔ 로그인 길에서 새로 읽었다');
     assert.ok(!('onf_devkey_off' in store) && !('onf_devkey_try' in store), '⛔ 로그인 길을 열쇠 막힘으로 셌다');
   }
+  //   느린 doGet 이 결국 그려지면(load 뒤 노크) 안내는 끝까지 없다
+  const R = boot({}); R.g.onCredential({ credential: gtok() });
+  R.advance(12000); R.load(); R.knock(); R.advance(60000);
+  assert.strictEqual(R.msg(), '', '⛔ 그려진 느린 화면에 안내가 떴다');
 });
 
 t('⛔ [🟡1] 「한 번 막힘」 기록은 새로고침에 안 사라진다 — 막힘 1 → 다음 열쇠 열기 3초에 새로고침 → 그다음 막힘이 「2번째」', () => {
@@ -276,10 +288,12 @@ t('T1 로그인 길 · 래퍼는 떴는데 앱 프레임 0 → 3초 뒤에도 0 
   assert.strictEqual(nav.length, 0, '⛔ 3초를 안 기다렸다');
   R.advance(1);
   assert.deepStrictEqual(nav, [src], '⛔ 앱 없는 래퍼를 같은 주소로 다시 안 열었다');
-  R.advance(7999);
-  assert.strictEqual(R.msg(), '', '⛔ 다시 여는 동안 「화면이 안 열렸어요」를 적었다');
-  R.load(); R.advance(1);
-  assert.ok(/화면이 안 열렸어요/.test(R.msg()), '⛔ 다시 연 뒤 8초에도 노크가 없는데 종전 안내가 없다');
+  R.advance(9000);
+  assert.strictEqual(R.msg(), '', '⛔ 다시 여는 동안(다시 연 문서 load 전) 「화면이 안 열렸어요」를 적었다');
+  R.load(); R.advance(7999);
+  assert.strictEqual(R.msg(), '', '⛔ 다시 연 문서 load 뒤 8초를 안 기다렸다');
+  R.advance(1);
+  assert.ok(/화면이 안 열렸어요/.test(R.msg()), '⛔ 다시 연 뒤 load+8초에도 노크가 없는데 종전 안내가 없다');
   R.advance(60000);
   assert.strictEqual(nav.length, 1, '⛔ 두 번 넘게 열었다');
   assert.strictEqual(R.reloads(), 0);
