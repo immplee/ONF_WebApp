@@ -86,7 +86,7 @@ function open(o) {
   wait.kids.push({ className: 'onf-spin' }); wait._t = '불러오는 중';   // index.html 의 「불러오는 중」 — textContent 대입은 아이까지 지운다(DOM 과 같게)
   Object.defineProperty(wait, 'textContent', { get() { return this._t; }, set(v) { this._t = v; this.kids = []; } });
   //   홈 액자(mount)는 keep = 기억을 정한다 · 판(o.panel)은 읽기만
-  const h = s.g.ONF.frame.openExec(el, SRC, wait, o.panel ? () => closed.push(1) : null, !o.panel);
+  const h = s.g.ONF.frame.openExec(el, SRC, wait, o.panel ? () => closed.push(1) : null, !o.panel, o.hooks);
   const txt = (e) => (e.textContent || '') + (e.kids || []).map(txt).join(' ');
   const btn = () => { const b = wait.kids[0]; return b && b.kids ? b.kids.find((k) => k.tag === 'button') : null; };
   return Object.assign(s, { el, wait, closed, reloads, h, btn, text: () => txt(wait) });
@@ -469,7 +469,7 @@ t('⑧ 학생 홈 액자(mount) — 기억한 기기면 홈 액자도 처음부�
   s.g.document.documentElement = { classList: { toggle() {} } };
   s.g.ONF.frame.mount(el, SRC, { wait: mkEl('div') });
   assert.deepStrictEqual(el.nav, [['src', SRC, true]], '⛔ 홈 액자가 우회 길을 안 탄다');
-  assert.ok(/openExec\(frameEl, src, opts\.wait \|\| null, null, true\)/.test(FRAME_JS), '⛔ 홈 액자가 기억을 정하는 자리(keep)가 아니다');
+  assert.ok(/openExec\(frameEl, src, opts\.wait \|\| null, null, true(, opts\.hooks \|\| null)?\)/.test(FRAME_JS), '⛔ 홈 액자가 기억을 정하는 자리(keep)가 아니다');
   const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   assert.ok(/wait: document\.querySelector\('\.onf-wait'\)/.test(idx), '⛔ index.html 이 안내 자리(.onf-wait)를 안 넘긴다 — 못 열면 구글 오류 화면 그대로');
 });
@@ -488,6 +488,36 @@ t('⑧-3 선생님 판(teacher bookMake)은 우회 길 · 선생님 **홈** 액�
   assert.ok(/<script src="\.\.\/assets\/onf-frame\.js"><\/script>/.test(th), '⛔ 선생님 껍데기가 onf-frame.js 를 안 싣는다');
   const mount = th.slice(th.indexOf('function mount()'), th.indexOf('var frameWatch = null;'));
   assert.ok(/frame\.src = EXEC/.test(mount) && !/openExec|credentialless/.test(mount), '⛔ 선생님 홈 액자를 우회 길로 연다 — credentialless 면 구글 로그인 쿠키가 없어 회사 계정 문에서 잘린다');
+});
+
+/* 🟠 첫 화면 로고 로딩(assets/onf-load.js · 2026-10-22) — 홈 액자는 「산 화면」·「못 엶」을 알린다. 알림이 틀리면 막이 화면을 30초 가리거나(ok 누락) 안내를 덮는다(stuck 누락). */
+function spy() { const c = { ok: 0, stuck: 0 }; return { c, hooks: { ok: () => c.ok++, stuck: () => c.stuck++ } }; }
+t('🟠 hooks — 보통 화면이면 ok 한 번 · stuck 없음', () => {
+  const k = spy(), s = open({ hooks: k.hooks });
+  s.el.up(); s.tick(10 * GRACE());
+  assert.deepStrictEqual(k.c, { ok: 1, stuck: 0 });
+});
+t('🟠 hooks — 우회로 다시 열어 뜨면 ok 한 번(다시 여는 동안엔 안 알린다)', () => {
+  const k = spy(), s = open({ hooks: k.hooks });
+  s.el.load(0); s.tick(GRACE());
+  assert.deepStrictEqual(k.c, { ok: 0, stuck: 0 }, '⛔ 다시 여는 중인데 알렸다');
+  s.el.up(); s.tick(10 * GRACE());
+  assert.deepStrictEqual(k.c, { ok: 1, stuck: 0 });
+});
+t('🟠 hooks — 끝내 못 열면 stuck 한 번 · ok 없음(막이 안내를 덮지 않게)', () => {
+  const k = spy(), s = open({ cl: false, hooks: k.hooks });
+  s.el.load(0); s.tick(GRACE()); s.el.load(0); s.tick(GRACE());
+  assert.ok(/화면이 안 열렸어요/.test(s.text()));
+  assert.deepStrictEqual(k.c, { ok: 0, stuck: 1 });
+});
+t('🟠 hooks — 알림이 던져도 열기 판정은 그대로(안내는 뜬다)', () => {
+  const s = open({ cl: false, hooks: { ok() { throw new Error('x'); }, stuck() { throw new Error('y'); } } });
+  s.el.load(0); s.tick(GRACE()); s.el.load(0); s.tick(GRACE());
+  assert.ok(/화면이 안 열렸어요/.test(s.text()), '⛔ 알림이 던져서 안내가 안 떴다');
+});
+t('🟠 hooks — 없으면(판·선생님 판) 종전 그대로', () => {
+  const s = open(); s.el.up(); s.tick(10 * GRACE());
+  assert.strictEqual(s.el.nav.length, 1);
 });
 
 t('⑧-4 선생님 판 — onf-frame.js 가 없으면(못 받음) 종전대로 src 로 연다', () => {

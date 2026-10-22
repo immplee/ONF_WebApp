@@ -800,7 +800,7 @@ t('📱 폰 판 스위치 — 꺼져 있으면(opts.phone 없음) caps 에 phone
   s.send({ onf: 'openBook', href: E1, left: 0 }, s.homeInner);
   assert.strictEqual(s.H.st.length, 1, '⛔ 스위치가 꺼졌는데 판 칸을 넣었다');
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  assert.ok(/phone: phoneOn !== '0' \}\);/.test(html) && /q\.get\('phonepanel'\)/.test(html) && /localStorage\.getItem\('onfPhonePanel'\)/.test(html), '⛔ index.html 이 스위치를 안 넘긴다(또는 기본 꺼짐 · 끄는 길 없음)');
+  assert.ok(/phone: phoneOn !== '0'(, hooks: loadHooks)? \}\);/.test(html) && /q\.get\('phonepanel'\)/.test(html) && /localStorage\.getItem\('onfPhonePanel'\)/.test(html), '⛔ index.html 이 스위치를 안 넘긴다(또는 기본 꺼짐 · 끄는 길 없음)');
 });
 
 console.log('[🔐 못 연 판 — 여러 계정 우회 반박 검토 🟡4 2026-10-16]');

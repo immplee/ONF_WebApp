@@ -147,13 +147,16 @@
    *  @param wait  액자 뒤 「불러오는 중」(.onf-wait) — 못 열면 여기에 우리 말 · 없으면 액자만 걷는다
    *  @param close 판이면 닫는 함수 — 안내에 [닫기] · 없으면(홈) [다시 열기]
    *  @param keep  홈 액자만 true — 이 기기 기억(onfClTry·onfCl)을 정한다 · 판은 읽기만
+   *  @param hooks 홈 액자만 — { ok: 산 화면, stuck: 못 엶 } 를 알린다(첫 화면 로고 로딩 onf-load.js · 2026-10-22) · 없으면 종전 그대로
    *  @return { stop: 판정을 그만두고 노크 듣기를 걷는다(판을 지울 때) · stuck: 못 열어 안내를 띄웠나 } */
-  function openExec(el, src, wait, close, keep) {
+  function openExec(el, src, wait, close, keep, hooks) {
     var can = clCan(), cl = can && (clPage || clAt(CL_KEY)), byMemory = cl, tried = {}, done = false, stuck = false, tm = null, re = 0, nav = false;   // re = 다시 연 횟수 · nav = 다시 여는 중(다음 load 전)
     function onMsg(ev) { if (!done && !nav && ev && _fromOurFrame(ev.source, el)) ok(); }   // 🔁 다시 여는 중엔 안 받는다 — replace 는 새 응답까지 옛 문서를 살려 둬 옛 문서의 늦은 말이 올 수 있다(반박 🟠1)   // 노크 — 깊이 무관 · 내 액자 후손의 말이면 산 화면(값은 안 본다 · load 전에 와도 여기서 끝난다)
     function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
+    function tell(k) { try { if (hooks && typeof hooks[k] === 'function') hooks[k](); } catch (e) {} }   // 알림이 던져도 열기 판정은 그대로 간다
     function ok() {
       end();
+      tell('ok');                                                    // 🟠 로고 로딩 — 막을 걷기 시작한다(아래 기억 판정과 무관 · 먼저 알린다)
       if (re) el.style.visibility = '';                              // 🔁 다시 연 화면이 떴다 — 걷었던 액자를 되돌린다(처음에 뜬 액자는 안 만진다)
       if (cl && tried.norm) clPage = true;                           // 이 페이지의 뒤 판은 처음부터 — 판이 정해도(저장 안 함 · 여러 계정 선생님 판마다 오류 + 1.5초 · 재확인 T2)
       if (!keep) return;                                             // 기기 기억은 홈 액자만 — 판은 읽기만
@@ -202,6 +205,7 @@
     function say() {
       console.warn('[onf] 화면을 못 열었다 — 안내로 바꾼다');
       stuck = true;
+      tell('stuck');                                                 // 🟠 로고 로딩 막을 바로 걷는다 — 아래 안내가 보여야 한다
       el.style.visibility = 'hidden';                                // 구글 영어 오류를 걷는다 — 뒤(z 0)의 안내가 보이고 눌린다
       if (!wait) return;
       var box = document.createElement('div'), h = document.createElement('b'), p = document.createElement('span'), b = document.createElement('button');
@@ -812,7 +816,7 @@
     }
     global.addEventListener('resize', sync);
 
-    openExec(frameEl, src, opts.wait || null, null, true);   // 🔐 여러 계정 우회(위) — 못 열면 index.html 의 「불러오는 중」 자리에 안내 · 기억은 홈 액자만 정한다
+    openExec(frameEl, src, opts.wait || null, null, true, opts.hooks || null);   // 🟠 hooks = 첫 화면 로고 로딩(index.html · onf-load.js) · 🔐 여러 계정 우회(위) — 못 열면 index.html 의 「불러오는 중」 자리에 안내 · 기억은 홈 액자만 정한다
     return { _books: books, _drop: bookDrop };   // 검사용으로만(test/book-panel.test.js 가 판 자격·back 을 본다) — 화면 코드에서 쓰지 마라
   }
 

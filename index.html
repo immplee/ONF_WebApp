@@ -33,6 +33,9 @@
 </head>
 <body class="onf-full">
 <div class="onf-wait"><div class="onf-spin"></div><span>불러오는 중</span></div>
+<!-- 🟠 첫 화면 로고 로딩(2026-10-22 Peter) — 위 고리 **위에** 로고 막을 그린다. 되돌리기·안전장치는 그 파일 머리 주석.
+     ⚠️ 여기(고리 바로 뒤)에 둔다 — 아래 큰 스크립트들을 받는 동안 고리가 먼저 비치지 않게. 안 실려도 종전 고리 그대로다. -->
+<script src="/assets/onf-load.js"></script>
 <iframe id="app" allow="clipboard-write; microphone"></iframe>
 <script src="/assets/onf-frame.js"></script>
 <script src="/assets/onf-api.js"></script>
@@ -133,12 +136,16 @@
       return ONF.api.appUrl(token, ex.join('&'));
     } catch (e) { return null; }
   }
+  /* 🟠 첫 화면 로고 로딩 — 홈(교재 주소·mode 없음 · 토큰 있음)이면 홈이 알려 줄 로고 자리로 날아가고, 아니면 다 뜨면 걷힌다(assets/onf-load.js).
+     ⛔ 파일이 안 실렸거나 꺼졌으면 null — mount 는 종전 그대로 연다. */
+  var loadHooks = null;
+  try { loadHooks = window.ONF && ONF.load ? ONF.load.bind(document.getElementById('app'), { home: !!token && !q.get('fileId') && !q.get('mode') && extra.join('&').indexOf('slug=') < 0 }) : null; } catch (eL) { loadHooks = null; }
   ONF.frame.mount(document.getElementById('app'),
                   ONF.api.appUrl(token, extra.join('&')),
                   { diag: q.get('diag') === '1', bookSrc: bookSrc,
                     wait: document.querySelector('.onf-wait'),   // 🔐 여러 계정 우회 — 못 열면 이 자리에 안내(onf-frame.js openExec)
                     swap: swapOn !== '0', perf: q.get('perf') === '1',
-                    phone: phoneOn !== '0' });
+                    phone: phoneOn !== '0', hooks: loadHooks });
 </script>
 </body>
 </html>
