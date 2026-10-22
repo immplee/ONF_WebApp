@@ -138,6 +138,15 @@
   }
   /* 🟠 첫 화면 로고 로딩 — 홈(교재 주소·mode 없음 · 토큰 있음)이면 홈이 알려 줄 로고 자리로 날아가고, 아니면 다 뜨면 걷힌다(assets/onf-load.js).
      ⛔ 파일이 안 실렸거나 꺼졌으면 null — mount 는 종전 그대로 연다. */
+  /* 🚀 첫 교재 처음부터(2026-10-22 · onf-frame.js preEarly) — 홈 주소로 열 때만 열쇠(토큰 해시 · 토큰 자체는 안 적는다)를 넘긴다.
+     끄기: PREBOOK_ON = false(모두) · 주소 prebook=0|1(이 기기 기억 · onfPreBookOff). ⛔ 무엇이 던져도 열쇠 '' = 종전 그대로. */
+  var PREBOOK_ON = true, preKey = '';
+  try {
+    var preOff = q.get('prebook');
+    try { if (preOff === '0' || preOff === '1') localStorage.setItem('onfPreBookOff', preOff === '0' ? '1' : '0'); preOff = localStorage.getItem('onfPreBookOff') === '1'; } catch (eB) { preOff = preOff === '0'; }
+    var preHome = !!token && !q.get('fileId') && !q.get('mode') && extra.join('&').indexOf('slug=') < 0;
+    if (PREBOOK_ON && !preOff && preHome) { for (var hi = 0, hh = 5381; hi < token.length; hi++) hh = ((hh * 33) ^ token.charCodeAt(hi)) >>> 0; preKey = 'k' + hh.toString(36); }
+  } catch (eK) { preKey = ''; }
   var loadHooks = null;
   try { loadHooks = window.ONF && ONF.load ? ONF.load.bind(document.getElementById('app'), { home: !!token && !q.get('fileId') && !q.get('mode') && extra.join('&').indexOf('slug=') < 0 }) : null; } catch (eL) { loadHooks = null; }
   ONF.frame.mount(document.getElementById('app'),
@@ -145,7 +154,7 @@
                   { diag: q.get('diag') === '1', bookSrc: bookSrc,
                     wait: document.querySelector('.onf-wait'),   // 🔐 여러 계정 우회 — 못 열면 이 자리에 안내(onf-frame.js openExec)
                     swap: swapOn !== '0', perf: q.get('perf') === '1',
-                    phone: phoneOn !== '0', hooks: loadHooks });
+                    phone: phoneOn !== '0', hooks: loadHooks, preKey: preKey });
 </script>
 </body>
 </html>

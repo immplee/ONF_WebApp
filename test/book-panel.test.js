@@ -43,7 +43,7 @@ function setup(bs, o) {
   const homeWin = win('home-exec', top), homeInner = win('home-user', homeWin);
   const frameEl = { contentWindow: homeWin, style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 800 }), addEventListener() {} };
   const opened = [];
-  const M = g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { phone: o.phone !== false, swap: o.swap, perf: o.perf, bookSrc: bs || ((h) => { opened.push(h); const m = /-(e\d+)-/.exec(h);
+  const M = g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { phone: o.phone !== false, swap: o.swap, perf: o.perf, preKey: o.preKey, bookSrc: bs || ((h) => { opened.push(h); const m = /-(e\d+)-/.exec(h);
     return /mode=share/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=share' + (m && m[1] !== 'e1' ? '&ep=' + m[1] : '') + '&embed=1' : /mode=mine&v/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=mine&embed=1' : null; }) });
   const send = (data, source, origin) => listeners.message.forEach((fn) => fn({ data, source, origin: origin || 'https://n-abc-0lu-script.googleusercontent.com' }));
   const panel = () => body.kids.find((k) => k.className === 'onf-bookpanel');
@@ -771,6 +771,60 @@ t('📱 키보드 높이·밀림 보정은 **보이는 폰 판**에 — 판의 f
   assert.ok(kb(pci).length === 0, '⛔ PC 판 교재에 키보드 높이를 보냈다(PC 는 종전대로 홈)');
 });
 
+console.log('[🚀 첫 교재 처음부터 — 2026-10-22 Peter 「홈 들어가자마자 교재를 딱 열면 로딩이 길다」]');
+const LSf = (init) => { const m = Object.assign({}, init || {}); return { m, getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); } }; };
+const PB = 'https://class.ownify.co.kr/a-s1-e1-b?mode=share';
+const PBsrc = 'https://script.google.com/x/exec?t=T&mode=share&embed=1';
+const pre = (ls) => (g) => { g.localStorage = ls; };
+t('🚀 기억한 첫 교재가 있으면 홈을 띄우자마자 숨긴 판(park=1)을 같이 띄운다 — 같은 열쇠·같은 기기 꼴(폰/PC)·14일 안만', () => {
+  const ok = { onfPreBook: JSON.stringify({ k: 'kA', h: PB, ph: 0, t: 1.7e12 - 86400000 }) };
+  const s = setup(null, { preKey: 'kA', pre: pre(LSf(ok)) });
+  const ps = s.panels();
+  assert.strictEqual(ps.length, 1, '⛔ 기억한 교재를 처음부터 안 띄웠다');
+  assert.ok(ps[0].classList.contains('park') && ps[0].kids[0].src === PBsrc + '&park=1', '⛔ 숨긴 판(park=1)이 아니다: ' + ps[0].kids[0].src);
+  for (const [why, o] of [['열쇠 없음(홈 주소 아님 · 끔)', { pre: pre(LSf(ok)) }], ['다른 학생 열쇠', { preKey: 'kB', pre: pre(LSf(ok)) }],
+    ['기기 꼴이 다름(폰에서 기억)', { preKey: 'kA', pre: pre(LSf({ onfPreBook: JSON.stringify({ k: 'kA', h: PB, ph: 1, t: 1.7e12 }) })) }],
+    ['14일 넘음', { preKey: 'kA', pre: pre(LSf({ onfPreBook: JSON.stringify({ k: 'kA', h: PB, ph: 0, t: 1.7e12 - 15 * 86400000 }) })) }],
+    ['깨진 값', { preKey: 'kA', pre: pre(LSf({ onfPreBook: '{nope' })) }], ['저장소 없음', { preKey: 'kA' }],
+    ['교재가 아닌 주소(거르개)', { preKey: 'kA', pre: pre(LSf({ onfPreBook: JSON.stringify({ k: 'kA', h: 'https://evil.example.com/x', ph: 0, t: 1.7e12 }) })) }]]) {
+    const q = setup((h) => (/mode=share/.test(h) && /ownify\.co\.kr/.test(h) ? PBsrc : null), o);
+    assert.strictEqual(q.panels().length, 0, '⛔ ' + why + ' 인데 미리 띄웠다');
+  }
+});
+t('🚀 홈의 첫 bookWarm(panel:1) 주소를 다음 열기용으로 기억 — 한 번만(첫 것) · 열쇠 없으면 안 적는다 · 미리 띄운 판이 있으면 같은 주소로 판을 또 안 만든다', () => {
+  const ls = LSf();
+  const s = setup(null, { preKey: 'kA', pre: pre(ls) });
+  s.send({ onf: 'bookWarm', href: PB, panel: 1 }, s.homeInner);
+  s.send({ onf: 'bookWarm', href: 'https://class.ownify.co.kr/?mode=mine', panel: 1 }, s.homeInner);
+  const v = JSON.parse(ls.m.onfPreBook);
+  assert.deepStrictEqual([v.k, v.h, v.ph, v.t], ['kA', PB, 0, 1.7e12], '⛔ 첫 panel:1 주소를 안 적었거나 둘째로 덮었다');
+  const ls2 = LSf();
+  const n = setup(null, { pre: pre(ls2) });
+  n.send({ onf: 'bookWarm', href: PB, panel: 1 }, n.homeInner);
+  assert.strictEqual(ls2.m.onfPreBook, undefined, '⛔ 열쇠 없는(홈 주소 아님) 열기에서 기억을 적었다');
+  const ok = { onfPreBook: JSON.stringify({ k: 'kA', h: PB, ph: 0, t: 1.7e12 }) };
+  const e = setup(null, { preKey: 'kA', pre: pre(LSf(ok)) });
+  e.send({ onf: 'bookWarm', href: PB, panel: 1 }, e.homeInner);
+  assert.strictEqual(e.panels().length, 1, '⛔ 미리 띄운 판이 있는데 홈의 같은 주소로 판을 또 만들었다');
+  e.send({ onf: 'openBook', href: PB }, e.homeInner);
+  assert.ok(e.panels().length === 1 && !e.panels()[0].classList.contains('park'), '⛔ 누르면 미리 띄운 그 판이 보여야 한다(새로 안 받음)');
+});
+t('🚀 index.html — 홈 주소로 열 때만 열쇠(토큰 해시 · 토큰 글자 자체는 안 넘김)를 넘기고 · 끄는 길(PREBOOK_ON · prebook=0 기억)이 있다 · 던져도 열쇠 빈 값', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  assert.ok(/var PREBOOK_ON = true, preKey = '';/.test(html) && /q\.get\('prebook'\)/.test(html) && /localStorage\.getItem\('onfPreBookOff'\) === '1'/.test(html), '⛔ 끄는 길이 없다');
+  assert.ok(/preKey: preKey \}\);/.test(html) && /\} catch \(eK\) \{ preKey = ''; \}/.test(html), '⛔ 열쇠를 안 넘기거나 던질 때 빈 값이 아니다');
+  const blk = html.slice(html.indexOf('var PREBOOK_ON'), html.indexOf('} catch (eK)'));
+  const c = { q: new URLSearchParams(''), localStorage: { getItem: () => null, setItem() {} }, token: 'SECRETTOKEN', extra: [] };
+  vm.createContext(c); vm.runInContext(blk + '} catch (eK) { preKey = ""; }', c);
+  assert.ok(/^k[0-9a-z]+$/.test(c.preKey) && c.preKey.indexOf('SECRET') < 0, '⛔ 홈인데 열쇠가 없거나 토큰 글자가 샜다: ' + c.preKey);
+  const c2 = { q: new URLSearchParams('fileId=X'), localStorage: { getItem: () => null, setItem() {} }, token: 'SECRETTOKEN', extra: [] };
+  vm.createContext(c2); vm.runInContext(blk + '} catch (eK) { preKey = ""; }', c2);
+  assert.strictEqual(c2.preKey, '', '⛔ 교재 주소로 열었는데 열쇠를 넘겼다');
+  const c3 = { q: new URLSearchParams('prebook=0'), localStorage: { m: {}, getItem(k) { return this.m[k] || null; }, setItem(k, v) { this.m[k] = v; } }, token: 'SECRETTOKEN', extra: [] };
+  vm.createContext(c3); vm.runInContext(blk + '} catch (eK) { preKey = ""; }', c3);
+  assert.strictEqual(c3.preKey, '', '⛔ prebook=0 인데 켰다');
+});
+
 console.log('[홈 안 교재 판 — 주소(index.html bookSrc)]');
 t('교재 주소만 · 아는 값만 · 토큰 버림 · embed=1', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
@@ -800,7 +854,7 @@ t('📱 폰 판 스위치 — 꺼져 있으면(opts.phone 없음) caps 에 phone
   s.send({ onf: 'openBook', href: E1, left: 0 }, s.homeInner);
   assert.strictEqual(s.H.st.length, 1, '⛔ 스위치가 꺼졌는데 판 칸을 넣었다');
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  assert.ok(/phone: phoneOn !== '0'(, hooks: loadHooks)? \}\);/.test(html) && /q\.get\('phonepanel'\)/.test(html) && /localStorage\.getItem\('onfPhonePanel'\)/.test(html), '⛔ index.html 이 스위치를 안 넘긴다(또는 기본 꺼짐 · 끄는 길 없음)');
+  assert.ok(/phone: phoneOn !== '0'(, hooks: loadHooks)?(, preKey: preKey)? \}\);/.test(html) && /q\.get\('phonepanel'\)/.test(html) && /localStorage\.getItem\('onfPhonePanel'\)/.test(html), '⛔ index.html 이 스위치를 안 넘긴다(또는 기본 꺼짐 · 끄는 길 없음)');
 });
 
 console.log('[🔐 못 연 판 — 여러 계정 우회 반박 검토 🟡4 2026-10-16]');

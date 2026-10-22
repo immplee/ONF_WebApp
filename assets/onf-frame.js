@@ -358,7 +358,7 @@
       /* 📖 홈이 「첫 교재를 미리 받아 줘」(2026-10-12 · 설계서 §1-5 · 10-13 숨긴 판) — 주소는 판과 같은 거르개(bookSrc — 교재만 · 아는 값만 · embed=1).
          · panel:1(홈이 판을 쓸 넓은 화면이라고 했다) → **숨긴 판**으로 미리 띄운다(아래 bookPre · 교재는 park=1 로 「대기」 — 접속 신호 0).
          · 아니면(폰) 종전대로 그 주소를 **한 번** GET 해 교재 서버 캐시만 데운다(봇 수업 전 데우기와 같은 길 · 쿠키 안 실음 · 한 주소 한 번). */
-      if (ev.data.onf === 'bookWarm' && opts.bookSrc && typeof ev.data.href === 'string') { if (ev.data.panel === 1) bookPre(ev.data.href, ev.data.left, ev.data.m, ev.data.r); else bookWarm(ev.data.href); return; }
+      if (ev.data.onf === 'bookWarm' && opts.bookSrc && typeof ev.data.href === 'string') { if (ev.data.panel === 1) { preSave(ev.data.href); bookPre(ev.data.href, ev.data.left, ev.data.m, ev.data.r); } else bookWarm(ev.data.href); return; }   // 🚀 첫 panel:1 은 다음 열기용으로 기억(아래 preEarly)
       /* 📐 창 크기가 바뀌었다(2026-10-16 Peter 「B로 가자」 · 설계서 §4.1) — 홈이 다시 잰 메뉴 끝·여백·모서리를 **판 전부**(보이는 판·숨긴 판)에 새로 단다.
          보이기·숨기기·주소는 안 건드린다(다시 안 불러온다) · 위 홈 자물쇠를 지난 말만 — 판 액자 쪽 말은 여기까지 못 온다. */
       if (ev.data.onf === 'bookBox' && opts.bookSrc) { for (var bi = 0; bi < books.length; bi++) bookPlace(books[bi], ev.data.left, ev.data.m, ev.data.r); sync(); return; }
@@ -465,6 +465,7 @@
        ⛔ 숨긴 판은 아무 말도 못 가로챈다 — bookClose·bookFull·openBook 은 **보이는 판**에서 온 것만 · Esc·bookDismiss 는 보이는 판만 숨긴다. themeAsk 는 숨긴 판도 답한다(보일 때 색이 맞게).
        ⚠️ 판은 BOOK_MAX(3 · 10-14 Peter 「미리 띄우는 교재 셋」 · 보이는 판 하나 + 숨긴 판 둘) 개까지 — 넘으면 가장 오래 안 쓴 숨긴 판부터 지운다(bookRoom) · 숨긴 채 BOOK_IDLE_MS 지나면 지운다(메모리). 지울 땐 액자째(종전 닫기와 같다). */
     var BOOK_MAX = 3, BOOK_IDLE_MS = 30 * 60 * 1000;
+    var PRE_LS = 'onfPreBook', PRE_AGE_MS = 14 * 86400000, preSaved = false;   // 🚀 첫 교재 처음부터(아래 preEarly)
     var books = [], bookHome = null, bookHomeOrigin = '';   // books = 판들(오래 안 쓴 것이 앞) · { box, el, src, key, parked, win, origin, views, kb, hw, ho, idle, left }
     var warmed = {};
     /* 📖 판 한 장 스위치(2단계 · 아래 「교재 판 한 장」) — index.html 이 주소 swap=1|0 을 기기에 기억해 넘긴다(학생 키 onfSwap · 기본 끔). 끔이면 bookBoard 가 늘 null 이라 모든 길이 종전 그대로다(caps 에도 swap 칸이 없다). */
@@ -816,7 +817,26 @@
     }
     global.addEventListener('resize', sync);
 
+    /* 🚀 첫 교재를 처음부터(2026-10-22 Peter 「홈 들어가자마자 교재를 딱 열면 로딩이 길다」) — 홈은 다 그린 **뒤** 2초에 첫 교재 bookWarm(panel:1)을 보낸다.
+       그래서 들어가자마자 누르면 숨긴 판이 아직 없거나 받는 중이라 교재를 통째로 기다렸다(실측 학생 홈 뜨자마자 누름 4.5~5.4초 · 15초 뒤 누름 0.03초).
+       → 이 기기에서 **지난번 첫 panel:1 주소**를 기억해 두고(preSave · 키 onfPreBook), 다음에 홈을 띄우는 **그 순간** 같은 숨긴 판을 띄운다(preEarly · bookPre).
+         홈이 2초 뒤 같은 주소를 보내면 bookPre 가 이미 있는 판이라 버린다 · 회차가 바뀌었으면 그 주소는 노크 전 판 줄(bookCand)에 섰다가 판이 받아 둔다(종전 길 그대로).
+       ⛔ 홈 주소로 열 때만(index.html 이 opts.preKey = 토큰 꼬리 해시를 넘길 때만) · 같은 학생(키)·같은 기기 꼴(폰/PC)·14일 안 · 교재 거르개(bookSrc)를 다시 지난다.
+       ⚠️ 끄기: index.html PREBOOK_ON = false(모두) · 주소 prebook=0(이 기기 기억). 대가: 홈만 보고 교재를 안 여는 날은 GAS 교재 받기 한 번이 헛일(판은 30분 뒤 지운다). */
+    function preSave(href) {
+      if (!opts.preKey || preSaved) return;
+      preSaved = true;
+      try { global.localStorage.setItem(PRE_LS, JSON.stringify({ k: opts.preKey, h: String(href).slice(0, 2000), ph: phone() ? 1 : 0, t: Date.now() })); } catch (e) {}
+    }
+    function preEarly() {
+      if (!opts.preKey || !opts.bookSrc) return;
+      var v = null;
+      try { v = JSON.parse(global.localStorage.getItem(PRE_LS) || 'null'); } catch (e) { v = null; }
+      if (!v || v.k !== opts.preKey || typeof v.h !== 'string' || v.ph !== (phone() ? 1 : 0) || !(Date.now() - Number(v.t) < PRE_AGE_MS)) return;
+      bookPre(v.h);
+    }
     openExec(frameEl, src, opts.wait || null, null, true, opts.hooks || null);   // 🟠 hooks = 첫 화면 로고 로딩(index.html · onf-load.js) · 🔐 여러 계정 우회(위) — 못 열면 index.html 의 「불러오는 중」 자리에 안내 · 기억은 홈 액자만 정한다
+    preEarly();   // 🚀 홈 요청이 먼저 나간 **뒤** — 홈이 더 중요하다(둘이 같이 받는다)
     return { _books: books, _drop: bookDrop };   // 검사용으로만(test/book-panel.test.js 가 판 자격·back 을 본다) — 화면 코드에서 쓰지 마라
   }
 
