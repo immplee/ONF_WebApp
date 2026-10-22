@@ -25,7 +25,7 @@
 (function (global) {
   'use strict';
 
-  var ON = false;                                  // ⛔ 전 기기 되돌리기 = false
+  var ON = true;                                   // ⛔ 전 기기 되돌리기 = false
   var KEY = 'onfLoadFx', HIST = 'onfLoadMs';
   var SAFE_MS = 30000, GRACE_MS = 1500, FILL_MS = 250, HOLD_MS = 120, FLY_MS = 950, FADE_MS = 300;
   var HOP_STEP = 75, HOP_MS = 460;
