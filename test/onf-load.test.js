@@ -149,11 +149,11 @@ t('홈 아닌 화면(교재) → 다 뜨면(ok) 채우고 걷힌다 · 1초 안'
   assert.strictEqual(s.box(), null, '⛔ 교재 화면에서 막이 안 걷혔다');
   assert.ok(JSON.parse(s.ls.onfLoadMs).length === 1, '⛔ 걸린 시간을 안 배웠다');
 });
-t('홈인데 로고 자리가 안 온다(옛 홈) → 여유(1.5초) 뒤 걷힌다', () => {
+t('홈인데 로고 자리가 끝내 안 온다(옛 안내·구글 오류 화면) → 15초 뒤 걷힌다', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true });
-  k.ok(); s.tick(1400);
-  assert.ok(s.box(), '⛔ 여유를 안 기다렸다(로고 자리가 곧 올 수 있다)');
-  s.tick(1200);
+  k.ok(); s.tick(14900);
+  assert.ok(s.box(), '⛔ 15초 전에 걷었다(아이폰은 홈이 늦게 말한다)');
+  s.tick(1000);
   assert.strictEqual(s.box(), null, '⛔ 자리가 안 오면 영영 남는다');
 });
 t('홈 + 로고 자리 → 홈 로고 숨김 → 난다(가로·세로 따로 · 색 바꿈 · 바탕 걷힘) → 통통 → 걷고 홈 로고 다시 보임', () => {
@@ -227,8 +227,22 @@ t('data-lazy → 실릴 땐 안 그린다(로그인 화면) · bind(로그인 �
 });
 t('grace — 선생님 홈은 노크 뒤 15초까지 「다 그렸다」를 기다린다(학생 1.5초로 걷으면 자료 받는 동안 옛 화면이 드러난다)', () => {
   const s = env({ lazy: true }), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true, grace: 15000 });
-  k.ok(); s.tick(14000); assert.ok(s.box(), '⛔ 15초 전에 걷었다');
+  h.send({ onf: 'auth-please' }); k.ok(); s.tick(14000); assert.ok(s.box(), '⛔ 15초 전에 걷었다');   // 노크가 ok 를 부른다 — 막 손이 먼저 듣는다(bind 가 먼저 달렸다)
   s.tick(2000); assert.strictEqual(s.box(), null, '⛔ 15초가 지나도 안 걷힌다');
+});
+t('⛔ [2026-10-22 아이폰 사고] 학생 홈 — 액자 load 뒤 4초 동안 아무 말이 없어도(아이폰은 홈이 늦게 말한다) 걷지 않고 로고 자리를 기다려 난다', () => {
+  const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
+  box.querySelector('.onf-ld-in').rect = { left: 45, top: 400, width: 300, height: 50 };
+  k.ok(); s.tick(4000);                                                   // 말 0 — 종전엔 1.5초에 「스크립트 없는 화면」으로 짐작해 걷었다
+  assert.ok(s.box(), '⛔ 말 없는 4초에 걷었다(안 그려진 액자 뒤 고리가 비친다)');
+  assert.strictEqual(box.querySelector('.onf-ld-logo').anims.length, 0, '⛔ 자리도 없이 날았다');
+  h.send({ onf: 'hist', op: 'hi' }); h.send(BRAND); s.tick(250 + 120 + 20);
+  assert.strictEqual(box.querySelector('.onf-ld-logo').anims.length, 1, '⛔ 늦게 온 로고 자리로 안 난다');
+  assert.deepStrictEqual(h.user.sent.map((x) => x[0]), ['brandHold']);
+  //   스크립트 없는 안내(잠금·_onfNoticePage)는 스스로 k:none 을 보낸다 → 기다리지 않고 걷힌다
+  const s2 = env(), h2 = homeFrame(s2), k2 = s2.g.ONF.load.bind(h2.fr, { home: true });
+  k2.ok(); h2.send({ onf: 'brand', k: 'none' }); s2.tick(800);
+  assert.strictEqual(s2.box(), null, '⛔ 안내 화면이 「자리 없음」을 보냈는데 막이 남는다');
 });
 t('k:none(다 그렸는데 자리 없음 — 못 들어오는 안내 등) → 날지 않고 바로 걷힌다 · 홈 로고 숨김 없음', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true, grace: 15000 }), box = s.box();
