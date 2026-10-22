@@ -809,6 +809,23 @@ t('🚀 홈의 첫 bookWarm(panel:1) 주소를 다음 열기용으로 기억 —
   e.send({ onf: 'openBook', href: PB }, e.homeInner);
   assert.ok(e.panels().length === 1 && !e.panels()[0].classList.contains('park'), '⛔ 누르면 미리 띄운 그 판이 보여야 한다(새로 안 받음)');
 });
+t('🚀 반박 🟠1 · 🟡2 — 오늘 첫 교재가 기억과 다르면 노크 전 미리 판은 지우고 종전 길 · 노크한 판은 그대로 · 같은 주소면 홈이 잰 자리(left·m·r)를 그 숨긴 판에 단다', () => {
+  const BS = (h) => (/a-s1-e2-b/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=share&ep=e2&embed=1' : /mode=share/.test(h) ? PBsrc : null);
+  const E2 = 'https://class.ownify.co.kr/a-s1-e2-b?mode=share';
+  const ok = { onfPreBook: JSON.stringify({ k: 'kA', h: PB, ph: 0, t: 1.7e12 }) };
+  let s = setup(BS, { preKey: 'kA', pre: pre(LSf(ok)) });
+  assert.strictEqual(s.panels().length, 1);
+  s.send({ onf: 'bookWarm', href: E2, panel: 1, left: 200 }, s.homeInner);
+  assert.deepStrictEqual(s.panels().map((p) => p.kids[0].src), ['https://script.google.com/x/exec?t=T&mode=share&ep=e2&embed=1&park=1'], '⛔ 회차가 바뀌었는데 노크 전 옛 미리 판을 남겨 오늘 교재가 그 판 줄에 섰다');
+  s = setup(BS, { preKey: 'kA', pre: pre(LSf(ok)) });
+  s.obj(s.panels()[0]).win = win('book-old');   // 이미 노크한 판(살아 있다) — 지우지 않는다
+  s.send({ onf: 'bookWarm', href: E2, panel: 1 }, s.homeInner);
+  assert.ok(s.panels().some((p) => p.kids[0].src === PBsrc + '&park=1'), '⛔ 노크한(살아 있는) 미리 판까지 지웠다');
+  s = setup(BS, { preKey: 'kA', pre: pre(LSf(ok)) });
+  s.send({ onf: 'bookWarm', href: PB, panel: 1, left: 200, m: 12, r: 20 }, s.homeInner);
+  const p0 = s.panels()[0];
+  assert.ok(s.panels().length === 1 && p0.classList.contains('beside') && p0.vars['--bl'] === '200px' && p0.vars['--bm'] === '12px' && p0.vars['--br'] === '20px', '⛔ 같은 주소인데 홈이 잰 자리를 미리 판에 안 달았다: ' + JSON.stringify(p0.vars));
+});
 t('🚀 index.html — 홈 주소로 열 때만 열쇠(토큰 해시 · 토큰 글자 자체는 안 넘김)를 넘기고 · 끄는 길(PREBOOK_ON · prebook=0 기억)이 있다 · 던져도 열쇠 빈 값', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   assert.ok(/var PREBOOK_ON = true, preKey = '';/.test(html) && /q\.get\('prebook'\)/.test(html) && /localStorage\.getItem\('onfPreBookOff'\) === '1'/.test(html), '⛔ 끄는 길이 없다');

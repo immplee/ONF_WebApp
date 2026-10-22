@@ -465,7 +465,7 @@
        ⛔ 숨긴 판은 아무 말도 못 가로챈다 — bookClose·bookFull·openBook 은 **보이는 판**에서 온 것만 · Esc·bookDismiss 는 보이는 판만 숨긴다. themeAsk 는 숨긴 판도 답한다(보일 때 색이 맞게).
        ⚠️ 판은 BOOK_MAX(3 · 10-14 Peter 「미리 띄우는 교재 셋」 · 보이는 판 하나 + 숨긴 판 둘) 개까지 — 넘으면 가장 오래 안 쓴 숨긴 판부터 지운다(bookRoom) · 숨긴 채 BOOK_IDLE_MS 지나면 지운다(메모리). 지울 땐 액자째(종전 닫기와 같다). */
     var BOOK_MAX = 3, BOOK_IDLE_MS = 30 * 60 * 1000;
-    var PRE_LS = 'onfPreBook', PRE_AGE_MS = 14 * 86400000, preSaved = false;   // 🚀 첫 교재 처음부터(아래 preEarly)
+    var PRE_LS = 'onfPreBook', PRE_AGE_MS = 14 * 86400000, preSaved = false, preP = null;   // 🚀 첫 교재 처음부터(아래 preEarly)
     var books = [], bookHome = null, bookHomeOrigin = '';   // books = 판들(오래 안 쓴 것이 앞) · { box, el, src, key, parked, win, origin, views, kb, hw, ho, idle, left }
     var warmed = {};
     /* 📖 판 한 장 스위치(2단계 · 아래 「교재 판 한 장」) — index.html 이 주소 swap=1|0 을 기기에 기억해 넘긴다(학생 키 onfSwap · 기본 끔). 끔이면 bookBoard 가 늘 null 이라 모든 길이 종전 그대로다(caps 에도 swap 칸이 없다). */
@@ -646,8 +646,9 @@
     /* ⛔ 자격 내린 판(gone — 늙음·stale·답 없음)은 **세지도 지우지도 않는다**(2단계 반박 🟠 2026-10-17) — 맺음(안 보낸 칸·실패 카드·오프라인 백업)이 끝나기 전에 지우면 그 글이 사라진다 · 30분 지우기(bookIdle)가 치운다. */
     function bookRoom(n) { var bd = bookBoard(), c = 0, i, q; for (i = 0; i < books.length; i++) if (!books[i].gone) c++; for (i = 0; c > n && i < books.length; ) { q = books[i]; if (q.parked && q !== bd && !q.gone && !bookCand(q)) { bookDrop(q); c--; } else i++; } }
     function bookPre(href, left, m, r) {
-      var src = opts.bookSrc(href), b;
-      if (!src || bookFind(src)) return;
+      var src = opts.bookSrc(href), b, ex;
+      if (!src) return;
+      if ((ex = bookFind(src))) { if (ex.parked) bookPlace(ex, left, m, r); return; }   // 🚀 이미 있는 숨긴 판(미리 띄운 판 · 자리값 없이 만든 것)에 홈이 잰 자리를 단다(반박 🟡2 — 보일 때 폭이 바뀌어 다시 그리던 것)
       b = bookBoardFor(src);
       if (b) { bookFetch(b, src); return; }   // 📖 판이 값만 받아 둔다(새 판 0 · 접속 표시 0 · 판이 차례를 맡는다)
       if (!bookMine(src) && books.some(bookCand)) { if (bookQ.length < BOOK_Q_MAX && bookQ.indexOf(src) < 0) bookQ.push(src); return; }   // 📖 곧 판이 될 판이 노크 전 — 줄에 세운다(아래 bookCand)
@@ -826,6 +827,10 @@
     function preSave(href) {
       if (!opts.preKey || preSaved) return;
       preSaved = true;
+      /* 반박 검토 🟠1 — 홈의 오늘 첫 교재가 기억과 다르고(회차가 바뀜) 미리 띄운 판이 아직 노크 전이면 지운다:
+         노크를 못 하는 판(옮긴·막힌 교재 · 못 연 판)이면 오늘 교재가 그 판 줄(bookCand → bookQ)에 섰다가 버려져 누를 때 통째로 기다렸다(종전 0.03초). 지우면 종전 길 그대로. */
+      if (preP && !preP.win && books.indexOf(preP) >= 0 && preP.src !== opts.bookSrc(href)) bookDrop(preP);
+      preP = null;
       try { global.localStorage.setItem(PRE_LS, JSON.stringify({ k: opts.preKey, h: String(href).slice(0, 2000), ph: phone() ? 1 : 0, t: Date.now() })); } catch (e) {}
     }
     function preEarly() {
@@ -834,6 +839,7 @@
       try { v = JSON.parse(global.localStorage.getItem(PRE_LS) || 'null'); } catch (e) { v = null; }
       if (!v || v.k !== opts.preKey || typeof v.h !== 'string' || v.ph !== (phone() ? 1 : 0) || !(Date.now() - Number(v.t) < PRE_AGE_MS)) return;
       bookPre(v.h);
+      preP = bookFind(opts.bookSrc(v.h));   // 🚀 미리 띄운 판(위 preSave 가 오늘 주소와 견준다)
     }
     openExec(frameEl, src, opts.wait || null, null, true, opts.hooks || null);   // 🟠 hooks = 첫 화면 로고 로딩(index.html · onf-load.js) · 🔐 여러 계정 우회(위) — 못 열면 index.html 의 「불러오는 중」 자리에 안내 · 기억은 홈 액자만 정한다
     preEarly();   // 🚀 홈 요청이 먼저 나간 **뒤** — 홈이 더 중요하다(둘이 같이 받는다)
