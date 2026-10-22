@@ -28,7 +28,7 @@
 
   var ON = true;                                   // ⛔ 전 기기 되돌리기 = false
   var KEY = 'onfLoadFx', HIST = 'onfLoadMs';
-  var SAFE_MS = 30000, GRACE_MS = 1500, FILL_MS = 250, HOLD_MS = 120, FLY_MS = 950, FADE_MS = 300;
+  var SAFE_MS = 30000, GRACE_MS = 1500, HOME_MS = 15000, FILL_MS = 250, HOLD_MS = 120, FLY_MS = 950, FADE_MS = 300;
   var HOP_STEP = 75, HOP_MS = 460;
   var ORANGE = '#D2691E';
   var VB = '60 60 712.7 118.7';                    // ⛔ Ownify ONF_Brand_Svg 와 같은 viewBox·같은 글자 — 홈 로고 상자와 1:1 로 겹친다
@@ -121,7 +121,7 @@
     if (!box) return null;
     opts = opts || {};
     var t0 = global.performance ? performance.now() : Date.now();
-    var E = expected(ls), phase = 'wait', raf = 0, timers = [], anims = [], brand = null, okAt = 0, home = null;   // home = 로고 자리를 보낸 창·출처(숨김·다시 보임을 알린다)
+    var E = expected(ls), phase = 'wait', raf = 0, timers = [], anims = [], brand = null, okAt = 0, home = null, heard = false;   // heard = 홈 액자가 말을 한 번이라도 했다(스크립트가 도는 화면)   // home = 로고 자리를 보낸 창·출처(숨김·다시 보임을 알린다)
     var reduced = false;
     try { reduced = global.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
     function now() { return global.performance ? performance.now() : Date.now(); }
@@ -188,9 +188,11 @@
     }
     function onMsg(ev) {
       try {
-        if (phase !== 'wait' || !ev || !ev.data || ev.data.onf !== 'brand' || !opts.home) return;
+        if (phase !== 'wait' || !ev || !ev.data) return;
         if (!global.ONF || !ONF.frame || !ONF.frame._fromOurFrame(ev.source, frameEl)) return;
         if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return;
+        heard = true;                                                       // 우리 화면 스크립트가 돈다 — 「다 그렸다」(brand)가 온다
+        if (ev.data.onf !== 'brand' || !opts.home) return;
         var b = brandOk(ev.data, frameEl.clientWidth || global.innerWidth, frameEl.clientHeight || global.innerHeight);
         if (!b) return;
         brand = b; if (!okAt) okAt = now();
@@ -205,7 +207,11 @@
       ok: function () {                                                     // 산 화면 — 홈이면 로고 자리를 조금 기다리고, 아니면 바로 끝낸다
         if (phase !== 'wait') return;
         if (!okAt) okAt = now();
-        if (opts.home) later(finish, opts.grace || GRACE_MS); else finish();   // grace — 선생님 홈은 노크 뒤에 자료를 받아 그린다(길다)
+        /* 홈은 「다 그렸다」(brand)를 기다린다 — 두 홈 다 15초(선생님은 노크 뒤 자료를 받아 그리고 · 학생은 load 뒤 무거운 첫 그리기가 끝나야 보낸다).
+           ⛔ [2026-10-22 Peter 「학생 홈은 로고가 다 채워지면 날지 않고 『원형 도넛 + 불러오는 중』이 떠」] 종전 학생은 1.5초만 기다려 brand 가 늦으면
+             날지 않고 걷혔고, 아직 안 그려진 액자 뒤 껍데기 고리가 비쳤다. → 액자가 말을 한 번이라도 했으면(heard) 15초까지 기다린다.
+           · 말 없는 화면(스크립트 없는 안내 한 장 _onfNoticePage)은 brand 가 영영 안 온다 — 1.5초에 그대로 걷힌다(15초 덮지 않게). */
+        if (opts.home) { later(function () { if (!heard) finish(); }, GRACE_MS); later(finish, opts.grace || HOME_MS); } else finish();
       },
       stuck: gone                                                           // 못 열었다 — 종전 안내가 보이게 바로 걷는다
     };

@@ -227,8 +227,26 @@ t('data-lazy → 실릴 땐 안 그린다(로그인 화면) · bind(로그인 �
 });
 t('grace — 선생님 홈은 노크 뒤 15초까지 「다 그렸다」를 기다린다(학생 1.5초로 걷으면 자료 받는 동안 옛 화면이 드러난다)', () => {
   const s = env({ lazy: true }), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true, grace: 15000 });
-  k.ok(); s.tick(14000); assert.ok(s.box(), '⛔ 15초 전에 걷었다');
+  h.send({ onf: 'auth-please' }); k.ok(); s.tick(14000); assert.ok(s.box(), '⛔ 15초 전에 걷었다');   // 노크가 ok 를 부른다 — 막 손이 먼저 듣는다(bind 가 먼저 달렸다)
   s.tick(2000); assert.strictEqual(s.box(), null, '⛔ 15초가 지나도 안 걷힌다');
+});
+t('⛔ [2026-10-22 사고] 학생 홈 — 액자가 말을 했으면(hist hi 등) 로고 자리를 15초까지 기다려 난다 · 1.5초에 걷지 않는다(걷으면 안 그려진 액자 뒤 고리가 비친다)', () => {
+  const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
+  box.querySelector('.onf-ld-in').rect = { left: 45, top: 400, width: 300, height: 50 };
+  k.ok(); h.send({ onf: 'hist', op: 'hi' }); s.tick(4000);                 // 홈 load 뒤 무거운 첫 그리기 — brand 가 4초 늦다
+  assert.ok(s.box(), '⛔ 말하는 홈인데 로고 자리를 안 기다리고 걷었다');
+  assert.strictEqual(box.querySelector('.onf-ld-logo').anims.length, 0, '⛔ 자리도 없이 날았다');
+  h.send(BRAND); s.tick(250 + 120 + 20);
+  assert.strictEqual(box.querySelector('.onf-ld-logo').anims.length, 1, '⛔ 늦게 온 로고 자리로 안 난다');
+  assert.deepStrictEqual(h.user.sent.map((x) => x[0]), ['brandHold']);
+  //   말은 했는데 자리가 끝내 안 온다 → 15초에 걷힌다
+  const s2 = env(), h2 = homeFrame(s2), k2 = s2.g.ONF.load.bind(h2.fr, { home: true });
+  h2.send({ onf: 'bookHello' }); k2.ok(); s2.tick(14900); assert.ok(s2.box(), '⛔ 15초 전에 걷었다');
+  s2.tick(1000); assert.strictEqual(s2.box(), null, '⛔ 15초가 지나도 안 걷힌다');
+  //   남의 창 말은 「말했다」로 안 센다 — 1.5초에 걷힌다
+  const s3 = env(), h3 = homeFrame(s3), k3 = s3.g.ONF.load.bind(h3.fr, { home: true });
+  h3.send({ onf: 'hist', op: 'hi' }, win('attacker', h3.top)); k3.ok(); s3.tick(2600);
+  assert.strictEqual(s3.box(), null, '⛔ 남의 말 때문에 15초를 덮는다');
 });
 t('k:none(다 그렸는데 자리 없음 — 못 들어오는 안내 등) → 날지 않고 바로 걷힌다 · 홈 로고 숨김 없음', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true, grace: 15000 }), box = s.box();
