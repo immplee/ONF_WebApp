@@ -20,7 +20,8 @@
  *     · 못 열었다(openExec say · 구글 오류 · 여러 계정) → 그 자리에서 걷는다(종전 안내가 그대로 보인다).
  *     · 이 파일의 어떤 오류도 막을 걷고 끝난다(try/catch). 파일이 안 실리면 막 자체가 없다(종전).
  *   ⛔ 받는 말은 홈 액자 후손 + googleusercontent 출처만(onf-frame.js 출처 자물쇠와 같은 검사) · 값은 숫자·모양 검사 뒤에만 쓴다.
- *   ⚠️ 학생 껍데기(index.html) 홈 액자 한 곳만 — 교재 판(.onf-bookpanel .onf-wait)·선생님 껍데기(teacher/)는 종전 고리 그대로.
+ *   ⚠️ 두 껍데기 홈 액자 — 학생(index.html · 실릴 때 바로) · 선생님(teacher/index.html · `data-lazy` = 로그인 뒤 mount 때 · 2026-10-22 Peter 폰에서 「고리 그대로」 — 그때 선생님 껍데기엔 이 막이 없었다).
+ *     교재 판(.onf-bookpanel .onf-wait)은 종전 고리 그대로.
  */
 (function (global) {
   'use strict';
@@ -65,6 +66,7 @@
   /* 홈이 보낸 로고 자리 — 안쪽 화면 좌표(px). 모양이 이상하면 null(→ 날지 않고 걷힌다). */
   function brandOk(d, vw, vh) {
     if (!d || d.onf !== 'brand') return null;
+    if (d.k === 'none') return { k: 'none' };                                // 다 떴는데 내려앉을 자리가 없다(못 들어오는 안내 등) — 기다리지 않고 걷힌다
     var x = +d.x, y = +d.y, w = +d.w, h = +d.h;
     if (![x, y, w, h].every(isFinite)) return null;
     if (w < 16 || h < 4 || w > vw || x < -1 || y < -1 || x + w > vw + 1 || y + h > vh + 1) return null;
@@ -74,7 +76,7 @@
     return { x: x, y: y, w: w, h: h, k: k, c: c };
   }
   /* 마무리 고르기 — 날 수 있을 때만 난다 */
-  function pick(brand, reduced, canAnimate) { return brand && !reduced && canAnimate ? 'fly' : 'fade'; }
+  function pick(brand, reduced, canAnimate) { return brand && brand.k !== 'none' && !reduced && canAnimate ? 'fly' : 'fade'; }
 
   var CSS =
     '.onf-ld{position:fixed;inset:0;z-index:5;pointer-events:none;contain:strict}'
@@ -94,22 +96,28 @@
     return s + '</svg>';
   }
 
-  var doc = global.document, box = null, fillEl = null, ls = null, on = false;
+  var doc = global.document, box = null, fillEl = null, ls = null, on = false, lazy = false;
   try { ls = global.localStorage; } catch (e) {}
-  try {
-    on = !!(doc && doc.body) && readOn(new URLSearchParams(global.location.search), ls);
-    if (on) {
+  /* 막 만들기 — 학생 껍데기는 이 파일이 실릴 때 바로(고리보다 먼저 보이게) · 선생님 껍데기는 `data-lazy` 라 bind 때(⛔ 로그인 화면을 가리면 안 된다). */
+  function make() {
+    try {
       var st = doc.createElement('style'); st.textContent = CSS; doc.head.appendChild(st);
       box = doc.createElement('div'); box.className = 'onf-ld'; box.setAttribute('aria-hidden', 'true');
       box.innerHTML = '<div class="onf-ld-bg"></div><div class="onf-ld-logo"><div class="onf-ld-in">'
         + svg('onf-ld-ghost') + '<div class="onf-ld-fill">' + svg('') + '</div></div></div>';
       doc.body.appendChild(box);
       fillEl = box.querySelector('.onf-ld-fill');
-    }
-  } catch (e) { try { if (box && box.parentNode) box.parentNode.removeChild(box); } catch (e2) {} box = null; }
+    } catch (e) { try { if (box && box.parentNode) box.parentNode.removeChild(box); } catch (e2) {} box = null; }
+  }
+  try {
+    lazy = !!(doc && doc.currentScript && doc.currentScript.hasAttribute && doc.currentScript.hasAttribute('data-lazy'));
+    on = !!(doc && doc.body) && readOn(new URLSearchParams(global.location.search), ls);
+    if (on && !lazy) make();
+  } catch (e) { on = false; }
 
   /* 홈 액자에 묶는다 — index.html 이 mount 직전에 부른다. 돌려준 hooks 를 openExec 가 부른다(ok = 산 화면 · stuck = 못 엶). */
   function bind(frameEl, opts) {
+    if (on && lazy && !box) make();                                         // 선생님 껍데기 — 로그인 뒤 액자를 열 때 처음 그린다
     if (!box) return null;
     opts = opts || {};
     var t0 = global.performance ? performance.now() : Date.now();
@@ -197,7 +205,7 @@
       ok: function () {                                                     // 산 화면 — 홈이면 로고 자리를 조금 기다리고, 아니면 바로 끝낸다
         if (phase !== 'wait') return;
         if (!okAt) okAt = now();
-        if (opts.home) later(finish, GRACE_MS); else finish();
+        if (opts.home) later(finish, opts.grace || GRACE_MS); else finish();   // grace — 선생님 홈은 노크 뒤에 자료를 받아 그린다(길다)
       },
       stuck: gone                                                           // 못 열었다 — 종전 안내가 보이게 바로 걷는다
     };

@@ -48,7 +48,7 @@ function env(o) {
     addEventListener: (k, f) => { (L[k] = L[k] || []).push(f); },
     removeEventListener: (k, f) => { L[k] = (L[k] || []).filter((x) => x !== f); },
     innerWidth: 390, innerHeight: 844,
-    document: { body, head, createElement: (tag) => mkEl(tag) }
+    document: { body, head, createElement: (tag) => mkEl(tag), currentScript: { hasAttribute: (k) => k === 'data-lazy' && !!o.lazy } }
   };
   g.window = g;
   vm.createContext(g);
@@ -214,6 +214,39 @@ t('채우는 중엔 92% 를 안 넘고, 끝나면 100%', () => {
   assert.ok(p > 0.9 && p <= 0.92, '⛔ 상한이 틀렸다: ' + p);
   k.ok(); s.tick(260);
   assert.strictEqual(fill.style.clipPath, 'inset(0 0.00% 0 0)');
+});
+
+console.log('[선생님 껍데기 — 로그인 화면을 가리지 않는다]');
+t('data-lazy → 실릴 땐 안 그린다(로그인 화면) · bind(로그인 뒤 mount) 때 처음 그린다 · 꺼져 있으면 bind 도 안 그린다', () => {
+  const s = env({ lazy: true });
+  assert.strictEqual(s.box(), null, '⛔ 실리자마자 막을 그렸다 — 로그인 화면(🔒)을 가린다');
+  const h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true, grace: 15000 });
+  assert.ok(k && s.box(), '⛔ mount 때 막을 안 그린다');
+  const off = env({ lazy: true, search: '?loadfx=0' });
+  assert.strictEqual(off.g.ONF.load.bind({}, {}), null); assert.strictEqual(off.box(), null);
+});
+t('grace — 선생님 홈은 노크 뒤 15초까지 「다 그렸다」를 기다린다(학생 1.5초로 걷으면 자료 받는 동안 옛 화면이 드러난다)', () => {
+  const s = env({ lazy: true }), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true, grace: 15000 });
+  k.ok(); s.tick(14000); assert.ok(s.box(), '⛔ 15초 전에 걷었다');
+  s.tick(2000); assert.strictEqual(s.box(), null, '⛔ 15초가 지나도 안 걷힌다');
+});
+t('k:none(다 그렸는데 자리 없음 — 못 들어오는 안내 등) → 날지 않고 바로 걷힌다 · 홈 로고 숨김 없음', () => {
+  const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true, grace: 15000 }), box = s.box();
+  k.ok(); h.send({ onf: 'brand', k: 'none' }); s.tick(800);
+  assert.strictEqual(box.querySelector('.onf-ld-logo').anims.length, 0, '⛔ 자리 없이 날았다');
+  assert.strictEqual(s.box(), null, '⛔ 「다 그렸다」를 받고도 여유만큼 더 덮는다');
+  assert.ok(!h.user.sent.some((x) => x[0] === 'brandHold'));
+});
+t('선생님 껍데기 배선 — data-lazy 로 싣는다 · mount 에서 bind · 다시 로그인(stale) 노크·8초 막힘(watch) 땐 바로 걷는다 · 로그인·토큰 블록은 안 건드린다', () => {
+  const th = fs.readFileSync(path.join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
+  assert.ok(/<script src="\.\.\/assets\/onf-load\.js" data-lazy><\/script>/.test(th), '⛔ data-lazy 로 안 싣는다(로그인 화면을 가린다)');
+  const mt = th.slice(th.indexOf('function mount() {'), th.indexOf('var frameWatch = null;'));
+  assert.ok(/ONF\.load\.bind\(frame, \{ home: true, grace: 15000 \}\)/.test(mt), '⛔ mount 에서 막을 안 묶는다');
+  assert.ok(/if \(d\.stale\) LD\.stuck\(\); else LD\.ok\(\);/.test(mt), '⛔ 다시 로그인 노크에 막을 안 걷는다(로그인 창을 가린다)');
+  const w = mt.slice(mt.indexOf('function watch() {'));
+  assert.ok(/if \(appWin\) return;\s*if \(LD\) LD\.stuck\(\);/.test(w), '⛔ 막힘 안내 전에 막을 안 걷는다');
+  const knock = th.slice(th.indexOf('/* onf-knock:begin */'), th.indexOf('/* onf-knock:end */'));
+  assert.ok(knock.length > 100 && !/LD\b|ONF\.load/.test(knock), '⛔ 로그인·토큰 블록(onf-knock)에 손을 댔다');
 });
 
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패');

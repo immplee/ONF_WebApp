@@ -71,6 +71,9 @@
 <script src="../assets/onf-api.js"></script>
 <!-- 🔐 판(학생 exec)만 쓴다 — 여러 계정 우회 openExec. 홈 액자(/a/macros/ownify.co.kr)는 안 쓴다(아래 bookMake 주석). -->
 <script src="../assets/onf-frame.js"></script>
+<!-- 🟠 첫 화면 로고 로딩(2026-10-22 Peter · 학생 껍데기와 같은 파일) — `data-lazy`: 실릴 때 그리지 않는다(⛔ 로그인 화면을 가리면 안 된다).
+     로그인 뒤 액자를 여는 mount() 에서 처음 그린다. 되돌리기·안전장치는 그 파일 머리 주석. 안 실려도 종전 고리 그대로. -->
+<script src="../assets/onf-load.js" data-lazy></script>
 <script>
 /* =====================================================================
    선생님 홈 껍데기 — 하는 일은 **둘뿐**이다: 구글 로그인 · 토큰 넘기기.
@@ -209,6 +212,17 @@ function mount() {
      없었고(#why 는 #lock 안이라 같이 숨는다), 「3초」와 「영영」이 같은 흰 종이였다. */
   document.getElementById('wait').hidden = false;
   frame.hidden = false;
+  /* 🟠 로고 로딩 막 — 여기서 처음 그린다(로그인 화면을 치운 뒤). 노크(auth-please)가 오면 안쪽이 첫 화면을 그릴 때까지 기다리고(grace 15초 —
+     선생님 홈은 노크 뒤 토큰을 받아 자료를 사 와서 그린다) · 안쪽이 「다 그렸다」(brand)를 보내면 그 자리로 날아가거나 걷힌다.
+     ⛔ 다시 로그인하라는 노크(stale)·8초 막힘 안내(watch) 땐 바로 걷는다 — 막이 로그인 창·안내를 가리면 안 된다.
+     ⛔ 로그인·토큰 배선(onf-knock 블록)은 안 건드린다 — 아래 따로 듣는 손 하나다(dkSeen 과 같은 꼴 · knock 손이 appWin 을 정한 뒤에 돈다). */
+  var LD = null;
+  try { LD = window.ONF && ONF.load ? ONF.load.bind(frame, { home: true, grace: 15000 }) : null; } catch (eLD) { LD = null; }
+  if (LD) window.addEventListener('message', function ldKnock(ev) {
+    var d = ev && ev.data;
+    if (!d || d.onf !== 'auth-please' || !appWin || ev.source !== appWin) return;
+    if (d.stale) LD.stuck(); else LD.ok();
+  });
   /* ⛔ [2026-09-19] **질의문자열을 액자 안으로 넘긴다.** 학생 한 명짜리 창을
      `?mode=student&t=…` 로 여는데, 여기서 안 넘기면 안쪽은 그냥 목록을 그린다(주소만 그럴싸하다).
      ⚠️ **우리가 아는 이름만** 넘긴다 — 주소에 실린 것을 통째로 흘려보내면 남이 만든 링크가
@@ -283,6 +297,7 @@ function mount() {
   frameWatch = setTimeout(watch, keyOpen ? 30000 : 8000);   // 열쇠로 연 화면은 load 를 기다린다(위) · 로그인 길은 종전 8초
   function watch() {
     if (appWin) return;
+    if (LD) LD.stuck();                                           // 🟠 막힘 안내·다시 열기 전에 로고 막을 걷는다(안내가 보여야 한다)
     /* 🔑 받아 둔 토큰·열쇠로(구글 창구 없이) 열어 액자는 다 읽혔는데(load) 안쪽이 안 왔다 = 이 기기는 구글 창구 없이는 액자가 안 뜰 수 있다(아이폰 실측과 같은 꼴) →
        칸을 치우고 한 번 다시 연다(그때는 구글 창구로). 7일 끄기(DK_OFF)는 **두 번째 잇단 막힘**에서만 — 첫 번째는 DK_TRY 표시만(구글 일시 오류 한 번으로 7일 로그인하지 않게). */
     if (keyOpen && loaded) {
