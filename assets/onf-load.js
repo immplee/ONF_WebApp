@@ -163,6 +163,7 @@
       var cx = fr.left + brand.x + brand.w / 2, cy = fr.top + brand.y + brand.h / 2;
       var s = tw / a.width, dx = cx - (a.left + a.width / 2), dy = cy - (a.top + a.height / 2);
       box.querySelector('.onf-ld-ghost').style.opacity = 0;
+      tellHome('brandHold');                                                // 날 때만·날기 직전에 숨긴다 — 받자마자 숨기면 숨은 탭에서 여기 오기 전에 홈의 4초 시계가 먼저 풀린다
       anims.push(lg.animate([{ transform: 'translate(-50%,-50%)' }, { transform: 'translate(-50%,-50%) translateX(' + dx + 'px)' }],
         { duration: FLY_MS, easing: 'cubic-bezier(.55,0,.12,1)', fill: 'forwards' }));
       anims.push(inn.animate([{ transform: 'none' }, { transform: 'translateY(' + dy + 'px) scale(' + s + ')' }],
@@ -186,7 +187,6 @@
         if (!b) return;
         brand = b; if (!okAt) okAt = now();
         home = { w: ev.source, o: ev.origin };
-        if (pick(brand, reduced, typeof box.animate === 'function') === 'fly') tellHome('brandHold');   // 날 때만 숨긴다(걷히기만 하면 홈 로고는 그대로)
         finish();
       } catch (e) {}
     }
