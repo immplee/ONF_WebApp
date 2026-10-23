@@ -481,6 +481,7 @@ function hwHand() {
   if (q.get('mode') !== 'hwbook') return null;
   var g = null; try { g = JSON.parse(sessionStorage.getItem('onfHwGo') || 'null'); } catch (e) {}
   if (!g || g.t !== (q.get('t') || '') || g.l !== (q.get('l') || '') || !(Date.now() - g.at < 600000)) return null;
+  try { sessionStorage.removeItem('onfHwGo'); } catch (e) {}   // 한 번만 준다 — 입장권을 탭에 남겨 두지 않는다(반박 🟡6 · 새로 고침이면 과제 판이 「다시 골라 주세요」)
   return { f: g.f, hwt: g.hwt };
 }
 /* onf-hwbook:end */

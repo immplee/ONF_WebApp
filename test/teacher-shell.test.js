@@ -387,6 +387,9 @@ t('📝 과제 판 — 고른 사진·입장권 맡기기(모양 거름 · 주�
   const mk = (search, store) => { const H = boot({ onf_id_tok: odk() }, { search }); if (store) H.g.sessionStorage.setItem('onfHwGo', JSON.stringify(store)); const got = []; const w = { parent: H.els.app.contentWindow, postMessage: (m) => got.push(m) }; H.knockAs(w); return got.filter((m) => m && m.onf === 'auth').pop(); };
   const a = mk('?mode=hwbook&t=Tok_1&l=' + L, kept);
   assert.deepEqual(a && a.hw, { f: kept.f, hwt: HWT }, '⛔ 과제 판 노크에 맡긴 것을 안 줬다');
+  const H1 = boot({ onf_id_tok: odk() }, { search: '?mode=hwbook&t=Tok_1&l=' + L }); H1.g.sessionStorage.setItem('onfHwGo', JSON.stringify(kept));
+  const got1 = []; const w1 = { parent: H1.els.app.contentWindow, postMessage: (m) => got1.push(m) }; H1.knockAs(w1);
+  assert.equal(H1.g.sessionStorage.getItem('onfHwGo'), null, '⛔ 준 뒤에도 입장권을 탭에 남겼다');
   assert.equal(mk('?mode=hwbook&t=Tok_2&l=' + L, kept).hw, undefined, '⛔ 다른 학생 과제 판에 줬다');
   assert.equal(mk('?mode=hwbook&t=Tok_1', kept).hw, undefined, '⛔ 다른 수업에 줬다');
   assert.equal(mk('?t=Tok_1&l=' + L, kept).hw, undefined, '⛔ 과제 판이 아닌 화면에 줬다');
