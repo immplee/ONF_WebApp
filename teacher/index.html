@@ -457,6 +457,9 @@ window.addEventListener('message', function (ev) {
    ⛔ 액자 주소는 **붙이기 전에**(붙인 빈 액자에 src = WebKit 뒤로 칸이 우리 칸 위에 쌓여 뒤로가 빈 화면 · mount 주석 · 2026-10-23 반박 🔴2).
    ⛔ z-index 50 — 껍데기 층(≤5) 위 · 구글 로그인 시트(GIS) 아래(새로 받기 시트를 가리면 못 누른다). */
 var hwBox = null, hwFr = null, hwWin = null, hwOrigin = '', hwGo = null, hwSkip = false, hwGave = '', hwWant = false;
+/* 미리 띄우기(Peter 2026-10-23 「과제 열기가 너무 느려」 — 과제 화면을 구글에서 띄우는 데 3~4초): 홈이 모아 보기 창을 열면 hwbookWarm{t} → 같은 자리에 **안 보이게** 과제 액자를 미리(…&warm=1 · 열기는 안 함)
+   → [과제 열기] 때 그 액자를 보이고 hwbookGo{l, hw} 만 보낸다(판이 이미 떠 있다) · 다른 학생이면 새로 · 10분 안 쓰면 걷는다 · 안 보이는 동안은 뒤로·노크 칸을 안 건드린다 */
+var hwT = '', hwWarmOn = false, hwWarmTm = 0, hwGoMsg = null;
 function hwFrom(win) {
   var w = win, target = hwFr && hwFr.contentWindow;
   if (!w || !target) return false;
@@ -467,11 +470,22 @@ function hwFrom(win) {
   return false;
 }
 function hwOpen(t, l, f, hwt) {
+  var files0 = f, tk0 = hwt;
+  if (hwBox && hwWarmOn && hwT === t) {   // 미리 띄운 판 — 보이고 「이 수업·이 사진으로 열어」 만
+    hwWarmOn = false; clearTimeout(hwWarmTm);
+    hwBox.style.visibility = ''; hwBox.style.pointerEvents = '';
+    try { hwFr.focus(); } catch (eF) {}
+    var st0 = { onfHw: 1, n: (typeof histDepth === 'number' ? histDepth : 0) };
+    try { if (history.state && history.state.onfHw) history.replaceState(st0, ''); else history.pushState(st0, ''); } catch (e) {}
+    hwGoMsg = { onf: 'hwbookGo', l: l, hw: hwShape(files0, tk0) };
+    if (hwWin) { try { hwWin.postMessage(hwGoMsg, hwOrigin); } catch (e) {} hwGoMsg = null; }
+    return;
+  }
   hwClose();
   var files = Array.isArray(f) ? f.filter(function (x) { return x && /^[A-Za-z0-9_-]{10,200}$/.test(String(x.id || '')) && /^\d{4}-\d{2}-\d{2}$/.test(String(x.ymd || '')); })
     .slice(0, 80).map(function (x) { return { id: String(x.id), ymd: String(x.ymd) }; }) : null;
   var tk = hwt && typeof hwt.p === 'string' && hwt.p.length <= 12000 && /^[A-Za-z0-9_-]{43}$/.test(String(hwt.sig || '')) ? { p: hwt.p, sig: String(hwt.sig) } : null;
-  hwGo = { f: files, hwt: tk };
+  hwGo = { f: files, hwt: tk }; hwT = t;
   hwBox = document.createElement('div');
   hwBox.className = 'onf-hwbox';
   hwBox.style.cssText = 'position:fixed;inset:0;z-index:50;background:var(--bg,#1d1712)';
@@ -481,7 +495,7 @@ function hwOpen(t, l, f, hwt) {
   hwFr.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent';
   var wait = document.createElement('div');
   wait.className = 'onf-wait';
-  wait.innerHTML = '<div class="onf-spin"></div><span>과제를 여는 중</span>';
+  wait.innerHTML = '<div class="onf-spin"></div><span>불러오는 중</span>';
   var x = document.createElement('button');   // 과제 판이 뜨기 전(구글 오류 화면 · 노크 없음)에도 닫을 수 있게 — 노크가 오면 숨긴다(판에 ‹ 가 있다)
   x.type = 'button'; x.className = 'onf-hwx'; x.setAttribute('aria-label', '닫기'); x.textContent = '✕';
   x.style.cssText = 'position:absolute;top:12px;left:12px;z-index:2;width:40px;height:40px;border-radius:12px;border:0;font-size:18px;cursor:pointer;background:rgba(0,0,0,.35);color:#fff';
@@ -492,6 +506,24 @@ function hwOpen(t, l, f, hwt) {
   try { hwFr.focus(); } catch (eF) {}   // 키보드(Esc·화살표)가 가려진 홈으로 안 가게
   var st = { onfHw: 1, n: (typeof histDepth === 'number' ? histDepth : 0) };
   try { if (history.state && history.state.onfHw) history.replaceState(st, ''); else history.pushState(st, ''); } catch (e) {}   // 이미 과제 판 칸이면 덮어쓴다(칸 두 개 = 뒤로 두 번)
+}
+function hwShape(f, hwt) {
+  var files = Array.isArray(f) ? f.filter(function (x) { return x && /^[A-Za-z0-9_-]{10,200}$/.test(String(x.id || '')) && /^\d{4}-\d{2}-\d{2}$/.test(String(x.ymd || '')); })
+    .slice(0, 80).map(function (x) { return { id: String(x.id), ymd: String(x.ymd) }; }) : null;
+  var tk = hwt && typeof hwt.p === 'string' && hwt.p.length <= 12000 && /^[A-Za-z0-9_-]{43}$/.test(String(hwt.sig || '')) ? { p: hwt.p, sig: String(hwt.sig) } : null;
+  return { f: files, hwt: tk };
+}
+function hwWarm(t) {
+  if (hwBox && hwT === t) return;          // 이미 그 학생 판(미리 띄웠거나 열려 있음)
+  if (hwBox && !hwWarmOn) return;          // 다른 판이 보이는 중 — 건드리지 않는다
+  hwClose();
+  hwBox = document.createElement('div'); hwBox.className = 'onf-hwbox';
+  hwBox.style.cssText = 'position:fixed;inset:0;z-index:50;background:var(--bg,#1d1712);visibility:hidden;pointer-events:none';   // 안 보이지만 크기는 진짜(맞춤 계산이 틀리지 않게)
+  hwFr = document.createElement('iframe'); hwFr.setAttribute('allow', 'clipboard-write; microphone'); hwFr.setAttribute('title', '과제');
+  hwFr.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent';
+  hwFr.src = EXEC + '?mode=hwbook&t=' + encodeURIComponent(t) + '&warm=1';   // ⛔ 붙이기 전에(WebKit 뒤로 칸)
+  hwBox.appendChild(hwFr); document.body.appendChild(hwBox);
+  hwT = t; hwWarmOn = true; clearTimeout(hwWarmTm); hwWarmTm = setTimeout(function () { if (hwWarmOn) hwClose(); }, 600000);
 }
 function hwBack() { if (history.state && history.state.onfHw) history.back(); else hwClose(); }
 function hwAuth() {   // 판에 지금 토큰(+ 고른 사진·입장권 한 번)
@@ -504,16 +536,16 @@ function hwAuth() {   // 판에 지금 토큰(+ 고른 사진·입장권 한 번
 function hwTell() { if (hwWant && hwWin && pending && tokAlive(pending)) { hwWant = false; hwAuth(); } }   // onCredential 이 부른다 — 새로 받은 토큰을 판에도
 function hwClose() {
   if (hwBox && hwBox.parentNode) hwBox.parentNode.removeChild(hwBox);
-  hwBox = null; hwFr = null; hwWin = null; hwOrigin = ''; hwGo = null; hwGave = ''; hwWant = false;
+  hwBox = null; hwFr = null; hwWin = null; hwOrigin = ''; hwGo = null; hwGave = ''; hwWant = false; hwT = ''; hwWarmOn = false; hwGoMsg = null; clearTimeout(hwWarmTm);
 }
 /* onf-hist 블록 popstate 가 묻는다 — 과제 판 칸이 맨 위거나 방금 그 칸을 걷었으면 홈에 「뒤로」를 안 보낸다(홈은 안 바뀌었다) */
 function hwSkipPop() { var k = hwSkip || !!(history.state && history.state.onfHw); hwSkip = false; return k; }
 window.addEventListener('popstate', function () {
-  if (hwBox && !(history.state && history.state.onfHw)) { hwClose(); hwSkip = true; }   // 뒤로·스와이프 = 과제 판 닫기
+  if (hwBox && !hwWarmOn && !(history.state && history.state.onfHw)) { hwClose(); hwSkip = true; }   // 뒤로·스와이프 = 과제 판 닫기(안 보이는 미리 띄운 판은 그대로)
 });
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
-  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'auth-please' && d.onf !== 'themeAsk')) return;
+  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk')) return;
   if (hwFr && hwFrom(ev.source)) {   // 과제 판 액자에서 온 말
     try { if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return; } catch (e) { return; }
     if (hwWin && ev.source !== hwWin) return;   // 한 번 정하면 그 창만(노크 자물쇠와 같다)
@@ -529,14 +561,16 @@ window.addEventListener('message', function (ev) {
         return;
       }
       hwAuth();
+      if (hwGoMsg) { try { hwWin.postMessage(hwGoMsg, hwOrigin); } catch (e) {} hwGoMsg = null; }   // 미리 띄운 판이 늦게 떴다 — 토큰 뒤에 바로 「열어」
       return;
     }
     if (d.onf === 'themeAsk') { themeAsk(ev); return; }
     if (d.onf === 'hwbookBack') hwBack();
     return;
   }
-  if (d.onf !== 'hwbook' && d.onf !== 'hwbookBack') return;
+  if (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm') return;
   if (!appWin || ev.source !== appWin || ev.origin !== appOrigin) return;   // 홈(우리가 정한 안쪽 창)에서 온 말만
+  if (d.onf === 'hwbookWarm') { if (/^[A-Za-z0-9_-]{1,40}$/.test(String(d.t || ''))) hwWarm(String(d.t)); return; }
   if (d.onf === 'hwbookBack') { location.href = location.pathname; return; }   // 주소로 연 과제 판(mode=hwbook) 의 ‹ = 홈으로
   var t = String(d.t || ''), l = String(d.l || '');
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(t)) return;

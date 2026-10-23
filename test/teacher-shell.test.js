@@ -399,5 +399,38 @@ t('📝 과제 판 액자 — 노크엔 지금 토큰 + 고른 사진·입장권
   assert.equal(R.calls.filter((c) => /^push:\{"onfHw"/.test(c)).length, 2, '⛔ 열려 있는 과제 판 위에 칸을 또 쌓았다(처음 1 + 다시 1 · 그 사이 닫았으므로 2)');
 });
 
+t('📝 과제 미리 띄우기 — hwbookWarm = 안 보이는 액자(&warm=1 · 뒤로 칸 없음) · 과제 열기 = 그 액자를 보이고 hwbookGo{l,hw} · 다른 학생이면 새로 · 안 보이는 동안 뒤로는 안 닫음', () => {
+  const L = '402d6a62-96ae-817f-86ec-ecaf4f919ab9', HWT = { p: '{"s":"Tok_1"}', sig: 'A'.repeat(43) };
+  const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
+  R.knockAs(me);
+  const frames = () => R.created.filter((e) => e.tag === 'iframe'), pushes = () => R.calls.filter((c) => /^push:/.test(c)).length;
+  R.postAs({ onf: 'hwbookWarm', t: 'Tok_1' }, me);
+  assert.equal(frames().length, 1); assert.equal(frames()[0].src, R.g.EXEC + '?mode=hwbook&t=Tok_1&warm=1');
+  const box = R.created.find((e) => e.className === 'onf-hwbox');
+  assert.ok(/visibility:hidden/.test(box.style.cssText) && /pointer-events:none/.test(box.style.cssText), '⛔ 미리 띄운 액자가 보인다');
+  assert.equal(pushes(), 0, '⛔ 미리 띄우기가 뒤로 칸을 쌓았다');
+  R.postAs({ onf: 'hwbookWarm', t: 'Tok_1' }, me); assert.equal(frames().length, 1, '같은 학생이면 다시 안 띄운다');
+  R.g.history.state = null; R.pop(); assert.ok(!box.removed, '⛔ 안 보이는 미리 띄운 판을 뒤로가 닫았다');
+  const got = [], inner = { parent: { parent: frames()[0].contentWindow }, postMessage: (m) => got.push(m) };
+  R.postAs({ onf: 'auth-please' }, inner);   // 미리 띄운 판이 먼저 노크(토큰만)
+  assert.equal(got.length, 1); assert.equal(got[0].hw, undefined);
+  R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L, f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT }, me);
+  assert.equal(frames().length, 1, '⛔ 과제 열기가 새 액자를 또 만들었다(미리 띄운 것을 써야)');
+  assert.equal(box.style.visibility, '', '⛔ 보이지 않았다');
+  assert.equal(pushes(), 1, '보일 때 뒤로 칸 하나');
+  assert.deepEqual(JSON.parse(JSON.stringify(got[1])), { onf: 'hwbookGo', l: L, hw: { f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT } }, '⛔ hwbookGo');
+  // 늦게 뜬 판 — 과제 열기 뒤에 노크하면 토큰 다음에 바로 hwbookGo
+  const R2 = boot({ onf_id_tok: odk() }), me2 = { parent: R2.els.app.contentWindow, postMessage() {} }; R2.knockAs(me2);
+  R2.postAs({ onf: 'hwbookWarm', t: 'Tok_1' }, me2); R2.postAs({ onf: 'hwbook', t: 'Tok_1', l: L, f: [], hwt: HWT }, me2);
+  const got2 = [], in2 = { parent: { parent: R2.created.filter((e) => e.tag === 'iframe')[0].contentWindow }, postMessage: (m) => got2.push(m) };
+  R2.postAs({ onf: 'auth-please' }, in2);
+  assert.deepEqual(got2.map((m) => m.onf), ['auth', 'hwbookGo'], '⛔ 늦게 뜬 판에 열기 말을 안 줬다');
+  // 다른 학생 — 미리 띄운 것을 걷고 새로
+  const R3 = boot({ onf_id_tok: odk() }), me3 = { parent: R3.els.app.contentWindow, postMessage() {} }; R3.knockAs(me3);
+  R3.postAs({ onf: 'hwbookWarm', t: 'Tok_1' }, me3); R3.postAs({ onf: 'hwbook', t: 'Tok_2', l: L }, me3);
+  const fr3 = R3.created.filter((e) => e.tag === 'iframe');
+  assert.equal(fr3.length, 2); assert.ok(R3.created.filter((e) => e.className === 'onf-hwbox')[0].removed); assert.ok(/t=Tok_2&l=/.test(fr3[1].src));
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);
