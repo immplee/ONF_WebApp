@@ -469,7 +469,7 @@ function hwFrom(win) {
   }
   return false;
 }
-function hwOpen(t, l, f, hwt) {
+function hwOpen(t, l, f, hwt, au) {
   var files0 = f, tk0 = hwt;
   if (hwBox && hwWarmOn && hwT === t) {   // 미리 띄운 판 — 보이고 「이 수업·이 사진으로 열어」 만
     hwWarmOn = false; clearTimeout(hwWarmTm);
@@ -477,15 +477,12 @@ function hwOpen(t, l, f, hwt) {
     try { hwFr.focus(); } catch (eF) {}
     var st0 = { onfHw: 1, n: (typeof histDepth === 'number' ? histDepth : 0) };
     try { if (history.state && history.state.onfHw) history.replaceState(st0, ''); else history.pushState(st0, ''); } catch (e) {}
-    hwGoMsg = { onf: 'hwbookGo', l: l, hw: hwShape(files0, tk0) };
+    hwGoMsg = { onf: 'hwbookGo', l: l, hw: hwShape(files0, tk0, au) };
     if (hwWin) { try { hwWin.postMessage(hwGoMsg, hwOrigin); } catch (e) {} hwGoMsg = null; }
     return;
   }
   hwClose();
-  var files = Array.isArray(f) ? f.filter(function (x) { return x && /^[A-Za-z0-9_-]{10,200}$/.test(String(x.id || '')) && /^\d{4}-\d{2}-\d{2}$/.test(String(x.ymd || '')); })
-    .slice(0, 80).map(function (x) { return { id: String(x.id), ymd: String(x.ymd) }; }) : null;
-  var tk = hwt && typeof hwt.p === 'string' && hwt.p.length <= 12000 && /^[A-Za-z0-9_-]{43}$/.test(String(hwt.sig || '')) ? { p: hwt.p, sig: String(hwt.sig) } : null;
-  hwGo = { f: files, hwt: tk }; hwT = t;
+  hwGo = hwShape(f, hwt, au); hwT = t;
   hwBox = document.createElement('div');
   hwBox.className = 'onf-hwbox';
   hwBox.style.cssText = 'position:fixed;inset:0;z-index:50;background:var(--bg,#1d1712)';
@@ -507,11 +504,12 @@ function hwOpen(t, l, f, hwt) {
   var st = { onfHw: 1, n: (typeof histDepth === 'number' ? histDepth : 0) };
   try { if (history.state && history.state.onfHw) history.replaceState(st, ''); else history.pushState(st, ''); } catch (e) {}   // 이미 과제 판 칸이면 덮어쓴다(칸 두 개 = 뒤로 두 번)
 }
-function hwShape(f, hwt) {
+function hwShape(f, hwt, au) {
   var files = Array.isArray(f) ? f.filter(function (x) { return x && /^[A-Za-z0-9_-]{10,200}$/.test(String(x.id || '')) && /^\d{4}-\d{2}-\d{2}$/.test(String(x.ymd || '')); })
     .slice(0, 80).map(function (x) { return { id: String(x.id), ymd: String(x.ymd) }; }) : null;
   var tk = hwt && typeof hwt.p === 'string' && hwt.p.length <= 12000 && /^[A-Za-z0-9_-]{43}$/.test(String(hwt.sig || '')) ? { p: hwt.p, sig: String(hwt.sig) } : null;
-  return { f: files, hwt: tk };
+  var a = au && /^\d{4}-\d{2}-\d{2}$/.test(String(au.d || '')) && Number(au.at) >= 0 && Number(au.at) < 1e14 ? { d: String(au.d), at: Number(au.at) } : null;   // 🎧 들으며 필기 — 그 녹음(날짜 · 올린 시각)을 띄운 판(4단계 · 2026-10-24)
+  return { f: files, hwt: tk, a: a };
 }
 function hwWarm(t) {
   if (hwBox && hwT === t) return;          // 이미 그 학생 판(미리 띄웠거나 열려 있음)
@@ -580,7 +578,7 @@ window.addEventListener('message', function (ev) {
   var t = String(d.t || ''), l = String(d.l || '');
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(t)) return;
   if (!/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(l)) l = '';
-  hwOpen(t, l, d.f, d.hwt);
+  hwOpen(t, l, d.f, d.hwt, d.a);
   try { appWin.postMessage({ onf: 'hwOpened' }, appOrigin); } catch (e) {}   // 홈 창은 이 말을 받고 모아 보기 창을 닫는다
 });
 /* onf-hwbook:end */

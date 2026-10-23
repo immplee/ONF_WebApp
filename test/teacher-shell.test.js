@@ -366,6 +366,19 @@ t('📝 과제 판 — 「열어 줘(hwbook)」 = 껍데기 주소를 안 바꾸
   assert.ok(told.some((m) => m.onf === 'hwOpened'), '⛔ 홈에 hwOpened');
   assert.ok(!JSON.stringify(R.calls).includes('PHOTO') && R.g.sessionStorage.getItem('onfHwGo') === null, '⛔ 고른 사진을 주소·저장소에 남겼다');
 });
+t('🎧 들으며 필기(4단계 · 2026-10-24) — 홈이 고른 녹음(날짜·올린 시각)이 판 노크 답 hw.a 로 간다 · 꼴이 틀리면 null', () => {
+  const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
+  R.knockAs(me);
+  R.postAs({ onf: 'hwbook', t: 'Tok_1', a: { d: '2026-10-22', at: 1792700000000 } }, me);
+  const fr = R.created.filter((e) => e.tag === 'iframe')[0], got = [], inner = { parent: { parent: fr.contentWindow }, postMessage: (m) => got.push(m) };
+  R.postAs({ onf: 'auth-please' }, inner);
+  assert.deepEqual(JSON.parse(JSON.stringify(got[0].hw.a)), { d: '2026-10-22', at: 1792700000000 }, '⛔ 고른 녹음이 판에 안 갔다');
+  const R2 = boot({ onf_id_tok: odk() }), me2 = { parent: R2.els.app.contentWindow, postMessage() {} };
+  R2.knockAs(me2); R2.postAs({ onf: 'hwbook', t: 'Tok_1', a: { d: '2026-10-22"><x', at: 'zz' } }, me2);
+  const fr2 = R2.created.filter((e) => e.tag === 'iframe')[0], got2 = [], in2 = { parent: { parent: fr2.contentWindow }, postMessage: (m) => got2.push(m) };
+  R2.postAs({ onf: 'auth-please' }, in2);
+  assert.strictEqual(got2[0].hw.a, null, '⛔ 꼴이 틀린 녹음 고르기를 넘겼다');
+});
 t('📝 과제 판 액자 — 노크엔 지금 토큰 + 고른 사진·입장권(한 번만) · 그 액자 후손·googleusercontent 만 · 홈 노크 자물쇠(appWin)는 안 건드림 · ‹ 와 뒤로 = 닫기(홈엔 뒤로 안 보냄)', () => {
   const L = '402d6a62-96ae-817f-86ec-ecaf4f919ab9', HWT = { p: '{"s":"Tok_1"}', sig: 'A'.repeat(43) };
   const R = boot({ onf_id_tok: odk() }), homeGot = [], me = { parent: R.els.app.contentWindow, postMessage: (m) => homeGot.push(m) };
@@ -378,7 +391,7 @@ t('📝 과제 판 액자 — 노크엔 지금 토큰 + 고른 사진·입장권
   R.postAs({ onf: 'auth-please' }, inner);
   assert.equal(got.length, 1); assert.ok(/^odk1\./.test(got[0].token) && got[0].hist === 0);
   assert.equal(got[0].sa, undefined, '⛔ 브라우저인데 홈 화면 앱이라고 했다(‹ 가 다시 보인다)');
-  assert.deepEqual(JSON.parse(JSON.stringify(got[0].hw)), { f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT }, '⛔ 고른 사진·입장권');
+  assert.deepEqual(JSON.parse(JSON.stringify(got[0].hw)), { f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT, a: null }, '⛔ 고른 사진·입장권');
   R.postAs({ onf: 'auth-please', stale: true }, inner);
   assert.equal(got.length, 1, '⛔ 죽은 토큰을 또 줬다(판이 「로그인이 필요해요」 에 갇힌다)');
   assert.ok(R.calls.includes('prompt'), '⛔ 만료 토큰 — 구글에서 새로 받지 않았다');
@@ -421,7 +434,7 @@ t('📝 과제 미리 띄우기 — hwbookWarm = 안 보이는 액자(&warm=1 ·
   assert.equal(frames().length, 1, '⛔ 과제 열기가 새 액자를 또 만들었다(미리 띄운 것을 써야)');
   assert.equal(box.style.visibility, '', '⛔ 보이지 않았다');
   assert.equal(pushes(), 1, '보일 때 뒤로 칸 하나');
-  assert.deepEqual(JSON.parse(JSON.stringify(got[1])), { onf: 'hwbookGo', l: L, hw: { f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT } }, '⛔ hwbookGo');
+  assert.deepEqual(JSON.parse(JSON.stringify(got[1])), { onf: 'hwbookGo', l: L, hw: { f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT, a: null } }, '⛔ hwbookGo');
   // 늦게 뜬 판 — 과제 열기 뒤에 노크하면 토큰 다음에 바로 hwbookGo
   const R2 = boot({ onf_id_tok: odk() }), me2 = { parent: R2.els.app.contentWindow, postMessage() {} }; R2.knockAs(me2);
   R2.postAs({ onf: 'hwbookWarm', t: 'Tok_1' }, me2); R2.postAs({ onf: 'hwbook', t: 'Tok_1', l: L, f: [], hwt: HWT }, me2);
