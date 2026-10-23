@@ -234,7 +234,7 @@ function mount() {
   if (/^[A-Za-z0-9_-]{1,40}$/.test(st)) pass.set('t', st);
   //   느린 구간 표(선생님 홈 `perf=1` — 2026-09-28)도 넘긴다. 값은 「1」 하나만 안다.
   if (q.get('perf') === '1') pass.set('perf', '1');
-  var qs = pass.toString();
+  var qs = pass.toString(), appSrc = EXEC + (qs ? '?' + qs : '');   // 홈 액자 주소 — 처음 열기·한 번 더 열기가 같이 쓴다(src 속성은 replace 로 열어 비어 있다)
   /* 🔑 [2026-10-17] 받아 둔 것(열쇠·구글 토큰)으로 연 화면의 「막힘」 판정은 **액자 load 부터** 8초를 센다.
      ⛔ 종전엔 열고 8초였다 — 서버(doGet)가 한 번 느린 것(10-17 10:05:52 doGet 12.2초)과 진짜 막힌 액자를 못 갈라,
        느린 한 번에 열쇠를 7일 끄고 새로 읽어(다시 로그인 + 두 번째 doGet) 빈 화면이 15~20초+ 였다.
@@ -282,12 +282,14 @@ function mount() {
     setTimeout(function () {
       if (appWin || appN() !== 0) return;
       console.info('[onf] 래퍼는 떴는데 앱 프레임이 없다(구글 오류?) — 한 번 더 연다');
-      var u = frame.src;
+      var u = appSrc;
       try { frame.contentWindow.location.replace(u); } catch (e) { frame.src = u; }   // 같은 주소 · replace — 기록 칸을 안 쌓는다(onf-hist 의 go(-n) 전제)
       clearTimeout(frameWatch); frameWatch = setTimeout(watch, 30000);   // 다시 연 문서의 load 가 8초를 다시 센다(위 load 손)
     }, 3000);
   });
-  frame.src = EXEC + (qs ? '?' + qs : '');
+  /* 📱 replace 로 연다(2026-10-23 · 까닭은 학생 껍데기 onf-frame.js 「처음 열기도 replace」 주석) — mount 는 구글 로그인 뒤(onCredential)에도 불린다:
+     다 뜬 페이지의 붙은 빈 액자에 src 를 넣으면 WebKit(아이폰·아이패드)은 기록 칸을 하나 쌓아, 홈에서 뒤로 = 이 액자만 빈 문서로 되감긴다(선생님 홈이 흰 화면). */
+  try { frame.contentWindow.location.replace(appSrc); } catch (e) { frame.src = appSrc; }
   /* ⛔ 프레임이 **막혔는지**를 화면이 말해야 한다. 안쪽이 살아 있으면 몇백 ms 안에 노크가 온다.
      안 오면 구글이 문 앞에서 자른 것이다(회사 계정이 아니거나 로그인이 안 된 것) —
      그때 구글의 「액세스 권한 필요」 화면만 덩그러니 두면 사람이 무엇을 해야 할지 모른다.

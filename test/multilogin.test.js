@@ -58,7 +58,7 @@ function mkEl(tag) {
 function mkFrame(s) {
   const nav = [], L = {};
   const doc = { kids: 0, app: 0, blank: true, win: null };
-  const el = { style: {}, credentialless: false, nav, L,
+  const el = { style: {}, credentialless: false, nav, L, isConnected: true,   // 판·홈 액자는 늘 문서에 붙은 뒤 연다(bookMake appendChild → openExec · index.html 액자)
     addEventListener(k, f) { (L[k] = L[k] || []).push(f); },
     get src() { return this._src || ''; },
     set src(v) { this._src = v; nav.push(['src', v, !!this.credentialless]); doc.blank = true; } };
@@ -97,10 +97,10 @@ const GRACE = () => { const m = /CL_GRACE = (\d+)/.exec(FRAME_JS); assert.ok(m, 
 
 console.log('[여러 계정 우회 — 판별 · 다시 열기 · 기억]');
 
-t('openExec 가 나와 있다 · 처음 열 땐 src 대입(보통) — 기억이 없으면 credentialless 를 안 켠다 · 손잡이(stop·stuck)를 돌려준다', () => {
+t('openExec 가 나와 있다 · 처음 열 땐 location.replace(보통 · 붙은 빈 액자에 src 를 넣으면 WebKit 이 기록 칸을 쌓는다 — 2026-10-23) — 기억이 없으면 credentialless 를 안 켠다 · 손잡이(stop·stuck)를 돌려준다', () => {
   const s = open();
   assert.strictEqual(typeof s.g.ONF.frame.openExec, 'function');
-  assert.deepStrictEqual(s.el.nav, [['src', SRC, false]], '⛔ 처음 열기가 src 대입·보통이 아니다');
+  assert.deepStrictEqual(s.el.nav, [['replace', SRC, false]], '⛔ 처음 열기가 replace·보통이 아니다(src 대입 = 아이폰에서 판 칸 위에 기록 칸 — 뒤로가 판을 안 닫는다)');
   assert.ok(s.h && typeof s.h.stop === 'function' && s.h.stuck() === false, '⛔ 손잡이가 없다(판이 지울 때 노크 듣기를 못 걷는다 · 못 연 판을 못 가린다)');
 });
 
@@ -137,14 +137,14 @@ t('④ 🟠 「두 번 걸리면」 기억 — 홈이 한 번 막혀 우회로 �
   assert.ok(!('onfCl' in s.ls), '⛔ 한 번 걸린 것으로 7일 credentialless 를 기억했다(계정 하나 학생도 구글 일시 오류 한 번이면 — R1)');
   assert.strictEqual(Number(s.ls.onfClTry), s.now.v, '⛔ 한 번 걸린 것을 안 적었다');
   const s2 = open({ ls: s.ls, now: s.now.v + 60000 });
-  assert.deepStrictEqual(s2.el.nav, [['src', SRC, false]], '⛔ 한 번 걸린 기기를 처음부터 credentialless 로 열었다');
+  assert.deepStrictEqual(s2.el.nav, [['replace', SRC, false]], '⛔ 한 번 걸린 기기를 처음부터 credentialless 로 열었다');
   bypass(s2);
   assert.strictEqual(Number(s2.ls.onfCl), s2.now.v, '⛔ 두 번째 열기도 막혔는데 기억을 안 했다(여러 계정 크롬은 매번 오류 화면을 거친다)');
   assert.ok(!('onfClTry' in s2.ls), '⛔ 기억한 뒤 「한 번 걸림」 표시를 안 지웠다');
   const s3 = open({ ls: s2.ls, now: s2.now.v + 60000 });
-  assert.deepStrictEqual(s3.el.nav, [['src', SRC, true]], '⛔ 기억한 기기인데 처음부터 credentialless 가 아니다');
+  assert.deepStrictEqual(s3.el.nav, [['replace', SRC, true]], '⛔ 기억한 기기인데 처음부터 credentialless 가 아니다');
   const s4 = open({ ls: s2.ls, now: s2.now.v + 7 * DAY + 1 });
-  assert.deepStrictEqual(s4.el.nav, [['src', SRC, false]], '⛔ 기억이 7일 넘었는데 credentialless 로 열었다');
+  assert.deepStrictEqual(s4.el.nav, [['replace', SRC, false]], '⛔ 기억이 7일 넘었는데 credentialless 로 열었다');
 });
 
 t('④-b 「두 번」은 잇달아야 — 한 번 걸린 뒤 보통으로 뜨면 표시를 지운다 · 7일 지난 표시는 처음으로 친다', () => {
@@ -164,14 +164,14 @@ t('④-c 🟠 판(숨긴 미리 판 포함)은 기억을 **안 정한다**(R3 �
   assert.ok(!('onfCl' in s.ls) && !('onfClTry' in s.ls), '⛔ 판이 기억을 썼다(숨긴 판 하나의 오류로 기기 전체 7일 — R3)');
   const el2 = mkFrame(s);
   s.g.ONF.frame.openExec(el2, SRC, null, null, false);
-  assert.deepStrictEqual(el2.nav, [['src', SRC, true]], '⛔ 판이 우회로 뜬 페이지에서 다음 판을 또 보통부터 열었다(선생님 판마다 오류 화면 + 1.5초 — T2)');
+  assert.deepStrictEqual(el2.nav, [['replace', SRC, true]], '⛔ 판이 우회로 뜬 페이지에서 다음 판을 또 보통부터 열었다(선생님 판마다 오류 화면 + 1.5초 — T2)');
   assert.ok(!('onfCl' in s.ls) && !('onfClTry' in s.ls), '⛔ 페이지 안 기억을 기기에 적었다');
   //   그 판이 credentialless 로 안 되면 페이지 기억도 버린다(다음 판은 보통부터)
   el2.load(0); s.tick(GRACE());
   assert.deepStrictEqual(el2.nav[1], ['replace', SRC, false], '⛔ 페이지 기억으로 연 판이 안 됐는데 보통으로 안 갔다');
   const el3 = mkFrame(s);
   s.g.ONF.frame.openExec(el3, SRC, null, null, false);
-  assert.deepStrictEqual(el3.nav, [['src', SRC, false]], '⛔ 안 되는 페이지 기억을 안 버렸다');
+  assert.deepStrictEqual(el3.nav, [['replace', SRC, false]], '⛔ 안 되는 페이지 기억을 안 버렸다');
 });
 
 t('④-d 같은 페이지 — 홈이 우회로 떴으면(첫 방문 · 아직 기억 전) 뒤에 여는 판은 처음부터 credentialless(판마다 오류 화면 + 여유를 안 거친다) · 저장은 안 한다', () => {
@@ -179,14 +179,14 @@ t('④-d 같은 페이지 — 홈이 우회로 떴으면(첫 방문 · 아직 �
   bypass(s);
   const el2 = mkFrame(s);
   s.g.ONF.frame.openExec(el2, SRC, null, null, false);
-  assert.deepStrictEqual(el2.nav, [['src', SRC, true]], '⛔ 홈이 막혔던 페이지에서 판을 또 보통부터 열었다(판마다 1.5초+)');
+  assert.deepStrictEqual(el2.nav, [['replace', SRC, true]], '⛔ 홈이 막혔던 페이지에서 판을 또 보통부터 열었다(판마다 1.5초+)');
   assert.ok(!('onfCl' in s.ls), '⛔ 페이지 안 기억을 기기에 적었다');
 });
 
 t('④-2 기억으로 처음부터 연 credentialless 가 되면 기억 시각을 **안 늘린다**(7일마다 한 번 보통으로 다시 재 본다)', () => {
   const t0 = 1760000000000 - 3 * DAY;
   const s = open({ ls: { onfCl: String(t0) } });
-  assert.deepStrictEqual(s.el.nav, [['src', SRC, true]]);
+  assert.deepStrictEqual(s.el.nav, [['replace', SRC, true]]);
   s.el.up();
   assert.strictEqual(Number(s.ls.onfCl), t0, '⛔ 기억으로 연 것에 기억을 덧씌웠다 — 영영 보통으로 안 돌아간다');
   assert.ok(!('onfClTry' in s.ls), '⛔ 기억으로 연 것을 「한 번 걸림」으로 셌다(보통이 막힌 적이 없다)');
@@ -302,6 +302,19 @@ t('저장소가 막힌 창(사생활 보호 · localStorage 없음)에서도 죽
   s.el.up();
 });
 
+t('📱 처음 열기 — 붙은 액자는 replace(기록 칸 0) · 아직 안 붙은 액자는 src(첫 로드라 칸이 안 생긴다) · credentialless 는 이동 전에 (Peter 2026-10-23 아이폰 「뒤로가 홈으로 안 감 · ✕ 뒤 흰 화면」)', () => {
+  /* 라이브 Playwright WebKit(iPhone 13): 판을 누르는 순간 판 칸(pushState) · 판 액자 exec 는 ≈4초 뒤 커밋 — src 대입이면 그 커밋이 기록 칸 하나(history.length 3 → 4~5) 를 판 칸 위에 쌓아
+     뒤로 = 판 액자만 빈 문서로 되감김(popstate 없음) · ✕ 의 go(-bd) 도 그 칸으로. replace 면 3 그대로 · 뒤로 = 판 숨김 · ✕ = 홈(실측). */
+  const s = env({ ls: { onfCl: String(1760000000000 - DAY) } });
+  const a = mkFrame(s);
+  s.g.ONF.frame.openExec(a, SRC, null, null, false);
+  assert.deepStrictEqual(a.nav, [['replace', SRC, true]], '⛔ 붙은 액자를 replace 로 안 열었다(또는 credentialless 를 이동 뒤에 켰다)');
+  assert.strictEqual(a.src, '', '⛔ replace 에 더해 src 도 넣었다 — 그 자체가 또 이동(기록 칸)이다');
+  const b = mkFrame(s); b.isConnected = false;
+  s.g.ONF.frame.openExec(b, SRC, null, null, false);
+  assert.deepStrictEqual(b.nav, [['src', SRC, true]], '⛔ 안 붙은 액자는 replace 할 창이 없다 — src 로 열어야 한다');
+});
+
 t('location.replace 를 못 부르면(던짐) src 대입으로라도 연다', () => {
   const s = open();
   s.el.contentWindow.location.replace = () => { throw new Error('x'); };
@@ -406,7 +419,7 @@ t('R5 숨긴 판(park=1 · 판 = 기억 안 정함) — 앱 없는 래퍼면 그
   const el = mkFrame(s), P = SRC + '&park=1';
   s.g.ONF.frame.openExec(el, P, null, () => {}, false);
   el.load(1, false, ERR); s.tick(APP());
-  assert.deepStrictEqual(el.nav, [['src', P, false], ['replace', P, false]], '⛔ 숨긴 판을 다른 주소(park 빠짐)로 다시 열었거나 안 열었다');
+  assert.deepStrictEqual(el.nav, [['replace', P, false], ['replace', P, false]], '⛔ 숨긴 판을 다른 주소(park 빠짐)로 다시 열었거나 안 열었다');
   el.load(1, false, ERR); s.tick(10 * APP());
   assert.strictEqual(el.nav.length, 2, '⛔ 숨긴 판을 두 번 넘게 열었다(미리 띄우기 몫)');
   assert.ok(!('onfCl' in s.ls) && !('onfClTry' in s.ls));
@@ -468,7 +481,7 @@ t('⑧ 학생 홈 액자(mount) — 기억한 기기면 홈 액자도 처음부�
   s.g.history = { state: null, replaceState() {}, pushState() {} };
   s.g.document.documentElement = { classList: { toggle() {} } };
   s.g.ONF.frame.mount(el, SRC, { wait: mkEl('div') });
-  assert.deepStrictEqual(el.nav, [['src', SRC, true]], '⛔ 홈 액자가 우회 길을 안 탄다');
+  assert.deepStrictEqual(el.nav, [['replace', SRC, true]], '⛔ 홈 액자가 우회 길을 안 탄다');
   assert.ok(/openExec\(frameEl, src, opts\.wait \|\| null, null, true(, opts\.hooks \|\| null)?\)/.test(FRAME_JS), '⛔ 홈 액자가 기억을 정하는 자리(keep)가 아니다');
   const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   assert.ok(/wait: document\.querySelector\('\.onf-wait'\)/.test(idx), '⛔ index.html 이 안내 자리(.onf-wait)를 안 넘긴다 — 못 열면 구글 오류 화면 그대로');
@@ -487,7 +500,7 @@ t('⑧-3 선생님 판(teacher bookMake)은 우회 길 · 선생님 **홈** 액�
   assert.ok(/p\.oe = ONF\.frame\.openExec\(p\.el, u, wait, bookClose\);/.test(mk), '⛔ 선생님 판이 우회 길을 안 탄다(선생님은 회사+개인 계정을 같이 쓰는 일이 흔하다)');
   assert.ok(/<script src="\.\.\/assets\/onf-frame\.js"><\/script>/.test(th), '⛔ 선생님 껍데기가 onf-frame.js 를 안 싣는다');
   const mount = th.slice(th.indexOf('function mount()'), th.indexOf('var frameWatch = null;'));
-  assert.ok(/frame\.src = EXEC/.test(mount) && !/openExec|credentialless/.test(mount), '⛔ 선생님 홈 액자를 우회 길로 연다 — credentialless 면 구글 로그인 쿠키가 없어 회사 계정 문에서 잘린다');
+  assert.ok(/frame\.contentWindow\.location\.replace\(appSrc\)/.test(mount) && !/openExec|credentialless/.test(mount), '⛔ 선생님 홈 액자를 우회 길로 연다 — credentialless 면 구글 로그인 쿠키가 없어 회사 계정 문에서 잘린다');
 });
 
 /* 🟠 첫 화면 로고 로딩(assets/onf-load.js · 2026-10-22) — 홈 액자는 「산 화면」·「못 엶」을 알린다. 알림이 틀리면 막이 화면을 30초 가리거나(ok 누락) 안내를 덮는다(stuck 누락). */

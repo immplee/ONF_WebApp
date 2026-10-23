@@ -231,6 +231,12 @@
       }, CL_GRACE);
     });
     if (can) el.credentialless = cl;
+    /* 📱 처음 열기도 replace(2026-10-23 Peter 아이폰 「교재 판에서 뒤로가 홈으로 안 가고 · 그 뒤 ✕ 면 흰 화면 userCodeAppPanel」) —
+       이미 문서에 붙은 액자(빈 about:blank)에 `src` 를 넣으면 WebKit(아이폰·아이패드 모든 브라우저)은 그 이동을 **기록 칸 하나로** 쌓는다
+       (크롬은 「처음 빈 문서 → replace」라 안 쌓는다). 폰 판은 누르는 순간 판 칸(histBook · pushState)을 넣고 판 액자는 ≈4초 뒤 커밋하니
+       그 칸이 **우리 판 칸 위**에 앉는다 → 뒤로 = 판 액자만 빈 문서로 되감김(판 그대로) · ✕ 의 go(-bd) 도 그 칸으로 → 아이폰 크롬은 최상위가 구글 샌드박스 주소로 바뀌어 흰 화면.
+       Playwright WebKit(iPhone 13) 라이브 실측: 누른 뒤 history.length 3 이어야 할 것이 5 · 뒤로 = popstate 없음. replace 는 칸을 안 만든다(위 go() 와 같은 이유). */
+    try { if (el.isConnected && el.contentWindow) { el.contentWindow.location.replace(src); return { stop: end, stuck: function () { return stuck; } }; } } catch (e) {}
     el.src = src;
     return { stop: end, stuck: function () { return stuck; } };
   }
