@@ -477,11 +477,11 @@ function hwOpen(t, l, f, hwt) {
   hwBox.style.cssText = 'position:fixed;inset:0;z-index:50;background:var(--bg,#1d1712)';
   hwFr = document.createElement('iframe');
   hwFr.setAttribute('allow', 'clipboard-write; microphone');
-  hwFr.setAttribute('title', '과제 판');
+  hwFr.setAttribute('title', '과제');
   hwFr.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent';
   var wait = document.createElement('div');
   wait.className = 'onf-wait';
-  wait.innerHTML = '<div class="onf-spin"></div><span>과제 판을 여는 중</span>';
+  wait.innerHTML = '<div class="onf-spin"></div><span>과제를 여는 중</span>';
   var x = document.createElement('button');   // 과제 판이 뜨기 전(구글 오류 화면 · 노크 없음)에도 닫을 수 있게 — 노크가 오면 숨긴다(판에 ‹ 가 있다)
   x.type = 'button'; x.className = 'onf-hwx'; x.setAttribute('aria-label', '닫기'); x.textContent = '✕';
   x.style.cssText = 'position:absolute;top:12px;left:12px;z-index:2;width:40px;height:40px;border-radius:12px;border:0;font-size:18px;cursor:pointer;background:rgba(0,0,0,.35);color:#fff';
