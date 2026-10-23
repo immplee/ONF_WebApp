@@ -373,9 +373,7 @@ function fromOurFrame(win) {
 function answer() {
   if (!pending || !appWin) return;
   /* `hist:1` = 「기록 칸은 내가 만들어 줄게」 — 아래 onf-hist 블록이 받는 쪽이다. 껍데기가 최상위일 때만 1(남의 액자 안이면 블록이 안 돈다). */
-  var m = { onf: 'auth', token: pending, hist: (window.top === window.self) ? 1 : 0 }, hw = typeof hwHand === 'function' ? hwHand() : null;
-  if (hw) m.hw = hw;   // 📝 과제 판 — 모아 보기 창이 맡긴 고른 사진·입장권(onf-hwbook 블록)
-  try { appWin.postMessage(m, appOrigin); } catch (e) {}
+  try { appWin.postMessage({ onf: 'auth', token: pending, hist: (window.top === window.self) ? 1 : 0 }, appOrigin); } catch (e) {}
 }
 
 window.addEventListener('message', function (ev) {
@@ -450,40 +448,79 @@ window.addEventListener('message', function (ev) {
    ⛔ 받는 말은 우리가 정한 그 안쪽 창·출처(appWin·appOrigin)에서 온 것뿐(기기 열쇠와 같은 자물쇠) · 값은 모양만(t = 학생 토큰 · l = 노션 행 id) — 진짜 문은 서버 RPC.
    이 창이 제 주소를 바꾸는 것이라(위에서 내려온 이동이 아니다) 사람 누름이 없어도 된다(묶음 짓기 RPC 를 기다린 뒤 온다). */
 /* onf-hwbook:begin */
-window.addEventListener('message', function (ev) {
-  var d = ev && ev.data;
-  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack')) return;
-  if (!appWin || ev.source !== appWin || ev.origin !== appOrigin) return;
-  if (d.onf === 'hwbookBack') {   // ⛔ 뒤로는 우리가 홈에서 옮겨 왔을 때만(표시) — 붙여 연 주소면 뒤로가 남의 사이트일 수 있다(반박 🟡8)
-    var came = false; try { came = sessionStorage.getItem('onfHwFrom') === '1'; sessionStorage.removeItem('onfHwFrom'); } catch (eS) {}
-    if (came && /[?&]mode=hwbook(&|$)/.test(location.search)) history.back(); else location.href = location.pathname;
-    return;
+/* ⛔ 껍데기 주소를 바꾸지 않는다(Peter 2026-10-23 「수업 열기를 누르니 처음 로그인처럼 구글 창이 뜬다」) — 아이폰·아이패드·사파리(WebKit)는 껍데기를 새로 읽을 때마다
+   구글 창구부터(devkeyOff · 2026-10-12) → 종전 location.href 이동은 [수업 시작]마다 로그인을 다시 물었다. 이제 **껍데기 위에 과제 판 액자를 하나 더** 띄운다:
+   새로 읽기 0 · 홈 액자는 뒤에 그대로(닫으면 0초) · 뒤로 = 액자 닫기(기록 칸 하나 · 아래 onf-hist 블록은 이 칸을 홈 것으로 안 친다 hwSkipPop).
+   과제 판의 노크는 그 액자 후손 + googleusercontent 만 · 답 = 지금 토큰(+ 창이 맡긴 고른 사진·입장권 hw · 한 번만 · 메모리에만 — 주소·저장소엔 안 남는다).
+   ponytail: 과제 판이 「토큰 만료(stale)」 로 다시 물으면 지금 토큰을 다시 줄 뿐(구글 다시 받기는 홈 노크 길만) — 판을 닫고 다시 열면 홈이 새 토큰을 받아 온다. */
+var hwBox = null, hwFr = null, hwWin = null, hwOrigin = '', hwGo = null, hwSkip = false;
+function hwFrom(win) {
+  var w = win, target = hwFr && hwFr.contentWindow;
+  if (!w || !target) return false;
+  for (var i = 0; i < 8 && w; i++) {
+    if (w === target) return true;
+    try { w = (w.parent && w.parent !== w) ? w.parent : null; } catch (e) { return false; }
   }
-  var t = String(d.t || ''), l = String(d.l || '');
-  if (!/^[A-Za-z0-9_-]{1,40}$/.test(t)) return;
-  hwKeep(t, l, d.f, d.hwt);
-  var u = location.pathname + '?mode=hwbook&t=' + encodeURIComponent(t);
-  if (/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(l)) u += '&l=' + encodeURIComponent(l);
-  try { sessionStorage.setItem('onfHwFrom', '1'); } catch (eS) {}
-  location.href = u;
-});
-/* 고른 사진·입장권 맡기기(Peter 2026-10-23 「목록·열기 빠르게」) — 창이 서버 열기를 안 부르고 바로 넘어온다 · 과제 판이 노크하면 토큰과 같이 준다(answer).
-   ⛔ 주소에 싣지 않는다(입장권이 방문 기록에 남는다) · 이 탭 sessionStorage · 같은 학생(t)·수업(l)일 때만 · 10분.
-   값은 모양만 거른다(사진 id · 날짜 · 입장권 길이) — 진짜 확인은 서버(고른 사진은 그 학생 폴더에 있는 것만 · 입장권은 서명). */
-function hwKeep(t, l, f, hwt) {
+  return false;
+}
+function hwOpen(t, l, f, hwt) {
+  hwClose();
   var files = Array.isArray(f) ? f.filter(function (x) { return x && /^[A-Za-z0-9_-]{10,200}$/.test(String(x.id || '')) && /^\d{4}-\d{2}-\d{2}$/.test(String(x.ymd || '')); })
     .slice(0, 80).map(function (x) { return { id: String(x.id), ymd: String(x.ymd) }; }) : null;
   var tk = hwt && typeof hwt.p === 'string' && hwt.p.length <= 12000 && /^[A-Za-z0-9_-]{43}$/.test(String(hwt.sig || '')) ? { p: hwt.p, sig: String(hwt.sig) } : null;
-  try { sessionStorage.setItem('onfHwGo', JSON.stringify({ t: t, l: l, f: files, hwt: tk, at: Date.now() })); } catch (eS) {}
+  hwGo = { f: files, hwt: tk };
+  hwBox = document.createElement('div');
+  hwBox.className = 'onf-hwbox';
+  hwBox.style.cssText = 'position:fixed;inset:0;z-index:2147480000;background:var(--bg,#1d1712)';
+  hwFr = document.createElement('iframe');
+  hwFr.setAttribute('allow', 'clipboard-write; microphone');
+  hwFr.setAttribute('title', '과제 판');
+  hwFr.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent';
+  var wait = document.createElement('div');
+  wait.className = 'onf-wait';
+  wait.innerHTML = '<div class="onf-spin"></div><span>과제 판을 여는 중</span>';
+  hwBox.appendChild(wait); hwBox.appendChild(hwFr);
+  document.body.appendChild(hwBox);
+  hwFr.src = EXEC + '?mode=hwbook&t=' + encodeURIComponent(t) + (l ? '&l=' + encodeURIComponent(l) : '');
+  try { history.pushState({ onfHw: 1, n: (typeof histDepth === 'number' ? histDepth : 0) }, ''); } catch (e) {}
 }
-function hwHand() {
-  var q; try { q = new URLSearchParams(location.search); } catch (e) { return null; }
-  if (q.get('mode') !== 'hwbook') return null;
-  var g = null; try { g = JSON.parse(sessionStorage.getItem('onfHwGo') || 'null'); } catch (e) {}
-  if (!g || g.t !== (q.get('t') || '') || g.l !== (q.get('l') || '') || !(Date.now() - g.at < 600000)) return null;
-  try { sessionStorage.removeItem('onfHwGo'); } catch (e) {}   // 한 번만 준다 — 입장권을 탭에 남겨 두지 않는다(반박 🟡6 · 새로 고침이면 과제 판이 「다시 골라 주세요」)
-  return { f: g.f, hwt: g.hwt };
+function hwClose() {
+  if (hwBox && hwBox.parentNode) hwBox.parentNode.removeChild(hwBox);
+  hwBox = null; hwFr = null; hwWin = null; hwOrigin = ''; hwGo = null;
 }
+/* onf-hist 블록 popstate 가 묻는다 — 과제 판 칸이 맨 위거나 방금 그 칸을 걷었으면 홈에 「뒤로」를 안 보낸다(홈은 안 바뀌었다) */
+function hwSkipPop() { var k = hwSkip || !!(history.state && history.state.onfHw); hwSkip = false; return k; }
+window.addEventListener('popstate', function () {
+  if (hwBox && !(history.state && history.state.onfHw)) { hwClose(); hwSkip = true; }   // 뒤로·스와이프 = 과제 판 닫기
+});
+window.addEventListener('message', function (ev) {
+  var d = ev && ev.data;
+  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'auth-please' && d.onf !== 'themeAsk')) return;
+  if (hwFr && hwFrom(ev.source)) {   // 과제 판 액자에서 온 말
+    try { if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return; } catch (e) { return; }
+    if (hwWin && ev.source !== hwWin) return;   // 한 번 정하면 그 창만(노크 자물쇠와 같다)
+    hwWin = ev.source; hwOrigin = ev.origin;
+    if (d.onf === 'auth-please') {
+      var w = hwBox && hwBox.querySelector('.onf-wait'); if (w) w.hidden = true;
+      if (!pending) return;
+      var m = { onf: 'auth', token: pending, hist: 0 };
+      if (hwGo) { m.hw = hwGo; hwGo = null; }   // 고른 사진·입장권은 한 번만
+      try { hwWin.postMessage(m, hwOrigin); } catch (e) {}
+      return;
+    }
+    if (d.onf === 'themeAsk') { themeAsk(ev); return; }
+    if (d.onf === 'hwbookBack') { if (history.state && history.state.onfHw) history.back(); else hwClose(); }
+    return;
+  }
+  if (d.onf !== 'hwbook' && d.onf !== 'hwbookBack') return;
+  if (!appWin || ev.source !== appWin || ev.origin !== appOrigin) return;   // 홈(우리가 정한 안쪽 창)에서 온 말만
+  if (d.onf === 'hwbookBack') { location.href = location.pathname; return; }   // 주소로 연 과제 판(mode=hwbook) 의 ‹ = 홈으로
+  var t = String(d.t || ''), l = String(d.l || '');
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(t)) return;
+  if (!/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(l)) l = '';
+  hwOpen(t, l, d.f, d.hwt);
+  try { appWin.postMessage({ onf: 'hwOpened' }, appOrigin); } catch (e) {}   // 홈 창은 이 말을 받고 모아 보기 창을 닫는다
+});
 /* onf-hwbook:end */
 
 /* ═══ 📖 선생님 홈 옆 판(2026-10-12 Peter 「선생님 홈에서 교재를 열면 왜 새 창으로? 학생 홈처럼 창으로 열리고 전체 화면으로」) ═══
@@ -926,6 +963,7 @@ window.addEventListener('message', function (ev) {
 window.addEventListener('popstate', function () {
   var s = history.state, h = (s && s.onfHist) ? s : null;
   histDepth = (h || bookOwner(s)) ? Math.max(0, Number(s.n) || 0) : 0;   // 📱 판 칸의 n = 그 아래 홈 칸 수
+  if (typeof hwSkipPop === 'function' && hwSkipPop()) { histDepth = s && s.onfHw ? Math.max(0, Number(s.n) || 0) : histDepth; return; }   // 📝 과제 판 칸(onf-hwbook) — 홈은 안 바뀌었다
   if (!appWin || bookOwner(s)) return;    // 📱 판 칸이 맨 위면 홈은 안 바뀌었다(판 칸은 늘 홈 칸 위에 쌓인다 · 판 숨김·보임은 onf-book 블록 bookPop)
   try { appWin.postMessage({ onf: 'hist-pop', id: h ? h.onfHist : '', s: h ? (h.s || null) : null }, appOrigin); } catch (e) {}   // '*' 금지
 });

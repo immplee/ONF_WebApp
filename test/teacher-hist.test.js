@@ -28,7 +28,7 @@ t('표지 구간이 있고, 껍데기가 **최상위일 때만** 도는 자리�
   assert.ok(/\/\* onf-hist:end \*\/\s*\}/.test(src.slice(B)), '표지 끝 뒤가 그 문의 닫는 괄호가 아니다');
 });
 t('⛔ 안쪽에 토큰을 줄 때 hist 를 싣되, 껍데기가 최상위일 때만 1 이다 · targetOrigin 은 appOrigin (\'*\' 금지)', () => {
-  assert.ok(/var m = \{ onf: 'auth', token: pending, hist: \(window\.top === window\.self\) \? 1 : 0 \}, hw = [^\n]*\n[^\n]*\n\s*try \{ appWin\.postMessage\(m, appOrigin\); \}/.test(src))   // 📝 과제 판 맡김(hw)을 같은 말에 얹는다 — targetOrigin 은 그대로 appOrigin;
+  assert.ok(/postMessage\(\{ onf: 'auth', token: pending, hist: \(window\.top === window\.self\) \? 1 : 0 \}, appOrigin\)/.test(src));
   const blk = src.slice(A, B);
   assert.ok(!/postMessage\([^)]*'\*'/.test(blk), "⛔ 블록에 '*' 발신이 있다");
   assert.ok(/postMessage\(\{ onf: 'hist-pop'[^\n]*\}, appOrigin\)/.test(blk), '⛔ hist-pop 은 appOrigin 으로만 보낸다');

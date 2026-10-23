@@ -29,21 +29,21 @@ const DAY = 86400000;
 /* 껍데기 본 스크립트를 통째로 돌린다 — 시계는 손으로 돌린다(advance) · 액자 load·안쪽 노크는 손으로 쏜다. */
 function boot(store, opt) {
   opt = opt || {};
-  const calls = [], handlers = {}, els = {}, timers = new Map();
+  const calls = [], handlers = {}, els = {}, timers = new Map(), created = [];
   const spin = { gone: false, parentNode: { removeChild() { spin.gone = true; } } };   // #wait .onf-spin — 걷히면 gone
   let clock = 0, tid = 0;
   const el = (id) => els[id] || (els[id] = { id, hidden: id === 'app' || id === 'wait', style: {}, classList: { add() {}, remove() {}, toggle() {} },
-    contentWindow: id === 'app' ? { name: 'appwin', postMessage() {} } : null, appendChild() {}, setAttribute() {}, parentNode: null, textContent: '', innerHTML: '',
+    contentWindow: id === 'app' ? { name: 'appwin', postMessage() {} } : null, appendChild() {}, setAttribute() {}, parentNode: null, textContent: '', innerHTML: '', querySelector: () => null,
     _on: {}, addEventListener(tp, f) { (this._on[tp] = this._on[tp] || []).push(f); } });
   const ls = store || {};
   const g = {
     navigator: CHROME, console: { warn() {}, log() {}, info() {} }, atob: (b) => Buffer.from(b, 'base64').toString('binary'),
     URL, URLSearchParams, Date, JSON, Math,
     localStorage: { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { if (opt.full) throw new Error('QuotaExceededError'); ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } },
-    document: { getElementById: el, querySelector: (q) => (q === '#wait .onf-spin' && !spin.gone ? spin : null), createElement: () => el('x' + Math.random()), body: { appendChild() {} },
+    document: { getElementById: el, querySelector: (q) => (q === '#wait .onf-spin' && !spin.gone ? spin : null), createElement: (tag) => { const e = el('x' + Math.random()); e.tag = tag; if (tag === 'iframe') e.contentWindow = { name: 'hwwin', postMessage() {} }; created.push(e); return e; }, body: { appendChild(e) { e.parentNode = { removeChild() { e.removed = true; } }; } },
       documentElement: { setAttribute() {}, getAttribute() {} } },
     location: { search: opt.search || '', pathname: '/teacher/', href: 'https://class.ownify.co.kr/teacher', reload() { calls.push('reload'); } },
-    history: { state: null, length: 2, replaceState() {}, pushState() {}, go() {}, back() { calls.push('back'); } },
+    history: { state: null, length: 2, replaceState() {}, pushState(st) { calls.push('push:' + JSON.stringify(st)); g.history.state = st; }, go() {}, back() { calls.push('back'); } },
     sessionStorage: (() => { const m = {}; return { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } }; })(),
     addEventListener: (type, fn) => { (handlers[type] = handlers[type] || []).push(fn); },
     removeEventListener: (type, fn) => { handlers[type] = (handlers[type] || []).filter((f) => f !== fn); },
@@ -55,7 +55,7 @@ function boot(store, opt) {
   vm.createContext(g); vm.runInContext(main, g);
   const app = els.app;
   const R = {
-    g, ls, els, calls,
+    g, ls, els, calls, created, pop() { (handlers.popstate || []).slice().forEach((h) => h({})); },
     reloads: () => calls.filter((x) => x === 'reload').length,
     advance(ms) {                                                       // 시계를 ms 만큼 — 그 사이 때가 된 타이머를 차례로
       const end = clock + ms;
@@ -347,55 +347,47 @@ t('📝 주소의 mode — student·hwbook(과제 판 2026-10-23)만 안쪽으�
   assert.ok(!/t=/.test(src('?mode=hwbook&t=bad%20tok')), '⛔ 모양이 틀린 t 를 넘겼다');
 });
 
-t('📝 과제 판 — 「열어 줘(hwbook)」 = 우리 안쪽 창에서 온 것만 · 모양 거름 · l 은 hwbook 일 때만 안쪽으로 · 「홈으로(hwbookBack)」', () => {
-  const L = '402d6a62-96ae-817f-86ec-ecaf4f919ab9';
-  assert.ok(/[?&]l=402d6a62/.test(String(boot({ onf_id_tok: odk() }, { search: '?mode=hwbook&t=Tok_1&l=' + L }).els.app.src || '')), '⛔ l 이 안쪽에 안 간다');
+t('📝 과제 판 — 「열어 줘(hwbook)」 = 껍데기 주소를 안 바꾸고(새로 읽기 0 = 로그인 다시 안 물음) 위에 과제 판 액자 · 홈(우리 안쪽 창)에서 온 것만 · 모양 거름 · 홈에 hwOpened', () => {
+  const L = '402d6a62-96ae-817f-86ec-ecaf4f919ab9', HREF = 'https://class.ownify.co.kr/teacher';
+  assert.ok(/[?&]l=402d6a62/.test(String(boot({ onf_id_tok: odk() }, { search: '?mode=hwbook&t=Tok_1&l=' + L }).els.app.src || '')), '⛔ 주소로 연 과제 판 — l 이 안쪽에 안 간다');
   assert.ok(!/[?&]l=/.test(String(boot({ onf_id_tok: odk() }, { search: '?mode=student&t=Tok_1&l=' + L }).els.app.src || '')), '⛔ 학생 창에 l 을 흘렸다');
-  assert.ok(!/[?&]l=/.test(String(boot({ onf_id_tok: odk() }, { search: '?mode=hwbook&t=Tok_1&l=evil' }).els.app.src || '')), '⛔ 모양이 틀린 l 을 넘겼다');
-  const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} }, other = { parent: R.els.app.contentWindow, postMessage() {} };
+  const R = boot({ onf_id_tok: odk() }), told = [], me = { parent: R.els.app.contentWindow, postMessage: (m) => told.push(m) }, other = { parent: R.els.app.contentWindow, postMessage() {} };
   R.knockAs(me);
+  const frames = () => R.created.filter((e) => e.tag === 'iframe');
   R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L }, other);
-  assert.strictEqual(R.g.location.href, 'https://class.ownify.co.kr/teacher', '⛔ 노크한 창이 아닌 창의 말로 옮겼다');
   R.postAs({ onf: 'hwbook', t: 'Tok 1', l: L }, me);
-  assert.strictEqual(R.g.location.href, 'https://class.ownify.co.kr/teacher', '⛔ 모양이 틀린 t 로 옮겼다');
   R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L }, me, 'https://evil.example');
-  assert.strictEqual(R.g.location.href, 'https://class.ownify.co.kr/teacher', '⛔ 다른 출처의 말로 옮겼다');
-  R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L }, me);
-  assert.strictEqual(R.g.location.href, '/teacher/?mode=hwbook&t=Tok_1&l=' + L, '⛔ 과제 판으로 안 옮겼다');
-  R.postAs({ onf: 'hwbookBack' }, me);
-  assert.strictEqual(R.g.location.href, '/teacher/', '홈으로(과제 판 주소가 아니면 홈 주소로)');
-  // 홈에서 옮겨 온 과제 판(표시 있음) → 뒤로 · 붙여 연 과제 판(표시 없음) → 홈 주소로(뒤로가 남의 사이트일 수 있다)
-  const H = boot({ onf_id_tok: odk() }, { search: '?mode=hwbook&t=Tok_1' }), hw = { parent: H.els.app.contentWindow, postMessage() {} };
-  H.knockAs(hw);
-  H.postAs({ onf: 'hwbookBack' }, hw);
-  assert.ok(!H.calls.includes('back') && H.g.location.href === '/teacher/', '⛔ 표시 없이 뒤로 갔다(붙여 연 주소)');
-  const H2 = boot({ onf_id_tok: odk() }, { search: '?mode=hwbook&t=Tok_1' }), hw2 = { parent: H2.els.app.contentWindow, postMessage() {} };
-  H2.g.sessionStorage.setItem('onfHwFrom', '1'); H2.knockAs(hw2);
-  H2.postAs({ onf: 'hwbookBack' }, hw2);
-  assert.ok(H2.calls.includes('back') && H2.g.sessionStorage.getItem('onfHwFrom') === null, '⛔ 홈에서 온 과제 판인데 뒤로 안 갔다 / 표시를 안 지웠다');
-  assert.strictEqual(R.g.sessionStorage.getItem('onfHwFrom'), null, '돌아간 뒤 표시는 지운다');
+  assert.equal(frames().length, 0, '⛔ 노크한 창이 아닌 창·틀린 모양·다른 출처의 말로 열었다');
+  R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L, f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }, { id: 'bad id', ymd: '2026-10-20' }], hwt: { p: '{"s":"Tok_1"}', sig: 'A'.repeat(43) } }, me);
+  assert.equal(R.g.location.href, HREF, '⛔ 껍데기 주소를 바꿨다(새로 읽기 = WebKit 로그인 다시)');
+  assert.equal(frames().length, 1);
+  assert.equal(frames()[0].src, R.g.EXEC + '?mode=hwbook&t=Tok_1&l=' + L, '⛔ 과제 판 액자 주소');
+  assert.ok(R.calls.some((c) => /^push:\{"onfHw":1/.test(c)), '⛔ 뒤로 = 닫기 칸이 없다');
+  assert.ok(told.some((m) => m.onf === 'hwOpened'), '⛔ 홈에 hwOpened');
+  assert.ok(!JSON.stringify(R.calls).includes('PHOTO') && R.g.sessionStorage.getItem('onfHwGo') === null, '⛔ 고른 사진을 주소·저장소에 남겼다');
 });
-
-t('📝 과제 판 — 고른 사진·입장권 맡기기(모양 거름 · 주소엔 안 실음) → 그 과제 판이 노크하면 토큰과 같이 · 다른 학생·수업·10분 지나면 안 줌', () => {
+t('📝 과제 판 액자 — 노크엔 지금 토큰 + 고른 사진·입장권(한 번만) · 그 액자 후손·googleusercontent 만 · 홈 노크 자물쇠(appWin)는 안 건드림 · ‹ 와 뒤로 = 닫기(홈엔 뒤로 안 보냄)', () => {
   const L = '402d6a62-96ae-817f-86ec-ecaf4f919ab9', HWT = { p: '{"s":"Tok_1"}', sig: 'A'.repeat(43) };
-  const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
-  R.knockAs(me);
-  R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L, f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }, { id: 'bad id', ymd: '2026-10-20' }, { id: 'PHOTOaaaaaaaa2', ymd: 'x' }], hwt: HWT }, me);
-  assert.ok(!/PHOTO|sig|AAAA/.test(R.g.location.href), '⛔ 고른 사진·입장권을 주소에 실었다');
-  const kept = JSON.parse(R.g.sessionStorage.getItem('onfHwGo'));
-  assert.deepEqual([kept.t, kept.l, kept.f, kept.hwt], ['Tok_1', L, [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], HWT], '⛔ 모양 거름');
-  const mk = (search, store) => { const H = boot({ onf_id_tok: odk() }, { search }); if (store) H.g.sessionStorage.setItem('onfHwGo', JSON.stringify(store)); const got = []; const w = { parent: H.els.app.contentWindow, postMessage: (m) => got.push(m) }; H.knockAs(w); return got.filter((m) => m && m.onf === 'auth').pop(); };
-  const a = mk('?mode=hwbook&t=Tok_1&l=' + L, kept);
-  assert.deepEqual(a && a.hw, { f: kept.f, hwt: HWT }, '⛔ 과제 판 노크에 맡긴 것을 안 줬다');
-  const H1 = boot({ onf_id_tok: odk() }, { search: '?mode=hwbook&t=Tok_1&l=' + L }); H1.g.sessionStorage.setItem('onfHwGo', JSON.stringify(kept));
-  const got1 = []; const w1 = { parent: H1.els.app.contentWindow, postMessage: (m) => got1.push(m) }; H1.knockAs(w1);
-  assert.equal(H1.g.sessionStorage.getItem('onfHwGo'), null, '⛔ 준 뒤에도 입장권을 탭에 남겼다');
-  assert.equal(mk('?mode=hwbook&t=Tok_2&l=' + L, kept).hw, undefined, '⛔ 다른 학생 과제 판에 줬다');
-  assert.equal(mk('?mode=hwbook&t=Tok_1', kept).hw, undefined, '⛔ 다른 수업에 줬다');
-  assert.equal(mk('?t=Tok_1&l=' + L, kept).hw, undefined, '⛔ 과제 판이 아닌 화면에 줬다');
-  assert.equal(mk('?mode=hwbook&t=Tok_1&l=' + L, Object.assign({}, kept, { at: Date.now() - 11 * 60000 })).hw, undefined, '⛔ 10분 지난 것을 줬다');
-  R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L, f: [], hwt: { p: 'x'.repeat(13000), sig: 'A'.repeat(43) } }, me);
-  assert.equal(JSON.parse(R.g.sessionStorage.getItem('onfHwGo')).hwt, null, '⛔ 너무 긴 입장권을 받았다');
+  const R = boot({ onf_id_tok: odk() }), homeGot = [], me = { parent: R.els.app.contentWindow, postMessage: (m) => homeGot.push(m) };
+  R.knockAs(me); homeGot.length = 0;
+  R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L, f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT }, me);
+  const fr = R.created.filter((e) => e.tag === 'iframe')[0], got = [], inner = { parent: { parent: fr.contentWindow }, postMessage: (m) => got.push(m) };
+  R.postAs({ onf: 'auth-please' }, { parent: {}, postMessage: (m) => got.push(m) });
+  R.postAs({ onf: 'auth-please' }, inner, 'https://evil.example');
+  assert.equal(got.length, 0, '⛔ 남의 창·다른 출처 노크에 토큰을 줬다');
+  R.postAs({ onf: 'auth-please' }, inner);
+  assert.equal(got.length, 1); assert.ok(/^odk1\./.test(got[0].token) && got[0].hist === 0);
+  assert.deepEqual(JSON.parse(JSON.stringify(got[0].hw)), { f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT }, '⛔ 고른 사진·입장권');
+  R.postAs({ onf: 'auth-please', stale: true }, inner);
+  assert.equal(got.length, 2); assert.equal(got[1].hw, undefined, '⛔ 고른 사진을 두 번 줬다(다시 열기마다 사진을 또 붙인다)');
+  assert.ok(!homeGot.some((m) => m.onf === 'auth'), '⛔ 과제 판 노크가 홈 자물쇠를 건드렸다');
+  R.postAs({ onf: 'hwbookBack' }, inner);
+  assert.ok(R.calls.includes('back'), '⛔ ‹ = 기록 칸 하나 뒤로(닫기)');
+  R.g.history.state = null; R.pop();
+  assert.ok(R.created.find((e) => e.className === 'onf-hwbox').removed, '⛔ 뒤로 = 과제 판 액자 닫기');
+  assert.ok(!homeGot.some((m) => m.onf === 'hist-pop'), '⛔ 과제 판 칸을 걷은 뒤로를 홈 「뒤로」 로 보냈다(홈 창이 닫힌다)');
+  R.postAs({ onf: 'auth-please' }, inner);
+  assert.equal(got.length, 2, '⛔ 닫힌 액자 노크에 답했다');
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
