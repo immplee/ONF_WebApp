@@ -538,7 +538,37 @@ function hwAuth() {   // 판에 지금 토큰(+ 고른 사진·입장권 한 번
   if (hwGoMsg) { try { hwWin.postMessage(hwGoMsg, hwOrigin); } catch (e) {} hwGoMsg = null; }   // 미리 띄운 판 「열어」 — 토큰 바로 뒤(새로 받은 토큰 길 hwTell 로 와도 · 반박 🔴1)
 }
 function hwTell() { if (hwWant && hwWin && pending && tokAlive(pending)) { hwWant = false; hwAuth(); } }   // onCredential 이 부른다 — 새로 받은 토큰을 판에도
+/* 📖 과제 판 + 교재(과제 첨삭 수업 5단계 · 2026-10-24 · 설계 §3-1) — 판이 「옆에/교재만/사진만」 을 알린다.
+   옆에 = 과제 판 액자를 왼쪽 반으로 줄이고 교재 판(종전 교재 판 그대로 · 제 펜 줄)을 오른쪽 반(.beside · 판 z 5 < 과제 판 z 50) ·
+   교재만 = 과제 판을 숨기고(살려 둔다) 교재 판을 거의 전체 + 왼쪽 위 「📝 과제로」 칩 · 사진만 = 과제 판 전체 · 교재 판은 숨김(park).
+   교재 주소는 teacherBookSrc 거르개를 그대로 지난다(남의 주소·모르는 mode 거절). 폰은 판이 이 단추를 안 보인다. */
+var hwView = 'photo', hwBookHref = '', hwChipEl = null;
+function hwBookP() { var src = hwBookHref ? teacherBookSrc(hwBookHref) : null; return src ? bookFind(src) : null; }
+function hwViewSet(v, href) {
+  if (!hwBox || ['photo', 'side', 'book'].indexOf(v) < 0) return;
+  if (v !== 'photo' && typeof href === 'string' && href) { if (!teacherBookSrc(href)) return; hwBookHref = href; }
+  if (v !== 'photo' && !hwBookHref) return;
+  hwView = v; hwLay();
+  if (v === 'photo') { var p = hwBookP(); if (p && !p.parked) bookPark(p, true); }
+  else bookOpen(hwBookHref, v === 'side' ? Math.round((window.innerWidth || 0) / 2) : 1, 8, 16, false);
+}
+function hwLay() {
+  if (!hwBox) return;
+  var W = window.innerWidth || 0;
+  hwBox.style.right = hwView === 'side' ? (W - Math.round(W / 2)) + 'px' : '';
+  hwBox.style.visibility = hwView === 'book' ? 'hidden' : ''; hwBox.style.pointerEvents = hwView === 'book' ? 'none' : '';
+  if (hwView === 'book' && !hwChipEl) {
+    hwChipEl = document.createElement('button'); hwChipEl.type = 'button'; hwChipEl.className = 'onf-hwchip'; hwChipEl.textContent = '📝 과제로';
+    hwChipEl.style.cssText = 'position:fixed;top:14px;left:14px;z-index:60;height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--onf-line,#e8ddcf);background:var(--onf-bg,#fff);color:inherit;font:inherit;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.18)';
+    hwChipEl.onclick = function () { hwViewSet('side'); if (hwWin) { try { hwWin.postMessage({ onf: 'hwbookView', v: 'side' }, hwOrigin); } catch (e) {} } };
+    document.body.appendChild(hwChipEl);
+  }
+  if (hwView !== 'book' && hwChipEl) { if (hwChipEl.parentNode) hwChipEl.parentNode.removeChild(hwChipEl); hwChipEl = null; }
+}
+window.addEventListener('resize', function () { if (hwBox && hwView !== 'photo') { hwLay(); if (hwView === 'side') { var p = hwBookP(); if (p) bookPlace(p, Math.round((window.innerWidth || 0) / 2), 8, 16); } } });
 function hwClose() {
+  if (hwView !== 'photo') { var hp = hwBookP(); if (hp && !hp.parked) bookPark(hp, true); }   // 과제 판을 닫으면 옆에 띄운 교재도 숨긴다
+  hwView = 'photo'; hwBookHref = ''; if (hwChipEl && hwChipEl.parentNode) hwChipEl.parentNode.removeChild(hwChipEl); hwChipEl = null;
   if (hwBox && hwBox.parentNode) hwBox.parentNode.removeChild(hwBox);
   hwBox = null; hwFr = null; hwWin = null; hwOrigin = ''; hwGo = null; hwGave = ''; hwWant = false; hwT = ''; hwWarmOn = false; hwGoMsg = null; clearTimeout(hwWarmTm);
 }
@@ -549,7 +579,7 @@ window.addEventListener('popstate', function () {
 });
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
-  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk')) return;
+  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView')) return;
   if (hwFr && hwFrom(ev.source)) {   // 과제 판 액자에서 온 말
     try { if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return; } catch (e) { return; }
     if (hwWin && ev.source !== hwWin) return;   // 한 번 정하면 그 창만(노크 자물쇠와 같다)
@@ -569,6 +599,7 @@ window.addEventListener('message', function (ev) {
     }
     if (d.onf === 'themeAsk') { themeAsk(ev); return; }
     if (d.onf === 'hwbookBack') hwBack();
+    if (d.onf === 'hwbookView') hwViewSet(String(d.v || ''), d.href);   // 📖 교재 옆에 · 교재만 · 사진만(과제 첨삭 5단계)
     return;
   }
   if (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm') return;
