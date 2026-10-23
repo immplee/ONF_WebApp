@@ -43,7 +43,8 @@ function boot(store, opt) {
     document: { getElementById: el, querySelector: (q) => (q === '#wait .onf-spin' && !spin.gone ? spin : null), createElement: () => el('x' + Math.random()), body: { appendChild() {} },
       documentElement: { setAttribute() {}, getAttribute() {} } },
     location: { search: opt.search || '', pathname: '/teacher/', href: 'https://class.ownify.co.kr/teacher', reload() { calls.push('reload'); } },
-    history: { state: null, replaceState() {}, pushState() {}, go() {}, back() {} },
+    history: { state: null, length: 2, replaceState() {}, pushState() {}, go() {}, back() { calls.push('back'); } },
+    sessionStorage: (() => { const m = {}; return { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } }; })(),
     addEventListener: (type, fn) => { (handlers[type] = handlers[type] || []).push(fn); },
     removeEventListener: (type, fn) => { handlers[type] = (handlers[type] || []).filter((f) => f !== fn); },
     setTimeout: (fn, ms) => { timers.set(++tid, { fn, at: clock + (ms || 0) }); return tid; },
@@ -363,6 +364,16 @@ t('📝 과제 판 — 「열어 줘(hwbook)」 = 우리 안쪽 창에서 온 �
   assert.strictEqual(R.g.location.href, '/teacher/?mode=hwbook&t=Tok_1&l=' + L, '⛔ 과제 판으로 안 옮겼다');
   R.postAs({ onf: 'hwbookBack' }, me);
   assert.strictEqual(R.g.location.href, '/teacher/', '홈으로(과제 판 주소가 아니면 홈 주소로)');
+  // 홈에서 옮겨 온 과제 판(표시 있음) → 뒤로 · 붙여 연 과제 판(표시 없음) → 홈 주소로(뒤로가 남의 사이트일 수 있다)
+  const H = boot({ onf_id_tok: odk() }, { search: '?mode=hwbook&t=Tok_1' }), hw = { parent: H.els.app.contentWindow, postMessage() {} };
+  H.knockAs(hw);
+  H.postAs({ onf: 'hwbookBack' }, hw);
+  assert.ok(!H.calls.includes('back') && H.g.location.href === '/teacher/', '⛔ 표시 없이 뒤로 갔다(붙여 연 주소)');
+  const H2 = boot({ onf_id_tok: odk() }, { search: '?mode=hwbook&t=Tok_1' }), hw2 = { parent: H2.els.app.contentWindow, postMessage() {} };
+  H2.g.sessionStorage.setItem('onfHwFrom', '1'); H2.knockAs(hw2);
+  H2.postAs({ onf: 'hwbookBack' }, hw2);
+  assert.ok(H2.calls.includes('back') && H2.g.sessionStorage.getItem('onfHwFrom') === null, '⛔ 홈에서 온 과제 판인데 뒤로 안 갔다 / 표시를 안 지웠다');
+  assert.strictEqual(R.g.sessionStorage.getItem('onfHwFrom'), null, '돌아간 뒤 표시는 지운다');
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);

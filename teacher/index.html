@@ -452,11 +452,16 @@ window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
   if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack')) return;
   if (!appWin || ev.source !== appWin || ev.origin !== appOrigin) return;
-  if (d.onf === 'hwbookBack') { if (/[?&]mode=hwbook(&|$)/.test(location.search) && history.length > 1) history.back(); else location.href = location.pathname; return; }
+  if (d.onf === 'hwbookBack') {   // ⛔ 뒤로는 우리가 홈에서 옮겨 왔을 때만(표시) — 붙여 연 주소면 뒤로가 남의 사이트일 수 있다(반박 🟡8)
+    var came = false; try { came = sessionStorage.getItem('onfHwFrom') === '1'; sessionStorage.removeItem('onfHwFrom'); } catch (eS) {}
+    if (came && /[?&]mode=hwbook(&|$)/.test(location.search)) history.back(); else location.href = location.pathname;
+    return;
+  }
   var t = String(d.t || ''), l = String(d.l || '');
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(t)) return;
   var u = location.pathname + '?mode=hwbook&t=' + encodeURIComponent(t);
   if (/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(l)) u += '&l=' + encodeURIComponent(l);
+  try { sessionStorage.setItem('onfHwFrom', '1'); } catch (eS) {}
   location.href = u;
 });
 /* onf-hwbook:end */
