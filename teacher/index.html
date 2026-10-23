@@ -229,7 +229,7 @@ function mount() {
        안쪽 `doGet` 에 아무 값이나 실어 보낼 수 있다. 값 모양도 여기서 한 번 본다. */
   var q = new URLSearchParams(location.search);
   var pass = new URLSearchParams();
-  if (q.get('mode') === 'student') pass.set('mode', 'student');
+  if (q.get('mode') === 'student' || q.get('mode') === 'hwbook') pass.set('mode', q.get('mode'));   // 📝 hwbook = 과제 판(과제 첨삭 수업 1단계 · 2026-10-23 · 문은 안쪽 RPC 가 지킨다 · 스위치 ONF_HWBOOK)
   var st = q.get('t') || '';
   if (/^[A-Za-z0-9_-]{1,40}$/.test(st)) pass.set('t', st);
   //   느린 구간 표(선생님 홈 `perf=1` — 2026-09-28)도 넘긴다. 값은 「1」 하나만 안다.

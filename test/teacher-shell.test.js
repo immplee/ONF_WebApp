@@ -42,7 +42,7 @@ function boot(store, opt) {
     localStorage: { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { if (opt.full) throw new Error('QuotaExceededError'); ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } },
     document: { getElementById: el, querySelector: (q) => (q === '#wait .onf-spin' && !spin.gone ? spin : null), createElement: () => el('x' + Math.random()), body: { appendChild() {} },
       documentElement: { setAttribute() {}, getAttribute() {} } },
-    location: { search: '', href: 'https://class.ownify.co.kr/teacher', reload() { calls.push('reload'); } },
+    location: { search: opt.search || '', href: 'https://class.ownify.co.kr/teacher', reload() { calls.push('reload'); } },
     history: { state: null, replaceState() {}, pushState() {}, go() {}, back() {} },
     addEventListener: (type, fn) => { (handlers[type] = handlers[type] || []).push(fn); },
     removeEventListener: (type, fn) => { handlers[type] = (handlers[type] || []).filter((f) => f !== fn); },
@@ -334,6 +334,14 @@ t('T4 열쇠 길은 안 탄다 — 8초 덫이 그 한 번(구글 창구로 새�
   R.advance(300); R.load(); R.advance(8000);
   assert.strictEqual(nav.length, 0, '⛔ 열쇠 길에서 덫 말고 따로 다시 열었다');
   assert.strictEqual(R.reloads(), 1, '전제: 덫은 종전대로');
+});
+
+t('📝 주소의 mode — student·hwbook(과제 판 2026-10-23)만 안쪽으로 넘긴다 · 모르는 mode 는 버린다 · t 는 모양만', () => {
+  const src = (q) => { const R = boot({ onf_id_tok: odk() }, { search: q }); return String(R.els.app.src || ''); };
+  assert.ok(/[?&]mode=hwbook(&|$)/.test(src('?mode=hwbook&t=Tok_1')) && /[?&]t=Tok_1(&|$)/.test(src('?mode=hwbook&t=Tok_1')), '⛔ 과제 판 주소가 안쪽에 안 간다: ' + src('?mode=hwbook&t=Tok_1'));
+  assert.ok(/[?&]mode=student(&|$)/.test(src('?mode=student&t=Tok_1')), '학생 한 명 창은 그대로');
+  assert.ok(!/mode=/.test(src('?mode=evil&t=Tok_1')), '⛔ 모르는 mode 를 안쪽 doGet 에 흘렸다');
+  assert.ok(!/t=/.test(src('?mode=hwbook&t=bad%20tok')), '⛔ 모양이 틀린 t 를 넘겼다');
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
