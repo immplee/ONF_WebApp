@@ -232,6 +232,8 @@ function mount() {
   if (q.get('mode') === 'student' || q.get('mode') === 'hwbook') pass.set('mode', q.get('mode'));   // 📝 hwbook = 과제 판(과제 첨삭 수업 1단계 · 2026-10-23 · 문은 안쪽 RPC 가 지킨다 · 스위치 ONF_HWBOOK)
   var st = q.get('t') || '';
   if (/^[A-Za-z0-9_-]{1,40}$/.test(st)) pass.set('t', st);
+  var lsn = q.get('l') || '';   // 📝 과제 판 — 「사진 모아 보기」 가 고른 수업(노션 행 id 꼴만)
+  if (q.get('mode') === 'hwbook' && /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(lsn)) pass.set('l', lsn);
   //   느린 구간 표(선생님 홈 `perf=1` — 2026-09-28)도 넘긴다. 값은 「1」 하나만 안다.
   if (q.get('perf') === '1') pass.set('perf', '1');
   var qs = pass.toString(), appSrc = EXEC + (qs ? '?' + qs : '');   // 홈 액자 주소 — 처음 열기·한 번 더 열기가 같이 쓴다(src 속성은 replace 로 열어 비어 있다)
@@ -441,6 +443,23 @@ window.addEventListener('message', function (ev) {
   pending = k;
 });
 /* onf-devkey:end */
+
+/* ═══ 📝 과제 판(과제 첨삭 수업 2단계 · 2026-10-23) — 선생님 홈 「사진 모아 보기」 가 묶음을 지은 뒤 「과제 판 열어 줘」 · 과제 판 ‹ = 「홈으로」 ═══
+   ⛔ 받는 말은 우리가 정한 그 안쪽 창·출처(appWin·appOrigin)에서 온 것뿐(기기 열쇠와 같은 자물쇠) · 값은 모양만(t = 학생 토큰 · l = 노션 행 id) — 진짜 문은 서버 RPC.
+   이 창이 제 주소를 바꾸는 것이라(위에서 내려온 이동이 아니다) 사람 누름이 없어도 된다(묶음 짓기 RPC 를 기다린 뒤 온다). */
+/* onf-hwbook:begin */
+window.addEventListener('message', function (ev) {
+  var d = ev && ev.data;
+  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack')) return;
+  if (!appWin || ev.source !== appWin || ev.origin !== appOrigin) return;
+  if (d.onf === 'hwbookBack') { if (/[?&]mode=hwbook(&|$)/.test(location.search) && history.length > 1) history.back(); else location.href = location.pathname; return; }
+  var t = String(d.t || ''), l = String(d.l || '');
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(t)) return;
+  var u = location.pathname + '?mode=hwbook&t=' + encodeURIComponent(t);
+  if (/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(l)) u += '&l=' + encodeURIComponent(l);
+  location.href = u;
+});
+/* onf-hwbook:end */
 
 /* ═══ 📖 선생님 홈 옆 판(2026-10-12 Peter 「선생님 홈에서 교재를 열면 왜 새 창으로? 학생 홈처럼 창으로 열리고 전체 화면으로」) ═══
    학생 껍데기 assets/onf-frame.js 의 교재 판과 **같은 꼴**(⚠️ 쌍둥이 — 한쪽을 고치면 다른 쪽도): 홈이 caps 를 받은 뒤 교재·⭐ 내 문장 주소를 보내면

@@ -42,7 +42,7 @@ function boot(store, opt) {
     localStorage: { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { if (opt.full) throw new Error('QuotaExceededError'); ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } },
     document: { getElementById: el, querySelector: (q) => (q === '#wait .onf-spin' && !spin.gone ? spin : null), createElement: () => el('x' + Math.random()), body: { appendChild() {} },
       documentElement: { setAttribute() {}, getAttribute() {} } },
-    location: { search: opt.search || '', href: 'https://class.ownify.co.kr/teacher', reload() { calls.push('reload'); } },
+    location: { search: opt.search || '', pathname: '/teacher/', href: 'https://class.ownify.co.kr/teacher', reload() { calls.push('reload'); } },
     history: { state: null, replaceState() {}, pushState() {}, go() {}, back() {} },
     addEventListener: (type, fn) => { (handlers[type] = handlers[type] || []).push(fn); },
     removeEventListener: (type, fn) => { handlers[type] = (handlers[type] || []).filter((f) => f !== fn); },
@@ -68,6 +68,8 @@ function boot(store, opt) {
     },
     load() { (app._on.load || []).forEach((f) => f({ type: 'load' })); },   // 액자 load(교차 출처 — contentWindow.location 을 못 읽는다)
     post(data, origin) { (handlers.message || []).slice().forEach((h) => h({ data, source: { postMessage() {} }, origin })); },   // 남의 창 말
+    knockAs(src) { (handlers.message || []).slice().forEach((h) => h({ data: { onf: 'auth-please', stale: false }, source: src, origin: KORIGIN })); },   // 📝 그 창으로 노크(appWin 이 그 창이 된다)
+    postAs(data, src, origin) { (handlers.message || []).slice().forEach((h) => h({ data, source: src, origin: origin || KORIGIN })); },
     knock() { (handlers.message || []).slice().forEach((h) => h({ data: { onf: 'auth-please', stale: false }, source: { parent: app.contentWindow, postMessage() {} }, origin: KORIGIN })); },
     opened: () => /AKfycb/.test(String(app.src || '')),
     msg: () => String(els.waitmsg ? els.waitmsg.innerHTML : ''),
@@ -342,6 +344,25 @@ t('📝 주소의 mode — student·hwbook(과제 판 2026-10-23)만 안쪽으�
   assert.ok(/[?&]mode=student(&|$)/.test(src('?mode=student&t=Tok_1')), '학생 한 명 창은 그대로');
   assert.ok(!/mode=/.test(src('?mode=evil&t=Tok_1')), '⛔ 모르는 mode 를 안쪽 doGet 에 흘렸다');
   assert.ok(!/t=/.test(src('?mode=hwbook&t=bad%20tok')), '⛔ 모양이 틀린 t 를 넘겼다');
+});
+
+t('📝 과제 판 — 「열어 줘(hwbook)」 = 우리 안쪽 창에서 온 것만 · 모양 거름 · l 은 hwbook 일 때만 안쪽으로 · 「홈으로(hwbookBack)」', () => {
+  const L = '402d6a62-96ae-817f-86ec-ecaf4f919ab9';
+  assert.ok(/[?&]l=402d6a62/.test(String(boot({ onf_id_tok: odk() }, { search: '?mode=hwbook&t=Tok_1&l=' + L }).els.app.src || '')), '⛔ l 이 안쪽에 안 간다');
+  assert.ok(!/[?&]l=/.test(String(boot({ onf_id_tok: odk() }, { search: '?mode=student&t=Tok_1&l=' + L }).els.app.src || '')), '⛔ 학생 창에 l 을 흘렸다');
+  assert.ok(!/[?&]l=/.test(String(boot({ onf_id_tok: odk() }, { search: '?mode=hwbook&t=Tok_1&l=evil' }).els.app.src || '')), '⛔ 모양이 틀린 l 을 넘겼다');
+  const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} }, other = { parent: R.els.app.contentWindow, postMessage() {} };
+  R.knockAs(me);
+  R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L }, other);
+  assert.strictEqual(R.g.location.href, 'https://class.ownify.co.kr/teacher', '⛔ 노크한 창이 아닌 창의 말로 옮겼다');
+  R.postAs({ onf: 'hwbook', t: 'Tok 1', l: L }, me);
+  assert.strictEqual(R.g.location.href, 'https://class.ownify.co.kr/teacher', '⛔ 모양이 틀린 t 로 옮겼다');
+  R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L }, me, 'https://evil.example');
+  assert.strictEqual(R.g.location.href, 'https://class.ownify.co.kr/teacher', '⛔ 다른 출처의 말로 옮겼다');
+  R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L }, me);
+  assert.strictEqual(R.g.location.href, '/teacher/?mode=hwbook&t=Tok_1&l=' + L, '⛔ 과제 판으로 안 옮겼다');
+  R.postAs({ onf: 'hwbookBack' }, me);
+  assert.strictEqual(R.g.location.href, '/teacher/', '홈으로(과제 판 주소가 아니면 홈 주소로)');
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
