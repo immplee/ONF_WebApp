@@ -373,7 +373,9 @@ function fromOurFrame(win) {
 function answer() {
   if (!pending || !appWin) return;
   /* `hist:1` = 「기록 칸은 내가 만들어 줄게」 — 아래 onf-hist 블록이 받는 쪽이다. 껍데기가 최상위일 때만 1(남의 액자 안이면 블록이 안 돈다). */
-  try { appWin.postMessage({ onf: 'auth', token: pending, hist: (window.top === window.self) ? 1 : 0 }, appOrigin); } catch (e) {}
+  var m = { onf: 'auth', token: pending, hist: (window.top === window.self) ? 1 : 0 }, hw = typeof hwHand === 'function' ? hwHand() : null;
+  if (hw) m.hw = hw;   // 📝 과제 판 — 모아 보기 창이 맡긴 고른 사진·입장권(onf-hwbook 블록)
+  try { appWin.postMessage(m, appOrigin); } catch (e) {}
 }
 
 window.addEventListener('message', function (ev) {
@@ -459,11 +461,28 @@ window.addEventListener('message', function (ev) {
   }
   var t = String(d.t || ''), l = String(d.l || '');
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(t)) return;
+  hwKeep(t, l, d.f, d.hwt);
   var u = location.pathname + '?mode=hwbook&t=' + encodeURIComponent(t);
   if (/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(l)) u += '&l=' + encodeURIComponent(l);
   try { sessionStorage.setItem('onfHwFrom', '1'); } catch (eS) {}
   location.href = u;
 });
+/* 고른 사진·입장권 맡기기(Peter 2026-10-23 「목록·열기 빠르게」) — 창이 서버 열기를 안 부르고 바로 넘어온다 · 과제 판이 노크하면 토큰과 같이 준다(answer).
+   ⛔ 주소에 싣지 않는다(입장권이 방문 기록에 남는다) · 이 탭 sessionStorage · 같은 학생(t)·수업(l)일 때만 · 10분.
+   값은 모양만 거른다(사진 id · 날짜 · 입장권 길이) — 진짜 확인은 서버(고른 사진은 그 학생 폴더에 있는 것만 · 입장권은 서명). */
+function hwKeep(t, l, f, hwt) {
+  var files = Array.isArray(f) ? f.filter(function (x) { return x && /^[A-Za-z0-9_-]{10,200}$/.test(String(x.id || '')) && /^\d{4}-\d{2}-\d{2}$/.test(String(x.ymd || '')); })
+    .slice(0, 80).map(function (x) { return { id: String(x.id), ymd: String(x.ymd) }; }) : null;
+  var tk = hwt && typeof hwt.p === 'string' && hwt.p.length <= 12000 && /^[A-Za-z0-9_-]{43}$/.test(String(hwt.sig || '')) ? { p: hwt.p, sig: String(hwt.sig) } : null;
+  try { sessionStorage.setItem('onfHwGo', JSON.stringify({ t: t, l: l, f: files, hwt: tk, at: Date.now() })); } catch (eS) {}
+}
+function hwHand() {
+  var q; try { q = new URLSearchParams(location.search); } catch (e) { return null; }
+  if (q.get('mode') !== 'hwbook') return null;
+  var g = null; try { g = JSON.parse(sessionStorage.getItem('onfHwGo') || 'null'); } catch (e) {}
+  if (!g || g.t !== (q.get('t') || '') || g.l !== (q.get('l') || '') || !(Date.now() - g.at < 600000)) return null;
+  return { f: g.f, hwt: g.hwt };
+}
 /* onf-hwbook:end */
 
 /* ═══ 📖 선생님 홈 옆 판(2026-10-12 Peter 「선생님 홈에서 교재를 열면 왜 새 창으로? 학생 홈처럼 창으로 열리고 전체 화면으로」) ═══

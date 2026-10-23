@@ -376,5 +376,24 @@ t('📝 과제 판 — 「열어 줘(hwbook)」 = 우리 안쪽 창에서 온 �
   assert.strictEqual(R.g.sessionStorage.getItem('onfHwFrom'), null, '돌아간 뒤 표시는 지운다');
 });
 
+t('📝 과제 판 — 고른 사진·입장권 맡기기(모양 거름 · 주소엔 안 실음) → 그 과제 판이 노크하면 토큰과 같이 · 다른 학생·수업·10분 지나면 안 줌', () => {
+  const L = '402d6a62-96ae-817f-86ec-ecaf4f919ab9', HWT = { p: '{"s":"Tok_1"}', sig: 'A'.repeat(43) };
+  const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
+  R.knockAs(me);
+  R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L, f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }, { id: 'bad id', ymd: '2026-10-20' }, { id: 'PHOTOaaaaaaaa2', ymd: 'x' }], hwt: HWT }, me);
+  assert.ok(!/PHOTO|sig|AAAA/.test(R.g.location.href), '⛔ 고른 사진·입장권을 주소에 실었다');
+  const kept = JSON.parse(R.g.sessionStorage.getItem('onfHwGo'));
+  assert.deepEqual([kept.t, kept.l, kept.f, kept.hwt], ['Tok_1', L, [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], HWT], '⛔ 모양 거름');
+  const mk = (search, store) => { const H = boot({ onf_id_tok: odk() }, { search }); if (store) H.g.sessionStorage.setItem('onfHwGo', JSON.stringify(store)); const got = []; const w = { parent: H.els.app.contentWindow, postMessage: (m) => got.push(m) }; H.knockAs(w); return got.filter((m) => m && m.onf === 'auth').pop(); };
+  const a = mk('?mode=hwbook&t=Tok_1&l=' + L, kept);
+  assert.deepEqual(a && a.hw, { f: kept.f, hwt: HWT }, '⛔ 과제 판 노크에 맡긴 것을 안 줬다');
+  assert.equal(mk('?mode=hwbook&t=Tok_2&l=' + L, kept).hw, undefined, '⛔ 다른 학생 과제 판에 줬다');
+  assert.equal(mk('?mode=hwbook&t=Tok_1', kept).hw, undefined, '⛔ 다른 수업에 줬다');
+  assert.equal(mk('?t=Tok_1&l=' + L, kept).hw, undefined, '⛔ 과제 판이 아닌 화면에 줬다');
+  assert.equal(mk('?mode=hwbook&t=Tok_1&l=' + L, Object.assign({}, kept, { at: Date.now() - 11 * 60000 })).hw, undefined, '⛔ 10분 지난 것을 줬다');
+  R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L, f: [], hwt: { p: 'x'.repeat(13000), sig: 'A'.repeat(43) } }, me);
+  assert.equal(JSON.parse(R.g.sessionStorage.getItem('onfHwGo')).hwt, null, '⛔ 너무 긴 입장권을 받았다');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);
