@@ -596,9 +596,9 @@
     function bookCan(p, a) { return !!(p && !p.gone && !p.sw && (a.view || a.line) && (!a.view || p.views.indexOf(a.view) >= 0) && (!a.line || p.views.indexOf('line') >= 0)); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 [] · 📖 자격 내린 판(gone)·갈아 끼우는 중(sw — 아직 옛 교재)엔 「열어」를 안 보낸다
     /* 아무것도 안 묻는 열기([이어서 하기])도 **줄 링크로 연 판**(view 없음)이면 그 판(반박 검토 🟡4) — 판은 이미 그 교재다 · 할 말이 없으니 보이기만.
        ⛔ view 로 연 판(덱·복습)은 안 맡긴다 — 열자마자 그 창을 띄운 판이다(위 「view 없는 보통 열기」 검사). */
-    function bookLike(src, a) {
+    function bookLike(src, a, out) {
       var b = bookBase(src), q;
-      for (var i = 0; i < books.length; i++) { q = books[i]; if (q.gone || q.sw || bookAged(q)) continue; if (bookBase(q.src) === b && (bookCan(q, a) || (!a.view && !a.line && !bookAsk(q.src).view))) return q; }   // 📖 늙은 판(bookAged)은 bookShow 가 그 주소로 새로 띄워 view·line 을 잃는다 — 갈아 끼우기(→ stale → 새 판)로
+      for (var i = 0; i < books.length; i++) { q = books[i]; if (q.gone || q.sw || bookAged(q) || !outSame(q, src, out)) continue; if (bookBase(q.src) === b && (bookCan(q, a) || (!a.view && !a.line && !bookAsk(q.src).view))) return q; }   // 📖 늙은 판(bookAged)은 bookShow 가 그 주소로 새로 띄워 view·line 을 잃는다 — 갈아 끼우기(→ stale → 새 판)로 · 🌤 정적 판·지금 길 판은 서로 안 맡는다(검토 고침 1)
       return null;
     }
     /* left = 홈 왼쪽 메뉴의 오른쪽 끝(px · 홈이 잰다) — 있으면 판이 그 오른쪽부터 덮는다(2026-10-12 Peter 「창 모드일 때는 맨 왼쪽 탭만 보이게」).
@@ -624,8 +624,12 @@
     var OUT_FAIL = 'onfOutFail', OUT_FAIL_MS = 86400000, outSeen = {};
     function outOk(src) {
       if (!opts.out || !opts.tok || bookMine(src) || bookAsk(src).view === 'cards') return false;
-      try { return !(Date.now() - Number(global.localStorage.getItem(OUT_FAIL) || 0) < OUT_FAIL_MS); } catch (e) { return true; }
+      try { return !(Date.now() - Number(global.localStorage.getItem(OUT_FAIL) || 0) < OUT_FAIL_MS); } catch (e) { return false; }   // 저장소가 막힌 창 — 실패를 못 기억하니 열 때마다 2.5초를 안 낸다
     }
+    /* 🌤 이 열기가 정적 판으로 갈 판인가 · 판 p 가 같은 길인가(검토 고침 1 · 2026-10-24) — 정적 판도 지금 교재와 같은 bookHi swap:1 로 판(board)이 된다.
+       길이 다른 판엔 갈아 끼우기(bookBoardFor)·「열어」(bookLike)·줄 선 미리 주소(bookQ)를 안 보낸다 → 켠 교재만 정적 판 · ⭐ 내 문장·🗂️ 카드 덱(outOk 거짓)은 늘 지금 길 판. */
+    function outWant(src, out) { return !!out && outOk(src); }
+    function outSame(p, src, out) { return !!p.out === outWant(src, out); }
     function bookMake(src, parked, out, cf) {
       var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, key: bookKey(src), parked: parked, win: null, origin: '', views: [], kb: null, hw: null, ho: '', idle: null, left: null, m: null, r: null, back: null,   // back = 나를 열어 준 판(하나만 · 없으면 null) — 아래 「앞 판 규칙」
         swap: false, load: src, real: src, sw: null, ask: {}, born: Date.now(), gone: false, home: false };   // 📖 아래 「교재 판 한 장」 — swap = 노크 swap:1 · load = 액자가 처음 연 주소 · real = 판이 실제로 든 교재 · sw = 기다리는 갈아 끼우기 · ask = 보낸 번호 → 주소 · born = 만든 때 · gone = 주소로 못 찾음 · home = 홈에서 연 판(bookBoard)
@@ -650,6 +654,10 @@
         p.oe = openApp(p.el, ONF_OUT_BOOK, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, bookCfOk(cf), function () {
           console.info('[onf] 정적 판이 안 떴다 — 지금 길로 다시');
           try { global.localStorage.setItem(OUT_FAIL, String(Date.now())); } catch (e) {}
+          /* 검토 고침 3 — hello·노크 뒤 outFail 이면 판 창·출처·views·swap·기록 다리·키보드 창이 정적 판을 가리킨다 → 새 판처럼 비운다(죽은 창을 판으로 쳐 갈아 끼우기가 14초 기다렸다).
+             기다리던 갈아 끼우기(sw)는 지금 길 노크(bookHi)가 종전대로 끝낸다. */
+          p.win = null; p.origin = ''; p.views = []; p.swap = false; p.hw = null; p.ho = ''; p.kb = null;
+          p.real = p.src = p.load; p.key = bookKey(p.load);
           exec();
         }, opts.tok);
       } else exec();
@@ -696,8 +704,10 @@
       var src = opts.bookSrc(href), b;
       if (!src) return;
       if (out) { outSeen[src] = 1; if (preH && opts.bookSrc(preH) === src) preWrite(); }   // 🌤 기억한 첫 교재가 켠 교재였다 — o:1(아래 preEarly)
-      var a = bookAsk(src), p = bookFind(src) || bookLike(src, a), m = { onf: 'bookView' };   // 📖 view·line 만 다른 판이 할 줄 알면 그 판(위 bookLike) — 갈아 끼우기보다 **먼저**(0초 길)
-      if (!p && home && (b = bookBoardFor(src))) { bookSwapTo(b, src, left, bm, br, cf); return; }
+      var a = bookAsk(src), p = bookFind(src), m = { onf: 'bookView' };
+      if (p && p.out && !outWant(src, out)) { bookRetire(p); p = null; }   // 🌤 검토 고침 2 — 서버 스위치를 끈 뒤 낡은 o:1 기억으로 띄운 정적 판 · 자격 내리고 지금 길 새 판(끈 때만 드는 값)
+      p = p || bookLike(src, a, out);   // 📖 view·line 만 다른 판이 할 줄 알면 그 판(위 bookLike) — 갈아 끼우기보다 **먼저**(0초 길)
+      if (!p && home && (b = bookBoardFor(src, out))) { bookSwapTo(b, src, left, bm, br, cf); return; }
       p = p || bookMake(src, false, out, cf);
       bookShow(p, left, bm, br);   // 🔐 못 연 판이면 bookShow 가 새 판으로 바꾼다 — 새 판은 노크 전이라 아래 bookCan 이 거짓(말 안 보냄)
       if (a.view) m.view = a.view;
@@ -711,9 +721,9 @@
       var src = opts.bookSrc(href), b, ex;
       if (!src) return;
       if ((ex = bookFind(src))) { if (ex.parked) bookPlace(ex, left, m, r); return; }   // 🚀 이미 있는 숨긴 판(미리 띄운 판 · 자리값 없이 만든 것)에 홈이 잰 자리를 단다(반박 🟡2 — 보일 때 폭이 바뀌어 다시 그리던 것)
-      b = bookBoardFor(src);
+      b = bookBoardFor(src, out);
       if (b) { bookFetch(b, src); return; }   // 📖 판이 값만 받아 둔다(새 판 0 · 접속 표시 0 · 판이 차례를 맡는다)
-      if (!bookMine(src) && books.some(bookCand)) { if (bookQ.length < BOOK_Q_MAX && bookQ.indexOf(src) < 0) bookQ.push(src); return; }   // 📖 곧 판이 될 판이 노크 전 — 줄에 세운다(아래 bookCand)
+      if (!bookMine(src) && !outWant(src, out) && books.some(function (q) { return bookCand(q) && !q.out; })) { if (bookQ.length < BOOK_Q_MAX && bookQ.indexOf(src) < 0) bookQ.push(src); return; }   // 📖 곧 판이 될 판이 노크 전 — 줄에 세운다(아래 bookCand) · 🌤 정적 판 후보 뒤엔 안 선다(그 판엔 흘리지 않는다 — 바로 지금 길 숨긴 판)
       //   ⚠️ 선생님 껍데기의 D1(폰은 미리 판 없음)은 안 가져온다 — 학생 폰은 숨긴 미리 판 하나가 종전 그대로다(설계 §7.2 · 그 판이 곧 판이 된다)
       bookRoom(bookMax() - 1);   // 자리가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 — 종전엔 안 띄웠다 · 📱 폰은 자리 2)
       var np = bookMake(src, true, out); np.home = true;   // 📖 홈이 미리 띄운 판 — 노크하면 판이 된다
@@ -734,7 +744,7 @@
       return b;
     }
     function bookMine(src) { return /[?&]mode=mine(&|$)/.test(src); }
-    function bookBoardFor(src) { return bookMine(src) ? null : bookBoard(); }   // ⭐ 내 문장 주소는 교재 판에 안 끼운다(설계 §5.4 — 내 문장 판은 따로)
+    function bookBoardFor(src, out) { var b = bookMine(src) ? null : bookBoard(); return b && outSame(b, src, out) ? b : null; }   // 🌤 길이 다른 판엔 안 끼운다(위 outSame)   // ⭐ 내 문장 주소는 교재 판에 안 끼운다(설계 §5.4 — 내 문장 판은 따로)
     function bookFetch(b, src) { try { b.win.postMessage({ onf: 'bookFetch', src: src }, b.origin); } catch (e) {} }
     /* 노크 전 판 후보 = 홈에서 연·미리 띄운 판(home) · 아직 노크 전(!win) · 내 문장 아님 · 만든 지 1분 안. 있으면 미리(교재) 주소는 줄에 선다 — 학생 홈은 2초 뒤 넷을 한꺼번에 보낸다(첫 교재 판은 그때 노크 전).
        그 판이 swap:1 로 노크해 판이 되면 줄을 bookFetch 로 흘린다(아래 bookHi) · swap 없이 끝나면 안 흘린다. ponytail: 1분 = 노크 기다림 짐작(선생님 껍데기와 같다). */
@@ -836,7 +846,7 @@
         if (p.real !== p.load || p.sw) { p.real = p.load; if (p.sw) bookSwapEnd(p, p.sw, false, 'fail', ''); p.src = p.load; p.key = bookKey(p.load); }   // 다시 읽힌 판 = 처음 주소
         bookTell(p);
         var bd = bookBoard(), bq = bookQ;   // 📖 판이 생겼다 — 노크 전에 줄 선 미리 주소를 흘린다(위 bookCand)
-        if (bd && bq.length) { bookQ = []; bq.forEach(function (x) { if (!bookFind(x)) bookFetch(bd, x); }); }
+        if (bd && !bd.out && bq.length) { bookQ = []; bq.forEach(function (x) { if (!bookFind(x)) bookFetch(bd, x); }); }   // 🌤 줄 선 주소는 지금 길 것뿐(위 bookPre) — 정적 판엔 안 흘린다
         return;
       }
       if (d.onf === 'bookSwapped') { bookSwapped(p, d); return; }   // 📖 판의 답 — 숨긴 판도(답을 기다리는 사이 사람이 닫을 수 있다)

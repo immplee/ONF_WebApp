@@ -43,7 +43,7 @@ function setup(o) {
     setTimeout: (f, ms) => { timers.push({ f, ms, on: true }); return timers.length; },
     clearTimeout: (id) => { if (timers[id - 1]) timers[id - 1].on = false; } };
   vm.createContext(g);
-  g.window = g; g.URL = URL; g.localStorage = o.ls || null; g.innerWidth = 1440;
+  g.window = g; g.URL = URL; g.localStorage = o.ls || LSf(); g.innerWidth = 1440;
   g.T = 1.7e12; g.Date = { now: () => g.T };
   g.navigator = { userAgent: 'node' }; g.history = { state: null, replaceState() {}, pushState() {} };
   g.console = { info() {}, warn() {}, log() {} };
@@ -250,6 +250,87 @@ t('S5g ⭐ 내 문장·카드 덱 주소는 out:1 이어도 지금 길', () => {
   assert.strictEqual(s.panels().slice(-1)[0].kids[0].src, SRCM, '⛔ 내 문장이 정적 판으로 갔다');
   s.send({ onf: 'openBook', href: CARDS, out: 1 }, s.homeInner);
   assert.strictEqual(s.panels().slice(-1)[0].kids[0].src, SRCC, '⛔ 카드 덱이 정적 판으로 갔다');
+});
+
+console.log('[🌤 검토 고침 1차 — 켠 교재만 · 판 섞지 않기]');
+/* 판 노크 — 첫 노크 뒤 swap:1 노크(정적 판도 지금 교재와 같은 말) */
+function knock(s, box, origin, views) { const w = box.kids[0].contentWindow; s.send({ onf: 'bookHi', views: views || 'line' }, w, origin); s.send({ onf: 'bookHi', views: views || 'line', swap: 1 }, w, origin); w.sent.length = 0; return w; }
+const execWin = (s, box) => { const bw = win('book-exec', s.top), bi = win('book-user', bw); box.kids[0].contentWindow = bw; return bi; };
+const shown = (s) => s.panels().filter((p) => !p.classList.contains('park'));
+const sentOf = (w, k) => js(w.sent).filter((x) => x[0].onf === k);
+
+t('I1 정적 판이 판(board)이 돼도 안 켠 교재(out 없음)를 그 판에 갈아 끼우지 않는다 — 새 지금 길 판', () => {
+  const s = setup({ swap: true });
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
+  const box = s.panels()[0], w = outWin(s, box);
+  s.send({ onf: 'outHello' }, w, OUT_O);
+  knock(s, box, OUT_O);
+  s.send({ onf: 'openBook', href: E2 }, s.homeInner);
+  assert.strictEqual(sentOf(w, 'bookSwap').length, 0, '⛔ 안 켠 교재를 정적 판에 갈아 끼웠다');
+  assert.strictEqual(shown(s)[0].kids[0].src, SRC2, '⛔ 안 켠 교재가 지금 길 새 판으로 안 떴다');
+});
+
+t('I1 지금 길 판(board)에 켠 교재(out:1)를 갈아 끼우지 않는다 — 새 정적 판', () => {
+  const s = setup({ swap: true });
+  s.send({ onf: 'openBook', href: E1 }, s.homeInner);
+  const box = s.panels()[0], bi = execWin(s, box);
+  knock(s, box, GO);
+  s.send({ onf: 'openBook', href: E2, out: 1 }, s.homeInner);
+  assert.strictEqual(sentOf(bi, 'bookSwap').length, 0, '⛔ 켠 교재를 지금 길 판에 갈아 끼웠다');
+  assert.strictEqual(shown(s)[0].kids[0].src, OUT_BOOK, '⛔ 켠 교재가 정적 판으로 안 떴다');
+});
+
+t('I1 카드 덱(view=cards)은 정적 판에 「열어」(bookLike)를 안 보낸다 — 지금 길 새 판', () => {
+  const s = setup({ swap: true });
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
+  const box = s.panels()[0], w = outWin(s, box);
+  knock(s, box, OUT_O, 'cards,line');
+  for (const o of [{}, { out: 1 }]) {
+    s.send(Object.assign({ onf: 'openBook', href: CARDS }, o), s.homeInner);
+    assert.strictEqual(sentOf(w, 'bookView').length + sentOf(w, 'bookSwap').length, 0, '⛔ 카드 덱을 정적 판에 보냈다 ' + JSON.stringify(o));
+    assert.strictEqual(shown(s)[0].kids[0].src, SRCC, '⛔ 카드 덱이 지금 길 판으로 안 떴다');
+  }
+});
+
+t('I1 노크 전 정적 판 후보 뒤에 미리(bookWarm) 주소를 줄 세우지 않는다 — 정적 판에 bookFetch 안 감 · 지금 길 숨긴 판으로 미리', () => {
+  const s = setup({ swap: true });
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
+  const box = s.panels()[0], w = outWin(s, box);
+  s.send({ onf: 'bookWarm', href: E2, panel: 1 }, s.homeInner);
+  knock(s, box, OUT_O);
+  s.send({ onf: 'bookHi', views: 'line', swap: 1 }, w, OUT_O);
+  assert.strictEqual(sentOf(w, 'bookFetch').length, 0, '⛔ 안 켠 미리 주소를 정적 판에 bookFetch 했다');
+  assert.ok(s.panels().some((p) => p.kids[0].src === SRC2 + '&park=1'), '⛔ 미리 주소를 지금 길 숨긴 판으로 안 띄웠다');
+});
+
+t('I2 서버 스위치가 꺼진 뒤 — 낡은 o:1 기억으로 띄운 정적 숨긴 판을 out 없는 누름이 쓰지 않는다(자격 내리고 지금 길 새 판)', () => {
+  const s = setup({ ls: LSf(PB({ o: 1 })), preKey: 'kA' });
+  const old = s.panels()[0];
+  assert.strictEqual(old.kids[0].src, OUT_BOOK, '대역: 정적 숨긴 판');
+  s.send({ onf: 'openBook', href: E1 }, s.homeInner);
+  const v = shown(s);
+  assert.ok(v.length === 1 && v[0] !== old && v[0].kids[0].src === SRC1, '⛔ out 없는 누름이 정적 판을 그대로 보였다');
+  assert.ok(!s.panels().includes(old) || s.obj(old).gone, '⛔ 낡은 정적 판이 주소로 또 찾힌다');
+});
+
+t('I3 hello 뒤 outFail — 판 창·출처·views·swap·기록 다리를 비운다(새 판처럼) · 다음 열기가 죽은 창에 갈아 끼우지 않는다', () => {
+  const s = setup({ swap: true, ls: LSf() });
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
+  const box = s.panels()[0], w = outWin(s, box);
+  s.send({ onf: 'outHello' }, w, OUT_O);
+  knock(s, box, OUT_O, 'cards,line');
+  s.send({ onf: 'outFail', why: 'api' }, w, OUT_O);
+  const p = s.obj(box);
+  assert.ok(p.win === null && p.origin === '' && p.views.length === 0 && p.swap === false && p.hw === null && p.kb === null, '⛔ 물러난 판에 정적 판 창이 남았다');
+  s.send({ onf: 'openBook', href: E2 }, s.homeInner);
+  assert.strictEqual(sentOf(w, 'bookSwap').length, 0, '⛔ 물러난 판(죽은 정적 창)에 갈아 끼우기를 보냈다');
+});
+
+t('minor 저장소가 막힌 창(localStorage 던짐) — 실패를 못 기억하니 정적 판을 안 쓴다', () => {
+  const bad = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
+  const s = setup({ ls: bad });
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
+  assert.strictEqual(s.panels()[0].kids[0].src, SRC1, '⛔ 저장소가 막혔는데 정적 판으로 갔다');
 });
 
 console.log('\n통과 ' + pass + ' / 실패 ' + fail);
