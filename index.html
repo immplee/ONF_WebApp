@@ -113,6 +113,10 @@
      끔이면 onf-frame.js 의 갈아 끼우기가 하나도 안 돈다(종전 그대로). perf=1 이면 갈아 끼움 시간을 콘솔·홈에 한 줄(bookPerf). */
   var swapOn = q.get('swap');
   try { if (swapOn === '1' || swapOn === '0') localStorage.setItem('onfSwap', swapOn); else swapOn = localStorage.getItem('onfSwap'); } catch (eS) {}
+  /* 🌤 밖으로 1(2026-10-24) — 홈이 out:1 로 연 교재만 구글 밖 정적 판(onf-frame.js openApp) · 주소 out=0|1 이면 이 기기에 기억(onfOut) · 없으면 기억값 · 그것도 없으면 켬.
+     out=0 = 이 기기는 늘 지금 길. 토큰은 정적 판 주소에 안 싣고 mount 에 넘긴다(판이 준비되면 postMessage 로). */
+  var outOn = q.get('out');
+  try { if (outOn === '1' || outOn === '0') localStorage.setItem('onfOut', outOn); else outOn = localStorage.getItem('onfOut'); } catch (eO) {}
   /* 토큰은 이미 이 도메인에 저장됐다 — 주소창에서 지운다(화면 찍어 보낼 때 같이 나가면 안 된다).
      ⛔ 반드시 위 `q.get(...)` 들을 다 읽은 **뒤**여야 한다. */
   ONF.frame.hideToken();
@@ -154,6 +158,7 @@
                   { diag: q.get('diag') === '1', bookSrc: bookSrc,
                     wait: document.querySelector('.onf-wait'),   // 🔐 여러 계정 우회 — 못 열면 이 자리에 안내(onf-frame.js openExec)
                     swap: swapOn !== '0', perf: q.get('perf') === '1',
+                    out: outOn !== '0', tok: token,   // 🌤 밖으로 1 — 토큰은 정적 판에 postMessage 로만(주소 X)
                     phone: phoneOn !== '0', hooks: loadHooks, preKey: preKey });
 </script>
 </body>

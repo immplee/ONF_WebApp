@@ -190,7 +190,7 @@
       try {
         if (phase !== 'wait' || !ev || !ev.data) return;
         if (!global.ONF || !ONF.frame || !ONF.frame._fromOurFrame(ev.source, frameEl)) return;
-        if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return;
+        if (!(ONF.frame.isAppOrigin ? ONF.frame.isAppOrigin(ev.origin) : /(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname))) return;   // 🌤 onf-frame.js 와 같은 자물쇠(2026-10-24) · 옛 onf-frame.js(캐시가 어긋남)면 종전 판정
         if (ev.data.onf !== 'brand' || !opts.home) return;
         var b = brandOk(ev.data, frameEl.clientWidth || global.innerWidth, frameEl.clientHeight || global.innerHeight);
         if (!b) return;
