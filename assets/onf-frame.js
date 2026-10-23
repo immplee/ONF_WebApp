@@ -102,6 +102,16 @@
    *   ⚠️ `parent` 는 교차 출처에서도 읽고 비교할 수 있다(HTML 표준 CrossOriginProperties).
    *     최상위에서는 `w.parent === w` 라 그 자리에서 멈춘다(무한 루프 방지).
    *   ⚠️ 상한 8은 안전장치일 뿐이다 — 실제 겹은 1~2다. */
+  /* 📄 PDF 저장 이름(Peter 2026-10-23 「Ownify 선생님 → ONF_영어이름(한글이름)_yymmdd(요일)」) — 크롬은 「PDF 로 저장」 이름을 **탭 제목**에서 가져온다.
+     교재가 인쇄하는 동안만 이름을 바꿔 달라고 한다(printTitle · t:'' = 되돌림 · 교재 executeIframePrint). 받는 쪽은 홈 액자·보이는 판 둘 다(아래 두 message 자리).
+     ⚠️ 첫 바꿈 때의 제목만 적어 둔다 — 인쇄를 두 번 눌러도 되돌릴 곳은 처음 제목이다. */
+  var printOld = null;
+  function printTitle(t) {
+    if (typeof t !== 'string') return;
+    t = t.replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120);
+    if (t) { if (printOld === null) printOld = document.title; document.title = t; }
+    else if (printOld !== null) { document.title = printOld; printOld = null; }
+  }
   function _fromOurFrame(win, frameEl) {
     var w = win, target = frameEl && frameEl.contentWindow;
     if (!w || !target) return false;
@@ -383,6 +393,7 @@
         var newTitle = ev.data.t.replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120);
         if (newTitle) document.title = newTitle;
       }
+      if (ev.data.onf === 'printTitle') { printTitle(ev.data.t); return; }   // 📄 위 printTitle — 홈 액자에서 바로 연 교재(폰·옛 길)
     });
     /* ═══ 기록 칸 다리 — 안쪽(GAS iframe)의 「뒤로 = 창 닫기」 기록 칸을 **여기(최상위 문서)** 에 만든다 (Peter 2026-10-01 「학생홈도 고쳐줘」) ═══
        ⛔ 왜: 아이폰 스와이프 뒤로는 이전 기록의 스냅샷을 덮개로 깔고, **메인 프레임**의 같은 문서 이동 신호가 오면 덮개를 걷는다.
@@ -789,6 +800,7 @@
       if (d.onf === 'hist') { bookHist(p, ev); return; }
       if (d.onf === 'frameHello') { p.kb = ev.source; lastH = -1; lastTop = -1; sync(); return; }
       if (p.parked) return;                                 // ⛔ 숨긴 판은 닫기·전체·갈아 끼우기를 못 부른다
+      if (d.onf === 'printTitle') { printTitle(d.t); return; }   // 📄 판 안 교재의 PDF 저장 이름(위 printTitle) — 보이는 판만
       if (d.onf === 'bookClose') bookClose(d.all === 1);   // all:1 = 교재 머리줄 「홈」 — 앞 판 없이 전부 닫기
       else if (d.onf === 'bookFull') p.box.classList.toggle('full', !!d.on);
       /* 판 안에서 교재 ↔ ⭐ 내 문장을 오갈 때(2026-10-12) — 판만 바꾼다(홈째 넘어가면 「뒤로」에 홈을 다시 읽는다) · 10-13 부터 보이던 판은 숨기고 새 판(돌아가면 0초).
@@ -857,6 +869,7 @@
     hideToken: hideToken, mount: mount, getToken: getToken, withToken: withToken, TOKEN_KEY: TOKEN_KEY,
     tokenFromPath: tokenFromPath,
     openExec: openExec,   // 🔐 선생님 껍데기 판도 쓴다(teacher/index.html bookMake)
+    printTitle: printTitle,   // 📄 선생님 껍데기(teacher/index.html) 판도 같은 함수
     /* 검사용으로만 낸다 — 순수 판정 함수라 창 없이 잴 수 있다. 화면 코드에서 부르지 마라. */
     _fromOurFrame: _fromOurFrame };
 })(window);

@@ -812,6 +812,7 @@ window.addEventListener('message', function (ev) {
   if (d.onf === 'hist') { bookHist(p, ev); return; }           // 📱 판 안쪽 기록 다리(폰만 켠다 · 숨긴 판의 노크도 받는다)
   if (d.onf === 'frameHello') { p.kb = ev.source; p.ko = ev.origin; kbH = -1; kbTop = -1; bookKb(); return; }   // 📱 이 판 교재의 키보드 높이 받는 창
   if (p.parked) return;                                        // ⛔ 숨긴 판은 닫기·전체·갈아 끼우기를 못 부른다
+  if (d.onf === 'printTitle') { if (window.ONF && ONF.frame && ONF.frame.printTitle) ONF.frame.printTitle(d.t); return; }   // 📄 PDF 저장 이름 — 판 안 교재가 인쇄하는 동안만 탭 제목(assets/onf-frame.js printTitle · 쌍둥이)
   if (d.onf === 'bookClose') bookClose(d.all === 1);   // all:1 = 교재 머리줄 「홈」 — 앞 판 없이 전부 닫기
   else if (d.onf === 'bookFull') p.box.classList.toggle('full', !!d.on);
   else if (d.onf === 'openBook' && typeof d.href === 'string') {

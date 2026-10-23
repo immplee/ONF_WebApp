@@ -1663,5 +1663,20 @@ t("🟡 속도 말(bookPerf)에는 주소·토큰이 없다 — {onf, ms, from, 
   assert.deepStrictEqual(fetchOf(bi), [RS(SE('e3'))], '⛔ 이미 판이 든 주소(E2)를 줄에서 bookFetch 로 보냈다');
 });
 
+t('📄 printTitle — 인쇄 동안만 탭 제목을 PDF 이름으로 · 두 번 바꿔도 되돌림은 처음 제목 · 빈 글자 = 되돌림 · 홈 액자 말도 받는다 · 남의 창은 안 받는다', () => {
+  const s = setup();
+  s.g.document.title = 'Ownify 선생님';
+  s.send({ onf: 'printTitle', t: 'ONF_Sunny(임꺽정)_261023(금)' }, s.homeInner);
+  assert.strictEqual(s.g.document.title, 'ONF_Sunny(임꺽정)_261023(금)', '⛔ 홈 액자에서 온 printTitle 로 제목이 안 바뀌었다');
+  s.send({ onf: 'printTitle', t: 'ONF_Sunny(임꺽정)_261024(토)\n' }, s.homeInner);
+  assert.strictEqual(s.g.document.title, 'ONF_Sunny(임꺽정)_261024(토)', '⛔ 줄바꿈을 안 지웠다');
+  s.send({ onf: 'printTitle', t: '' }, s.homeInner);
+  assert.strictEqual(s.g.document.title, 'Ownify 선생님', '⛔ 되돌림이 처음 제목이 아니다');
+  s.send({ onf: 'printTitle', t: '' }, s.homeInner);
+  assert.strictEqual(s.g.document.title, 'Ownify 선생님', '⛔ 두 번째 되돌림이 제목을 바꿨다');
+  s.send({ onf: 'printTitle', t: 'X' }, win('stranger'));
+  assert.strictEqual(s.g.document.title, 'Ownify 선생님', '⛔ 남의 창 말로 제목이 바뀌었다');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);
