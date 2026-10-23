@@ -379,13 +379,13 @@ t('🎧 들으며 필기(4단계 · 2026-10-24) — 홈이 고른 녹음(날짜�
   R2.postAs({ onf: 'auth-please' }, in2);
   assert.strictEqual(got2[0].hw.a, null, '⛔ 꼴이 틀린 녹음 고르기를 넘겼다');
 });
-t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼쪽 반 · 교재 판 오른쪽 반 · 교재만 = 과제 판 숨김 + 「과제로」 칩 · 사진만 = 교재 숨김 · 남의 주소 거절 · 과제 판 액자에서 온 말만', () => {
+t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼쪽 반 · 과제 판 전용 교재 액자 오른쪽 반(홈 옆 교재 판 기계 안 씀) · 교재만 = 과제 판 숨김 + 「과제로」 칩 · 사진만 = 교재 숨김 · 남의 주소 거절 · 과제 판 액자에서 온 말만', () => {
   const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
   R.knockAs(me);
   R.postAs({ onf: 'hwbook', t: 'Tok_1' }, me);
   const fr = R.created.filter((e) => e.tag === 'iframe')[0], inner = { parent: { parent: fr.contentWindow }, postMessage() {} };
   R.postAs({ onf: 'auth-please' }, inner);
-  const box = R.created.filter((e) => e.className === 'onf-hwbox')[0], panels = () => R.created.filter((e) => e.className && /onf-bookpanel/.test(e.className));
+  const box = R.created.filter((e) => e.className === 'onf-hwbox')[0], panels = () => R.created.filter((e) => e.className === 'onf-hwbk' && e.parentNode && !e.removed);
   const HREF = 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILEaaaaaaaa01&sheetName=E3';
   const ce = R.g.document.createElement; R.g.document.createElement = (tag) => { const e = ce(tag); e.style.setProperty = (k, v) => { e.style[k] = v; }; e.style.removeProperty = (k) => { delete e.style[k]; }; e.blur = () => {}; return e; };   // 교재 판 칸 값(--bl)
   R.g.ONF = Object.assign({}, R.g.ONF || {}, { api: { EXEC: R.g.EXEC } }); if (R.g.window && R.g.window !== R.g) R.g.window.ONF = R.g.ONF;   // teacherBookSrc 가 쓰는 exec 주소(onf-api.js 몫)
@@ -402,6 +402,10 @@ t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼�
   assert.ok(chip && chip.parentNode, '⛔ 교재만 — 「과제로」 칩이 없다');
   R.postAs({ onf: 'hwbookView', v: 'photo' }, inner);
   assert.ok(box.style.visibility === '' && box.style.right === '', '⛔ 사진만 — 과제 판이 전체로 안 돌아왔다');
+  assert.strictEqual(panels()[0].style.display, 'none', '⛔ 사진만 — 교재 액자가 안 숨었다');
+  assert.ok(!R.created.some((e) => e.className && /onf-bookpanel/.test(e.className)), '⛔ 홈 옆 교재 판(books)을 건드렸다');
+  R.g.hwClose();   // 과제 판 닫기(뒤로·‹ 모두 여기로) = 그 교재 액자도 지움
+  assert.strictEqual(panels().length, 0, '⛔ 과제 판을 닫았는데 교재 액자가 남았다');
 });
 t('📝 과제 판 액자 — 노크엔 지금 토큰 + 고른 사진·입장권(한 번만) · 그 액자 후손·googleusercontent 만 · 홈 노크 자물쇠(appWin)는 안 건드림 · ‹ 와 뒤로 = 닫기(홈엔 뒤로 안 보냄)', () => {
   const L = '402d6a62-96ae-817f-86ec-ecaf4f919ab9', HWT = { p: '{"s":"Tok_1"}', sig: 'A'.repeat(43) };
