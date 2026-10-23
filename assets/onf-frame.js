@@ -254,7 +254,7 @@
   /* ═══ 🌤 밖으로 1(2026-10-24) — 홈이 out:1 로 연 교재만 구글 밖 정적 판에 띄운다 ═══
      · 우리 화면 출처 = 구글(GAS 가 앱을 서빙하는 *.googleusercontent.com) **또는** 정적 판 출처(정확히 그 글자) — 자물쇠 여섯 자리가 이 하나만 본다.
        구글 쪽은 https + 하위 이름만(종전 hist hi·bookHi 의 엄한 꼴 — 호스트만 보던 자리는 조금 좁아진다 · 진짜 GAS 는 늘 이 꼴).
-     · 정적 판 주소엔 토큰을 안 싣는다 — 판이 outHello(받을 준비)를 하면 그 창·그 출처로 outBoot{tok, src, cf} 한 번.
+     · 정적 판 주소엔 토큰을 안 싣는다 — 판이 outHello(받을 준비)를 하면 그 창·그 출처로 outBoot{tok, src, cf}(hello 마다 — 다시 읽힌 판도 받게).
        OUT_MS 안 hello 가 없거나 outFail 이면 onFail(같은 판에 지금 길 · 아래 mount bookMake). ⛔ 구글 겹 액자 깊이 판단(openExec)은 안 쓴다 — 정적 판은 겹이 없다.
      · 정적 판 주소는 상수 한 줄(시험 땐 Pages 주소). OUT_MS = 문서 받을 준비까지 짐작 — 0단계 실측으로 고친다. */
   var ONF_OUT_ORIGINS = ['https://app.ownify.co.kr', 'https://onf-app.pages.dev'];
@@ -268,8 +268,8 @@
     function onMsg(ev) {
       if (done || !ev || !ev.data || ev.source !== el.contentWindow || ev.origin !== org) return;   // 그 액자 창 · 그 출처만
       if (ev.data.onf === 'outFail') return bad();
-      if (ev.data.onf !== 'outHello' || booted) return;
-      booted = true; clearTimeout(tm);
+      if (ev.data.onf !== 'outHello') return;
+      booted = true; clearTimeout(tm);   // 🌤 hello 마다 다시(2026-10-24) — 판이 스스로 다시 읽으면(2시간 · 「다시 열기」) 새 문서가 또 hello · 안 보내면 4초 뒤 outFail 로 지금 길
       try { ev.source.postMessage({ onf: 'outBoot', tok: tok, src: src, cf: cf || null }, org); } catch (e) {}
     }
     global.addEventListener('message', onMsg);
@@ -630,6 +630,34 @@
        길이 다른 판엔 갈아 끼우기(bookBoardFor)·「열어」(bookLike)·줄 선 미리 주소(bookQ)를 안 보낸다 → 켠 교재만 정적 판 · ⭐ 내 문장·🗂️ 카드 덱(outOk 거짓)은 늘 지금 길 판. */
     function outWant(src, out) { return !!out && outOk(src); }
     function outSame(p, src, out) { return !!p.out === outWant(src, out); }
+    /* 🧺 남은 쓰기 넘겨주기(밖으로 1 Task 6 · 2026-10-24) — 정적 판에서 못 보낸 쓰기는 그 출처(app.ownify.co.kr) 기기 저장소에 남고 정적 판이 다시 열려야 나간다
+       (안정성 보강 3 「다시 열면 기기 대기열 자동 보냄」). 서버 스위치를 끄거나 그날 물러나면 그 교재는 지금 길로만 열려 영영 안 나간다 →
+       이 기기가 14일 안에 정적 판을 띄웠고(onfOutUsed · 위 bookMake) 지금 그 교재를 지금 길로 열면 정적 판을 **숨긴 판으로 한 번** 띄우고 outFlushed 를 받으면 닫는다.
+       · books 밖 — 판 규칙(판·「열어」·자리 셈)과 노크(위 판 말 받이는 books 만 본다)에 안 섞인다 · 주소는 view·line 뗀 교재(bookBase) + park=1(접속 신호 0)
+       · 사본 힌트는 안 넘긴다 — 사본 표는 확인 전이라 못 보낸 칸을 저절로 안 보낸다(Ownify onfBkGated) · 다리 값으로 그린다
+       · 안 뜸·outFail·상한(FLUSH_MS)도 닫는다 — 그날 실패(onfOutFail)는 안 적는다(보이는 판이 아니다) · 남은 것은 기기에 그대로(다음 열기에 또)
+       · 기기 끔·토큰 없음·그날 실패·⭐ 내 문장·🗂️ 카드 덱은 안 한다(위 outOk) · 한 화면에 교재마다 한 번. ponytail: 60초 = 저장 재시도 몇 번 짐작 — 실측으로 고친다. */
+    var OUT_USED = 'onfOutUsed', OUT_USED_MS = 14 * 86400000, FLUSH_MS = 60000, flushed = {};
+    function bookFlush(src) {
+      var b = bookBase(src), box, el, oe, tm, org = new URL(ONF_OUT_BOOK).origin;
+      if (flushed[b] || !outOk(b)) return;
+      try { if (!(Date.now() - Number(global.localStorage.getItem(OUT_USED) || 0) < OUT_USED_MS)) return; } catch (e) { return; }
+      flushed[b] = 1;
+      box = document.createElement('div'); el = document.createElement('iframe');
+      box.className = 'onf-bookpanel'; box.classList.add('park');
+      el.setAttribute('title', '교재'); el.setAttribute('tabindex', '-1'); el.setAttribute('aria-hidden', 'true');
+      box.appendChild(el); document.body.appendChild(box);
+      function done() {
+        if (!box) return;
+        clearTimeout(tm); global.removeEventListener('message', onMsg); if (oe) oe.stop();
+        if (box.parentNode) box.parentNode.removeChild(box);
+        box = null;
+      }
+      function onMsg(ev) { if (ev && ev.data && ev.data.onf === 'outFlushed' && ev.source === el.contentWindow && ev.origin === org) done(); }   // 그 액자 창 · 그 출처만
+      global.addEventListener('message', onMsg);
+      oe = openApp(el, ONF_OUT_BOOK, b + (b.indexOf('?') < 0 ? '?' : '&') + 'park=1', null, done, opts.tok);
+      tm = setTimeout(done, FLUSH_MS);
+    }
     function bookMake(src, parked, out, cf) {
       var p = { box: document.createElement('div'), el: document.createElement('iframe'), src: src, key: bookKey(src), parked: parked, win: null, origin: '', views: [], kb: null, hw: null, ho: '', idle: null, left: null, m: null, r: null, back: null,   // back = 나를 열어 준 판(하나만 · 없으면 null) — 아래 「앞 판 규칙」
         swap: false, load: src, real: src, sw: null, ask: {}, born: Date.now(), gone: false, home: false };   // 📖 아래 「교재 판 한 장」 — swap = 노크 swap:1 · load = 액자가 처음 연 주소 · real = 판이 실제로 든 교재 · sw = 기다리는 갈아 끼우기 · ask = 보낸 번호 → 주소 · born = 만든 때 · gone = 주소로 못 찾음 · home = 홈에서 연 판(bookBoard)
@@ -651,6 +679,7 @@
          안 뜨면 같은 판에 지금 길(exec) · 그날은 이 기기 지금 길(onfOutFail). ⚠️ 위 exec 줄 모양은 multilogin.test.js 가 본다. */
       if (out && outOk(src)) {
         p.out = true;
+        try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}   // 🧺 아래 bookFlush — 이 기기 정적 판 저장소에 쓰기가 남을 수 있다
         p.oe = openApp(p.el, ONF_OUT_BOOK, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, bookCfOk(cf), function () {
           console.info('[onf] 정적 판이 안 떴다 — 지금 길로 다시');
           try { global.localStorage.setItem(OUT_FAIL, String(Date.now())); } catch (e) {}
@@ -703,6 +732,7 @@
     function bookOpen(href, left, bm, br, home, cf, out) {   // ⚠️ 칸 값 m·r 은 이 안의 지역 m(bookView 말)과 겹쳐 bm·br 로 받는다 · cf = 📖 ☁️ 홈이 실은 사본 힌트(홈 openBook 만) · out = 🌤 홈이 out:1 로 연 교재(위 outOk)
       var src = opts.bookSrc(href), b;
       if (!src) return;
+      if (!outWant(src, out)) bookFlush(src);   // 🧺 지금 길로 여는 교재 — 이 기기 정적 판 저장소에 남은 쓰기를 숨긴 판으로 한 번 넘겨준다(아래)
       if (out) { outSeen[src] = 1; if (preH && opts.bookSrc(preH) === src) preWrite(); }   // 🌤 기억한 첫 교재가 켠 교재였다 — o:1(아래 preEarly)
       var a = bookAsk(src), p = bookFind(src), m = { onf: 'bookView' };
       if (p && p.out && !outWant(src, out)) { bookRetire(p); p = null; }   // 🌤 검토 고침 2 — 서버 스위치를 끈 뒤 낡은 o:1 기억으로 띄운 정적 판 · 자격 내리고 지금 길 새 판(끈 때만 드는 값)

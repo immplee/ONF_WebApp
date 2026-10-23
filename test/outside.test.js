@@ -92,8 +92,7 @@ t('S5b out:1 → 액자 주소 = ONF_OUT_BOOK(t= 없음) · 그 액자 창의 ou
   s.send({ onf: 'outHello' }, w, GO);
   assert.strictEqual(boots(w).length + boots(stranger).length, 0, '⛔ 남의 창·남의 출처 hello 에 outBoot 을 보냈다');
   s.send({ onf: 'outHello' }, w, OUT_O);
-  s.send({ onf: 'outHello' }, w, OUT_O);
-  assert.deepStrictEqual(boots(w), [[{ onf: 'outBoot', tok: 'TOK', src: SRC1, cf: CF }, OUT_O]], '⛔ outBoot 이 없거나 두 번이거나 꼴·출처가 다르다');
+  assert.deepStrictEqual(boots(w), [[{ onf: 'outBoot', tok: 'TOK', src: SRC1, cf: CF }, OUT_O]], '⛔ outBoot 이 없거나 두 번이거나 꼴·출처가 다르다');   // 두 번째 hello(다시 읽힌 판)는 아래 R6
   //   정적 판의 노크(bookHi)는 새 출처로 와도 판 창이 된다 — 그 뒤는 지금 교재와 같은 말
   s.send({ onf: 'bookHi', views: 'line', swap: 1 }, w, OUT_O);
   assert.ok(s.obj(p).win === w && s.obj(p).origin === OUT_O, '⛔ 정적 판 노크를 판 창으로 안 받았다');
@@ -331,6 +330,72 @@ t('minor 저장소가 막힌 창(localStorage 던짐) — 실패를 못 기억�
   const s = setup({ ls: bad });
   s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
   assert.strictEqual(s.panels()[0].kids[0].src, SRC1, '⛔ 저장소가 막혔는데 정적 판으로 갔다');
+});
+
+console.log('[🌤 Task 6 — 다시 읽힌 판 · 남은 쓰기 넘겨주기]');
+
+t('R6 다시 읽힌 정적 판(2시간 다시 읽기·「다시 열기」)의 outHello 마다 outBoot 다시 — 같은 값 · 그 창·그 출처만(남의 창·출처 hello 엔 안 보냄)', () => {
+  const s = setup();
+  s.send({ onf: 'openBook', href: E1, out: 1, cf: CF }, s.homeInner);
+  const w = outWin(s, s.panels()[0]);
+  s.send({ onf: 'outHello' }, w, OUT_O);
+  s.send({ onf: 'outHello' }, w, OUT_O);
+  s.send({ onf: 'outHello' }, win('stranger', s.top), OUT_O);
+  s.send({ onf: 'outHello' }, w, 'https://evil.example.com');
+  const one = [{ onf: 'outBoot', tok: 'TOK', src: SRC1, cf: CF }, OUT_O];
+  assert.deepStrictEqual(boots(w), [one, one], '⛔ 다시 읽힌 판의 hello 에 outBoot 을 다시 안 보냈다(판이 4초 뒤 outFail → 지금 길): ' + JSON.stringify(boots(w)));
+});
+
+/* 남은 쓰기 넘겨주기 — 숨긴 정적 판(books 밖) = 주소가 정적 판이고 park 인 판 */
+const DAY = 86400000;
+const flushes = (s) => s.panels().filter((p) => p.kids[0].src === OUT_BOOK && p.classList.contains('park'));
+t('S6a onfOutUsed(14일 안) 있고 out 없는 교재 열기 → 정적 숨긴 판 하나(outBoot src park=1 · cf 없음) · outFlushed(그 창·그 출처) 받으면 닫힘 · 남의 말엔 안 닫힘', () => {
+  const s = setup({ ls: LSf({ onfOutUsed: String(1.7e12 - 13 * DAY) }) });
+  s.send({ onf: 'openBook', href: E1, cf: CF }, s.homeInner);
+  assert.strictEqual(shown(s)[0].kids[0].src, SRC1, '⛔ 보이는 판이 지금 길이 아니다');
+  const f = flushes(s);
+  assert.strictEqual(f.length, 1, '⛔ 남은 쓰기 넘겨줄 숨긴 정적 판이 하나가 아니다: ' + f.length);
+  const w = outWin(s, f[0]);
+  s.send({ onf: 'outHello' }, w, OUT_O);
+  assert.deepStrictEqual(boots(w), [[{ onf: 'outBoot', tok: 'TOK', src: SRC1 + '&park=1', cf: null }, OUT_O]], '⛔ 숨긴 판 outBoot 꼴: ' + JSON.stringify(boots(w)));
+  s.send({ onf: 'outFlushed', n: 2 }, win('stranger', s.top), OUT_O);
+  s.send({ onf: 'outFlushed', n: 2 }, w, 'https://evil.example.com');
+  assert.strictEqual(flushes(s).length, 1, '⛔ 남의 outFlushed 로 닫혔다');
+  s.send({ onf: 'outFlushed', n: 2 }, w, OUT_O);
+  assert.strictEqual(flushes(s).length, 0, '⛔ outFlushed 를 받았는데 안 닫혔다');
+  assert.strictEqual(shown(s)[0].kids[0].src, SRC1, '⛔ 보이던 판이 사라졌다');
+  s.send({ onf: 'openBook', href: E1 }, s.homeInner);
+  s.send({ onf: 'openBook', href: E2 }, s.homeInner);
+  assert.strictEqual(flushes(s).length, 1, '⛔ 한 화면에 같은 교재를 또 넘겨주거나 다른 교재(E2)를 안 넘겨줬다');
+});
+
+t('S6a onfOutUsed 없음·14일 넘음·끈 기기·실패한 날·토큰 없음·켠 교재(out:1)·내 문장 → 넘겨줄 판 안 생김', () => {
+  for (const [why, o, msg] of [['없음', {}], ['14일 넘음', { ls: LSf({ onfOutUsed: String(1.7e12 - 14 * DAY - 1) }) }],
+    ['끈 기기', { out: false, ls: LSf({ onfOutUsed: String(1.7e12) }) }], ['실패한 날', { ls: LSf({ onfOutUsed: String(1.7e12), onfOutFail: String(1.7e12 - 1000) }) }],
+    ['토큰 없음', { tok: '', ls: LSf({ onfOutUsed: String(1.7e12) }) }], ['켠 교재', { ls: LSf({ onfOutUsed: String(1.7e12) }) }, { out: 1 }],
+    ['내 문장', { ls: LSf({ onfOutUsed: String(1.7e12) }) }, { href: MINE }]]) {
+    const s = setup(o);
+    s.send(Object.assign({ onf: 'openBook', href: E1 }, msg || {}), s.homeInner);
+    assert.ok(s.panels().every((p) => !p.classList.contains('park')), '⛔ ' + why + ' 인데 숨긴 판이 생겼다');
+  }
+});
+
+t('S6a 정적 판을 띄우면 onfOutUsed 를 적는다 · 넘겨줄 판이 안 뜨면(OUT_MS)·outFail·60초 상한이면 닫고 하루 실패(onfOutFail)는 안 적는다', () => {
+  const ls = LSf();
+  const s = setup({ ls });
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
+  assert.strictEqual(ls.m.onfOutUsed, String(1.7e12), '⛔ 정적 판을 띄웠는데 onfOutUsed 를 안 적었다');
+  for (const how of ['hello 없음', 'outFail', '상한']) {
+    const l2 = LSf({ onfOutUsed: String(1.7e12) }), q = setup({ ls: l2 });
+    q.send({ onf: 'openBook', href: E1 }, q.homeInner);
+    const w = outWin(q, flushes(q)[0]);
+    if (how === 'hello 없음') q.fire(2500);
+    else if (how === 'outFail') { q.send({ onf: 'outHello' }, w, OUT_O); q.send({ onf: 'outFail', why: 'bridge' }, w, OUT_O); }
+    else { q.send({ onf: 'outHello' }, w, OUT_O); q.fire(60000); }
+    assert.strictEqual(flushes(q).length, 0, '⛔ ' + how + ' — 넘겨줄 판이 안 닫혔다');
+    assert.ok(!l2.m.onfOutFail, '⛔ ' + how + ' — 넘겨주기 실패로 그날 정적 판을 껐다');
+    assert.strictEqual(q.panels()[0].kids[0].src, SRC1, '⛔ ' + how + ' — 보이는 판이 바뀌었다');
+  }
 });
 
 console.log('\n통과 ' + pass + ' / 실패 ' + fail);
