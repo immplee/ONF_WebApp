@@ -632,16 +632,37 @@
     function outSame(p, src, out) { return !!p.out === outWant(src, out); }
     /* 🧺 남은 쓰기 넘겨주기(밖으로 1 Task 6 · 2026-10-24) — 정적 판에서 못 보낸 쓰기는 그 출처(app.ownify.co.kr) 기기 저장소에 남고 정적 판이 다시 열려야 나간다
        (안정성 보강 3 「다시 열면 기기 대기열 자동 보냄」). 서버 스위치를 끄거나 그날 물러나면 그 교재는 지금 길로만 열려 영영 안 나간다 →
-       이 기기가 14일 안에 정적 판을 띄웠고(onfOutUsed · 위 bookMake) 지금 그 교재를 지금 길로 열면 정적 판을 **숨긴 판으로 한 번** 띄우고 outFlushed 를 받으면 닫는다.
-       · books 밖 — 판 규칙(판·「열어」·자리 셈)과 노크(위 판 말 받이는 books 만 본다)에 안 섞인다 · 주소는 view·line 뗀 교재(bookBase) + park=1(접속 신호 0)
+       지금 길로 교재를 열 때 아래가 다 맞으면 정적 판을 **숨긴 판으로 한 번** 띄우고 outFlushed 를 받으면 닫는다.
+       · 남은 쓰기가 있다 — 정적 판이 outQueue{n} 으로 알린 마지막 값이 n>0(onfOutPending · 아래 outPend) · 14일 안에 정적 판을 띄웠다(onfOutUsed · 위 bookMake)
+         (검토 고침 2a — 남은 게 없는데 기기마다 교재마다 1.9MB 판 + 다리를 띄우지 않게)
+       · 살아 있는 정적 판이 없다 — 자격 내린 판(gone)도 액자는 살아 같은 출처 저장소를 이미 보낸다 · 둘이 같은 대기열을 보내면 두 번 갈 수 있다(검토 고침 1)
+       · 보이는 판이 뜬 뒤(첫 노크 · 노크가 없으면 FLUSH_WAIT_MS) 한가할 때(requestIdleCallback) — 보이는 판과 같은 박자에 안 겨룬다(검토 고침 2b)
+       · books 밖 — 판 규칙(판·「열어」·자리 셈)과 노크(아래 판 말 받이는 books 만 본다)에 안 섞인다 · 주소는 view·line 뗀 교재(bookBase) + park=1(접속 신호 0)
        · 사본 힌트는 안 넘긴다 — 사본 표는 확인 전이라 못 보낸 칸을 저절로 안 보낸다(Ownify onfBkGated) · 다리 값으로 그린다
        · 안 뜸·outFail·상한(FLUSH_MS)도 닫는다 — 그날 실패(onfOutFail)는 안 적는다(보이는 판이 아니다) · 남은 것은 기기에 그대로(다음 열기에 또)
-       · 기기 끔·토큰 없음·그날 실패·⭐ 내 문장·🗂️ 카드 덱은 안 한다(위 outOk) · 한 화면에 교재마다 한 번. ponytail: 60초 = 저장 재시도 몇 번 짐작 — 실측으로 고친다. */
-    var OUT_USED = 'onfOutUsed', OUT_USED_MS = 14 * 86400000, FLUSH_MS = 60000, flushed = {};
-    function bookFlush(src) {
-      var b = bookBase(src), box, el, oe, tm, org = new URL(ONF_OUT_BOOK).origin;
-      if (flushed[b] || !outOk(b)) return;
-      try { if (!(Date.now() - Number(global.localStorage.getItem(OUT_USED) || 0) < OUT_USED_MS)) return; } catch (e) { return; }
+       · 기기 끔·토큰 없음·그날 실패·⭐ 내 문장·🗂️ 카드 덱은 안 한다(위 outOk) · 한 화면에 교재마다 한 번.
+       ponytail: 60초 = 저장 재시도 몇 번 · 15초 = 지금 길 첫 그림 넉넉히 — 실측으로 고친다. */
+    var OUT_USED = 'onfOutUsed', OUT_USED_MS = 14 * 86400000, OUT_PEND = 'onfOutPending', FLUSH_MS = 60000, FLUSH_WAIT_MS = 15000, flushed = {}, OUT_ORG = new URL(ONF_OUT_BOOK).origin;
+    function outPend(n) { try { if (typeof n === 'number' && n > 0) global.localStorage.setItem(OUT_PEND, '1'); else if (n === 0) global.localStorage.removeItem(OUT_PEND); } catch (e) {} }
+    function flushWorth(b) {
+      if (flushed[b] || !outOk(b) || books.some(function (q) { return q.out; })) return false;   // q.out = 정적 판 액자가 산다(gone 이어도 · 지금 길로 물러난 판은 false)
+      try { return global.localStorage.getItem(OUT_PEND) === '1' && Date.now() - Number(global.localStorage.getItem(OUT_USED) || 0) < OUT_USED_MS; } catch (e) { return false; }
+    }
+    function bookFlushSoon(p, src) {
+      var b = bookBase(src), t = 0;
+      if (!p || !flushWorth(b)) return;   // 싼 거르개 먼저 — 시계도 안 건다
+      var go = function () {
+        if (p.flushGo !== go) return;
+        p.flushGo = null; clearTimeout(t);
+        var f = function () { bookFlush(b); };
+        if (typeof global.requestIdleCallback === 'function') global.requestIdleCallback(f, { timeout: 3000 }); else setTimeout(f, 0);
+      };
+      p.flushGo = go;   // 아래 판 노크(bookHi)가 부른다
+      if (p.win) go(); else t = setTimeout(go, FLUSH_WAIT_MS);   // 이미 뜬 판(다시 보임·갈아 끼우기)이면 한가할 때 바로
+    }
+    function bookFlush(b) {
+      var box, el, oe, tm;
+      if (!flushWorth(b)) return;   // 기다리는 사이 바뀌었을 수 있다(정적 판이 떴다 · 다 보냈다)
       flushed[b] = 1;
       box = document.createElement('div'); el = document.createElement('iframe');
       box.className = 'onf-bookpanel'; box.classList.add('park');
@@ -653,7 +674,11 @@
         if (box.parentNode) box.parentNode.removeChild(box);
         box = null;
       }
-      function onMsg(ev) { if (ev && ev.data && ev.data.onf === 'outFlushed' && ev.source === el.contentWindow && ev.origin === org) done(); }   // 그 액자 창 · 그 출처만
+      function onMsg(ev) {   // 그 액자 창 · 그 출처만
+        if (!ev || !ev.data || ev.source !== el.contentWindow || ev.origin !== OUT_ORG) return;
+        if (ev.data.onf === 'outQueue') outPend(ev.data.n);
+        else if (ev.data.onf === 'outFlushed') { outPend(0); done(); }
+      }
       global.addEventListener('message', onMsg);
       oe = openApp(el, ONF_OUT_BOOK, b + (b.indexOf('?') < 0 ? '?' : '&') + 'park=1', null, done, opts.tok);
       tm = setTimeout(done, FLUSH_MS);
@@ -732,14 +757,15 @@
     function bookOpen(href, left, bm, br, home, cf, out) {   // ⚠️ 칸 값 m·r 은 이 안의 지역 m(bookView 말)과 겹쳐 bm·br 로 받는다 · cf = 📖 ☁️ 홈이 실은 사본 힌트(홈 openBook 만) · out = 🌤 홈이 out:1 로 연 교재(위 outOk)
       var src = opts.bookSrc(href), b;
       if (!src) return;
-      if (!outWant(src, out)) bookFlush(src);   // 🧺 지금 길로 여는 교재 — 이 기기 정적 판 저장소에 남은 쓰기를 숨긴 판으로 한 번 넘겨준다(아래)
+      var fl = !outWant(src, out);   // 🧺 지금 길로 여는 교재 — 이 기기 정적 판 저장소에 남은 쓰기를 숨긴 판으로 한 번 넘겨준다(아래 bookFlushSoon · 보이는 판이 뜬 뒤)
       if (out) { outSeen[src] = 1; if (preH && opts.bookSrc(preH) === src) preWrite(); }   // 🌤 기억한 첫 교재가 켠 교재였다 — o:1(아래 preEarly)
       var a = bookAsk(src), p = bookFind(src), m = { onf: 'bookView' };
       if (p && p.out && !outWant(src, out)) { bookRetire(p); p = null; }   // 🌤 검토 고침 2 — 서버 스위치를 끈 뒤 낡은 o:1 기억으로 띄운 정적 판 · 자격 내리고 지금 길 새 판(끈 때만 드는 값)
       p = p || bookLike(src, a, out);   // 📖 view·line 만 다른 판이 할 줄 알면 그 판(위 bookLike) — 갈아 끼우기보다 **먼저**(0초 길)
-      if (!p && home && (b = bookBoardFor(src, out))) { bookSwapTo(b, src, left, bm, br, cf); return; }
+      if (!p && home && (b = bookBoardFor(src, out))) { bookSwapTo(b, src, left, bm, br, cf); if (fl) bookFlushSoon(b, src); return; }
       p = p || bookMake(src, false, out, cf);
       bookShow(p, left, bm, br);   // 🔐 못 연 판이면 bookShow 가 새 판으로 바꾼다 — 새 판은 노크 전이라 아래 bookCan 이 거짓(말 안 보냄)
+      if (fl) bookFlushSoon(bookShown(), src);
       if (a.view) m.view = a.view;
       if (a.line) m.line = a.line;
       if (bookCan(p, a)) { try { p.win.postMessage(m, p.origin); } catch (e) {} }   // 보인다(bookPark) 다음에 — 페이지가 「보임」 손질 뒤 연다
@@ -873,12 +899,14 @@
         p.win = ev.source; p.origin = ev.origin;
         p.views = typeof d.views === 'string' ? d.views.split(',') : [];   // 📖 할 줄 아는 view(위 bookLike) — 옛 교재는 안 싣는다 = 없음
         p.swap = d.swap === 1;   // 📖 swap:1 은 둘째 노크에 온다 — 첫 노크(없음)가 다시 오면 판이 다시 읽힌 것
+        if (p.flushGo) p.flushGo();   // 🧺 보이는 판이 떴다 — 기다리던 넘겨주기(위 bookFlushSoon)
         if (p.real !== p.load || p.sw) { p.real = p.load; if (p.sw) bookSwapEnd(p, p.sw, false, 'fail', ''); p.src = p.load; p.key = bookKey(p.load); }   // 다시 읽힌 판 = 처음 주소
         bookTell(p);
         var bd = bookBoard(), bq = bookQ;   // 📖 판이 생겼다 — 노크 전에 줄 선 미리 주소를 흘린다(위 bookCand)
         if (bd && !bd.out && bq.length) { bookQ = []; bq.forEach(function (x) { if (!bookFind(x)) bookFetch(bd, x); }); }   // 🌤 줄 선 주소는 지금 길 것뿐(위 bookPre) — 정적 판엔 안 흘린다
         return;
       }
+      if (d.onf === 'outQueue') { if (p.out && ev.source === p.el.contentWindow && ev.origin === OUT_ORG) outPend(d.n); return; }   // 🧺 정적 판의 기기 대기열 수(위 outPend) — 숨긴 판도
       if (d.onf === 'bookSwapped') { bookSwapped(p, d); return; }   // 📖 판의 답 — 숨긴 판도(답을 기다리는 사이 사람이 닫을 수 있다)
       if (d.onf === 'themeAsk') { themeAsk(ev); return; }   // 🌙 판 안 교재가 묻는다(2단계) — 숨긴 판도(보일 때 색이 맞게)
       /* 📱 판 안쪽 기록 다리(폰 · 위 bookHist — 숨긴 판의 노크도 받는다: 미리 띄운 판은 숨긴 채 뜬다) · 키보드 노크 = 이 판의 키보드 높이 받는 창(kbAt) */
