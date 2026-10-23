@@ -522,7 +522,11 @@ function hwWarm(t) {
   hwFr = document.createElement('iframe'); hwFr.setAttribute('allow', 'clipboard-write; microphone'); hwFr.setAttribute('title', '과제');
   hwFr.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent';
   hwFr.src = EXEC + '?mode=hwbook&t=' + encodeURIComponent(t) + '&warm=1';   // ⛔ 붙이기 전에(WebKit 뒤로 칸)
-  hwBox.appendChild(hwFr); document.body.appendChild(hwBox);
+  var wt = document.createElement('div'); wt.className = 'onf-wait'; wt.innerHTML = '<div class="onf-spin"></div><span>불러오는 중</span>';
+  var xb = document.createElement('button'); xb.type = 'button'; xb.className = 'onf-hwx'; xb.setAttribute('aria-label', '닫기'); xb.textContent = '✕';   // 보인 뒤 노크가 안 오면(구글 오류 화면 등) 닫을 단추 — 노크가 오면 숨긴다(반박 🟠2)
+  xb.style.cssText = 'position:absolute;top:12px;left:12px;z-index:2;width:40px;height:40px;border-radius:12px;border:0;font-size:18px;cursor:pointer;background:rgba(0,0,0,.35);color:#fff';
+  xb.onclick = function () { hwBack(); };
+  hwBox.appendChild(wt); hwBox.appendChild(hwFr); hwBox.appendChild(xb); document.body.appendChild(hwBox);
   hwT = t; hwWarmOn = true; clearTimeout(hwWarmTm); hwWarmTm = setTimeout(function () { if (hwWarmOn) hwClose(); }, 600000);
 }
 function hwBack() { if (history.state && history.state.onfHw) history.back(); else hwClose(); }
@@ -532,6 +536,7 @@ function hwAuth() {   // 판에 지금 토큰(+ 고른 사진·입장권 한 번
   if (hwGo) { m.hw = hwGo; hwGo = null; }
   hwGave = pending;
   try { hwWin.postMessage(m, hwOrigin); } catch (e) {}
+  if (hwGoMsg) { try { hwWin.postMessage(hwGoMsg, hwOrigin); } catch (e) {} hwGoMsg = null; }   // 미리 띄운 판 「열어」 — 토큰 바로 뒤(새로 받은 토큰 길 hwTell 로 와도 · 반박 🔴1)
 }
 function hwTell() { if (hwWant && hwWin && pending && tokAlive(pending)) { hwWant = false; hwAuth(); } }   // onCredential 이 부른다 — 새로 받은 토큰을 판에도
 function hwClose() {
@@ -561,7 +566,6 @@ window.addEventListener('message', function (ev) {
         return;
       }
       hwAuth();
-      if (hwGoMsg) { try { hwWin.postMessage(hwGoMsg, hwOrigin); } catch (e) {} hwGoMsg = null; }   // 미리 띄운 판이 늦게 떴다 — 토큰 뒤에 바로 「열어」
       return;
     }
     if (d.onf === 'themeAsk') { themeAsk(ev); return; }

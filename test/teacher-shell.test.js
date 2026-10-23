@@ -425,6 +425,15 @@ t('📝 과제 미리 띄우기 — hwbookWarm = 안 보이는 액자(&warm=1 ·
   const got2 = [], in2 = { parent: { parent: R2.created.filter((e) => e.tag === 'iframe')[0].contentWindow }, postMessage: (m) => got2.push(m) };
   R2.postAs({ onf: 'auth-please' }, in2);
   assert.deepEqual(got2.map((m) => m.onf), ['auth', 'hwbookGo'], '⛔ 늦게 뜬 판에 열기 말을 안 줬다');
+  // 토큰이 죽은 채 늦게 뜬 판 — 새로 받은 토큰 뒤에도 「열어」 가 간다(반박 🔴1)
+  const R4 = boot({ onf_id_tok: odk() }), me4 = { parent: R4.els.app.contentWindow, postMessage() {} }; R4.knockAs(me4);
+  R4.postAs({ onf: 'hwbookWarm', t: 'Tok_1' }, me4); R4.postAs({ onf: 'hwbook', t: 'Tok_1', l: L, f: [], hwt: HWT }, me4);
+  const got4 = [], in4 = { parent: { parent: R4.created.filter((e) => e.tag === 'iframe')[0].contentWindow }, postMessage: (m) => got4.push(m) };
+  R4.g.pending = 'x.' + b64({ exp: now() - 10, hd: 'ownify.co.kr', email: 't@ownify.co.kr' }) + '.y';   // 그새 토큰이 죽었다
+  R4.postAs({ onf: 'auth-please' }, in4); assert.equal(got4.length, 0, '죽은 토큰은 안 준다(새로 받기)');
+  R4.g.onCredential({ credential: gtok() });
+  assert.deepEqual(got4.map((m) => m.onf), ['auth', 'hwbookGo'], '⛔ 새 토큰 길에서 「열어」 가 빠졌다');
+  assert.ok(R4.created.some((e) => e.className === 'onf-hwx'), '⛔ 미리 띄운 판에 닫기 단추가 없다');
   // 다른 학생 — 미리 띄운 것을 걷고 새로
   const R3 = boot({ onf_id_tok: odk() }), me3 = { parent: R3.els.app.contentWindow, postMessage() {} }; R3.knockAs(me3);
   R3.postAs({ onf: 'hwbookWarm', t: 'Tok_1' }, me3); R3.postAs({ onf: 'hwbook', t: 'Tok_2', l: L }, me3);
