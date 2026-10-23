@@ -377,12 +377,15 @@ t('📝 과제 판 액자 — 노크엔 지금 토큰 + 고른 사진·입장권
   assert.equal(got.length, 0, '⛔ 남의 창·다른 출처 노크에 토큰을 줬다');
   R.postAs({ onf: 'auth-please' }, inner);
   assert.equal(got.length, 1); assert.ok(/^odk1\./.test(got[0].token) && got[0].hist === 0);
+  assert.equal(got[0].sa, undefined, '⛔ 브라우저인데 홈 화면 앱이라고 했다(‹ 가 다시 보인다)');
   assert.deepEqual(JSON.parse(JSON.stringify(got[0].hw)), { f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT }, '⛔ 고른 사진·입장권');
   R.postAs({ onf: 'auth-please', stale: true }, inner);
   assert.equal(got.length, 1, '⛔ 죽은 토큰을 또 줬다(판이 「로그인이 필요해요」 에 갇힌다)');
   assert.ok(R.calls.includes('prompt'), '⛔ 만료 토큰 — 구글에서 새로 받지 않았다');
   assert.ok(!homeGot.some((m) => m.onf === 'auth'), '⛔ 과제 판 노크가 홈 자물쇠를 건드렸다');
+  R.g.navigator = Object.assign({}, R.g.navigator, { standalone: true });   // 아이패드 홈 화면 앱 — 브라우저 뒤로가 없다
   const fresh = gtok(); R.g.onCredential({ credential: fresh });
+  assert.equal(got[1].sa, 1, '⛔ 홈 화면 앱인데 판에 안 알렸다(‹ 가 숨어 못 나간다 · 반박 🔴1)');
   assert.equal(got.length, 2, '⛔ 새로 받은 토큰을 판에 안 줬다'); assert.equal(got[1].token, fresh);
   assert.equal(got[1].hw, undefined, '⛔ 고른 사진을 두 번 줬다(다시 열기마다 사진을 또 붙인다)');
   R.postAs({ onf: 'auth-please', stale: true }, inner);   // 홈이 그새 또 새 토큰을 받았다면 그것을 바로 — 같은 것이면 다시 받기
