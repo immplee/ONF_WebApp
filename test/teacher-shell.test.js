@@ -379,8 +379,14 @@ t('📝 과제 판 액자 — 노크엔 지금 토큰 + 고른 사진·입장권
   assert.equal(got.length, 1); assert.ok(/^odk1\./.test(got[0].token) && got[0].hist === 0);
   assert.deepEqual(JSON.parse(JSON.stringify(got[0].hw)), { f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT }, '⛔ 고른 사진·입장권');
   R.postAs({ onf: 'auth-please', stale: true }, inner);
-  assert.equal(got.length, 2); assert.equal(got[1].hw, undefined, '⛔ 고른 사진을 두 번 줬다(다시 열기마다 사진을 또 붙인다)');
+  assert.equal(got.length, 1, '⛔ 죽은 토큰을 또 줬다(판이 「로그인이 필요해요」 에 갇힌다)');
+  assert.ok(R.calls.includes('prompt'), '⛔ 만료 토큰 — 구글에서 새로 받지 않았다');
   assert.ok(!homeGot.some((m) => m.onf === 'auth'), '⛔ 과제 판 노크가 홈 자물쇠를 건드렸다');
+  const fresh = gtok(); R.g.onCredential({ credential: fresh });
+  assert.equal(got.length, 2, '⛔ 새로 받은 토큰을 판에 안 줬다'); assert.equal(got[1].token, fresh);
+  assert.equal(got[1].hw, undefined, '⛔ 고른 사진을 두 번 줬다(다시 열기마다 사진을 또 붙인다)');
+  R.postAs({ onf: 'auth-please', stale: true }, inner);   // 홈이 그새 또 새 토큰을 받았다면 그것을 바로 — 같은 것이면 다시 받기
+  assert.equal(got.length, 2);
   R.postAs({ onf: 'hwbookBack' }, inner);
   assert.ok(R.calls.includes('back'), '⛔ ‹ = 기록 칸 하나 뒤로(닫기)');
   R.g.history.state = null; R.pop();
@@ -388,6 +394,9 @@ t('📝 과제 판 액자 — 노크엔 지금 토큰 + 고른 사진·입장권
   assert.ok(!homeGot.some((m) => m.onf === 'hist-pop'), '⛔ 과제 판 칸을 걷은 뒤로를 홈 「뒤로」 로 보냈다(홈 창이 닫힌다)');
   R.postAs({ onf: 'auth-please' }, inner);
   assert.equal(got.length, 2, '⛔ 닫힌 액자 노크에 답했다');
+  // 두 번 열면 과제 판 칸은 하나(덮어쓰기) · 붙이기 전에 주소
+  R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L }, me); R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L }, me);
+  assert.equal(R.calls.filter((c) => /^push:\{"onfHw"/.test(c)).length, 2, '⛔ 열려 있는 과제 판 위에 칸을 또 쌓았다(처음 1 + 다시 1 · 그 사이 닫았으므로 2)');
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);

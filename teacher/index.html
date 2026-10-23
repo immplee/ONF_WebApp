@@ -202,6 +202,7 @@ function onCredential(res) {
   pending = tok;
   tokSave(tok);                      // 새로고침해도 다시 로그인하지 않게
   if (!mounted) mount(); else answer();
+  if (typeof hwTell === 'function') hwTell();   // 📝 과제 판이 새 토큰을 기다리면 그쪽에도(onf-hwbook)
 }
 
 function mount() {
@@ -452,8 +453,10 @@ window.addEventListener('message', function (ev) {
    구글 창구부터(devkeyOff · 2026-10-12) → 종전 location.href 이동은 [수업 시작]마다 로그인을 다시 물었다. 이제 **껍데기 위에 과제 판 액자를 하나 더** 띄운다:
    새로 읽기 0 · 홈 액자는 뒤에 그대로(닫으면 0초) · 뒤로 = 액자 닫기(기록 칸 하나 · 아래 onf-hist 블록은 이 칸을 홈 것으로 안 친다 hwSkipPop).
    과제 판의 노크는 그 액자 후손 + googleusercontent 만 · 답 = 지금 토큰(+ 창이 맡긴 고른 사진·입장권 hw · 한 번만 · 메모리에만 — 주소·저장소엔 안 남는다).
-   ponytail: 과제 판이 「토큰 만료(stale)」 로 다시 물으면 지금 토큰을 다시 줄 뿐(구글 다시 받기는 홈 노크 길만) — 판을 닫고 다시 열면 홈이 새 토큰을 받아 온다. */
-var hwBox = null, hwFr = null, hwWin = null, hwOrigin = '', hwGo = null, hwSkip = false;
+   토큰 만료(아이패드 = 1시간 구글 토큰): 과제 판이 stale 로 물으면 — 홈이 그새 새 토큰을 받았으면 그것 · 아니면 홈 노크 길과 같이 구글에서 새로 받고(onCredential → hwTell) 판에 준다.
+   ⛔ 액자 주소는 **붙이기 전에**(붙인 빈 액자에 src = WebKit 뒤로 칸이 우리 칸 위에 쌓여 뒤로가 빈 화면 · mount 주석 · 2026-10-23 반박 🔴2).
+   ⛔ z-index 50 — 껍데기 층(≤5) 위 · 구글 로그인 시트(GIS) 아래(새로 받기 시트를 가리면 못 누른다). */
+var hwBox = null, hwFr = null, hwWin = null, hwOrigin = '', hwGo = null, hwSkip = false, hwGave = '', hwWant = false;
 function hwFrom(win) {
   var w = win, target = hwFr && hwFr.contentWindow;
   if (!w || !target) return false;
@@ -471,7 +474,7 @@ function hwOpen(t, l, f, hwt) {
   hwGo = { f: files, hwt: tk };
   hwBox = document.createElement('div');
   hwBox.className = 'onf-hwbox';
-  hwBox.style.cssText = 'position:fixed;inset:0;z-index:2147480000;background:var(--bg,#1d1712)';
+  hwBox.style.cssText = 'position:fixed;inset:0;z-index:50;background:var(--bg,#1d1712)';
   hwFr = document.createElement('iframe');
   hwFr.setAttribute('allow', 'clipboard-write; microphone');
   hwFr.setAttribute('title', '과제 판');
@@ -479,14 +482,29 @@ function hwOpen(t, l, f, hwt) {
   var wait = document.createElement('div');
   wait.className = 'onf-wait';
   wait.innerHTML = '<div class="onf-spin"></div><span>과제 판을 여는 중</span>';
-  hwBox.appendChild(wait); hwBox.appendChild(hwFr);
+  var x = document.createElement('button');   // 과제 판이 뜨기 전(구글 오류 화면 · 노크 없음)에도 닫을 수 있게 — 노크가 오면 숨긴다(판에 ‹ 가 있다)
+  x.type = 'button'; x.className = 'onf-hwx'; x.setAttribute('aria-label', '닫기'); x.textContent = '✕';
+  x.style.cssText = 'position:absolute;top:12px;left:12px;z-index:2;width:40px;height:40px;border-radius:12px;border:0;font-size:18px;cursor:pointer;background:rgba(0,0,0,.35);color:#fff';
+  x.onclick = function () { hwBack(); };
+  hwFr.src = EXEC + '?mode=hwbook&t=' + encodeURIComponent(t) + (l ? '&l=' + encodeURIComponent(l) : '');   // ⛔ 붙이기 전에(위 주석)
+  hwBox.appendChild(wait); hwBox.appendChild(hwFr); hwBox.appendChild(x);
   document.body.appendChild(hwBox);
-  hwFr.src = EXEC + '?mode=hwbook&t=' + encodeURIComponent(t) + (l ? '&l=' + encodeURIComponent(l) : '');
-  try { history.pushState({ onfHw: 1, n: (typeof histDepth === 'number' ? histDepth : 0) }, ''); } catch (e) {}
+  try { hwFr.focus(); } catch (eF) {}   // 키보드(Esc·화살표)가 가려진 홈으로 안 가게
+  var st = { onfHw: 1, n: (typeof histDepth === 'number' ? histDepth : 0) };
+  try { if (history.state && history.state.onfHw) history.replaceState(st, ''); else history.pushState(st, ''); } catch (e) {}   // 이미 과제 판 칸이면 덮어쓴다(칸 두 개 = 뒤로 두 번)
 }
+function hwBack() { if (history.state && history.state.onfHw) history.back(); else hwClose(); }
+function hwAuth() {   // 판에 지금 토큰(+ 고른 사진·입장권 한 번)
+  if (!hwWin || !pending) return;
+  var m = { onf: 'auth', token: pending, hist: 0 };
+  if (hwGo) { m.hw = hwGo; hwGo = null; }
+  hwGave = pending;
+  try { hwWin.postMessage(m, hwOrigin); } catch (e) {}
+}
+function hwTell() { if (hwWant && hwWin && pending && tokAlive(pending)) { hwWant = false; hwAuth(); } }   // onCredential 이 부른다 — 새로 받은 토큰을 판에도
 function hwClose() {
   if (hwBox && hwBox.parentNode) hwBox.parentNode.removeChild(hwBox);
-  hwBox = null; hwFr = null; hwWin = null; hwOrigin = ''; hwGo = null;
+  hwBox = null; hwFr = null; hwWin = null; hwOrigin = ''; hwGo = null; hwGave = ''; hwWant = false;
 }
 /* onf-hist 블록 popstate 가 묻는다 — 과제 판 칸이 맨 위거나 방금 그 칸을 걷었으면 홈에 「뒤로」를 안 보낸다(홈은 안 바뀌었다) */
 function hwSkipPop() { var k = hwSkip || !!(history.state && history.state.onfHw); hwSkip = false; return k; }
@@ -502,14 +520,19 @@ window.addEventListener('message', function (ev) {
     hwWin = ev.source; hwOrigin = ev.origin;
     if (d.onf === 'auth-please') {
       var w = hwBox && hwBox.querySelector('.onf-wait'); if (w) w.hidden = true;
-      if (!pending) return;
-      var m = { onf: 'auth', token: pending, hist: 0 };
-      if (hwGo) { m.hw = hwGo; hwGo = null; }   // 고른 사진·입장권은 한 번만
-      try { hwWin.postMessage(m, hwOrigin); } catch (e) {}
+      var xb = hwBox && hwBox.querySelector('.onf-hwx'); if (xb) xb.hidden = true;
+      if (d.stale && pending && pending !== hwGave && tokAlive(pending)) { hwAuth(); return; }   // 홈이 그새 새 토큰을 받았다
+      if (d.stale || !pending || !tokAlive(pending)) {   // 죽은 토큰 — 홈 노크 길과 같이 새로 받는다(기기 열쇠면 칸에서 지움)
+        if (String(pending).indexOf('odk1.') === 0) { pending = ''; try { localStorage.removeItem(TOKKEY); } catch (e0) {} }
+        hwWant = true;
+        try { google.accounts.id.cancel(); google.accounts.id.prompt(); } catch (e3) {}
+        return;
+      }
+      hwAuth();
       return;
     }
     if (d.onf === 'themeAsk') { themeAsk(ev); return; }
-    if (d.onf === 'hwbookBack') { if (history.state && history.state.onfHw) history.back(); else hwClose(); }
+    if (d.onf === 'hwbookBack') hwBack();
     return;
   }
   if (d.onf !== 'hwbook' && d.onf !== 'hwbookBack') return;
@@ -967,7 +990,7 @@ window.addEventListener('popstate', function () {
   if (!appWin || bookOwner(s)) return;    // 📱 판 칸이 맨 위면 홈은 안 바뀌었다(판 칸은 늘 홈 칸 위에 쌓인다 · 판 숨김·보임은 onf-book 블록 bookPop)
   try { appWin.postMessage({ onf: 'hist-pop', id: h ? h.onfHist : '', s: h ? (h.s || null) : null }, appOrigin); } catch (e) {}   // '*' 금지
 });
-try { if (history.state && (history.state.onfHist || history.state.onfBook)) history.replaceState(null, ''); } catch (e) {}   // 껍데기가 다시 읽힌 채 남은 표식만 지운다(📱 판 칸 포함)
+try { if (history.state && (history.state.onfHist || history.state.onfBook || history.state.onfHw)) history.replaceState(null, ''); } catch (e) {}   // 껍데기가 다시 읽힌 채 남은 표식만 지운다(📱 판 칸 포함)
 /* onf-hist:end */
 }
 
