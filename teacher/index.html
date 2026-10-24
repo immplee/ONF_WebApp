@@ -872,8 +872,25 @@ function bookOpen(href, left, m, r, home, cf) {   // cf = 📖 ☁️ 홈이 실
   var src = teacherBookSrc(href), p, b;
   if (!src) return;
   p = bookFind(src);
-  if (!p && home && (b = bookBoardFor(src))) { bookSwapTo(b, src, left, m, r, cf); return; }
+  if (!p && home && (b = bookBoardFor(src))) { bookSwapTo(b, src, left, m, r, cf); rsMark(bookShown(), href); return; }
   bookShow(p || bookMake(src, false), left, m, r);
+  rsMark(bookShown(), href);
+}
+/* 🔄 새로고침 = 열린 창 그대로(Peter 2026-10-24 · ⚠️ 쌍둥이: 학생 assets/onf-frame.js rsSave·rsBoot) — 보이는 판의 연 주소·자리·교재가 알린 상태(bookState)를 이 탭에만(sessionStorage) ·
+   다시 읽히면 홈이 처음 노크할 때(bookHello — 로그인이 끝나 홈이 뜬 뒤) 그 주소로 다시 열고 교재 노크 때 bookRestore · 닫으면 지운다 · 12시간 넘은 기억은 버린다 */
+var RS_KEY = 'onfThOpenBook', RS_MS = 12 * 3600 * 1000, rsBooted = false;
+function rsMark(p, href) { if (!p) return; p.href = href; rsSave(p); }
+function rsSave(p) { if (!p || !p.href) return; try { sessionStorage.setItem(RS_KEY, JSON.stringify({ h: p.href, l: p.left, m: p.m, r: p.r, st: p.st || null, at: Date.now() })); } catch (e) {} }
+function rsDrop() { try { sessionStorage.removeItem(RS_KEY); } catch (e) {} }
+function rsTell(p) { if (!p || !p.rs || !p.win) return; var st = p.rs; p.rs = null; try { p.win.postMessage({ onf: 'bookRestore', st: st }, p.origin); } catch (e) {} }
+function rsBoot() {
+  if (rsBooted) return; rsBooted = true;
+  var v = null;
+  try { v = JSON.parse(sessionStorage.getItem(RS_KEY) || 'null'); } catch (e) { v = null; }
+  if (!v || typeof v.h !== 'string' || !(Date.now() - Number(v.at) < RS_MS)) return;
+  bookOpen(v.h, typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true);
+  var p = bookShown(); if (!p) return;
+  p.st = v.st && typeof v.st === 'object' ? v.st : null; p.rs = p.st; rsTell(p);
 }
 /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판·📖 판(bookBoard)·📖 노크 전 판 후보(bookCand)는 안 건드린다(books 는 오래 안 쓴 것이 앞). */
 /* ⛔ 자격 내린 판(gone — 늙음·stale·답 없음)은 **세지도 지우지도 않는다**(2단계 반박 🟠 2026-10-17) — 맺음(안 보낸 칸·실패 카드·오프라인 백업)이 끝나기 전에 지우면 그 글이 사라진다 · 30분 지우기(bookIdle)가 치운다. */
@@ -1012,6 +1029,7 @@ function themeTell() { themeAskers.forEach(function (a) { try { a.w.postMessage(
 function bookHide() {
   var p = bookShown();
   if (!p) return false;
+  rsDrop();   // 🔄 닫았다 — 새로고침해도 다시 안 연다
   bookPark(p, true);
   if (bookHome && bookHomeOrigin) { try { bookHome.postMessage({ onf: 'bookClosed' }, bookHomeOrigin); } catch (e) {} }
   bookKb();
@@ -1043,8 +1061,10 @@ window.addEventListener('message', function (ev) {
       var cp = { onf: 'caps', book: 1, phone: BOOK_PH ? 1 : 0 };
       if (BOOK_SW) cp.swap = 1;
       try { ev.source.postMessage(cp, ev.origin); } catch (e) {}
+      if (!rsBooted) { bookHome = ev.source; bookHomeOrigin = ev.origin; rsBoot(); }   // 🔄 새로고침 전에 열려 있던 판(위 rsBoot) — 홈이 뜬 뒤 한 번
       return;
     }
+    if (d.onf === 'reload') { var rp = bookShown(); if (rp) rsSave(rp); location.reload(); return; }   // 🔄 홈의 당겨서 새로고침(Ownify ONF_Shell_Js)
     if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left, d.m, d.r, true, d.cf); var hq = bookShown(); if (hq) hq.back = null; return; }   // 홈에서 연 판은 앞 판 기억 없음(종전 · 4.4) · 📖 판이 있으면 갈아 끼움
     if (d.onf === 'bookWarm' && d.panel === 1 && typeof d.href === 'string') { bookPre(d.href, d.left, d.m, d.r); return; }   // 지금·곧 할 수업 교재를 숨긴 판으로 미리(10-13)
     /* 📐 창 크기가 바뀌었다(2026-10-16 · 학생 껍데기와 같다) — 홈이 다시 잰 메뉴 끝·여백·모서리를 판 전부(보이는 판·숨긴 판)에 새로 단다. 보이기·숨기기·주소는 안 건드린다. 내 액자(위 bookFrom)에서 온 말만. */
@@ -1057,7 +1077,8 @@ window.addEventListener('message', function (ev) {
   if (!p) return;                                              // 판 액자(교재·내 문장)
   if (d.onf === 'bookHi') {
     if (!/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(String(ev.origin))) return;
-    p.win = ev.source; p.origin = ev.origin; p.swap = d.swap === 1; p.lg = d.lg === 1;   // lg = 「나갈까요?」 물음을 알아듣는 교재(위 histGuard)   // 📖 swap:1 은 둘째 노크에 온다 — 첫 노크(없음)가 다시 오면 판이 다시 읽힌 것
+    p.win = ev.source; p.origin = ev.origin; p.swap = d.swap === 1; p.lg = d.lg === 1;
+    if (p.rs && !p.parked) setTimeout(function () { rsTell(p); }, 0);   // 🔄 되살릴 상태 — 노크 답 뒤에   // lg = 「나갈까요?」 물음을 알아듣는 교재(위 histGuard)   // 📖 swap:1 은 둘째 노크에 온다 — 첫 노크(없음)가 다시 오면 판이 다시 읽힌 것
     if (p.real !== p.load || p.sw) { p.real = p.load; if (p.sw) bookSwapEnd(p, p.sw, false, 'fail', ''); p.src = p.load; p.key = bookKey(p.load); }   // 다시 읽힌 판 = 처음 주소
     bookTell(p);
     var bd = bookBoard(), q = bookQ;   // 📖 판이 생겼다 — 노크 전에 줄 선 미리 주소를 흘린다(위 bookQ)
@@ -1070,6 +1091,8 @@ window.addEventListener('message', function (ev) {
   if (d.onf === 'frameHello') { p.kb = ev.source; p.ko = ev.origin; kbH = -1; kbTop = -1; bookKb(); return; }   // 📱 이 판 교재의 키보드 높이 받는 창
   if (p.parked) return;                                        // ⛔ 숨긴 판은 닫기·전체·갈아 끼우기를 못 부른다
   if (d.onf === 'printTitle') { if (window.ONF && ONF.frame && ONF.frame.printTitle) ONF.frame.printTitle(d.t); return; }   // 📄 PDF 저장 이름 — 판 안 교재가 인쇄하는 동안만 탭 제목(assets/onf-frame.js printTitle · 쌍둥이)
+  if (d.onf === 'bookState') { if (histSmall(d.st)) { try { p.st = JSON.parse(JSON.stringify(d.st)); } catch (e) { return; } rsSave(p); } return; }   // 🔄 보이는 판의 지금 상태
+  if (d.onf === 'reload') { rsSave(p); location.reload(); return; }   // 🔄 교재의 당겨서 새로고침
   if (d.onf === 'bookLeaveKeep') { histGuard(p); try { p.win.postMessage({ onf: 'bookLeaveKept' }, p.origin); } catch (e) {} return; }   // 📱 「나갈까요?」 취소 — 물음 칸 다시(되묻기가 떠 있는 채)
   if (d.onf === 'bookClose') bookClose(d.all === 1);   // all:1 = 교재 머리줄 「홈」 — 앞 판 없이 전부 닫기
   else if (d.onf === 'bookFull') p.box.classList.toggle('full', !!d.on);

@@ -552,6 +552,7 @@ function phoneSetup(o) {
     root.classList = { set: new Set(), toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } };
     root.getAttribute = (k) => root.attrs[k];
     if (o.vv) g.visualViewport = Object.assign({ addEventListener() {} }, o.vv);
+    if (o.pre) o.pre(g, root);   // 🔄 검사마다 더 끼울 것(sessionStorage · location.reload — 새로고침 되살리기 2026-10-24)
   } });
   s.H = H; s.mq = mq;
   s.pop = () => { if (H.to.length) H.i = H.to.shift(); s.listeners.popstate.forEach((f) => f({})); };
@@ -923,6 +924,30 @@ t('📱 「교재에서 나갈까요?」 칸 = 껍데기가 판 보이기 **전�
   const f = phoneSetup();
   f.send({ onf: 'openBook', href: E1 }, f.homeInner);
   assert.ok(f.H.st.length === 2 && !f.H.state.lg, '⛔ lg 없이 마운트했는데 물음 칸을 밀었다');
+});
+
+t('🔄 새로고침 = 열린 창 그대로(Peter 2026-10-24) — 보이는 판 주소·교재 상태(bookState)를 이 탭(sessionStorage)에 · 다시 읽히면 그 판을 다시 열고 노크 때 bookRestore · 닫으면 지운다 · reload 말 = 다시 읽기', () => {
+  const ss = { v: {}, getItem(k) { return k in this.v ? this.v[k] : null; }, setItem(k, x) { this.v[k] = String(x); }, removeItem(k) { delete this.v[k]; } };
+  let reloads = 0;
+  const pre = (g) => { g.sessionStorage = ss; g.location = Object.assign(g.location || {}, { reload() { reloads++; } }); };
+  const s = phoneSetup({ wide: true, pre });
+  s.send({ onf: 'openBook', href: E2, left: 184 }, s.homeInner);
+  const bi = hi(s, s.panel());
+  s.send({ onf: 'bookState', st: { sheet: 'E2_X', top: 2400, left: 0, side: { t: 'cmt', cell: 'w2', row: 15 } } }, bi);
+  const v = JSON.parse(ss.getItem('onfOpenBook'));
+  assert.deepStrictEqual([v.h, v.l, v.st.sheet, v.st.side.row], [E2, 184, 'E2_X', 15], '⛔ 보이는 판 주소·상태를 이 탭에 안 적었다');
+  s.send({ onf: 'reload' }, bi);
+  assert.strictEqual(reloads, 1, '⛔ 교재의 당겨서 새로고침(reload)에 다시 안 읽었다');
+  //   다시 읽힘 = 새 껍데기 — 그 판을 다시 열고 노크 때 상태를 돌려준다
+  const t = phoneSetup({ wide: true, pre });
+  assert.ok(t.panel() && !t.panel().classList.contains('park') && /e2/.test(t.opened.join()), '⛔ 새로고침 뒤 열려 있던 판을 다시 안 열었다');
+  const ti = hi(t, t.panel());
+  t.timers.filter((x) => x.on && x.ms === 0).forEach((x) => { x.on = false; x.f(); });
+  assert.deepStrictEqual(js(ti.sent).filter((x) => x[0].onf === 'bookRestore').map((x) => x[0].st.sheet), ['E2_X'], '⛔ 노크한 교재에 되살릴 상태(bookRestore)를 안 보냈다');
+  t.send({ onf: 'bookClose' }, ti);
+  assert.strictEqual(ss.getItem('onfOpenBook'), null, '⛔ 닫았는데 기억이 남았다(새로고침하면 닫은 판이 다시 열린다)');
+  const u = phoneSetup({ wide: true, pre });
+  assert.ok(!u.panel(), '⛔ 닫은 뒤 새로고침에 판을 열었다');
 });
 
 t('📱 폰 판 스위치 — 꺼져 있으면(opts.phone 없음) caps 에 phone 0 · 폰 폭이어도 onf-ph·판 칸 없음(종전 PC 판 그대로) · index.html 은 기본 켬(2026-10-16) · phonepanel=0 · 기억값 0 으로만 끈다', () => {
