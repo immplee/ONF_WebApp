@@ -536,7 +536,7 @@ function hwLateX(x, wait) { var box = hwBox; hwSeen = false; x.hidden = true; se
 function hwBack() { if (history.state && history.state.onfHw) history.back(); else hwClose(); }
 function hwAuth() {   // 판에 지금 토큰(+ 고른 사진·입장권 한 번)
   if (!hwWin || !pending) return;
-  var m = { onf: 'auth', token: pending, hist: 0 };
+  var m = { onf: 'auth', token: pending, hist: 0, side: 1 };   // side = 이 껍데기는 「교재 옆에」를 한다(과제 판 액자만 · 주소로 연 판엔 없다)
   try { if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) m.sa = 1; } catch (e) {}   // 홈 화면 앱엔 브라우저 뒤로가 없다 — 판이 ‹ 를 보이게(반박 🔴1)
   if (hwGo) { m.hw = hwGo; hwGo = null; }
   hwGave = pending;

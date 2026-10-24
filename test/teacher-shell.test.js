@@ -447,7 +447,7 @@ t('📝 과제 판 액자 — 노크엔 지금 토큰 + 고른 사진·입장권
   R.postAs({ onf: 'auth-please' }, inner, 'https://evil.example');
   assert.equal(got.length, 0, '⛔ 남의 창·다른 출처 노크에 토큰을 줬다');
   R.postAs({ onf: 'auth-please' }, inner);
-  assert.equal(got.length, 1); assert.ok(/^odk1\./.test(got[0].token) && got[0].hist === 0);
+  assert.equal(got.length, 1); assert.ok(/^odk1\./.test(got[0].token) && got[0].hist === 0 && got[0].side === 1, '⛔ 과제 판에 「교재 옆에」 할 줄 안다고 안 알렸다');
   assert.equal(got[0].sa, undefined, '⛔ 브라우저인데 홈 화면 앱이라고 했다(‹ 가 다시 보인다)');
   assert.deepEqual(JSON.parse(JSON.stringify(got[0].hw)), { f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT, a: null }, '⛔ 고른 사진·입장권');
   R.postAs({ onf: 'auth-please', stale: true }, inner);
