@@ -497,6 +497,7 @@ function hwOpen(t, l, f, hwt, au) {
   x.type = 'button'; x.className = 'onf-hwx'; x.setAttribute('aria-label', '닫기'); x.textContent = '✕';
   x.style.cssText = 'position:absolute;top:12px;left:12px;z-index:2;width:40px;height:40px;border-radius:12px;border:0;font-size:18px;cursor:pointer;background:rgba(0,0,0,.35);color:#fff';
   x.onclick = function () { hwBack(); };
+  hwLateX(x, wait);
   hwFr.src = EXEC + '?mode=hwbook&t=' + encodeURIComponent(t) + (l ? '&l=' + encodeURIComponent(l) : '');   // ⛔ 붙이기 전에(위 주석)
   hwBox.appendChild(wait); hwBox.appendChild(hwFr); hwBox.appendChild(x);
   document.body.appendChild(hwBox);
@@ -524,9 +525,14 @@ function hwWarm(t) {
   var xb = document.createElement('button'); xb.type = 'button'; xb.className = 'onf-hwx'; xb.setAttribute('aria-label', '닫기'); xb.textContent = '✕';   // 보인 뒤 노크가 안 오면(구글 오류 화면 등) 닫을 단추 — 노크가 오면 숨긴다(반박 🟠2)
   xb.style.cssText = 'position:absolute;top:12px;left:12px;z-index:2;width:40px;height:40px;border-radius:12px;border:0;font-size:18px;cursor:pointer;background:rgba(0,0,0,.35);color:#fff';
   xb.onclick = function () { hwBack(); };
+  hwLateX(xb, wt);
   hwBox.appendChild(wt); hwBox.appendChild(hwFr); hwBox.appendChild(xb); document.body.appendChild(hwBox);
   hwT = t; hwWarmOn = true; clearTimeout(hwWarmTm); hwWarmTm = setTimeout(function () { if (hwWarmOn) hwClose(); }, 600000);
 }
+/* ✕ 는 15초 넘게 「불러오는 중」 일 때만(Peter 2026-10-24 ⑧ 「불러오는 중 창 왼쪽 위 ✕ 없애줘」) — 평소엔 뒤로가 닫는다 ·
+   못 뜬 화면(구글 오류 · 홈 화면 앱처럼 뒤로가 없는 곳)에서 갇히지 않게 늦게 하나만 */
+var hwSeen = false;   // 과제 판이 노크했다(= 떴다)
+function hwLateX(x, wait) { var box = hwBox; hwSeen = false; x.hidden = true; setTimeout(function () { if (hwBox && hwBox === box && !hwSeen && wait && !wait.hidden) x.hidden = false; }, 15000); }
 function hwBack() { if (history.state && history.state.onfHw) history.back(); else hwClose(); }
 function hwAuth() {   // 판에 지금 토큰(+ 고른 사진·입장권 한 번)
   if (!hwWin || !pending) return;
@@ -550,13 +556,13 @@ function hwBookFrame(src) {
     var box = document.createElement('div'), el = document.createElement('iframe'), wt = document.createElement('div');
     box.className = 'onf-hwbk'; box.style.cssText = 'position:fixed;top:0;bottom:0;right:0;z-index:50;padding:8px;box-sizing:border-box;background:var(--onf-dock-bg,var(--bg,#1d1712))';
     el.setAttribute('allow', 'clipboard-write; microphone'); el.setAttribute('title', '교재');
-    el.style.cssText = 'display:block;width:100%;height:100%;border:0;border-radius:16px;background:var(--onf-bg,#fff)';
-    wt.className = 'onf-wait'; wt.innerHTML = '<div class="onf-spin"></div><span>불러오는 중</span>';
+    el.style.cssText = 'position:relative;z-index:1;display:block;width:100%;height:100%;border:0;border-radius:16px;background:transparent';   // ⛔ 액자가 「불러오는 중」(z 0) 위 — 종전엔 액자에 위치가 없어 막이 위에 깔려 교재가 떠도 영영 가렸다(Peter 2026-10-24 「계속 불러오는 중」)
+    wt.className = 'onf-wait'; wt.style.cssText = 'position:absolute;inset:8px;border-radius:16px'; wt.innerHTML = '<div class="onf-spin"></div><span>불러오는 중</span>';
     box.appendChild(wt); box.appendChild(el); document.body.appendChild(box);
     hwBk = { box: box, el: el, wt: wt, src: '' };
   }
   if (hwBk.src !== src) {
-    hwBk.src = src;
+    hwBk.src = src; hwBk.win = null;   // 새 교재 = 새 노크를 기다린다
     if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} hwBk.oe = null; }
     if (window.ONF && ONF.frame && ONF.frame.openExec) hwBk.oe = ONF.frame.openExec(hwBk.el, src, hwBk.wt, function () { hwViewSet('photo'); hwTellView(); });   // 🔐 여러 계정 우회(교재 판과 같은 길)
     else hwBk.el.src = src;
@@ -589,15 +595,27 @@ function hwLay() {
   if (hwView !== 'book' && hwChipEl) { if (hwChipEl.parentNode) hwChipEl.parentNode.removeChild(hwChipEl); hwChipEl = null; }
 }
 window.addEventListener('resize', function () { if (hwBox && hwView !== 'photo') hwLay(); });
-/* 과제 판 전용 교재 액자가 하는 말 — 색 묻기 · 인쇄 이름 · ✕/홈(= 사진만으로) · 그 밖(다른 판 열기 등)은 받지 않는다 */
+/* 📖 펜 줄 하나(⑬) — 과제 판이 알린 도구·색·굵기를 옆 교재(노크한 창)에 그대로 · 교재가 늦게 뜨면 노크(bookHi) 때 마지막 것을 */
+var hwPenLast = null;
+function hwPenRelay(d) {
+  var tool = String(d.tool || '');
+  if (!/^[a-z]{2,8}$/.test(tool)) return;
+  var pick = {};
+  ['pen', 'marker'].forEach(function (k) { var x = d.pick && d.pick[k]; if (x && typeof x.color === 'string' && x.color.length <= 16 && typeof x.w === 'number') pick[k] = { color: x.color, w: x.w }; });
+  hwPenLast = { onf: 'penRelay', tool: tool, pick: pick, stampK: d.stampK === 1 ? 1 : 0 };
+  if (hwBk && hwBk.win) { try { hwBk.win.postMessage(hwPenLast, hwBk.origin); } catch (e) {} }
+}
+/* 과제 판 전용 교재 액자가 하는 말 — 노크(펜 중계 창) · 색 묻기 · 인쇄 이름 · ✕/홈(= 사진만으로) · 그 밖(다른 판 열기 등)은 받지 않는다 */
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
   if (!d || !hwBk || !bookFrom(ev, hwBk.el)) return;
+  if (d.onf === 'bookHi') { hwBk.win = ev.source; hwBk.origin = ev.origin; if (hwPenLast) { try { hwBk.win.postMessage(hwPenLast, hwBk.origin); } catch (e) {} } return; }
   if (d.onf === 'themeAsk') { themeAsk(ev); return; }
   if (d.onf === 'printTitle') { if (window.ONF && ONF.frame && ONF.frame.printTitle) ONF.frame.printTitle(d.t); return; }
   if (d.onf === 'bookClose') { hwViewSet('photo'); hwTellView(); }
 });
 function hwClose() {
+  if (hwBox && !hwWarmOn && appWin) { try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (e) {} }   // 홈이 카드 상태(완료 등)를 다시 받게
   if (hwBk) { if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} } if (hwBk.box.parentNode) hwBk.box.parentNode.removeChild(hwBk.box); hwBk = null; }   // 과제 판을 닫으면 그 교재 액자도 지운다
   hwView = 'photo'; if (hwChipEl && hwChipEl.parentNode) hwChipEl.parentNode.removeChild(hwChipEl); hwChipEl = null;
   if (hwBox && hwBox.parentNode) hwBox.parentNode.removeChild(hwBox);
@@ -610,12 +628,13 @@ window.addEventListener('popstate', function () {
 });
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
-  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView')) return;
+  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwPen')) return;
   if (hwFr && hwFrom(ev.source)) {   // 과제 판 액자에서 온 말
     try { if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return; } catch (e) { return; }
     if (hwWin && ev.source !== hwWin) return;   // 한 번 정하면 그 창만(노크 자물쇠와 같다)
     hwWin = ev.source; hwOrigin = ev.origin;
     if (d.onf === 'auth-please') {
+      hwSeen = true;
       var w = hwBox && hwBox.querySelector('.onf-wait'); if (w) w.hidden = true;
       var xb = hwBox && hwBox.querySelector('.onf-hwx'); if (xb) xb.hidden = true;
       if (d.stale && pending && pending !== hwGave && tokAlive(pending)) { hwAuth(); return; }   // 홈이 그새 새 토큰을 받았다
@@ -630,7 +649,8 @@ window.addEventListener('message', function (ev) {
     }
     if (d.onf === 'themeAsk') { themeAsk(ev); return; }
     if (d.onf === 'hwbookBack') hwBack();
-    if (d.onf === 'hwbookView') hwViewSet(String(d.v || ''), d.href);   // 📖 교재 옆에 · 교재만 · 사진만(과제 첨삭 5단계)
+    if (d.onf === 'hwbookView') hwViewSet(String(d.v || ''), d.href);
+    if (d.onf === 'hwPen') hwPenRelay(d);   // 📖 펜 줄 하나 — 과제 판 도구를 옆 교재로(⑬)   // 📖 교재 옆에 · 교재만 · 사진만(과제 첨삭 5단계)
     return;
   }
   if (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm') return;

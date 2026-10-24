@@ -379,6 +379,20 @@ t('🎧 들으며 필기(4단계 · 2026-10-24) — 홈이 고른 녹음(날짜�
   R2.postAs({ onf: 'auth-please' }, in2);
   assert.strictEqual(got2[0].hw.a, null, '⛔ 꼴이 틀린 녹음 고르기를 넘겼다');
 });
+t('⑧ 과제 여는 동안 ✕ 는 숨김 · 15초 넘게 「불러오는 중」 이면만 보임(갇힘 방지) · 노크가 오면 안 보임 (Peter 2026-10-24)', () => {
+  const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
+  R.knockAs(me); R.postAs({ onf: 'hwbook', t: 'Tok_1' }, me);
+  const x = R.created.filter((e) => e.className === 'onf-hwx').slice(-1)[0];
+  assert.strictEqual(x.hidden, true, '⛔ 여는 순간 ✕ 가 보인다');
+  R.advance(16000);
+  assert.strictEqual(x.hidden, false, '⛔ 15초 넘게 못 떠도 ✕ 가 없다(갇힘)');
+  const R2 = boot({ onf_id_tok: odk() }), me2 = { parent: R2.els.app.contentWindow, postMessage() {} };
+  R2.knockAs(me2); R2.postAs({ onf: 'hwbook', t: 'Tok_1' }, me2);
+  const fr = R2.created.filter((e) => e.tag === 'iframe')[0], x2 = R2.created.filter((e) => e.className === 'onf-hwx').slice(-1)[0];
+  R2.postAs({ onf: 'auth-please' }, { parent: { parent: fr.contentWindow }, postMessage() {} });
+  R2.advance(16000);
+  assert.strictEqual(x2.hidden, true, '⛔ 다 떴는데 15초 뒤 ✕ 가 나왔다');
+});
 t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼쪽 반 · 과제 판 전용 교재 액자 오른쪽 반(홈 옆 교재 판 기계 안 씀) · 교재만 = 과제 판 숨김 + 「과제로」 칩 · 사진만 = 교재 숨김 · 남의 주소 거절 · 과제 판 액자에서 온 말만', () => {
   const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
   R.knockAs(me);
@@ -395,7 +409,18 @@ t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼�
   assert.strictEqual(panels().length, 0, '⛔ 과제 판 액자가 아닌 창의 말을 받았다');
   R.postAs({ onf: 'hwbookView', v: 'side', href: HREF }, inner);
   assert.strictEqual(panels().length, 1, '⛔ 옆에 — 교재 판이 안 떴다');
+  const bkFr = R.created.filter((e) => e.tag === 'iframe').slice(-1)[0], bkWait = R.created.filter((e) => e.className === 'onf-wait').slice(-1)[0];
+  assert.ok(/position:relative;z-index:1/.test(bkFr.style.cssText) && /position:absolute/.test(bkWait.style.cssText), '⛔ 교재 액자가 「불러오는 중」 막 아래에 깔린다(교재가 떠도 영영 가림 · Peter 2026-10-24)');
   assert.ok(/\/\d+px$|^\d+px$/.test(box.style.right) && box.style.right !== '', '⛔ 옆에 — 과제 판이 왼쪽 반으로 안 줄었다: ' + box.style.right);
+  // ⑬ 펜 줄 하나 — 과제 판 도구 → 껍데기 → 교재(노크한 창) · 늦게 뜬 교재엔 노크 때 마지막 것
+  R.postAs({ onf: 'hwPen', tool: 'marker', pick: { pen: { color: '#E5484D', w: 3 }, marker: { color: 'ink', w: 14 } }, stampK: 1 }, inner);
+  const bookGot = [], bookWin = { parent: bkFr.contentWindow, postMessage: (m) => bookGot.push(m) };
+  R.postAs({ onf: 'bookHi' }, bookWin);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(bookGot[0] || {})), { onf: 'penRelay', tool: 'marker', pick: { pen: { color: '#E5484D', w: 3 }, marker: { color: 'ink', w: 14 } }, stampK: 1 }, '⛔ 교재가 노크했는데 마지막 펜 도구를 안 받았다');
+  R.postAs({ onf: 'hwPen', tool: 'pen', pick: {} }, inner);
+  assert.strictEqual(bookGot[1] && bookGot[1].tool, 'pen', '⛔ 도구를 바꿨는데 교재에 안 갔다');
+  R.postAs({ onf: 'hwPen', tool: 'x"><b', pick: {} }, inner);
+  assert.strictEqual(bookGot.length, 2, '⛔ 꼴이 틀린 도구를 중계했다');
   R.postAs({ onf: 'hwbookView', v: 'book' }, inner);
   assert.strictEqual(box.style.visibility, 'hidden', '⛔ 교재만 — 과제 판이 안 숨었다');
   const chip = R.created.filter((e) => e.className === 'onf-hwchip')[0];
