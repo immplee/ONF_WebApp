@@ -25,7 +25,8 @@ const E1 = 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', E2 = 'https://clas
 const MINE = 'https://class.ownify.co.kr/?mode=mine&v=1', CARDS = 'https://class.ownify.co.kr/a-s1-e1-b?mode=share&view=cards';
 const SRC1 = 'https://script.google.com/x/exec?t=T&mode=share&embed=1', SRC2 = 'https://script.google.com/x/exec?t=T&mode=share&ep=e2&embed=1';
 const SRCM = 'https://script.google.com/x/exec?t=T&mode=mine&embed=1', SRCC = 'https://script.google.com/x/exec?t=T&mode=share&view=cards&embed=1';
-const BS = (h) => (/view=cards/.test(h) ? SRCC : /mode=mine/.test(h) ? SRCM : /a-s1-e2-b/.test(h) ? SRC2 : /mode=share/.test(h) ? SRC1 : null);
+const B2 = 'https://class.ownify.co.kr/b-s1-e1-b?mode=share', SRCB2 = 'https://script.google.com/x/exec?t=T&mode=share&ep=b2&embed=1';   // 둘째 교재(안 켬)
+const BS = (h) => (/view=cards/.test(h) ? SRCC : /mode=mine/.test(h) ? SRCM : /a-s1-e2-b/.test(h) ? SRC2 : /b-s1-e1-b/.test(h) ? SRCB2 : /mode=share/.test(h) ? SRC1 : null);
 const CF = { f: 'FILE_ID_0123456789', s: 'E1', k: 'v1.abc.def' };
 
 /* book-panel.test.js 의 setup 꼴 — mount 에 out·tok 을 더 넘긴다(index.html 과 같게 기본 켬) */
@@ -276,6 +277,28 @@ t('S-F2b out:1 누름이 찾은 판이 지금 길(exec) 판이면 — 자격 내
   const o2 = q.panels()[0];
   q.send({ onf: 'openBook', href: E1, out: 1 }, q.homeInner);
   assert.deepStrictEqual([q.panels().length, vis(q)[0]], [1, o2], '⛔ 끈 기기인데 지금 길 판을 내렸다');
+});
+
+/* 검토 고침 1(2026-10-24) — 넓은 화면·판 모드 홈은 [첫 교재, 내 문장, 다음 회차, 둘째 교재] 를 한꺼번에 미리 받는다. 종전엔 첫 교재(지금 길 후보) 뒤에 둘이 줄 서
+   판에 값만 받아 뒀다([교재, 내 문장]). 첫 교재가 정적 판이면 줄 설 곳이 없어 지금 길 숨긴 판이 하나 더 뜨고(GAS 한 번 더) 판 셋 넘침이 ⭐ 내 문장을 쫓아냈다(복습 ≈4.4초). */
+t('S-F2c 판 모드 넓은 화면 — 첫 교재 out:1 + 다음 회차·안 켠 둘째 교재 → 판은 [정적 첫 교재, 내 문장] 둘뿐 · 내 문장 안 쫓겨남', () => {
+  const s = setup({ swap: true, phone: false });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 0, out: 1 }, s.homeInner);
+  s.send({ onf: 'bookWarm', href: MINE, panel: 1, left: 0 }, s.homeInner);
+  s.send({ onf: 'bookWarm', href: E2, panel: 1, left: 0 }, s.homeInner);   // 다음 회차 — 홈은 out 을 안 싣는다(첫 교재만)
+  s.send({ onf: 'bookWarm', href: B2, panel: 1, left: 0 }, s.homeInner);
+  assert.deepStrictEqual(s.panels().map((p) => p.kids[0].src), [OUT_BOOK, SRCM + '&park=1'], '⛔ 판이 [정적 첫 교재, 내 문장] 이 아니다');
+  //   정적 판이 노크한 뒤(다음 방문 — preEarly 판이 2초 안에 노크) 와도 같다
+  const q = setup({ swap: true, phone: false });
+  q.send({ onf: 'bookWarm', href: E1, panel: 1, left: 0, out: 1 }, q.homeInner);
+  const box = q.panels()[0], w = outWin(q, box);
+  q.send({ onf: 'outHello' }, w, OUT_O); knock(q, box, OUT_O);
+  for (const h of [MINE, E2, B2]) q.send({ onf: 'bookWarm', href: h, panel: 1, left: 0 }, q.homeInner);
+  assert.deepStrictEqual(q.panels().map((p) => p.kids[0].src), [OUT_BOOK, SRCM + '&park=1'], '⛔ 노크 뒤 — 판이 [정적 첫 교재, 내 문장] 이 아니다');
+  //   첫 교재가 지금 길이면 종전 그대로(다음 회차·둘째 교재는 첫 교재 뒤 줄 — 판 둘)
+  const o = setup({ swap: true, phone: false });
+  for (const h of [E1, MINE, E2, B2]) o.send({ onf: 'bookWarm', href: h, panel: 1, left: 0 }, o.homeInner);
+  assert.deepStrictEqual(o.panels().map((p) => p.kids[0].src), [SRC1 + '&park=1', SRCM + '&park=1'], '종전 — 지금 길 첫 교재 뒤 줄');
 });
 
 t('S5g ⭐ 내 문장·카드 덱 주소는 out:1 이어도 지금 길', () => {

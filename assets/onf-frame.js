@@ -796,6 +796,10 @@
       if ((ex = bookFind(src))) { if (ex.parked) bookPlace(ex, left, m, r); return; }   // 🚀 이미 있는 숨긴 판(미리 띄운 판 · 자리값 없이 만든 것)에 홈이 잰 자리를 단다(반박 🟡2 — 보일 때 폭이 바뀌어 다시 그리던 것)
       b = bookBoardFor(src, out);
       if (b) { bookFetch(b, src); return; }   // 📖 판이 값만 받아 둔다(새 판 0 · 접속 표시 0 · 판이 차례를 맡는다)
+      /* 🌤 검토 고침 1(2026-10-24) — 판 모드에서 홈이 미리 띄운 숨긴 정적 판(첫 교재 out:1)이 있으면 지금 길 미리 받기(다음 회차·안 켠 둘째 교재)는 버린다:
+         종전엔 첫 교재(지금 길 후보) 뒤 줄에 서서 판에 값만 받아 뒀다(판 둘). 정적 판엔 흘리지 않으니 버리지 않으면 지금 길 숨긴 판이 하나 더(GAS 한 번 더) 뜨고
+         판 셋 넘침이 ⭐ 내 문장 판을 쫓아냈다(복습 ≈4.4초). 다음 회차는 켠 교재라 누르면 out:1 → 어차피 정적 새 판 · 안 켠 둘째 교재는 누를 때 지금 길 새 판. */
+      if (BOOK_SW && !bookMine(src) && !outWant(src, out) && books.some(function (q) { return q.home && q.out && q.parked && !q.gone; })) return;   // 숨긴 정적 판만 — 보이는 정적 판(이미 누름)일 땐 종전(I1)
       if (!bookMine(src) && !outWant(src, out) && books.some(function (q) { return bookCand(q) && !q.out; })) { if (bookQ.length < BOOK_Q_MAX && bookQ.indexOf(src) < 0) bookQ.push(src); return; }   // 📖 곧 판이 될 판이 노크 전 — 줄에 세운다(아래 bookCand) · 🌤 정적 판 후보 뒤엔 안 선다(그 판엔 흘리지 않는다 — 바로 지금 길 숨긴 판)
       //   ⚠️ 선생님 껍데기의 D1(폰은 미리 판 없음)은 안 가져온다 — 학생 폰은 숨긴 미리 판 하나가 종전 그대로다(설계 §7.2 · 그 판이 곧 판이 된다)
       bookRoom(bookMax() - 1);   // 자리가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 — 종전엔 안 띄웠다 · 📱 폰은 자리 2)
