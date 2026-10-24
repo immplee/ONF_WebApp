@@ -911,9 +911,9 @@ ta('S6b /home/get 이 HOMEGET_MS(800) 넘김 → 지금 길 · 늦은 답은 무
   assert.ok(!('onfOutFail' in s.g.localStorage.m), '⛔ 홈 일로 교재 물러남을 적었다');
 });
 
-ta('S6b unknown·ended·stale·off·none · api 다름 · v 없음 · 500 · 끊김 → 지금 길(시한 전에 바로 · 그날 기록 없음)', async () => {
+ta('S6b unknown·ended·stale·none · api 다름 · v 없음 · 500 · 끊김 → 지금 길(시한 전에 바로 · 그날 기록 없음)', async () => {
   const cases = [['unknown', (c) => c.ok(200, { ok: false, why: 'unknown' })], ['ended', (c) => c.ok(200, { ok: false, why: 'ended' })],
-    ['stale', (c) => c.ok(200, { ok: false, why: 'stale' })], ['off', (c) => c.ok(200, { ok: false, why: 'off' })], ['none', (c) => c.ok(200, { ok: false, why: 'none' })],
+    ['stale', (c) => c.ok(200, { ok: false, why: 'stale' })], ['none', (c) => c.ok(200, { ok: false, why: 'none' })],
     ['api 2', (c) => c.ok(200, HANS({ api: 2 }))], ['api 없음', (c) => { const a = HANS(); delete a.api; c.ok(200, a); }], ['v 없음', (c) => c.ok(200, HANS({ v: null }))],
     ['500', (c) => c.ok(500, { ok: false })], ['끊김', (c) => c.no(new Error('net'))]];
   for (const [nm, go] of cases) {
@@ -1086,6 +1086,50 @@ ta('R-5 물러난 뒤 죽어 가는 정적 홈 창(그 액자 · 정적 홈 출�
   s.homeInner.sent.length = 0;
   s.send({ onf: 'bookDismiss' }, s.homeInner, GO);
   assert.ok(js(s.homeInner.sent).some((x) => x[0].onf === 'bookClosed'), '⛔ 판을 연 구글 홈에 bookClosed 가 안 간다');
+});
+
+/* 최종 검토 고침 I2·M3(2026-10-24) */
+ta('I2 스위치 꺼짐(ok:false why off · HTTP 503) → 그날 onfOutFailHome 을 적고 다음 mount 는 /home/get 0회·바로 지금 길 · 다른 null 이유는 기록 없음 (?out=1 지움은 S6 index.html 검사)', async () => {
+  const offs = [['why off', (c) => c.ok(200, { ok: false, why: 'off' })], ['503', (c) => c.ok(503, { ok: false, why: 'off' })]];
+  for (const [nm, go] of offs) {
+    const s = hsetup();
+    s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+    go(s.calls[0]); await flush();
+    assert.strictEqual(s.frameEl.src, HSRC, '⛔ ' + nm + ' — 지금 길로 안 갔다');
+    assert.strictEqual(s.g.localStorage.m.onfOutFailHome, String(1.7e12), '⛔ ' + nm + ' — 그날 홈 물러남을 안 적었다');
+    assert.ok(!('onfOutFail' in s.g.localStorage.m), '⛔ ' + nm + ' — 교재 물러남까지 적었다');
+    const n = hsetup({ ls: s.g.localStorage });   // 같은 날 다음 mount
+    assert.strictEqual(n.calls.length, 0, '⛔ ' + nm + ' — 같은 날 다시 /home/get 을 물었다');
+    assert.strictEqual(n.frameEl.src, HSRC, '⛔ ' + nm + ' — 같은 날 정적 홈을 또 미리 받았다: ' + n.frameEl.src);
+  }
+  for (const why of ['unknown', 'stale', 'ended', 'none']) {
+    const s = hsetup(); s.calls[0].ok(200, { ok: false, why }); await flush();
+    assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ ' + why + ' — 그날 기록을 적었다(종전 그대로여야 한다)');
+  }
+  for (const st of [500, 404]) { const s = hsetup(); s.calls[0].ok(st, { ok: false }); await flush(); assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ HTTP ' + st + ' — 기록'); }
+});
+ta('I2 하루 지난 스위치 꺼짐 기록은 다시 묻는다', async () => {
+  const s = hsetup(); s.calls[0].ok(503, {}); await flush();
+  const stamp = s.g.localStorage.m.onfOutFailHome;
+  const y = hsetup({ ls: LSf(Object.assign({}, s.g.localStorage.m, { onfOutFailHome: String(1.7e12 - 86400000 - 1) })) });
+  assert.strictEqual(y.calls.length, 1, '⛔ 하루 지난 기록이 아직 막는다(' + stamp + ')');
+});
+ta('M3 outBoot 재전송(정적 홈이 몇 시간 뒤 다시 hello) → pre 칸 age 에 받은 뒤 흐른 시간을 더한다 · 원본 d 와 앞서 보낸 사본은 그대로', async () => {
+  const s = hsetup();
+  const a = HANS({ pre: { books: { ts: 5, age: 100, v: { z: 1 } }, odd: { ts: 6, v: 2 } } });
+  s.calls[0].ok(200, a); await flush();
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  assert.strictEqual(boots(s.homeWin)[0][0].d.pre.books.age, 100, '⛔ 바로 보낸 첫 outBoot 의 age 가 달라졌다');
+  s.g.T += 3 * 3600000;
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  const b = boots(s.homeWin);
+  assert.strictEqual(b.length, 2);
+  assert.strictEqual(b[1][0].d.pre.books.age, 100 + 3 * 3600000, '⛔ 다시 보낸 outBoot 이 낡은 age 그대로다');
+  assert.deepStrictEqual(b[1][0].d.pre.odd, { ts: 6, v: 2 }, '⛔ age 없는 칸이 바뀌었다');
+  assert.strictEqual(b[1][0].d.pre.books.ts, 5);
+  assert.deepStrictEqual(b[1][0].d.v, a.v);
+  assert.strictEqual(a.pre.books.age, 100, '⛔ 원본 d 를 고쳤다(복사해야 한다)');
+  assert.strictEqual(b[0][0].d.pre.books.age, 100, '⛔ 앞서 보낸 사본이 바뀌었다');
 });
 
 (async () => {

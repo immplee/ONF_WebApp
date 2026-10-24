@@ -286,13 +286,13 @@
      ponytail: 800ms = 짐작 시한 — 실측으로 고친다. */
   var ONF_WHO = 'https://onf-media.edia--orker.workers.dev/who';
   var WHO_MS = 800;
-  function askPost(url, b, ms, pick) {   // Worker 에 묻기 — 시한 안 답(pick 이 고른 값) · 아니면 null
+  function askPost(url, b, ms, pick, bad) {   // Worker 에 묻기 — 시한 안 답(pick 이 고른 값) · 아니면 null · bad(상태) = 2xx 아닌 답
     return new Promise(function (ok) {
       var tm = setTimeout(function () { ok(null); }, ms);
       function end(x) { clearTimeout(tm); ok(x); }
       try {
         global.fetch(url, { method: 'POST', body: JSON.stringify(b) })
-          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (r) { if (r.ok) return r.json(); if (bad) bad(r.status); return null; })
           .then(function (j) { end(j ? pick(j) : null); }, function () { end(null); });
       } catch (e) { end(null); }
     });
@@ -308,8 +308,14 @@
   var ONF_OUT_HOME_URL = 'https://app.ownify.co.kr/home/';
   var ONF_HOME_GET = 'https://onf-media.edia--orker.workers.dev/home/get';
   var HOMEGET_MS = 800, HOME_PAINT_MS = 2500, OUT_HOME_ORG = ONF_OUT_HOME_URL.replace(/^(https:\/\/[^\/]+).*$/, '$1');   // 출처 — 모듈 맨 위라 URL 없이(옛 브라우저·검사 하네스)
+  /* 스위치 꺼짐(`{ok:false,why:'off'}` · HOME_READ=0 롤백의 HTTP 503) = 그날 이 기기는 더 안 묻는다 — onfOutFailHome 을 적는다(homeQ 가 보고 /home/get·정적 홈 미리 받기 0 · ?out=1 이 지움).
+     그 밖의 null(unknown·stale·ended·none·시한·끊김)은 종전 그대로(기록 없음). */
+  function homeOff() { try { global.localStorage.setItem('onfOutFailHome', String(Date.now())); } catch (e) {} }
   function askHome(tok) {
-    return askPost(ONF_HOME_GET, { t: tok }, HOMEGET_MS, function (j) { return j.ok === true && j.api === 3 && j.v && typeof j.v === 'object' ? j : null; });
+    return askPost(ONF_HOME_GET, { t: tok }, HOMEGET_MS, function (j) {
+      if (j.ok === false && j.why === 'off') homeOff();
+      return j.ok === true && j.api === 3 && j.v && typeof j.v === 'object' ? j : null;
+    }, function (st) { if (st === 503) homeOff(); });
   }
 
   /* iframe 에 GAS 웹앱을 띄우고, 키보드·팬 보정을 붙인다.
@@ -1128,7 +1134,7 @@
       try { var n = Date.now(), ls = global.localStorage; return !(n - Number(ls.getItem(OUT_FAIL_HOME) || 0) < OUT_FAIL_MS) && n - Number(ls.getItem(OUT_USED) || 0) < OUT_USED_MS; } catch (e) { return false; }
     }
     function mainHome() {
-      var org = OUT_HOME_ORG, d = null, drawn = false, done = false, pend = null, tm;
+      var org = OUT_HOME_ORG, d = null, dAt = 0, drawn = false, done = false, pend = null, tm;
       function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
       function back(kill) {
         if (done) return;
@@ -1138,8 +1144,16 @@
         appWin = null; histWin = null; histOrigin = ''; bookHome = null; bookHomeOrigin = '';
         mainExec();
       }
+      function aged() {   // 답을 받은 뒤 흐른 시간만큼 칸 나이를 올린 사본(원본 d 는 안 건드린다) — 정적 홈이 몇 시간 뒤 다시 읽혀 hello 하면 낡은 나이가 새것처럼 가지 않게
+        var el = Date.now() - dAt, pre = d.pre;
+        if (!(el > 0) || !pre || typeof pre !== 'object') return d;
+        var c = {}, np = {}, k, x, y;
+        for (k in d) c[k] = d[k];
+        for (k in pre) { x = pre[k]; if (x && typeof x === 'object' && typeof x.age === 'number') { y = {}; for (var f in x) y[f] = x[f]; y.age = x.age + el; np[k] = y; } else np[k] = x; }
+        c.pre = np; return c;
+      }
       function boot(w) {
-        try { w.postMessage({ onf: 'outBoot', src: src, tok: opts.tok, d: d }, org); } catch (e) {}
+        try { w.postMessage({ onf: 'outBoot', src: src, tok: opts.tok, d: aged() }, org); } catch (e) {}
         if (!drawn) { clearTimeout(tm); tm = setTimeout(function () { back(true); }, HOME_PAINT_MS); }
       }
       function onMsg(ev) {
@@ -1157,7 +1171,7 @@
       askHome(opts.tok).then(function (a) {
         if (done) return;
         if (!a) return back(false);
-        d = a;
+        d = a; dAt = Date.now();
         if (pend) boot(pend);
       });
       tm = setTimeout(function () { back(true); }, OUT_MS);   // hello 없음 — 정적 홈이 안 실렸다
