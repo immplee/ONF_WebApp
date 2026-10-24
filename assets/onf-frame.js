@@ -286,17 +286,30 @@
      ponytail: 800ms = 짐작 시한 — 실측으로 고친다. */
   var ONF_WHO = 'https://onf-media.edia--orker.workers.dev/who';
   var WHO_MS = 800;
-  function askWho(tok, q) {
+  function askPost(url, b, ms, pick) {   // Worker 에 묻기 — 시한 안 답(pick 이 고른 값) · 아니면 null
     return new Promise(function (ok) {
-      var tm = setTimeout(function () { ok(null); }, WHO_MS), b = { t: tok };
+      var tm = setTimeout(function () { ok(null); }, ms);
       function end(x) { clearTimeout(tm); ok(x); }
-      for (var k in q) if (q[k]) b[k] = q[k];
       try {
-        global.fetch(ONF_WHO, { method: 'POST', body: JSON.stringify(b) })
+        global.fetch(url, { method: 'POST', body: JSON.stringify(b) })
           .then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (j) { var x = j && j.ok === true && j.api === 2 && j.books && j.books[0]; end(x ? { out: !!x.out, cf: x.cf && typeof x.cf === 'object' ? x.cf : null } : null); }, function () { end(null); });
+          .then(function (j) { end(j ? pick(j) : null); }, function () { end(null); });
       } catch (e) { end(null); }
     });
+  }
+  function askWho(tok, q) {
+    var b = { t: tok };
+    for (var k in q) if (q[k]) b[k] = q[k];
+    return askPost(ONF_WHO, b, WHO_MS, function (j) { var x = j.ok === true && j.api === 2 && j.books && j.books[0]; return x ? { out: !!x.out, cf: x.cf && typeof x.cf === 'object' ? x.cf : null } : null; });
+  }
+  /* 🌤 밖으로 3(2026-10-24) — 학생 홈 첫 화면 값(Worker 사본 · 사진 없는 가벼운 답)을 묻는다. 같은 Worker · 몸통 {t} 만(주소에 토큰 X).
+     ok·api 3·v 객체일 때만 답 그대로(정적 홈이 outBoot 의 d 로 받는다) · ended·unknown·stale·off·none·실패·늦음 = null(지금 길).
+     ponytail: HOMEGET_MS 800 · HOME_PAINT_MS 2500 = 짐작 시한 — 실측(Task 8)으로 고친다. ⚠️ onf-load.js 의 HOME_MS(15초 막 기다림)와 다른 이름. */
+  var ONF_OUT_HOME_URL = 'https://app.ownify.co.kr/home/';
+  var ONF_HOME_GET = 'https://onf-media.edia--orker.workers.dev/home/get';
+  var HOMEGET_MS = 800, HOME_PAINT_MS = 2500;
+  function askHome(tok) {
+    return askPost(ONF_HOME_GET, { t: tok }, HOMEGET_MS, function (j) { return j.ok === true && j.api === 3 && j.v && typeof j.v === 'object' ? j : null; });
   }
 
   /* iframe 에 GAS 웹앱을 띄우고, 키보드·팬 보정을 붙인다.
@@ -1100,8 +1113,58 @@
         return bookBase((opts.bookSrc && opts.bookSrc(u.href)) || s);
       } catch (e) { return bookBase(s); }
     }
+    /* 🌤 밖으로 3(2026-10-24 · 판정 R4·R10~R14·R18) — 켠 학생 홈: /home/get 과 정적 홈(ONF_OUT_HOME_URL)을 **같이** 시작한다.
+       묻는 때만(homeQ): index.html 의 홈 표시(opts.home — PREBOOK 끔이면 preKey 가 비어 따로 받는다) · 토큰 · 기기 out · 14일 안에 정적 판을 쓴 기기(onfOutUsed) ·
+       그날 홈 물러남 없음(onfOutFailHome — 교재 onfOutFail 과 따로: 홈이 물러나도 정적 교재는 그대로) — 아니면 종전 그대로(요청·기다림 0).
+       · 답(d)이 와야 hello 에 outBoot{src, tok, d} · 답 없음 = 정적 손잡이를 **먼저** 걷고(end) 지금 길 — 그날 기록 없음(정적 시계가 두 번째 물러남을 못 한다).
+       · hello 없음(OUT_MS) · outBoot 뒤 HOME_PAINT_MS 안 homeDrawn 없음 · 그리기 전 outFail = 지금 길 + 그날 기록.
+       · 그린 뒤 outFail = 지금 길 · 그날 기록은 error·mismatch 만(notice = 끝난 학생 안내 · stale = 다리가 안 와 낡은 교재를 못 엶 — 데이터 상태라 내일도 정적 홈).
+       · 로고 막 ok 와 onfOutUsed 는 homeDrawn 에(첫 hello 가 아니다) · 물러나면 죽은 정적 창(키보드·기록 다리·판을 연 홈)을 비운다 — 지금 길 노크가 다시 정한다.
+       ⚠️ flushWorth 는 안 막는다 — 정적 홈은 교재 대기열을 안 든다(그래서 mainOut 을 안 쓴다). */
+    var OUT_FAIL_HOME = 'onfOutFailHome';
+    function homeQ() {
+      if (!opts.home || !opts.out || !opts.tok) return false;
+      try { var n = Date.now(), ls = global.localStorage; return !(n - Number(ls.getItem(OUT_FAIL_HOME) || 0) < OUT_FAIL_MS) && n - Number(ls.getItem(OUT_USED) || 0) < OUT_USED_MS; } catch (e) { return false; }
+    }
+    function mainHome() {
+      var org = new URL(ONF_OUT_HOME_URL).origin, d = null, drawn = false, done = false, pend = null, tm;
+      function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
+      function back(kill) {
+        if (done) return;
+        end();
+        console.info('[onf] 정적 홈이 안 떴다 — 지금 길로 다시');
+        if (kill) { try { global.localStorage.setItem(OUT_FAIL_HOME, String(Date.now())); } catch (e) {} }
+        appWin = null; histWin = null; histOrigin = ''; bookHome = null; bookHomeOrigin = '';
+        mainExec();
+      }
+      function boot(w) {
+        try { w.postMessage({ onf: 'outBoot', src: src, tok: opts.tok, d: d }, org); } catch (e) {}
+        if (!drawn) { clearTimeout(tm); tm = setTimeout(function () { back(true); }, HOME_PAINT_MS); }
+      }
+      function onMsg(ev) {
+        if (done || !ev || !ev.data || ev.source !== frameEl.contentWindow || ev.origin !== org) return;   // 그 액자 창 · 정적 홈 출처만
+        var k = ev.data.onf;
+        if (k === 'outFail') return back(ev.data.why !== 'notice' && ev.data.why !== 'stale');
+        if (k === 'outHello') { clearTimeout(tm); if (d) boot(ev.source); else pend = ev.source; return; }   // hello 마다(다시 읽힌 홈도 받게 · openApp 과 같다)
+        if (k === 'homeDrawn' && d && !drawn) {
+          drawn = true; clearTimeout(tm);
+          try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}
+          try { if (opts.hooks && typeof opts.hooks.ok === 'function') opts.hooks.ok(); } catch (eH) {}
+        }
+      }
+      global.addEventListener('message', onMsg);
+      askHome(opts.tok).then(function (a) {
+        if (done) return;
+        if (!a) return back(false);
+        d = a;
+        if (pend) boot(pend);
+      });
+      tm = setTimeout(function () { back(true); }, OUT_MS);   // hello 없음 — 정적 홈이 안 실렸다
+      try { if (frameEl.isConnected && frameEl.contentWindow) frameEl.contentWindow.location.replace(ONF_OUT_HOME_URL); else frameEl.src = ONF_OUT_HOME_URL; } catch (e) { frameEl.src = ONF_OUT_HOME_URL; }   // 📱 replace — openExec 끝 주석
+    }
     var wq = whoQ(src);
-    if (wq) askWho(opts.tok, wq).then(function (a) {
+    if (homeQ()) mainHome();   // 홈 표시면 교재 주소가 없어 whoQ 는 늘 null
+    else if (wq) askWho(opts.tok, wq).then(function (a) {
       if (!a || !a.cf) return mainExec();
       var mk = mainBook(src);
       function onQ(ev) { if (mainOut && ev && ev.data && ev.data.onf === 'outQueue' && ev.source === frameEl.contentWindow && ev.origin === OUT_ORG) outPend(mk, ev.data.n); }   // 🧺 그 액자 창 · 정적 판 출처만
