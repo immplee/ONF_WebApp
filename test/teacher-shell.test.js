@@ -434,7 +434,7 @@ t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼�
   assert.ok(!R.created.some((e) => e.className === 'onf-hwchip'), '⛔ 교재만 — 「📝 과제로」 칩이 남았다(교재 머리 줄 [과제 사진으로] 가 맡는다 · 페이지 추가 4단계)');
   assert.ok(!R.created.some((e) => e.className === 'onf-hwdiv' && e.parentNode && !e.removed), '⛔ 교재만인데 경계선이 남았다');
   R.postAs({ onf: 'hwbookView', v: 'photo' }, inner);
-  assert.ok(box.style.visibility === '' && box.style.right === '', '⛔ 사진만 — 과제 판이 전체로 안 돌아왔다');
+  assert.ok(box.style.visibility === '' && box.style.right === '0px', '⛔ 사진만 — 과제 판이 전체로 안 돌아왔다(right 를 비우면 inset:0 의 오른쪽이 지워져 폭 0 — 2026-10-24 라이브)');
   assert.strictEqual(panels()[0].style.display, 'none', '⛔ 사진만 — 교재 액자가 안 숨었다');
   assert.ok(!R.created.some((e) => e.className && /onf-bookpanel/.test(e.className)), '⛔ 홈 옆 교재 판(books)을 건드렸다');
   R.g.hwClose();   // 과제 판 닫기(뒤로·‹ 모두 여기로) = 그 교재 액자도 지움

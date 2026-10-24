@@ -605,7 +605,7 @@ function hwDivider() {
 function hwLay() {
   if (!hwBox) return;
   var W = window.innerWidth || 0, cut = Math.round(W * hwSplit), side = hwView === 'side';
-  hwBox.style.right = side ? (W - cut) + 'px' : '';
+  hwBox.style.right = side ? (W - cut) + 'px' : '0px';   // ⛔ 빈 값이면 inset:0 의 right 가 지워져 판 폭이 0 이 된다(사진만으로 돌아오면 「불러오는 중」만 보였다 · 2026-10-24 라이브)
   hwBox.style.visibility = hwView === 'book' ? 'hidden' : ''; hwBox.style.pointerEvents = hwView === 'book' ? 'none' : '';
   if (hwBk) { hwBk.box.style.display = hwView === 'photo' ? 'none' : ''; hwBk.box.style.left = side ? cut + 'px' : '0'; }
   if (side) hwDivider().style.left = (cut - 7) + 'px';
