@@ -1021,6 +1021,73 @@ ta('S6 index.html — mount 에 홈 표시(home)를 넘긴다(PREBOOK 끔과 무
   assert.ok(!('onfOutFailHome' in c.localStorage.m) && !('onfOutFail' in c.localStorage.m), '⛔ out=1 인데 물러남 기억이 남았다');
 });
 
+/* 검토 고침 1(Task 6) */
+const on25 = (s) => s.timers.filter((x) => x.on && x.ms === 2500);
+ta('R12 그리기 시한은 outBoot 부터 — hello 가 mount 시계(OUT_MS)를 걷고 outBoot 뒤 새 2500 시계를 건다(답이 먼저 와도 · hello 가 먼저여도)', async () => {
+  for (const order of ['hello먼저', '답먼저']) {
+    const s = hsetup();
+    const m0 = on25(s);
+    assert.strictEqual(m0.length, 1, 'mount 때 hello 시계 하나');
+    if (order === '답먼저') { s.calls[0].ok(200, HANS()); await flush(); assert.strictEqual(on25(s)[0], m0[0], '⛔ ' + order + ' — hello 전에 시계를 바꿨다'); }
+    s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+    assert.strictEqual(m0[0].on, false, '⛔ ' + order + ' — hello 가 mount 시계를 안 걷었다(시한이 mount 부터 센다)');
+    if (order === 'hello먼저') { assert.strictEqual(on25(s).length, 0, '⛔ outBoot 전에 그리기 시계'); s.calls[0].ok(200, HANS()); await flush(); }
+    assert.strictEqual(boots(s.homeWin).length, 1);
+    const p = on25(s);
+    assert.ok(p.length === 1 && p[0] !== m0[0] && s.timers.indexOf(p[0]) > s.timers.indexOf(m0[0]), '⛔ ' + order + ' — outBoot 뒤 새 2500 시계가 없다');
+  }
+});
+ta('R-2 그리기 전 물러남은 openExec 길 — 같은 액자의 구글 홈 노크가 로고 막 ok 를 부른다(여러 계정 우회·hooks 그대로)', async () => {
+  const s = hsetup();
+  s.calls[0].ok(200, HANS()); await flush();
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  s.send({ onf: 'outFail', why: 'error' }, s.homeWin, OUT_O);
+  assert.strictEqual(s.okN.n, 0);
+  s.send({ onf: 'frameHello' }, s.homeInner, GO);
+  assert.strictEqual(s.okN.n, 1, '⛔ 물러난 뒤 지금 길 노크에 로고 ok 가 없다(openExec 를 안 탔다)');
+});
+ta('R-3 답 전 homeDrawn 은 무시 — 로고 ok·onfOutUsed 없음 · 답 뒤 outBoot 시한은 그대로 돈다', async () => {
+  const s = hsetup();
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  s.send({ onf: 'homeDrawn' }, s.homeWin, OUT_O);
+  assert.strictEqual(s.okN.n, 0, '⛔ 답 전 homeDrawn 으로 로고 막을 걷었다');
+  assert.strictEqual(s.g.localStorage.m.onfOutUsed, String(1.7e12 - 13 * 86400000), '⛔ 답 전 homeDrawn 으로 onfOutUsed 를 적었다');
+  s.calls[0].ok(200, HANS()); await flush();
+  s.fire(2500);
+  assert.strictEqual(s.frameEl.src, HSRC, '⛔ 답 전 homeDrawn 이 그리기 시한을 껐다');
+});
+ta('R-4 그리기 전 outFail 은 notice·stale 이어도 그날 기록', async () => {
+  for (const why of ['notice', 'stale']) {
+    const s = hsetup();
+    s.calls[0].ok(200, HANS()); await flush();
+    s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+    s.send({ onf: 'outFail', why }, s.homeWin, OUT_O);
+    assert.strictEqual(s.frameEl.src, HSRC);
+    assert.ok('onfOutFailHome' in s.g.localStorage.m, '⛔ 그리기 전 ' + why + ' 인데 그날 기록이 없다');
+  }
+});
+ta('R-5 물러난 뒤 죽어 가는 정적 홈 창(그 액자 · 정적 홈 출처)의 openBook·hist·bookWarm·frameHello 는 버린다 · 지금 길 구글 홈 말은 받는다', async () => {
+  const s = hsetup();
+  s.calls[0].ok(200, HANS()); await flush();
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  s.send({ onf: 'homeDrawn' }, s.homeWin, OUT_O);
+  s.send({ onf: 'outFail', why: 'mismatch' }, s.homeWin, OUT_O);
+  s.homeWin.sent.length = 0;
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeWin, OUT_O);
+  s.send({ onf: 'bookWarm', href: E2, panel: 1 }, s.homeWin, OUT_O);
+  s.send({ onf: 'hist', op: 'hi' }, s.homeWin, OUT_O);
+  s.send({ onf: 'bookHello' }, s.homeWin, OUT_O);
+  assert.strictEqual(s.panels().length, 0, '⛔ 죽어 가는 정적 홈 말로 판을 열었다');
+  assert.deepStrictEqual(js(s.homeWin.sent), [], '⛔ 죽어 가는 정적 홈 창에 답했다(hist-on·caps)');
+  s.send({ onf: 'openBook', href: E1 }, s.homeInner, GO);
+  s.send({ onf: 'hist', op: 'hi' }, s.homeInner, GO);
+  assert.strictEqual(s.panels().length, 1, '⛔ 지금 길 구글 홈의 openBook 을 버렸다');
+  assert.ok(js(s.homeInner.sent).some((x) => x[0].onf === 'hist-on'), '⛔ 지금 길 구글 홈의 hist hi 를 버렸다');
+  s.homeInner.sent.length = 0;
+  s.send({ onf: 'bookDismiss' }, s.homeInner, GO);
+  assert.ok(js(s.homeInner.sent).some((x) => x[0].onf === 'bookClosed'), '⛔ 판을 연 구글 홈에 bookClosed 가 안 간다');
+});
+
 (async () => {
   for (const [label, fn] of AT) {
     try { await fn(); console.log('  ✅ ' + label); pass++; }

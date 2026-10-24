@@ -307,7 +307,7 @@
      ponytail: HOMEGET_MS 800 · HOME_PAINT_MS 2500 = 짐작 시한 — 실측(Task 8)으로 고친다. ⚠️ onf-load.js 의 HOME_MS(15초 막 기다림)와 다른 이름. */
   var ONF_OUT_HOME_URL = 'https://app.ownify.co.kr/home/';
   var ONF_HOME_GET = 'https://onf-media.edia--orker.workers.dev/home/get';
-  var HOMEGET_MS = 800, HOME_PAINT_MS = 2500;
+  var HOMEGET_MS = 800, HOME_PAINT_MS = 2500, OUT_HOME_ORG = ONF_OUT_HOME_URL.replace(/^(https:\/\/[^\/]+).*$/, '$1');   // 출처 — 모듈 맨 위라 URL 없이(옛 브라우저·검사 하네스)
   function askHome(tok) {
     return askPost(ONF_HOME_GET, { t: tok }, HOMEGET_MS, function (j) { return j.ok === true && j.api === 3 && j.v && typeof j.v === 'object' ? j : null; });
   }
@@ -415,6 +415,7 @@
         if (!_fromOurFrame(ev.source, frameEl)) return;
         if (!isAppOrigin(ev.origin)) return;
       } catch (e) { return; }
+      if (homeGone && ev.source === frameEl.contentWindow && ev.origin === OUT_HOME_ORG) return;   // 🌤 물러난 정적 홈(아래 mainHome back) — 구글 응답이 들어설 때까지 살아 있는 옛 문서가 창 손잡이를 다시 가져가지 않게
       if (ev.data.onf === 'hist') { histMsg(ev); return; }   // 기록 칸 다리 — 위 자물쇠를 통과한 말만(아래 블록)
       if (ev && ev.data && ev.data.onf === 'frameHello') {
         appWin = ev.source; lastH = -1; lastTop = -1; sync();
@@ -1121,17 +1122,17 @@
        · 그린 뒤 outFail = 지금 길 · 그날 기록은 error·mismatch 만(notice = 끝난 학생 안내 · stale = 다리가 안 와 낡은 교재를 못 엶 — 데이터 상태라 내일도 정적 홈).
        · 로고 막 ok 와 onfOutUsed 는 homeDrawn 에(첫 hello 가 아니다) · 물러나면 죽은 정적 창(키보드·기록 다리·판을 연 홈)을 비운다 — 지금 길 노크가 다시 정한다.
        ⚠️ flushWorth 는 안 막는다 — 정적 홈은 교재 대기열을 안 든다(그래서 mainOut 을 안 쓴다). */
-    var OUT_FAIL_HOME = 'onfOutFailHome';
+    var OUT_FAIL_HOME = 'onfOutFailHome', homeGone = false;   // homeGone = 정적 홈이 물러났다(위 홈 자물쇠가 그 창·그 출처 말을 버린다)
     function homeQ() {
       if (!opts.home || !opts.out || !opts.tok) return false;
       try { var n = Date.now(), ls = global.localStorage; return !(n - Number(ls.getItem(OUT_FAIL_HOME) || 0) < OUT_FAIL_MS) && n - Number(ls.getItem(OUT_USED) || 0) < OUT_USED_MS; } catch (e) { return false; }
     }
     function mainHome() {
-      var org = new URL(ONF_OUT_HOME_URL).origin, d = null, drawn = false, done = false, pend = null, tm;
+      var org = OUT_HOME_ORG, d = null, drawn = false, done = false, pend = null, tm;
       function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
       function back(kill) {
         if (done) return;
-        end();
+        end(); homeGone = true;
         console.info('[onf] 정적 홈이 안 떴다 — 지금 길로 다시');
         if (kill) { try { global.localStorage.setItem(OUT_FAIL_HOME, String(Date.now())); } catch (e) {} }
         appWin = null; histWin = null; histOrigin = ''; bookHome = null; bookHomeOrigin = '';
@@ -1144,7 +1145,7 @@
       function onMsg(ev) {
         if (done || !ev || !ev.data || ev.source !== frameEl.contentWindow || ev.origin !== org) return;   // 그 액자 창 · 정적 홈 출처만
         var k = ev.data.onf;
-        if (k === 'outFail') return back(ev.data.why !== 'notice' && ev.data.why !== 'stale');
+        if (k === 'outFail') return back(!drawn || (ev.data.why !== 'notice' && ev.data.why !== 'stale'));   // 그리기 전엔 무엇이든 그날 기록
         if (k === 'outHello') { clearTimeout(tm); if (d) boot(ev.source); else pend = ev.source; return; }   // hello 마다(다시 읽힌 홈도 받게 · openApp 과 같다)
         if (k === 'homeDrawn' && d && !drawn) {
           drawn = true; clearTimeout(tm);
