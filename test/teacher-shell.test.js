@@ -412,6 +412,9 @@ t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼�
   const bkFr = R.created.filter((e) => e.tag === 'iframe').slice(-1)[0], bkWait = R.created.filter((e) => e.className === 'onf-wait').slice(-1)[0];
   assert.ok(/position:relative;z-index:1/.test(bkFr.style.cssText) && /position:absolute/.test(bkWait.style.cssText), '⛔ 교재 액자가 「불러오는 중」 막 아래에 깔린다(교재가 떠도 영영 가림 · Peter 2026-10-24)');
   assert.ok(/\/\d+px$|^\d+px$/.test(box.style.right) && box.style.right !== '', '⛔ 옆에 — 과제 판이 왼쪽 반으로 안 줄었다: ' + box.style.right);
+  const dv = R.created.filter((e) => e.className === 'onf-hwdiv')[0];
+  assert.ok(dv && dv.parentNode, '⛔ 옆에 — 경계선(폭 끌기)이 없다');
+  assert.deepStrictEqual([R.g.hwSplitAt(100, 1000), R.g.hwSplitAt(550, 1000), R.g.hwSplitAt(900, 1000), R.g.hwSplitAt(5, 0)], [0.4, 0.55, 0.72, 0.5], '⛔ 경계선 끌기 범위 = 과제 판 40%~72%(설계 §0-9)');
   // ⑬ 펜 줄 하나 — 과제 판 도구 → 껍데기 → 교재(노크한 창) · 늦게 뜬 교재엔 노크 때 마지막 것
   R.postAs({ onf: 'hwPen', tool: 'marker', pick: { pen: { color: '#E5484D', w: 3 }, marker: { color: 'ink', w: 14 } }, stampK: 1 }, inner);
   const bookGot = [], bookWin = { parent: bkFr.contentWindow, postMessage: (m) => bookGot.push(m) };
@@ -428,8 +431,8 @@ t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼�
   R.postAs({ onf: 'hwbookView', v: 'book' }, inner);
   R.postAs({ onf: 'hwbookView', v: 'book' }, inner);
   assert.strictEqual(box.style.visibility, 'hidden', '⛔ 교재만 — 과제 판이 안 숨었다');
-  const chip = R.created.filter((e) => e.className === 'onf-hwchip')[0];
-  assert.ok(chip && chip.parentNode, '⛔ 교재만 — 「과제로」 칩이 없다');
+  assert.ok(!R.created.some((e) => e.className === 'onf-hwchip'), '⛔ 교재만 — 「📝 과제로」 칩이 남았다(교재 머리 줄 [과제 사진으로] 가 맡는다 · 페이지 추가 4단계)');
+  assert.ok(!R.created.some((e) => e.className === 'onf-hwdiv' && e.parentNode && !e.removed), '⛔ 교재만인데 경계선이 남았다');
   R.postAs({ onf: 'hwbookView', v: 'photo' }, inner);
   assert.ok(box.style.visibility === '' && box.style.right === '', '⛔ 사진만 — 과제 판이 전체로 안 돌아왔다');
   assert.strictEqual(panels()[0].style.display, 'none', '⛔ 사진만 — 교재 액자가 안 숨었다');

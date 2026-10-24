@@ -552,7 +552,7 @@ function hwTell() { if (hwWant && hwWin && pending && tokAlive(pending)) { hwWan
      아이패드에서 반만 보이고 뒤로가 꼬였다(반박 🔴1·🟠3~6). 과제 판 전용 교재 액자 하나(hwBk)를 과제 판과 같은 층(z 50)에 둔다 — 기록 칸 없음 · 과제 판을 닫으면 같이 지운다.
    옆에 = 과제 판 왼쪽 반 · 교재 오른쪽 반 · 교재만 = 과제 판 숨김(살려 둠) + 왼쪽 아래 「📝 과제로」 칩 · 사진만 = 교재 숨김(살려 둠).
    교재 주소는 teacherBookSrc 거르개(남의 주소·모르는 mode 거절) · 못 받은 주소면 판에 지금 보기를 다시 알린다. 교재 판은 제 펜 줄을 그대로 쓴다(도구 한 줄 = 다음). */
-var hwView = 'photo', hwBk = null, hwChipEl = null;
+var hwView = 'photo', hwBk = null;
 function hwTellView() { if (hwWin) { try { hwWin.postMessage({ onf: 'hwbookView', v: hwView }, hwOrigin); } catch (e) {} } }
 function hwBookFrame(src) {
   if (!hwBk) {
@@ -583,19 +583,33 @@ function hwViewSet(v, href) {
   hwView = v; hwLay(); hwPenSync();
   if (v === 'book') { try { hwFr.blur(); hwBk.el.focus(); } catch (e) {} }   // 숨은 과제 판이 화살표를 먹지 않게
 }
+/* 📄 교재 옆에 = 경계선(세로 손잡이)을 끌어 폭 조절(페이지 추가 4단계 · 설계 §0-9 · 시제품 10판) — 과제 판 40%~72% · 이 기기에 기억 ·
+   끄는 동안 두 액자는 누름을 안 받는다(액자 위로 지나가면 손을 놓친다) · 교재만 [과제 사진으로] 는 교재 머리 줄 ✕ 자리가 맡는다(종전 왼쪽 아래 「📝 과제로」 칩은 걷음 · 시제품 11판) */
+var hwSplit = 0.5, hwDiv = null;
+try { var hwSv = +localStorage.getItem('onfHwSplit'); if (hwSv >= 0.4 && hwSv <= 0.72) hwSplit = hwSv; } catch (eS) {}
+function hwSplitAt(x, W) { return Math.max(0.4, Math.min(0.72, W > 0 ? x / W : 0.5)); }
+function hwDivider() {
+  if (hwDiv) return hwDiv;
+  var d = document.createElement('div'), g = document.createElement('i');
+  d.className = 'onf-hwdiv'; d.setAttribute('role', 'separator'); d.setAttribute('aria-orientation', 'vertical'); d.setAttribute('aria-label', '폭 조절 — 끌기');
+  d.style.cssText = 'position:fixed;top:0;bottom:0;width:14px;z-index:55;cursor:col-resize;touch-action:none;display:flex;align-items:center;justify-content:center';
+  g.style.cssText = 'display:block;width:5px;height:48px;border-radius:3px;background:var(--onf-line,#8a7562);opacity:.8;pointer-events:none';
+  d.appendChild(g);
+  var drag = null, frames = function (on) { [hwFr, hwBk && hwBk.el].forEach(function (f) { if (f) f.style.pointerEvents = on ? '' : 'none'; }); };
+  d.addEventListener('pointerdown', function (e) { drag = e.pointerId; try { d.setPointerCapture(e.pointerId); } catch (er) {} frames(false); e.preventDefault(); });
+  d.addEventListener('pointermove', function (e) { if (drag !== e.pointerId) return; hwSplit = hwSplitAt(e.clientX, window.innerWidth || 0); hwLay(); });
+  var up = function (e) { if (drag !== e.pointerId) return; drag = null; frames(true); try { localStorage.setItem('onfHwSplit', String(Math.round(hwSplit * 1000) / 1000)); } catch (er) {} };
+  d.addEventListener('pointerup', up); d.addEventListener('pointercancel', up);
+  document.body.appendChild(d); hwDiv = d; return d;
+}
 function hwLay() {
   if (!hwBox) return;
-  var W = window.innerWidth || 0, half = Math.round(W / 2);
-  hwBox.style.right = hwView === 'side' ? (W - half) + 'px' : '';
+  var W = window.innerWidth || 0, cut = Math.round(W * hwSplit), side = hwView === 'side';
+  hwBox.style.right = side ? (W - cut) + 'px' : '';
   hwBox.style.visibility = hwView === 'book' ? 'hidden' : ''; hwBox.style.pointerEvents = hwView === 'book' ? 'none' : '';
-  if (hwBk) { hwBk.box.style.display = hwView === 'photo' ? 'none' : ''; hwBk.box.style.left = hwView === 'side' ? half + 'px' : '0'; }
-  if (hwView === 'book' && !hwChipEl) {
-    hwChipEl = document.createElement('button'); hwChipEl.type = 'button'; hwChipEl.className = 'onf-hwchip'; hwChipEl.textContent = '📝 과제로';
-    hwChipEl.style.cssText = 'position:fixed;bottom:18px;left:18px;z-index:60;height:42px;padding:0 16px;border-radius:21px;border:1px solid var(--onf-line,#e8ddcf);background:var(--onf-bg,#fff);color:inherit;font:inherit;font-weight:700;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.18)';
-    hwChipEl.onclick = function () { hwViewSet('side'); hwTellView(); };
-    document.body.appendChild(hwChipEl);
-  }
-  if (hwView !== 'book' && hwChipEl) { if (hwChipEl.parentNode) hwChipEl.parentNode.removeChild(hwChipEl); hwChipEl = null; }
+  if (hwBk) { hwBk.box.style.display = hwView === 'photo' ? 'none' : ''; hwBk.box.style.left = side ? cut + 'px' : '0'; }
+  if (side) hwDivider().style.left = (cut - 7) + 'px';
+  else if (hwDiv) { if (hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null; }
 }
 window.addEventListener('resize', function () { if (hwBox && hwView !== 'photo') hwLay(); });
 /* 📖 펜 줄 하나(⑬) — 과제 판이 알린 도구·색·굵기를 옆 교재(노크한 창)에 그대로 · 교재가 늦게 뜨면 노크(bookHi) 때 마지막 것을 */
@@ -626,7 +640,7 @@ window.addEventListener('message', function (ev) {
 function hwClose() {
   if (hwBox && !hwWarmOn && appWin) { try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (e) {} }   // 홈이 카드 상태(완료 등)를 다시 받게
   if (hwBk) { if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} } if (hwBk.box.parentNode) hwBk.box.parentNode.removeChild(hwBk.box); hwBk = null; }   // 과제 판을 닫으면 그 교재 액자도 지운다
-  hwView = 'photo'; if (hwChipEl && hwChipEl.parentNode) hwChipEl.parentNode.removeChild(hwChipEl); hwChipEl = null;
+  hwView = 'photo'; if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;
   if (hwBox && hwBox.parentNode) hwBox.parentNode.removeChild(hwBox);
   hwBox = null; hwFr = null; hwWin = null; hwOrigin = ''; hwGo = null; hwGave = ''; hwWant = false; hwT = ''; hwWarmOn = false; hwGoMsg = null; clearTimeout(hwWarmTm);
 }
