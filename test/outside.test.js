@@ -478,17 +478,19 @@ t('G1 회차 A·B 둘 다 남음 — A 를 지금 길로 열어 넘겨주고 out
   assert.deepStrictEqual(boots(w2).map((x) => x[0].src), [SRC2 + '&park=1'], '⛔ B 넘겨주기 판이 B 가 아니다');
 });
 
-t('G2 판 안에서 갈아 끼운 정적 판의 outQueue — 판이 지금 든 교재(p.real) 표시로', () => {
+/* G2 — 2026-10-24 최종 검토 뒤: 정적 판엔 이제 갈아 끼우지 않는다(F-I1) → A·B 는 각자 정적 판 · 각 판의 outQueue 는 그 판이 든 교재(p.real) 표시로 */
+t('G2 정적 판 둘(A·B)의 outQueue — 각자 든 교재(p.real) 표시로', () => {
   const ls = LSf(), s = setup({ swap: true, ls });
   s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
   const box = s.panels()[0], w = outWin(s, box);
   s.send({ onf: 'outHello' }, w, OUT_O); knock(s, box, OUT_O);
   s.send({ onf: 'openBook', href: E2, out: 1 }, s.homeInner);
-  const sw = sentOf(w, 'bookSwap')[0];
-  assert.ok(sw, '준비: 정적 판에 갈아 끼우기');
-  s.send({ onf: 'bookSwapped', id: sw[0].id, ok: true }, w, OUT_O);
+  const box2 = shown(s)[0], w2 = outWin(s, box2);
+  assert.ok(box2 !== box, '준비: B 는 새 정적 판');
+  s.send({ onf: 'outQueue', n: 1 }, w2, OUT_O);
+  assert.ok(ls.m[PK2] === '1' && !(PK1 in ls.m), '⛔ B 판의 outQueue 를 B 표시로 안 적었다: ' + JSON.stringify(ls.m));
   s.send({ onf: 'outQueue', n: 1 }, w, OUT_O);
-  assert.ok(ls.m[PK2] === '1' && !(PK1 in ls.m), '⛔ 갈아 끼운 판의 outQueue 를 지금 교재(E2) 표시로 안 적었다: ' + JSON.stringify(ls.m));
+  assert.ok(ls.m[PK1] === '1', '⛔ A 판(숨김)의 outQueue 를 A 표시로 안 적었다: ' + JSON.stringify(ls.m));
 });
 
 t('G3 같은 판에 넘겨주기를 두 번 걸어도 잃지도 겹치지도 않는다 — 노크 전 같은 교재 두 번 → 하나', () => {
@@ -506,6 +508,33 @@ t('G4 넘겨주기 판이 사는 동안 보이는 정적 판을 만들면 넘겨
   s.send({ onf: 'openBook', href: E2, out: 1 }, s.homeInner);
   assert.strictEqual(flushes(s).length, 0, '⛔ 정적 판을 띄웠는데 넘겨주기 판이 살아 있다');
   assert.strictEqual(shown(s)[0].kids[0].src, OUT_BOOK, '준비: 보이는 정적 판');
+});
+
+console.log('[🌤 최종 검토 고침 — 2026-10-24]');
+/* I1 정적 판(board)엔 홈 out:1 누름도 안 끼운다 — 정적 판의 다리는 첫 교재에 묶여 O.boot 가 바로 fail → bookSwapEnd 가 지금 길 새 판(≈5초)으로 물러났다(오늘 판 갈아 끼우기 0.5~3초보다 느림).
+   그래서 out:1 누름은 새 정적 판(사본 겨루기)으로 · out 없는 누름은 이미 정적 판을 못 고른다(위 I1). */
+t('F-I1 홈이 A(out) 다음 B(out) — B 는 새 정적 판 · A 창에 bookSwap 없음', () => {
+  const s = setup({ swap: true });
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
+  const box = s.panels()[0], w = outWin(s, box);
+  s.send({ onf: 'outHello' }, w, OUT_O); knock(s, box, OUT_O);
+  s.send({ onf: 'openBook', href: E2, out: 1 }, s.homeInner);
+  assert.strictEqual(sentOf(w, 'bookSwap').length, 0, '⛔ 켠 교재를 정적 판(board)에 갈아 끼웠다');
+  const v = shown(s);
+  assert.ok(v.length === 1 && v[0] !== box && v[0].kids[0].src === OUT_BOOK, '⛔ B 가 새 정적 판으로 안 떴다');
+  const w2 = outWin(s, v[0]); s.send({ onf: 'outHello' }, w2, OUT_O);
+  assert.deepStrictEqual(boots(w2).map((x) => x[0].src), [SRC2], '⛔ 새 정적 판에 B 를 안 넘겼다');
+});
+
+/* M2 주소 out=1 은 그 기기의 하루 물러남 기억(onfOutFail)도 지운다 — Peter 가 기기를 바로 다시 시험하게. out=0 은 종전. */
+t('F-M2 index.html — out=1 이면 onfOutFail 지움 · out=0·없음은 그대로', () => {
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const line = (/\n\s*(var outOn = q\.get\('out'\);[^\n]*\n[^\n]*catch \(eO\) \{\})/.exec(html) || [])[1];
+  assert.ok(line, '⛔ index.html 에 out 스위치 줄이 없다');
+  const run = (qs, m) => { const c = { q: new URLSearchParams(qs), localStorage: LSf(m) }; vm.createContext(c); vm.runInContext(line, c); return c.localStorage.m; };
+  assert.ok(!('onfOutFail' in run('out=1', { onfOutFail: '1700000000000' })), '⛔ out=1 인데 onfOutFail 이 남았다');
+  assert.strictEqual(run('out=0', { onfOutFail: '17' }).onfOutFail, '17', '⛔ out=0 이 onfOutFail 을 건드렸다');
+  assert.strictEqual(run('', { onfOutFail: '17' }).onfOutFail, '17', '⛔ out 없는 주소가 onfOutFail 을 건드렸다');
 });
 
 console.log('\n통과 ' + pass + ' / 실패 ' + fail);

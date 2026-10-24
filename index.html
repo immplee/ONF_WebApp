@@ -114,9 +114,10 @@
   var swapOn = q.get('swap');
   try { if (swapOn === '1' || swapOn === '0') localStorage.setItem('onfSwap', swapOn); else swapOn = localStorage.getItem('onfSwap'); } catch (eS) {}
   /* 🌤 밖으로 1(2026-10-24) — 홈이 out:1 로 연 교재만 구글 밖 정적 판(onf-frame.js openApp) · 주소 out=0|1 이면 이 기기에 기억(onfOut) · 없으면 기억값 · 그것도 없으면 켬.
-     out=0 = 이 기기는 늘 지금 길. 토큰은 정적 판 주소에 안 싣고 mount 에 넘긴다(판이 준비되면 postMessage 로). */
+     out=0 = 이 기기는 늘 지금 길. 토큰은 정적 판 주소에 안 싣고 mount 에 넘긴다(판이 준비되면 postMessage 로).
+     out=1 은 그날 물러남 기억(onfOutFail 하루)도 지운다(2026-10-24 최종 검토 — 안 그러면 한 번 물러난 기기를 다음 날까지 다시 못 시험한다). */
   var outOn = q.get('out');
-  try { if (outOn === '1' || outOn === '0') localStorage.setItem('onfOut', outOn); else outOn = localStorage.getItem('onfOut'); } catch (eO) {}
+  try { if (outOn === '1' || outOn === '0') { localStorage.setItem('onfOut', outOn); if (outOn === '1') localStorage.removeItem('onfOutFail'); } else outOn = localStorage.getItem('onfOut'); } catch (eO) {}
   /* 토큰은 이미 이 도메인에 저장됐다 — 주소창에서 지운다(화면 찍어 보낼 때 같이 나가면 안 된다).
      ⛔ 반드시 위 `q.get(...)` 들을 다 읽은 **뒤**여야 한다. */
   ONF.frame.hideToken();

@@ -811,7 +811,7 @@
       return b;
     }
     function bookMine(src) { return /[?&]mode=mine(&|$)/.test(src); }
-    function bookBoardFor(src, out) { var b = bookMine(src) ? null : bookBoard(); return b && outSame(b, src, out) ? b : null; }   // 🌤 길이 다른 판엔 안 끼운다(위 outSame)   // ⭐ 내 문장 주소는 교재 판에 안 끼운다(설계 §5.4 — 내 문장 판은 따로)
+    function bookBoardFor(src, out) { var b = bookMine(src) ? null : bookBoard(); return b && !b.out && outSame(b, src, out) ? b : null; }   // 🌤 길이 다른 판엔 안 끼운다(위 outSame) · 정적 판(p.out)엔 아예 안 끼운다(2026-10-24 최종 검토 — 그 판 다리는 첫 교재에 묶여 O.boot 가 바로 fail → 지금 길 새 판 ≈5초로 물러났다 · out:1 누름은 새 정적 판이 사본 겨루기로 더 빠르다)   // ⭐ 내 문장 주소는 교재 판에 안 끼운다(설계 §5.4 — 내 문장 판은 따로)
     function bookFetch(b, src) { try { b.win.postMessage({ onf: 'bookFetch', src: src }, b.origin); } catch (e) {} }
     /* 노크 전 판 후보 = 홈에서 연·미리 띄운 판(home) · 아직 노크 전(!win) · 내 문장 아님 · 만든 지 1분 안. 있으면 미리(교재) 주소는 줄에 선다 — 학생 홈은 2초 뒤 넷을 한꺼번에 보낸다(첫 교재 판은 그때 노크 전).
        그 판이 swap:1 로 노크해 판이 되면 줄을 bookFetch 로 흘린다(아래 bookHi) · swap 없이 끝나면 안 흘린다. ponytail: 1분 = 노크 기다림 짐작(선생님 껍데기와 같다). */
