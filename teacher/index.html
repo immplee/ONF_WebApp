@@ -562,7 +562,7 @@ function hwBookFrame(src) {
     hwBk = { box: box, el: el, wt: wt, src: '' };
   }
   if (hwBk.src !== src) {
-    hwBk.src = src; hwBk.win = null; hwBk.wt.hidden = false;   // 새 교재 = 새 노크를 기다린다(막 다시)
+    hwBk.src = src; hwBk.win = null;   // 새 교재 = 새 노크를 기다린다
     if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} hwBk.oe = null; }
     if (window.ONF && ONF.frame && ONF.frame.openExec) hwBk.oe = ONF.frame.openExec(hwBk.el, src, hwBk.wt, function () { hwViewSet('photo'); hwTellView(); });   // 🔐 여러 계정 우회(교재 판과 같은 길)
     else hwBk.el.src = src;
@@ -615,7 +615,7 @@ function hwPenSync() {
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
   if (!d || !hwBk || !bookFrom(ev, hwBk.el)) return;
-  if (d.onf === 'bookHi') { hwBk.win = ev.source; hwBk.origin = ev.origin; hwBk.wt.hidden = true; hwPenSync(); return; }   // 교재가 살았다 — 「불러오는 중」 막을 걷는다(교재만으로 넓어지는 1~2초 동안 투명한 오른쪽으로 비쳤다 · 라이브 2026-10-24)
+  if (d.onf === 'bookHi') { hwBk.win = ev.source; hwBk.origin = ev.origin; hwPenSync(); return; }
   if (d.onf === 'themeAsk') { themeAsk(ev); return; }
   if (d.onf === 'printTitle') { if (window.ONF && ONF.frame && ONF.frame.printTitle) ONF.frame.printTitle(d.t); return; }
   if (d.onf === 'bookClose') { hwViewSet('photo'); hwTellView(); }
