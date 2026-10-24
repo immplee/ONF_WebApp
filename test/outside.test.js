@@ -243,6 +243,41 @@ t('S5f 다음 홈 열기 — o:1 기억이면 정적 판으로 숨긴 판(park �
   }
 });
 
+const vis = (s) => s.panels().filter((p) => !p.classList.contains('park'));   // 보이는 판(아래 shown 과 같다 — 그 줄보다 앞이라)
+/* 2026-10-24 T7 라이브 F2 — 첫 방문은 늘 지금 길이었다: 홈 bookWarm 이 out 을 안 실어 지금 길 숨긴 판을 띄웠고 out:1 누름이 그 판(bookFind)을 썼다 */
+t('S-F2a bookWarm(panel:1, out:1) → 정적 판으로 숨긴 판(park=1) · 기억에 o:1 · 그 뒤 out:1 누름은 그 정적 판을 보인다(새 판 0) · 끈 기기·실패한 날은 지금 길', () => {
+  const ls = LSf(), s = setup({ ls, preKey: 'kA' });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, out: 1 }, s.homeInner);
+  const box = s.panels()[0];
+  assert.ok(box && box.classList.contains('park') && box.kids[0].src === OUT_BOOK, '⛔ out:1 미리 받기가 정적 숨긴 판이 아니다: ' + (box && box.kids[0].src));
+  const w = outWin(s, box);
+  s.send({ onf: 'outHello' }, w, OUT_O);
+  assert.deepStrictEqual(boots(w).map((x) => x[0].src), [SRC1 + '&park=1'], '⛔ 숨긴 정적 판 outBoot 에 park=1');
+  assert.strictEqual(JSON.parse(ls.m.onfPreBook).o, 1, '⛔ out:1 미리 받기인데 기억에 o:1 이 없다(다음 방문 preEarly 가 지금 길)');
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
+  assert.deepStrictEqual([s.panels().length, vis(s)[0]], [1, box], '⛔ out:1 누름이 미리 띄운 정적 판을 안 썼다');
+  for (const [why, o] of [['끈 기기', { out: false }], ['실패한 날', { ls: LSf({ onfOutFail: String(1.7e12 - 1000) }) }]]) {
+    const q = setup(o);
+    q.send({ onf: 'bookWarm', href: E1, panel: 1, out: 1 }, q.homeInner);
+    assert.strictEqual(q.panels()[0].kids[0].src, SRC1 + '&park=1', '⛔ ' + why + ' 인데 미리 받기가 지금 길이 아니다');
+  }
+});
+t('S-F2b out:1 누름이 찾은 판이 지금 길(exec) 판이면 — 자격 내리고 정적 새 판(out 없는 누름이 정적 판을 내리는 것의 거울) · 끈 기기면 그 판 그대로', () => {
+  const s = setup();
+  s.send({ onf: 'bookWarm', href: E1, panel: 1 }, s.homeInner);   // 옛 홈 — out 없는 미리 받기
+  const old = s.panels()[0];
+  assert.strictEqual(old.kids[0].src, SRC1 + '&park=1', '대역: 지금 길 숨긴 판');
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
+  const v = vis(s);
+  assert.ok(v.length === 1 && v[0] !== old && v[0].kids[0].src === OUT_BOOK, '⛔ out:1 누름이 지금 길 숨긴 판을 그대로 보였다: ' + (v[0] && v[0].kids[0].src));
+  assert.ok(!s.panels().includes(old) || s.obj(old).gone, '⛔ 내린 지금 길 판이 주소로 또 찾힌다');
+  const q = setup({ out: false });
+  q.send({ onf: 'bookWarm', href: E1, panel: 1 }, q.homeInner);
+  const o2 = q.panels()[0];
+  q.send({ onf: 'openBook', href: E1, out: 1 }, q.homeInner);
+  assert.deepStrictEqual([q.panels().length, vis(q)[0]], [1, o2], '⛔ 끈 기기인데 지금 길 판을 내렸다');
+});
+
 t('S5g ⭐ 내 문장·카드 덱 주소는 out:1 이어도 지금 길', () => {
   const s = setup();
   s.send({ onf: 'openBook', href: MINE, out: 1 }, s.homeInner);

@@ -401,7 +401,13 @@
       /* 📖 홈이 「첫 교재를 미리 받아 줘」(2026-10-12 · 설계서 §1-5 · 10-13 숨긴 판) — 주소는 판과 같은 거르개(bookSrc — 교재만 · 아는 값만 · embed=1).
          · panel:1(홈이 판을 쓸 넓은 화면이라고 했다) → **숨긴 판**으로 미리 띄운다(아래 bookPre · 교재는 park=1 로 「대기」 — 접속 신호 0).
          · 아니면(폰) 종전대로 그 주소를 **한 번** GET 해 교재 서버 캐시만 데운다(봇 수업 전 데우기와 같은 길 · 쿠키 안 실음 · 한 주소 한 번). */
-      if (ev.data.onf === 'bookWarm' && opts.bookSrc && typeof ev.data.href === 'string') { if (ev.data.panel === 1) { preSave(ev.data.href); bookPre(ev.data.href, ev.data.left, ev.data.m, ev.data.r); } else bookWarm(ev.data.href); return; }   // 🚀 첫 panel:1 은 다음 열기용으로 기억(아래 preEarly)
+      if (ev.data.onf === 'bookWarm' && opts.bookSrc && typeof ev.data.href === 'string') {   // 🚀 첫 panel:1 은 다음 열기용으로 기억(아래 preEarly)
+        if (ev.data.panel !== 1) { bookWarm(ev.data.href); return; }
+        var wout = ev.data.out === 1, wsrc = wout && opts.bookSrc(ev.data.href);   // 🌤 T7 라이브 F2(2026-10-24) — 홈이 미리 받기에도 out:1 을 싣는다 → 숨긴 판도 정적 판 · 기억에 o:1(openBook 과 같은 outSeen)
+        if (wsrc) outSeen[wsrc] = 1;
+        preSave(ev.data.href); bookPre(ev.data.href, ev.data.left, ev.data.m, ev.data.r, wout);
+        return;
+      }
       /* 📐 창 크기가 바뀌었다(2026-10-16 Peter 「B로 가자」 · 설계서 §4.1) — 홈이 다시 잰 메뉴 끝·여백·모서리를 **판 전부**(보이는 판·숨긴 판)에 새로 단다.
          보이기·숨기기·주소는 안 건드린다(다시 안 불러온다) · 위 홈 자물쇠를 지난 말만 — 판 액자 쪽 말은 여기까지 못 온다. */
       if (ev.data.onf === 'bookBox' && opts.bookSrc) { for (var bi = 0; bi < books.length; bi++) bookPlace(books[bi], ev.data.left, ev.data.m, ev.data.r); sync(); return; }
@@ -771,7 +777,7 @@
       var fl = !outWant(src, out);   // 🧺 지금 길로 여는 교재 — 이 기기 정적 판 저장소에 남은 쓰기를 숨긴 판으로 한 번 넘겨준다(아래 bookFlushSoon · 보이는 판이 뜬 뒤)
       if (out) { outSeen[src] = 1; if (preH && opts.bookSrc(preH) === src) preWrite(); }   // 🌤 기억한 첫 교재가 켠 교재였다 — o:1(아래 preEarly)
       var a = bookAsk(src), p = bookFind(src), m = { onf: 'bookView' };
-      if (p && p.out && !outWant(src, out)) { bookRetire(p); p = null; }   // 🌤 검토 고침 2 — 서버 스위치를 끈 뒤 낡은 o:1 기억으로 띄운 정적 판 · 자격 내리고 지금 길 새 판(끈 때만 드는 값)
+      if (p && !outSame(p, src, out)) { bookRetire(p); p = null; }   // 🌤 길이 다른 판 — 자격 내리고 그 길 새 판: 정적 판 + out 없는 누름(검토 고침 2 — 서버 스위치를 끈 뒤 낡은 o:1 기억) · 지금 길 판 + out:1 누름(T7 F2 — out 모르는 옛 홈 미리 받기 · o 없는 기억)
       p = p || bookLike(src, a, out);   // 📖 view·line 만 다른 판이 할 줄 알면 그 판(위 bookLike) — 갈아 끼우기보다 **먼저**(0초 길)
       if (!p && home && (b = bookBoardFor(src, out))) { bookSwapTo(b, src, left, bm, br, cf); if (fl) bookFlushSoon(b, src); return; }
       p = p || bookMake(src, false, out, cf);
@@ -976,7 +982,7 @@
       preH = String(href).slice(0, 2000);
       preWrite();
     }
-    /* 🌤 o:1 = 홈이 그 교재를 out:1 로 열었다(bookWarm 은 out 을 안 싣는다 — 누르기 전이든 뒤든 openBook 이 알려 준다) · 아니면 칸 없음(옛 꼴 그대로) */
+    /* 🌤 o:1 = 홈이 그 교재를 out:1 로 열었거나 미리 받았다(새 홈은 bookWarm 에도 싣는다 · 옛 홈은 누르기 전이든 뒤든 openBook 이 알려 준다) · 아니면 칸 없음(옛 꼴 그대로) */
     function preWrite() { try { global.localStorage.setItem(PRE_LS, JSON.stringify({ k: opts.preKey, h: preH, ph: phone() ? 1 : 0, t: Date.now(), o: outSeen[opts.bookSrc(preH)] ? 1 : undefined })); } catch (e) {} }
     function preEarly() {
       if (!opts.preKey || !opts.bookSrc) return;
