@@ -161,6 +161,9 @@
    *  @return { stop: 판정을 그만두고 노크 듣기를 걷는다(판을 지울 때) · stuck: 못 열어 안내를 띄웠나 } */
   function openExec(el, src, wait, close, keep, hooks) {
     var can = clCan(), cl = can && (clPage || clAt(CL_KEY)), byMemory = cl, tried = {}, done = false, stuck = false, tm = null, re = 0, nav = false;   // re = 다시 연 횟수 · nav = 다시 여는 중(다음 load 전)
+    /* 🌤 이미 문서가 든 액자(정적 판이 물러나 같은 액자에 지금 길 · 밖으로 2 검토 고침 1)도 「다시 여는 중」으로 시작 — 구글 응답이 들어설 때까지 옛 문서가 살아
+       그 말(hist·제목)을 노크로 치면 판정이 일찍 끝난다(우회·안내를 잃고 onfClTry 를 잘못 지움). 교차 출처라 주소를 못 읽으면 든 것으로 · 새 액자(about:blank)는 종전 그대로. */
+    try { var lw = el.contentWindow; nav = !!(lw && lw.location) && lw.location.href !== 'about:blank'; } catch (eN) { nav = true; }
     function onMsg(ev) { if (!done && !nav && ev && _fromOurFrame(ev.source, el)) ok(); }   // 🔁 다시 여는 중엔 안 받는다 — replace 는 새 응답까지 옛 문서를 살려 둬 옛 문서의 늦은 말이 올 수 있다(반박 🟠1)   // 노크 — 깊이 무관 · 내 액자 후손의 말이면 산 화면(값은 안 본다 · load 전에 와도 여기서 끝난다)
     function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
     function tell(k) { try { if (hooks && typeof hooks[k] === 'function') hooks[k](); } catch (e) {} }   // 알림이 던져도 열기 판정은 그대로 간다
@@ -691,10 +694,10 @@
        · 안 뜸·outFail·상한(FLUSH_MS)도 닫는다 — 그날 실패(onfOutFail)는 안 적는다(보이는 판이 아니다) · 남은 것은 기기에 그대로(다음 열기에 또)
        · 기기 끔·토큰 없음·그날 실패·⭐ 내 문장·🗂️ 카드 덱은 안 한다(위 outOk) · 한 화면에 교재마다 한 번.
        ponytail: 60초 = 저장 재시도 몇 번 · 15초 = 지금 길 첫 그림 넉넉히 — 실측으로 고친다. */
-    var OUT_USED = 'onfOutUsed', OUT_USED_MS = 14 * 86400000, OUT_PEND = 'onfOutPending:', FLUSH_MS = 60000, FLUSH_WAIT_MS = 15000, flushed = {}, flushLive = [], OUT_ORG = new URL(ONF_OUT_BOOK).origin;
+    var mainOut = false, OUT_USED = 'onfOutUsed', OUT_USED_MS = 14 * 86400000, OUT_PEND = 'onfOutPending:', FLUSH_MS = 60000, FLUSH_WAIT_MS = 15000, flushed = {}, flushLive = [], OUT_ORG = new URL(ONF_OUT_BOOK).origin;
     function outPend(b, n) { try { if (typeof n === 'number' && n > 0) global.localStorage.setItem(OUT_PEND + b, '1'); else if (n === 0) global.localStorage.removeItem(OUT_PEND + b); } catch (e) {} }   // b = bookBase(회차 주소)
     function flushWorth(b) {
-      if (flushed[b] || !outOk(b) || books.some(function (q) { return q.out; })) return false;   // q.out = 정적 판 액자가 산다(gone 이어도 · 지금 길로 물러난 판은 false)
+      if (flushed[b] || !outOk(b) || mainOut || books.some(function (q) { return q.out; })) return false;   // mainOut = 첫 판(큰 화면)이 정적 판(아래 mount 끝 · 밖으로 2)   // q.out = 정적 판 액자가 산다(gone 이어도 · 지금 길로 물러난 판은 false)
       try { return global.localStorage.getItem(OUT_PEND + b) === '1' && Date.now() - Number(global.localStorage.getItem(OUT_USED) || 0) < OUT_USED_MS; } catch (e) { return false; }
     }
     /* 판 하나에 기다리는 교재 목록(p.flushQ) — 노크 전에 두 번 걸려도 앞 것을 잃지 않는다(검토 고침 2차) */
@@ -1087,13 +1090,27 @@
         return f ? { f: f, s: h } : { slug: g };
       } catch (e) { return null; }
     }
+    /* 🧺 첫 판 교재의 남은 쓰기 표시 열쇠 — 판과 같은 교재 주소(bookSrc 꼴 · bookBase)라야 다음에 지금 길 판으로 열 때 넘겨주기(flushWorth)가 찾는다(검토 고침 1).
+       bookSrc 가 못 읽는 주소면 첫 판 주소 그대로(못 찾지만 해는 없다). */
+    function mainBook(s) {
+      try {
+        var q = new URL(s).searchParams, g = q.get('slug'), u = new URL('/' + (q.get('fileId') || !g ? '' : g), 'https://class.ownify.co.kr');
+        ['fileId', 'sheetName', 'mode', 'back', 'line', 'view'].forEach(function (k) { if (q.get(k)) u.searchParams.set(k, q.get(k)); });
+        return bookBase((opts.bookSrc && opts.bookSrc(u.href)) || s);
+      } catch (e) { return bookBase(s); }
+    }
     var wq = whoQ(src);
     if (wq) askWho(opts.tok, wq).then(function (a) {
       if (!a || !a.cf) return mainExec();
+      var mk = mainBook(src);
+      function onQ(ev) { if (mainOut && ev && ev.data && ev.data.onf === 'outQueue' && ev.source === frameEl.contentWindow && ev.origin === OUT_ORG) outPend(mk, ev.data.n); }   // 🧺 그 액자 창 · 정적 판 출처만
       try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}
+      mainOut = true; flushStop(); global.addEventListener('message', onQ);
       openApp(frameEl, ONF_OUT_BOOK, src, a.cf, function () {
         console.info('[onf] 첫 판 정적 판이 안 떴다 — 지금 길로 다시');
         try { global.localStorage.setItem(OUT_FAIL, String(Date.now())); } catch (e) {}
+        mainOut = false; global.removeEventListener('message', onQ);
+        appWin = null; histWin = null; histOrigin = '';   // 죽은 정적 창을 가리키지 않게(판 물러남과 같게 · 지금 길 노크가 다시 정한다)
         mainExec();
       }, opts.tok, opts.hooks || null);
     });

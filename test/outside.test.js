@@ -784,6 +784,34 @@ ta('S4f 안 묻는 때 — 기기 out=0 · 토큰 없음 · 14일 안에 정적 
   }
 });
 
+/* 검토 고침 1 — 첫 판 정적 판의 outQueue 도 남은 쓰기 표시(onfOutPending)로 · 열쇠는 판과 같은 교재 주소(bookSrc 꼴) — 다음에 지금 길 판으로 열 때 넘겨주기가 찾는다.
+   첫 판 정적 판이 사는 동안엔 넘겨주기 판을 안 띄운다(한 출처에 정적 판 둘 금지) · 물러난 뒤엔 띄운다. */
+ta('S4g 첫 판 정적 판 outQueue → onfOutPending:<판 교재 주소> · 남의 창·출처는 버림 · n 0 이면 지움', async () => {
+  const s = wsetup({ src: SSRC });
+  s.calls[0].ok(200, ANS(CF)); await flush();
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  s.send({ onf: 'outQueue', n: 2 }, win('stranger', s.top), OUT_O);
+  s.send({ onf: 'outQueue', n: 2 }, s.homeWin, 'https://evil.example.com');
+  assert.ok(!(PK1 in s.g.localStorage.m), '⛔ 남의 창·출처 outQueue 를 적었다');
+  s.send({ onf: 'outQueue', n: 2 }, s.homeWin, OUT_O);
+  assert.strictEqual(s.g.localStorage.m[PK1], '1', '⛔ 첫 판 outQueue 를 판 교재 주소 열쇠로 안 적었다: ' + JSON.stringify(s.g.localStorage.m));
+  s.send({ onf: 'outQueue', n: 0 }, s.homeWin, OUT_O);
+  assert.ok(!(PK1 in s.g.localStorage.m), '⛔ n 0 인데 안 지웠다');
+});
+ta('S4g 첫 판 정적 판이 사는 동안 지금 길 판을 열어도 넘겨주기 판 없음 · 물러난 뒤엔 넘겨주기', async () => {
+  const s = wsetup({ src: SSRC, ls: UL({ [PK1]: '1' }) });
+  s.calls[0].ok(200, ANS(CF)); await flush();
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  s.send({ onf: 'openBook', href: E1 }, s.homeInner); settle(s); s.fire(0);
+  assert.strictEqual(flushes(s).length, 0, '⛔ 첫 판 정적 판이 사는데 넘겨주기 판을 띄웠다(같은 대기열 두 번)');
+  const n = wsetup({ src: SSRC, ls: UL({ [PK1]: '1' }) });
+  n.calls[0].ok(200, ANS(CF)); await flush();
+  n.send({ onf: 'outFail', why: 'bridge' }, n.homeWin, OUT_O);
+  n.g.localStorage.removeItem('onfOutFail');   // 그날 물러남은 넘겨주기도 막는다(outOk) — 이 검사는 「첫 판이 정적 판이 아님」만 본다
+  n.send({ onf: 'openBook', href: E1 }, n.homeInner); settle(n); n.fire(0);
+  assert.strictEqual(flushes(n).length, 1, '⛔ 첫 판이 물러났는데 넘겨주기 판이 안 떴다');
+});
+
 (async () => {
   for (const [label, fn] of AT) {
     try { await fn(); console.log('  ✅ ' + label); pass++; }

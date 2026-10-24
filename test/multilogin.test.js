@@ -81,6 +81,7 @@ function open(o) {
   o = o || {};
   const s = env(o);
   const el = mkFrame(s), wait = mkEl('div'), closed = [], reloads = [];
+  if (o.live) el.doc.blank = false;   // 이미 남의 문서(정적 판)가 든 액자에 지금 길로 다시 연다(밖으로 물러남)
   s.g.location.reload = () => reloads.push(1);
   wait.className = 'onf-wait';
   wait.kids.push({ className: 'onf-spin' }); wait._t = '불러오는 중';   // index.html 의 「불러오는 중」 — textContent 대입은 아이까지 지운다(DOM 과 같게)
@@ -543,6 +544,22 @@ t('안내 꼴(onf-ui.css .onf-stuck) — 가운데 · 낱말 안 쪼갬 · 단�
   const css = fs.readFileSync(path.join(ROOT, 'assets', 'onf-ui.css'), 'utf8');
   assert.ok(/\.onf-stuck \{[^}]*text-align: center;[^}]*word-break: keep-all;/.test(css), '⛔ 안내 꼴이 없다(폰에서 「주세요.」만 떨어진다)');
   assert.ok(/\.onf-stuck button \{/.test(css), '⛔ [닫기] 꼴이 없다');
+});
+
+/* 🌤 밖으로 2 검토 고침 1(2026-10-24) — 정적 판이 물러나 같은 액자에 openExec 하면 구글 응답이 들어설 때까지 정적 문서가 살아 있다.
+   그 사이 정적 문서의 말(hist·제목)을 노크로 치면 판정이 일찍 끝나 여러 계정 우회·안내를 잃고 onfClTry 를 잘못 지운다 → 이미 문서가 든 액자는 처음부터 「다시 여는 중」. */
+t('🌤 이미 문서가 든 액자(교차 출처 · 주소 못 읽음) — load 전 그 문서의 말은 노크가 아니다 · 오류 화면이면 종전처럼 우회 · onfClTry 그대로', () => {
+  const s = open({ live: true, ls: { onfClTry: String(1760000000000 - 1000) } });
+  (s.L.message || []).slice().forEach((f) => f({ data: { onf: 'hist', op: 'hi' }, source: s.el.contentWindow, origin: 'https://app.ownify.co.kr' }));
+  s.el.load(0); s.tick(GRACE());
+  assert.deepStrictEqual(s.el.nav[s.el.nav.length - 1], ['replace', SRC, true], '⛔ 옛 문서의 말을 노크로 쳐서 우회를 안 했다');
+  assert.ok('onfClTry' in s.ls, '⛔ 옛 문서의 말로 onfClTry 를 지웠다');
+});
+t('🌤 새 액자(about:blank)는 종전 그대로 — load 전 노크도 산 화면', () => {
+  const s = open();
+  (s.L.message || []).slice().forEach((f) => f({ data: { onf: 'hist', op: 'hi' }, source: s.el.inner(), origin: 'https://n-abc-0lu-script.googleusercontent.com' }));
+  s.el.load(0); s.tick(10 * GRACE());
+  assert.strictEqual(s.el.nav.length, 1, '⛔ 새 액자의 노크를 안 받았다(종전과 다름)');
 });
 
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패');
