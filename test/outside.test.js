@@ -1037,12 +1037,21 @@ ta('R12 그리기 시한은 outBoot 부터 — hello 가 mount 시계(OUT_MS)를
     assert.ok(p.length === 1 && p[0] !== m0[0] && s.timers.indexOf(p[0]) > s.timers.indexOf(m0[0]), '⛔ ' + order + ' — outBoot 뒤 새 2500 시계가 없다');
   }
 });
+const wk = (o) => {   // 아직 about:blank 인 액자(WebKit 이 정적 홈 이동을 아직 안 커밋한 때) · load 처리기·replace 기록
+  const s = hsetup(o), reps = [], loads = [];
+  s.homeWin.location = { href: 'about:blank', replace(u) { reps.push(u); } }; s.homeWin.length = 0;
+  s.frameEl.addEventListener = (k, f) => { if (k === 'load') loads.push(f); };
+  s.reps = reps; s.loads = loads;
+  s.commit = (href) => { s.homeWin.location.href = href; loads.forEach((f) => f()); };
+  return s;
+};
 ta('R-2 그리기 전 물러남은 openExec 길 — 같은 액자의 구글 홈 노크가 로고 막 ok 를 부른다(여러 계정 우회·hooks 그대로)', async () => {
-  const s = hsetup();
+  const s = wk();
   s.calls[0].ok(200, HANS()); await flush();
   s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
   s.send({ onf: 'outFail', why: 'error' }, s.homeWin, OUT_O);
   assert.strictEqual(s.okN.n, 0);
+  s.commit('https://n-abc-0lu-script.googleusercontent.com/userCodeAppPanel');   // 지금 길 구글 홈이 섰다(back() 은 「이동 중」으로 열어 load 뒤부터 노크를 받는다)
   s.send({ onf: 'frameHello' }, s.homeInner, GO);
   assert.strictEqual(s.okN.n, 1, '⛔ 물러난 뒤 지금 길 노크에 로고 ok 가 없다(openExec 를 안 탔다)');
 });
@@ -1130,6 +1139,42 @@ ta('M3 outBoot 재전송(정적 홈이 몇 시간 뒤 다시 hello) → pre 칸 
   assert.deepStrictEqual(b[1][0].d.v, a.v);
   assert.strictEqual(a.pre.books.age, 100, '⛔ 원본 d 를 고쳤다(복사해야 한다)');
   assert.strictEqual(b[0][0].d.pre.books.age, 100, '⛔ 앞서 보낸 사본이 바뀌었다');
+});
+
+/* 통합 검사 고침(2026-10-24 · WebKit) — /home/get 이 일찍 null 이면 back() → openExec 의 replace(exec)가 아직 안 선 정적 홈 이동에 떨어져 WebKit 이 버릴 수 있다.
+   그러면 정적 홈의 outHello 를 옛 홈의 노크로 받아 막을 걷고 빈 정적 홈에 멈췄다. */
+ta('W1 /home/get 일찍 null → 지금 길 openExec 은 정적 홈 출처의 노크(outHello)를 옛 홈의 노크로 안 받는다(로고 막 ok 0) · 구글 출처 노크는 load 뒤 받는다', async () => {
+  const s = wk();
+  s.calls[0].ok(200, { ok: false, why: 'none' }); await flush();
+  assert.strictEqual(s.frameEl.src, HSRC, '⛔ 지금 길로 안 갔다');
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  s.send({ onf: 'homeDrawn' }, s.homeWin, 'https://app.ownify.co.kr');
+  assert.strictEqual(s.okN.n, 0, '⛔ 정적 홈의 말을 지금 길 노크로 받아 로고 막을 걷었다(빈 정적 홈에 멈춘다)');
+  s.commit('https://n-abc-0lu-script.googleusercontent.com/userCodeAppPanel');   // 구글 홈이 커밋
+  s.send({ onf: 'oldHello' }, s.homeInner, GO);
+  assert.strictEqual(s.okN.n, 1, '⛔ 구글 홈 노크는 받아야 한다(종전 길)');
+});
+ta('W2 정적 홈이 커밋돼 버리면(replace(exec)를 WebKit 이 버림) → 자식 0 이라 CL_GRACE 뒤 같은 주소 exec 를 다시 연다 · 로고 막은 그대로', async () => {
+  const s = wk();
+  s.calls[0].ok(200, { ok: false, why: 'none' }); await flush();
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  s.commit(HOME_URL);
+  assert.strictEqual(s.okN.n, 0, '⛔ 정적 홈 load 에 막을 걷었다');
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);   // load 뒤(이동 중 아님) 정적 홈이 다시 hello — 출처 거름이 막아야 한다
+  assert.strictEqual(s.okN.n, 0, '⛔ load 뒤 정적 홈의 hello 를 옛 홈 노크로 받아 막을 걷었다(빈 정적 홈에 멈춘다)');
+  assert.deepStrictEqual(s.reps, [], '⛔ load 직후 바로 다시 열었다(여유 전)');
+  s.fire(1500);
+  assert.deepStrictEqual(s.reps, [HSRC], '⛔ 정적 홈에 멈춘 액자에 exec 를 다시 안 열었다: ' + JSON.stringify(s.reps));
+  assert.strictEqual(s.okN.n, 0);
+});
+ta('W3 back() 은 액자를 「이동 중」으로 시작 — 아직 about:blank 일 때 온 구글 출처 말(옛 문서의 늦은 말)도 load 전엔 노크로 안 받는다', async () => {
+  const s = wk();
+  s.calls[0].ok(200, { ok: false, why: 'none' }); await flush();
+  s.send({ onf: 'oldHello' }, s.homeInner, GO);
+  assert.strictEqual(s.okN.n, 0, '⛔ load 전 말을 노크로 받았다(back() 이 이동 중 표시를 안 했다)');
+  s.commit('https://n-abc-0lu-script.googleusercontent.com/userCodeAppPanel');
+  s.send({ onf: 'oldHello' }, s.homeInner, GO);
+  assert.strictEqual(s.okN.n, 1, '⛔ load 뒤 노크는 받아야 한다');
 });
 
 (async () => {

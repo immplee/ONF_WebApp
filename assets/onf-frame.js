@@ -158,13 +158,15 @@
    *  @param close 판이면 닫는 함수 — 안내에 [닫기] · 없으면(홈) [다시 열기]
    *  @param keep  홈 액자만 true — 이 기기 기억(onfClTry·onfCl)을 정한다 · 판은 읽기만
    *  @param hooks 홈 액자만 — { ok: 산 화면, stuck: 못 엶 } 를 알린다(첫 화면 로고 로딩 onf-load.js · 2026-10-22) · 없으면 종전 그대로
+   *  @param navStart true 면 「다시 여는 중」으로 시작 — 아직 정적 홈 이동이 안 선 액자(about:blank 로 읽힘)에 밖으로 3 back() 이 연다(WebKit 이 이 replace 를 버릴 수 있다 · 통합 검사 2026-10-24)
    *  @return { stop: 판정을 그만두고 노크 듣기를 걷는다(판을 지울 때) · stuck: 못 열어 안내를 띄웠나 } */
-  function openExec(el, src, wait, close, keep, hooks) {
+  function openExec(el, src, wait, close, keep, hooks, navStart) {
     var can = clCan(), cl = can && (clPage || clAt(CL_KEY)), byMemory = cl, tried = {}, done = false, stuck = false, tm = null, re = 0, nav = false;   // re = 다시 연 횟수 · nav = 다시 여는 중(다음 load 전)
     /* 🌤 이미 문서가 든 액자(정적 판이 물러나 같은 액자에 지금 길 · 밖으로 2 검토 고침 1)도 「다시 여는 중」으로 시작 — 구글 응답이 들어설 때까지 옛 문서가 살아
        그 말(hist·제목)을 노크로 치면 판정이 일찍 끝난다(우회·안내를 잃고 onfClTry 를 잘못 지움). 교차 출처라 주소를 못 읽으면 든 것으로 · 새 액자(about:blank)는 종전 그대로. */
     try { var lw = el.contentWindow; nav = !!(lw && lw.location) && lw.location.href !== 'about:blank'; } catch (eN) { nav = true; }
-    function onMsg(ev) { if (!done && !nav && ev && _fromOurFrame(ev.source, el)) ok(); }   // 🔁 다시 여는 중엔 안 받는다 — replace 는 새 응답까지 옛 문서를 살려 둬 옛 문서의 늦은 말이 올 수 있다(반박 🟠1)   // 노크 — 깊이 무관 · 내 액자 후손의 말이면 산 화면(값은 안 본다 · load 전에 와도 여기서 끝난다)
+    if (navStart) nav = true;
+    function onMsg(ev) { if (!done && !nav && ev && ONF_OUT_ORIGINS.indexOf(String(ev.origin)) < 0 && _fromOurFrame(ev.source, el)) ok(); }   // 🔁 다시 여는 중엔 안 받는다 — replace 는 새 응답까지 옛 문서를 살려 둬 옛 문서의 늦은 말이 올 수 있다(반박 🟠1)   // 노크 — 깊이 무관 · 내 액자 후손의 말이면 산 화면(값은 안 본다 · load 전에 와도 여기서 끝난다)
     function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
     function tell(k) { try { if (hooks && typeof hooks[k] === 'function') hooks[k](); } catch (e) {} }   // 알림이 던져도 열기 판정은 그대로 간다
     function ok() {
@@ -1101,7 +1103,7 @@
     /* 🌤 밖으로 2(2026-10-24 · 판정 2·5) — 링크 직행 교재(fileId·slug)면 /who 를 WHO_MS 안 묻고 cf 가 오면 첫 판을 정적 판(openApp)으로.
        묻는 때만(아래 whoQ): 토큰 · 기기 out · 그날 물러남 없음 · ⭐ 내 문장·🗂️ 카드 덱 아님(outOk) · ttok 아님 · 14일 안에 정적 판을 쓴 기기(onfOutUsed) — 아니면 종전 그대로(요청·기다림 0).
        안 뜨면(outFail·hello 없음) 같은 액자에 종전 openExec(여러 계정 우회·로고 신호 그대로) · 그날은 이 기기 지금 길(onfOutFail). 정적 판은 src 의 embed 를 따른다(링크 직행 = 판 단추 없음 · boot.js). */
-    function mainExec() { openExec(frameEl, src, opts.wait || null, null, true, opts.hooks || null); }
+    function mainExec(navStart) { openExec(frameEl, src, opts.wait || null, null, true, opts.hooks || null, navStart === true); }
     function whoQ(s) {
       try {
         var q = new URL(s).searchParams, f = q.get('fileId'), g = q.get('slug'), h = q.get('sheetName');
@@ -1142,7 +1144,7 @@
         console.info('[onf] 정적 홈이 안 떴다 — 지금 길로 다시');
         if (kill) { try { global.localStorage.setItem(OUT_FAIL_HOME, String(Date.now())); } catch (e) {} }
         appWin = null; histWin = null; histOrigin = ''; bookHome = null; bookHomeOrigin = '';
-        mainExec();
+        mainExec(true);   // 정적 홈 이동이 아직 안 섰을 수 있다 — 「이동 중」으로 열어 load 가 올 때까지 정적 홈 말·옛 문서 말을 노크로 안 받는다(정적 홈이 커밋되면 자식 0 → 다시 연다)
       }
       function aged() {   // 답을 받은 뒤 흐른 시간만큼 칸 나이를 올린 사본(원본 d 는 안 건드린다) — 정적 홈이 몇 시간 뒤 다시 읽혀 hello 하면 낡은 나이가 새것처럼 가지 않게
         var el = Date.now() - dAt, pre = d.pre;

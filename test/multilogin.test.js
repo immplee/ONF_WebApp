@@ -483,7 +483,7 @@ t('⑧ 학생 홈 액자(mount) — 기억한 기기면 홈 액자도 처음부�
   s.g.document.documentElement = { classList: { toggle() {} } };
   s.g.ONF.frame.mount(el, SRC, { wait: mkEl('div') });
   assert.deepStrictEqual(el.nav, [['replace', SRC, true]], '⛔ 홈 액자가 우회 길을 안 탄다');
-  assert.ok(/openExec\(frameEl, src, opts\.wait \|\| null, null, true(, opts\.hooks \|\| null)?\)/.test(FRAME_JS), '⛔ 홈 액자가 기억을 정하는 자리(keep)가 아니다');
+  assert.ok(/openExec\(frameEl, src, opts\.wait \|\| null, null, true(, opts\.hooks \|\| null(, navStart === true)?)?\)/.test(FRAME_JS), '⛔ 홈 액자가 기억을 정하는 자리(keep)가 아니다');
   const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   assert.ok(/wait: document\.querySelector\('\.onf-wait'\)/.test(idx), '⛔ index.html 이 안내 자리(.onf-wait)를 안 넘긴다 — 못 열면 구글 오류 화면 그대로');
 });
