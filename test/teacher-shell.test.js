@@ -422,6 +422,11 @@ t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼�
   R.postAs({ onf: 'hwPen', tool: 'x"><b', pick: {} }, inner);
   assert.strictEqual(bookGot.length, 2, '⛔ 꼴이 틀린 도구를 중계했다');
   R.postAs({ onf: 'hwbookView', v: 'book' }, inner);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(bookGot[2] || {})), { onf: 'penRelay', off: 1 }, '⛔ 교재만인데 교재 펜 줄을 안 되살렸다(과제 판이 숨어 펜 줄이 하나도 없다)');
+  R.postAs({ onf: 'hwbookView', v: 'side' }, inner);
+  assert.strictEqual(bookGot[3] && bookGot[3].tool, 'pen', '⛔ 옆에로 돌아왔는데 과제 판 도구를 다시 안 보냈다');
+  R.postAs({ onf: 'hwbookView', v: 'book' }, inner);
+  R.postAs({ onf: 'hwbookView', v: 'book' }, inner);
   assert.strictEqual(box.style.visibility, 'hidden', '⛔ 교재만 — 과제 판이 안 숨었다');
   const chip = R.created.filter((e) => e.className === 'onf-hwchip')[0];
   assert.ok(chip && chip.parentNode, '⛔ 교재만 — 「과제로」 칩이 없다');
