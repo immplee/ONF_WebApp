@@ -791,9 +791,13 @@
       if (a.line) m.line = a.line;
       if (bookCan(p, a)) { try { p.win.postMessage(m, p.origin); } catch (e) {} }   // 보인다(bookPark) 다음에 — 페이지가 「보임」 손질 뒤 연다
     }
-    /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판·📖 판(bookBoard)·📖 노크 전 판 후보(bookCand)·⭐ 내 문장 판(통제자 판정 2026-10-24 — [복습 시작] 0초)은 안 건드린다(books 는 오래 안 쓴 것이 앞). */
+    /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판·📖 판(bookBoard)·📖 노크 전 판 후보(bookCand)은 안 건드린다 · ⭐ 내 문장 판은 정적 판이 있는 넓은 화면에서만 맨 나중(아래 pin · [복습 시작] 0초)(books 는 오래 안 쓴 것이 앞). */
     /* ⛔ 자격 내린 판(gone — 늙음·stale·답 없음)은 **세지도 지우지도 않는다**(2단계 반박 🟠 2026-10-17) — 맺음(안 보낸 칸·실패 카드·오프라인 백업)이 끝나기 전에 지우면 그 글이 사라진다 · 30분 지우기(bookIdle)가 치운다. */
-    function bookRoom(n) { var bd = bookBoard(false) || bookBoard(true), c = 0, i, q; for (i = 0; i < books.length; i++) if (!books[i].gone) c++; for (i = 0; c > n && i < books.length; ) { q = books[i]; if (q.parked && q !== bd && !q.gone && !bookCand(q) && !bookMine(q.src)) { bookDrop(q); c--; } else i++; } }
+    function bookRoom(n) {
+      var bd = bookBoard(false) || bookBoard(true), pin = !phone() && books.some(function (x) { return x.out && !x.gone; }), c = 0, i, q, k;   // 🌤 pin = ⭐ 내 문장 판은 나중에(정적 판이 있는 넓은 화면만 · 통제자 판정 2026-10-24) — 정적 판 없는 학생·폰은 종전 한 바퀴 그대로
+      for (i = 0; i < books.length; i++) if (!books[i].gone) c++;
+      for (k = pin ? 0 : 1; k < 2; k++) for (i = 0; c > n && i < books.length; ) { q = books[i]; if (q.parked && q !== bd && !q.gone && !bookCand(q) && !(k === 0 && bookMine(q.src))) { bookDrop(q); c--; } else i++; }   // 첫 바퀴에 못 줄였으면 내 문장도(판 수는 안 넘는다)
+    }
     function bookPre(href, left, m, r, out) {
       var src = opts.bookSrc(href), b, ex;
       if (!src) return;
