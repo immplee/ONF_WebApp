@@ -298,7 +298,7 @@ t('📱 스위치 — 기본 켬(caps phone:1) · 주소 phonepanel=0 이면 끄
   assert.strictEqual(s.g.localStorage.s.onfThPhonePanel, '0', '⛔ 끈 것을 이 기기에 기억 안 했다(다음에 주소 없이 열면 다시 켜진다)');
   assert.ok(!s.root.classList.contains('onf-ph'), '⛔ 꺼졌는데 폰 모양(onf-ph)');
   s.send({ onf: 'openBook', href: E1, left: 0 }, s.home);
-  assert.strictEqual(s.H.st.length, 1, '⛔ 꺼졌는데 판 칸을 넣었다');
+  assert.strictEqual(s.H.st.length, 2, '⛔ 꺼졌는데 판이 PC 판(판 칸 하나 · 🖥 2026-10-24)이 아니다');
   s = phoneRun({ ls: { onfThPhonePanel: '0' } });
   assert.strictEqual(caps(s).phone, 0, '⛔ 기억한 끔을 안 따랐다');
   s = phoneRun({ ls: { onfThPhonePanel: '0' }, search: '?mode=student&phonepanel=1' });
@@ -316,7 +316,7 @@ t('📱 폰 — 홈 openBook → 판 하나(화면 전체 <html onf-ph> · left 
   assert.strictEqual(s.H.st.length, 2, '⛔ 보이는 판을 또 열었는데 판 칸이 또 쌓였다(뒤로 두 번이 필요)');
   const pc = phoneRun({ wide: true });
   pc.send({ onf: 'openBook', href: E1, left: 184 }, pc.home);
-  assert.ok(pc.H.st.length === 1 && !pc.root.classList.contains('onf-ph') && pc.panel().classList.contains('beside'), '⛔ PC 판에 판 칸을 넣었다(또는 폰 모양)');
+  assert.ok(pc.H.st.length === 2 && pc.H.state.onfBook === 1 && pc.H.state.bd === 1 && !pc.root.classList.contains('onf-ph') && pc.panel().classList.contains('beside'), '⛔ 🖥 PC 판에 판 칸이 없다(뒤로가 앱째 떠난다 · 2026-10-24) — 또는 폰 모양');
   assert.ok(/<link rel="stylesheet" href="\.\.\/assets\/onf-ui\.css">/.test(src), '⛔ 폰 판 모양(.onf-ph .onf-bookpanel)을 싣는 CSS 가 없다');
 });
 
@@ -395,7 +395,7 @@ t('📱 판 안 창(카드·응용) 칸도 최상위 — 노크(hist hi)는 폰 
   pc.send({ onf: 'openBook', href: E1 }, pc.home);
   const pi = pc.hi(pc.panel());
   pc.hist({ op: 'hi' }, pi);
-  assert.strictEqual(pi.sent.length, 0, '⛔ PC 판 노크에 hist-on — PC 판은 종전대로 액자 안 기록');
+  assert.deepStrictEqual(jsn(pi.sent).map((x) => x[0].onf), ['hist-on'], '⛔ 🖥 PC 판 노크에 hist-on 이 없다 — PC 도 판 안 창·「나갈까요?」 칸이 최상위(2026-10-24)');
 });
 
 t('📱 판 안에서 다른 교재·⭐ 내 문장 → 새 판 칸이 위에 · 뒤로 = 앞 판 · 그 판이 지워졌으면 그 주소로 다시 받는다 · 폰 판 자리 2 · 맨 아래면 판 없음', () => {
@@ -421,24 +421,25 @@ t('📱 판 안에서 다른 교재·⭐ 내 문장 → 새 판 칸이 위에 ·
 t('📱 폭이 바뀜 — PC 판(보임) → 폰: 화면 전체 · 판 칸 넣음(뒤로 = 숨김) · 자리 2 로 줄임 / 폰 → PC: 판 그대로 · ✕ 가 남은 판 칸을 걷는다 · PC 의 뒤로는 판을 안 건드림', () => {
   const s = phoneRun({ wide: true }), inner = [];
   [E1, E2, E3].forEach((h, i) => { s.send({ onf: 'openBook', href: h, left: 184 }, s.home); inner.push(s.hi(s.panels()[s.panels().length - 1], i)); });
-  assert.ok(s.panels().length === 3 && s.H.st.length === 1, '전제: PC 판 셋 · 판 칸 없음');
+  assert.ok(s.panels().length === 3 && s.H.st.length === 4, '전제: PC 판 셋 · 🖥 판 칸 셋(2026-10-24 PC 도 판 칸)');
   const v = s.panels()[2], vi = inner[2];
   s.flip(false);
   assert.ok(s.root.classList.contains('onf-ph') && s.panels().length === 2 && !v.classList.contains('park'), '⛔ 폰이 됐는데 모양·자리(2)가 안 바뀌었다(또는 보이던 판을 숨겼다)');
-  assert.ok(s.H.st.length === 2 && s.H.state.onfBook > 0 && s.H.state.bd === 1, '⛔ 폰이 됐는데 보이는 판에 판 칸이 없다(뒤로가 홈을 떠난다)');
+  assert.ok(s.H.st.length === 4 && s.H.state.onfBook > 0, '⛔ 폰이 됐는데 보이는 판에 판 칸이 없다(뒤로가 홈을 떠난다)');
   s.browserBack();
   assert.ok(v.classList.contains('park'), '⛔ 폰이 된 뒤 뒤로가 판을 안 숨겼다');
   s.send({ onf: 'openBook', href: E3 }, s.home);
   s.flip(true);
   assert.ok(!s.root.classList.contains('onf-ph') && !v.classList.contains('park'), '⛔ PC 가 됐는데 모양이 안 바뀌었다(또는 판을 숨겼다)');
   s.H.goes.length = 0;
+  const bd0 = s.H.state.bd;
   s.send({ onf: 'bookClose' }, vi);
-  assert.deepStrictEqual(s.H.goes, [-1], '⛔ PC 가 된 뒤 ✕ 가 남은 판 칸을 안 걷었다(뒤로 한 번이 헛돈다)');
+  assert.deepStrictEqual(s.H.goes, [-bd0], '⛔ PC 가 된 뒤 ✕ 가 남은 판 칸을 안 걷었다(뒤로 한 번이 헛돈다)');
   s.flush();
   s.send({ onf: 'openBook', href: E3, left: 184 }, s.home);
-  const n0 = s.H.st.length;
+  assert.ok(!v.classList.contains('park') && s.H.state.onfBook > 0, '⛔ 🖥 PC 에서 다시 연 판에 판 칸이 없다');
   s.browserBack();
-  assert.ok(!v.classList.contains('park') && n0 === s.H.st.length, '⛔ PC 의 뒤로가 판을 숨겼다(또는 PC 가 판 칸을 넣었다)');
+  assert.ok(v.classList.contains('park'), '⛔ 🖥 PC 의 뒤로가 판을 안 숨겼다(앱째 떠난다 · 2026-10-24)');
 });
 
 t('📱 키보드 높이·밀림 보정은 **보이는 폰 판**에 — 판 교재의 frameHello 창·출처로 kbH(\'*\' 아님) · 그 판 액자에 translateY · 숨기면 밀림을 푼다 · 홈·PC 판엔 안 보낸다', () => {
@@ -959,7 +960,7 @@ t('H8 — 판 안에서 온 openBook 은 bookSwap 0 · 새 판 + back · 판을 
   s.send({ onf: 'openBook', href: E2 }, bi);
   const q = shownOf(s)[0], qi = swapKnock(s, q, 2);
   assert.ok(q !== P && swapMsg(bi).length === 0 && s.panels().length === 2, '⛔ 판 안 openBook 이 판을 갈아 끼웠다');
-  s.send({ onf: 'bookClose' }, qi);
+  s.send({ onf: 'bookClose' }, qi); s.flush();   // 🖥 ✕ = 제 판 칸만 걷기 → popstate 가 앞 판을 보인다(2026-10-24)
   assert.ok(shownOf(s)[0] === P, '⛔ 판 안에서 연 판의 ✕ 가 앞 판(P) 0초가 아니다');
   s.send({ onf: 'openBook', href: E2 }, bi);                                  // 다시 q(back = P)
   s.send({ onf: 'openBook', href: E3, left: 270 }, s.home);                   // 홈에서 E3 → 판 P 를 갈아 끼움(q 는 숨김)

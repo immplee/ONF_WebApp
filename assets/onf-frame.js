@@ -531,10 +531,10 @@
          ✕·홈 링크(bookClose)는 숨기고 판 칸 줄을 history.go(-bd) 로 걷는다(기록이 안 쌓이게) — bd 는 맨 위에서 이어진 판 칸만 센다 → 홈 칸(기록 다리 onfHist)은 안 걷는다.
        · 판 안 창(카드·퍼즐·복습·💡 응용 — Ownify onfHistWin)의 「뒤로 = 창 닫기」 칸도 **최상위**에 — 판마다 따로 다리(p.hw · 홈 다리 histWin 은 안 바꾼다).
          ⛔ 액자 안 pushState 에 기대지 마라 — 아이폰 스와이프가 액자 안 칸을 되돌리면 3초 덮개가 남는다(위 기록 칸 다리 주석). 판 안쪽 칸 = {onfHist, s, n, b: 판 번호, bd}.
-         다리는 노크(hist hi) 때 폰이면 켠다 — PC 판은 종전 그대로(액자 안 기록). 숨긴 판은 칸을 못 민다(보이지 않는 칸이 뒤로를 먹는다).
+         다리는 노크(hist hi) 때 켠다 — 🖥 2026-10-24 부터 PC 도(판 칸·다리·뒤로 = 숨김 · 그 전 PC 는 액자 안 기록이라 판 없이 뒤로 = 앱째 떠남). 숨긴 판은 칸을 못 민다(보이지 않는 칸이 뒤로를 먹는다).
        · 판 번호 = bookSrcs 자리(1부터) — 기록 칸엔 판 주소(토큰이 든다)를 안 넣는다. 지운 판(30분 · 자리)의 칸으로 돌아오면 그 주소로 다시 받는다.
        · 판 자리 2(BOOK_PHONE — 보이는 판 하나 + 숨긴 판 하나 · 숨긴 판 ≈15~20MB) · 키보드 높이·밀림 보정은 보이는 판에(kbAt).
-       · 폭이 바뀌어 폰↔PC 가 바뀌면 보이는 판은 그대로 두고 모양만 바꾼다 — PC→폰이면 판 칸을 넣는다(뒤로 = 숨김) · 폰→PC 면 남은 판 칸은 ✕ 가 걷는다(PC 의 뒤로는 판을 안 건드린다).
+       · 폭이 바뀌어 폰↔PC 가 바뀌면 보이는 판은 그대로 두고 모양만 바꾼다 — PC→폰이면 판 칸을 넣는다(뒤로 = 숨김) · 폰→PC 도 판 칸 그대로(PC 도 뒤로 = 숨김 · 2026-10-24).
        ⚠️ 알고 받아들인 한계: 판 액자가 스스로 다시 읽히면(새 안쪽의 hello) 옛 판 안쪽 칸은 안 치운다 — 그 칸으로 돌아오면 모르는 칸(안쪽 어댑터가 맨 위로만 쥔다) · 뒤로 한 번이 헛돈다.
           Chrome 길게 누른 뒤로 목록처럼 여러 칸을 한 번에 건너면 중간 판의 안쪽 창은 안 닫힐 수 있다(그 판을 다시 보이면 창이 떠 있다). */
     var BOOK_PHONE = 2, BOOK_WIDE_Q = '(min-width:1100px) and (hover:hover) and (pointer:fine)';
@@ -550,13 +550,14 @@
     function histRun() { var t = histTop(); return bookOwner(t) ? Math.max(0, Number(t.bd) || 0) : 0; }   // 맨 위에서 이어진 판 칸 수
     function histBook(p) {
       if (bookOwner(histTop()) === p.key) return;      // 맨 위가 이미 이 판 칸(뒤로로 돌아온 판 · 판 안 창 칸 위)
+      p.hb = histRun();                                // 🖥 이 판 칸 밑에 이어진 판 칸 수 — PC ✕ 가 제 칸만 걷는다(아래 bookClose 앞 판 규칙)
       try { history.pushState({ onfBook: p.key, n: histDepth, bd: histRun() + 1 }, ''); } catch (e) {}   // 주소 칸은 비운다
     }
     /* 판 안쪽 기록 다리(폰) — 홈 다리(histMsg)와 같은 약속·같은 검증(op · id · 2KB · JSON 사본). hello 는 안 받는다(위 한계). */
     function bookHist(p, ev) {
       var d = ev.data, t, flat;
       if (d.op === 'hi') {
-        if (!phone() || !isAppOrigin(ev.origin)) return;
+        if (!isAppOrigin(ev.origin)) return;             // 🖥 PC 도 켠다(Peter 2026-10-24 「컴퓨터에서도 뒤로 = 교재에서 나갈까요?」 — 판 안 창·「나갈까요?」 칸이 최상위에)
         p.hw = ev.source; p.ho = ev.origin;
         try { p.hw.postMessage({ onf: 'hist-on' }, p.ho); } catch (e) {}
         return;
@@ -568,10 +569,10 @@
       } else if (d.op === 'back' && t && t.onfHist === d.id && t.b === p.key) history.back();   // 맨 위가 이 판의 그 칸일 때만(남의 칸 보호)
     }
     /* 기록 칸이 빠졌다(뒤로·앞으로) — 폰이면 맨 위 칸 주인 판을 보이고(없어졌으면 다시 받음) · 홈 칸·바닥이면 보이는 판을 숨긴다.
-       판 안쪽엔 그 판 맨 위 칸을 알린다(판 칸이면 '' = 안쪽 칸 없음) · 홈 칸·바닥이면 다리 있는 판 전부에 '' (판 칸은 늘 홈 칸 위라 남은 판 칸이 없다). PC 는 판을 안 보이고 안 숨긴다. */
+       판 안쪽엔 그 판 맨 위 칸을 알린다(판 칸이면 '' = 안쪽 칸 없음) · 홈 칸·바닥이면 다리 있는 판 전부에 '' (판 칸은 늘 홈 칸 위라 남은 판 칸이 없다). 🖥 PC 도 같다(2026-10-24). */
     function bookPop(s) {
       var k = bookOwner(s), src = k ? bookSrcs[k - 1] : '', p = src ? bookFind(src) : null;
-      if (phone()) {
+      {   // 🖥 PC 도 같다(2026-10-24) — 종전 PC 는 판 칸이 없어 뒤로가 앱째 떠났다
         if (src && !p) { p = bookBoardFor(src); if (p) { bookSwapTo(p, src); p = bookShown(); } else p = bookMake(src, false); }   // 📖 판이 있으면 그 주소로 갈아 끼운다(새 액자 대신) · 보인 판을 다시 집는다 — 판이 늙었으면 bookSwapTo 안 bookShow 가 새 판으로 바꿨다(옛 p 로 또 보이면 고아 액자 · 2단계 반박 🟡)
         if (p) bookShow(p); else bookHide();
       }
@@ -766,7 +767,7 @@
       if (p.parked) bookPark(p, false);
       books.splice(books.indexOf(p), 1); books.push(p);   // 가장 최근
       bookRoom(bookMax());
-      if (phone()) histBook(p);
+      histBook(p);   // 🖥 PC 도 판 칸(2026-10-24 · 뒤로 = 판 숨김 · 교재가 「나갈까요?」 칸을 그 위에)
       sync();
     }
     /* home === true = 홈에서 온 openBook — 📖 같은 주소·할 줄 아는 판(bookLike)이 없고 판(bookBoard)이 있으면 새 판 대신 갈아 끼운다(아래 「교재 판 한 장」).
@@ -900,7 +901,11 @@
        all === true 만 전부 닫기(교재 「홈」 bookClose{all:1} · 홈 메뉴 bookDismiss) — ⚠️ 엄격 비교: 못 연 판 안내의 [닫기] 가 이 함수를 onclick 으로 받아 이벤트가 인자로 온다. */
     function bookClose(all) {
       var cur = bookShown(), b = cur && cur.back;
-      if (all !== true && !phone() && b && books.indexOf(b) >= 0) { bookShow(b); return; }   // left·m·r 없이 부르면 보이던 판 칸 값 그대로(위 bookShow)
+      if (all !== true && !phone() && b && books.indexOf(b) >= 0) {   // left·m·r 없이 부르면 보이던 판 칸 값 그대로(위 bookShow)
+        var own = bookOwner(histTop()) === cur.key ? histRun() - (cur.hb || 0) : 0;   // 🖥 이 판 칸만 걷는다 → popstate 의 bookPop 이 밑의 앞 판을 보인다(기록과 화면이 같은 차례 · 2026-10-24)
+        if (own > 0) { try { history.go(-own); return; } catch (e) {} }
+        bookShow(b); return;
+      }
       if (!bookHide()) return;
       var r = histRun();
       if (r > 0) { try { history.go(-r); } catch (e) {} }
@@ -955,7 +960,7 @@
     function bookMode() {
       try { document.documentElement.classList.toggle('onf-ph', phone()); } catch (e) {}
       var p = bookShown();
-      if (p && phone()) histBook(p);
+      if (p) histBook(p);
       bookRoom(bookMax());
       sync();
     }

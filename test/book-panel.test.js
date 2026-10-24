@@ -114,11 +114,12 @@ t('교재 액자의 기록 다리(hist hi)·제목(title)·노크는 **홈 자�
   const bookWin = win('book-exec', s.top), bookInner = win('book-user', bookWin);
   s.panel().kids[0].contentWindow = bookWin;
   s.send({ onf: 'hist', op: 'hi' }, bookInner);
-  assert.strictEqual(bookInner.sent.length, 0, '⛔ 교재 액자의 hist hi 에 hist-on 으로 답했다 — 홈의 「뒤로 = 창 닫기」 다리를 뺏긴다');
+  assert.deepStrictEqual(bookInner.sent.map(([m]) => m.onf), ['hist-on'], '⛔ 교재 판 노크에 판 다리(hist-on)로 안 답했다 — 🖥 PC 도 판마다 따로 다리(2026-10-24 Peter 「컴퓨터에서도 뒤로 = 교재에서 나갈까요?」)');
+  assert.ok(!s.homeInner.sent.some(([m]) => m.onf === 'hist-on'), '⛔ 판 노크가 홈 다리에 섞였다');
   s.send({ onf: 'title', t: '교재 제목' }, bookInner);
   assert.strictEqual(s.g.document.title, 'Ownify┃홈', '⛔ 교재 액자가 탭 제목을 바꿨다');
   s.send({ onf: 'frameHello' }, bookInner);
-  assert.strictEqual(bookInner.sent.length, 0, '⛔ 교재 액자의 노크를 홈 노크로 받았다(키보드 보정 창이 바뀐다)');
+  assert.strictEqual(bookInner.sent.length, 1, '⛔ 교재 액자의 노크를 홈 노크로 받았다(키보드 보정 창이 바뀐다)');
 });
 
 t('판 안에서 교재 ↔ 내 문장 — 교재 액자가 보낸 openBook 은 판만 바꾼다(새 판 · 보이던 판은 숨김 — 대기를 모르면 지움) · 거르개(null)면 그대로 · 남의 출처는 버린다', () => {
@@ -589,7 +590,7 @@ t('📱 폰 — 교재 누름 → 판 하나(화면 전체 <html onf-ph> · 메�
   assert.ok(/\.onf-ph \.onf-bookpanel \{ top: 0; right: 0; bottom: 0; left: 0; width: auto; padding: 0; border: 0; border-radius: 0; box-shadow: none; \}/.test(css), '⛔ 폰 판이 화면 전체(홈 액자와 같은 상자)가 아니다');
   const pc = phoneSetup({ wide: true });
   pc.send({ onf: 'openBook', href: E1, left: 184 }, pc.homeInner);
-  assert.ok(pc.H.st.length === 1 && !pc.root.classList.contains('onf-ph') && pc.panel().classList.contains('beside'), '⛔ PC 판에 판 칸을 넣었다(또는 폰 모양)');
+  assert.ok(pc.H.st.length === 2 && JSON.stringify(pc.H.state) === JSON.stringify({ onfBook: 1, n: 0, bd: 1 }) && !pc.root.classList.contains('onf-ph') && pc.panel().classList.contains('beside'), '⛔ 🖥 PC 판에 판 칸이 없다(뒤로가 앱째 떠난다 · 2026-10-24) — 또는 폰 모양');
 });
 
 t('📱 뒤로(popstate) = 숨김(지우지 않음) · 교재에 「대기」 · 홈에 bookClosed · 다시 누르면 **같은 판** 0초 + 판 칸 다시', () => {
@@ -691,7 +692,7 @@ t('📱 판 안 창(카드·응용) 칸도 최상위 — 노크(hist hi)는 폰 
   const pi = hi(pc, pc.panel());
   pi.sent.length = 0;
   pc.hist({ op: 'hi' }, pi);
-  assert.strictEqual(pi.sent.length, 0, '⛔ PC 판 노크에 hist-on — PC 판은 종전대로 액자 안 기록');
+  assert.deepStrictEqual(js(pi.sent), [[{ onf: 'hist-on' }, O]], '⛔ 🖥 PC 판 노크에 hist-on 이 없다 — PC 도 판 안 창·「나갈까요?」 칸이 최상위(2026-10-24)');
 });
 
 t('📱 판 안에서 다른 교재·⭐ 내 문장 → 새 판 칸이 위에 · 뒤로 = 앞 판(종전 폰 「뒤로」 차례) · 그 판이 지워졌으면 그 주소로 다시 받는다 · 폰 판 자리 2', () => {
@@ -730,24 +731,25 @@ t('📱 미리 띄우기(bookWarm panel:1) — 숨긴 판(park=1) · 기록 안 
 t('📱 폭이 바뀜 — PC 판(보임) → 폰: 화면 전체 · 판 칸 넣음(뒤로 = 숨김) · 자리 2 로 줄임 / 폰 → PC: 판 그대로 · ✕ 가 남은 판 칸을 걷는다 · PC 의 뒤로는 판을 안 건드림', () => {
   const s = phoneSetup({ wide: true }), inner = [];
   for (const h of [E1, E2, E3]) { s.send({ onf: 'openBook', href: h, left: 184 }, s.homeInner); inner.push(hi(s, s.panels()[s.panels().length - 1])); }
-  assert.ok(s.panels().length === 3 && s.H.st.length === 1, '전제: PC 판 셋 · 판 칸 없음');
+  assert.ok(s.panels().length === 3 && s.H.st.length === 4, '전제: PC 판 셋 · 🖥 판 칸 셋(2026-10-24 PC 도 판 칸)');
   const v = s.panels()[2], vi = inner[2];
   s.flip(false);
   assert.ok(s.root.classList.contains('onf-ph') && s.panels().length === 2 && !v.classList.contains('park'), '⛔ 폰이 됐는데 모양·자리(2)가 안 바뀌었다(또는 보이던 판을 숨겼다)');
-  assert.ok(s.H.st.length === 2 && s.H.state.onfBook > 0 && s.H.state.bd === 1, '⛔ 폰이 됐는데 보이는 판에 판 칸이 없다(뒤로가 홈을 떠난다)');
+  assert.ok(s.H.st.length === 4 && s.H.state.onfBook > 0, '⛔ 폰이 됐는데 보이는 판에 판 칸이 없다(뒤로가 홈을 떠난다)');
   s.browserBack();
   assert.ok(v.classList.contains('park'), '⛔ 폰이 된 뒤 뒤로가 판을 안 숨겼다');
   s.send({ onf: 'openBook', href: E3 }, s.homeInner);
   s.flip(true);
   assert.ok(!s.root.classList.contains('onf-ph') && !v.classList.contains('park'), '⛔ PC 가 됐는데 모양이 안 바뀌었다(또는 판을 숨겼다)');
   s.H.goes.length = 0;
+  const bd0 = s.H.state.bd;
   s.send({ onf: 'bookClose' }, vi);
-  assert.deepStrictEqual(s.H.goes, [-1], '⛔ PC 가 된 뒤 ✕ 가 남은 판 칸을 안 걷었다(뒤로 한 번이 헛돈다)');
+  assert.deepStrictEqual(s.H.goes, [-bd0], '⛔ PC 가 된 뒤 ✕ 가 남은 판 칸을 안 걷었다(뒤로 한 번이 헛돈다)');
   s.flush();
   s.send({ onf: 'openBook', href: E3, left: 184 }, s.homeInner);
-  const n0 = s.H.st.length;
+  assert.ok(!v.classList.contains('park') && s.H.state.onfBook > 0, '⛔ 🖥 PC 에서 다시 연 판에 판 칸이 없다');
   s.browserBack();
-  assert.ok(!v.classList.contains('park') && n0 === s.H.st.length, '⛔ PC 의 뒤로가 판을 숨겼다(또는 PC 가 판 칸을 넣었다)');
+  assert.ok(v.classList.contains('park'), '⛔ 🖥 PC 의 뒤로가 판을 안 숨겼다(앱째 떠난다 · 2026-10-24)');
 });
 
 t('📱 키보드 높이·밀림 보정은 **보이는 폰 판**에 — 판의 frameHello 창으로 kbH · 그 판 액자에 translateY · 숨기면 홈 액자로 돌아가 다시 알림 · PC 판은 종전대로 홈', () => {
@@ -863,13 +865,38 @@ t('교재 주소만 · 아는 값만 · 토큰 버림 · embed=1', () => {
   assert.ok(!/LEAK/.test(String(f('https://script.ownify.co.kr/a-s1-e1-b?mode=share&t=LEAK&ttok=X&tas=Y'))), '⛔ 주소에 실려 온 토큰·선생님 자격을 넘긴다');
 });
 
+t('🖥 PC 뒤로(2026-10-24 Peter 「컴퓨터에서도 뒤로 = 교재에서 나갈까요?」) — 판 칸·판 안쪽 칸이 최상위 · 뒤로 = 숨김(홈 그대로) · 판 안에서 연 판의 ✕ 는 제 칸만 걷어 앞 판을 보인다(기록과 화면이 같은 차례)', () => {
+  const s = phoneSetup({ wide: true });
+  s.send({ onf: 'openBook', href: E1, left: 184 }, s.homeInner);
+  const a = s.panel(), ai = hi(s, a);
+  s.hist({ op: 'hi' }, ai);
+  s.hist({ op: 'push', id: 'lv1', state: { onfLeave: 'x' } }, ai);   // 교재의 「나갈까요?」 칸
+  assert.deepStrictEqual(s.H.state, { onfHist: 'lv1', s: { onfLeave: 'x' }, n: 0, b: 1, bd: 2 }, '⛔ PC 판 안쪽 칸이 최상위에 안 들어갔다');
+  s.send({ onf: 'openBook', href: E2 }, ai);                       // 판 안에서 다른 교재(앞 판 = a)
+  const b = s.panels().find((x) => x !== a), bi = hi(s, b);
+  s.hist({ op: 'hi' }, bi);
+  s.hist({ op: 'push', id: 'lv2', state: { onfLeave: 'y' } }, bi);
+  assert.ok(a.classList.contains('park') && !b.classList.contains('park') && s.H.state.b === 2 && s.H.state.bd === 4, '전제: b 칸 둘이 a 칸 둘 위');
+  s.H.goes.length = 0;
+  s.send({ onf: 'bookClose' }, bi);
+  assert.deepStrictEqual(s.H.goes, [-2], '⛔ ✕ 가 b 칸(판 칸 + 안쪽 칸)만 걷지 않았다');
+  bi.sent.length = 0; ai.sent.length = 0; s.flush();
+  assert.ok(!a.classList.contains('park') && b.classList.contains('park') && s.H.state.onfHist === 'lv1', '⛔ ✕ 뒤 앞 판(a)이 안 보인다(또는 기록이 a 칸이 아니다)');
+  assert.deepStrictEqual(hp(ai), ['lv1'], '⛔ a 에 맨 위 칸(lv1)을 안 알렸다 — 「나갈까요?」 칸이 사라진 줄 안다');
+  s.browserBack();
+  assert.deepStrictEqual(hp(ai), ['lv1', ''], '⛔ a 의 「나갈까요?」 칸이 빠졌는데 안 알렸다(되묻기가 안 뜬다)');
+  assert.ok(!a.classList.contains('park'), '⛔ 안쪽 칸 뒤로가 판을 숨겼다');
+  s.browserBack();
+  assert.ok(a.classList.contains('park') && s.H.state === null, '⛔ 🖥 판 칸 뒤로가 판을 안 숨겼다(앱째 떠난다)');
+});
+
 t('📱 폰 판 스위치 — 꺼져 있으면(opts.phone 없음) caps 에 phone 0 · 폰 폭이어도 onf-ph·판 칸 없음(종전 PC 판 그대로) · index.html 은 기본 켬(2026-10-16) · phonepanel=0 · 기억값 0 으로만 끈다', () => {
   const s = phoneSetup({ phone: false });
   s.send({ onf: 'bookHello' }, s.homeInner);
   assert.deepStrictEqual(JSON.parse(JSON.stringify(s.homeInner.sent.find((x) => x[0].onf === 'caps')[0])), { onf: 'caps', book: 1, phone: 0 }, '⛔ 스위치가 꺼졌는데 caps 에 phone:1 — 모든 폰에서 가로챈다');
   assert.ok(!s.root.classList.contains('onf-ph'), '⛔ 스위치가 꺼졌는데 폰 모양(onf-ph)');
   s.send({ onf: 'openBook', href: E1, left: 0 }, s.homeInner);
-  assert.strictEqual(s.H.st.length, 1, '⛔ 스위치가 꺼졌는데 판 칸을 넣었다');
+  assert.ok(!s.panel().classList.contains('park') && s.H.st.length === 2, '⛔ 스위치가 꺼졌는데 판이 PC 판(판 칸 하나 · 🖥 2026-10-24)이 아니다');
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   assert.ok(/phone: phoneOn !== '0'(, hooks: loadHooks)?(, preKey: preKey)? \}\);/.test(html) && /q\.get\('phonepanel'\)/.test(html) && /localStorage\.getItem\('onfPhonePanel'\)/.test(html), '⛔ index.html 이 스위치를 안 넘긴다(또는 기본 꺼짐 · 끄는 길 없음)');
 });
