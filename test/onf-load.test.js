@@ -141,7 +141,9 @@ console.log('[막 — 화면을 못 막는다]');
 t('못 열었다(stuck) → 그 자리에서 걷는다', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true });
   s.tick(500); k.stuck();
-  assert.strictEqual(s.box(), null, '⛔ 못 연 안내를 막이 덮는다');
+  assert.ok(s.box(), '⛔ 다 안 찬 채 툭 껐다(Peter 2026-10-24 「모션을 꺼 버리지 말고 끝까지 채우고」)');
+  s.tick(700);
+  assert.strictEqual(s.box(), null, '⛔ 못 연 안내를 막이 0.7초 넘게 덮는다');
 });
 t('홈 아닌 화면(교재) → 다 뜨면(ok) 채우고 걷힌다 · 1초 안', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: false });
@@ -160,7 +162,7 @@ t('홈 + 로고 자리 → 홈 로고 숨김 → 난다(가로·세로 따로 ·
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
   box.querySelector('.onf-ld-in').rect = { left: 45, top: 400, width: 300, height: 50 };
   k.ok(); s.tick(100); h.send(BRAND);
-  s.tick(250 + 120 + 20);
+  s.tick(800);   // 남은 만큼 채움(≈0.53초 · fillMs) + 잠깐(120) 뒤 난다
   const lg = box.querySelector('.onf-ld-logo'), inn = box.querySelector('.onf-ld-in');
   assert.strictEqual(lg.anims.length, 1, '⛔ 가로로 안 난다'); assert.strictEqual(inn.anims.length, 1, '⛔ 세로·크기가 안 변한다');
   const last = inn.anims[0].kf[1].transform; assert.ok(/scale\(0\.286/.test(last), '⛔ 홈 로고 폭(86)에 안 맞췄다: ' + last);
@@ -180,7 +182,7 @@ t('PC 글자 이름(k=text) → 통통 뒤 홈 글자를 먼저 보이고 겹친
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
   box.querySelector('.onf-ld-in').rect = { left: 570, top: 425, width: 300, height: 50 };
   k.ok(); h.send(Object.assign({}, BRAND, { k: 'text', w: 64, h: 22 }));
-  s.tick(250 + 120 + 950 + 5 * 75 + 460 + 10);
+  s.tick(600 + 120 + 950 + 5 * 75 + 460 + 10);
   assert.deepStrictEqual(h.user.sent.map((x) => x[0]), ['brandHold', 'brandDone'], '⛔ 겹친 로고를 걷기 전에 홈 글자를 안 보였다');
   assert.ok(s.box() && s.box().anims.length === 1, '⛔ 글자 이름인데 살짝 걷지 않고 툭 없앴다');
   s.tick(300);
@@ -196,7 +198,7 @@ t('⛔ 남의 창·남의 출처 말은 버린다(로고 자리를 위조해 막
 });
 t('동작 줄이기 → 날지 않고 걷힌다', () => {
   const s = env({ reduced: true }), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
-  k.ok(); h.send(BRAND); s.tick(1000);
+  k.ok(); h.send(BRAND); s.tick(1300);
   assert.strictEqual(box.querySelector('.onf-ld-logo').anims.length, 0);
   assert.ok(!h.user.sent.some((x) => x[0] === 'brandHold'), '⛔ 날지도 않는데 홈 로고를 숨겼다');
   assert.strictEqual(s.box(), null);
@@ -204,16 +206,27 @@ t('동작 줄이기 → 날지 않고 걷힌다', () => {
 t('30초 안전 시계 — 아무 소식이 없어도 걷힌다', () => {
   const s = env(), h = homeFrame(s); s.g.ONF.load.bind(h.fr, { home: true });
   s.tick(29900); assert.ok(s.box());
-  s.tick(200); assert.strictEqual(s.box(), null, '⛔ 막이 영영 남는다');
+  s.tick(700); assert.strictEqual(s.box(), null, '⛔ 막이 영영 남는다(끝까지 채운 뒤 걷힌다)');
 });
-t('채우는 중엔 92% 를 안 넘고, 끝나면 100%', () => {
-  const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: false }), box = s.box();
-  const fill = box.querySelector('.onf-ld-fill');
-  s.tick(25000);
-  const p = 1 - parseFloat(/inset\(0 ([\d.]+)%/.exec(fill.style.clipPath)[1]) / 100;
-  assert.ok(p > 0.9 && p <= 0.92, '⛔ 상한이 틀렸다: ' + p);
-  k.ok(); s.tick(260);
-  assert.strictEqual(fill.style.clipPath, 'inset(0 0.00% 0 0)');
+t('채우는 중 — 화면이 살아나기(노크) 전엔 60% · 홈이 다 그리기 전엔 92% 를 안 넘고, 끝나면 100%(Peter 2026-10-24 「로딩 속도에 맞춰」)', () => {
+  const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
+  const fill = box.querySelector('.onf-ld-fill'), P = () => 1 - parseFloat(/inset\(0 ([\d.]+)%/.exec(fill.style.clipPath)[1]) / 100;
+  s.tick(12000);
+  assert.ok(P() > 0.58 && P() <= 0.6, '⛔ 노크 전 상한이 틀렸다: ' + P());
+  k.ok(); s.tick(14000);
+  assert.ok(P() > 0.9 && P() <= 0.92, '⛔ 노크 뒤 상한이 틀렸다: ' + P());
+  h.send(BRAND); s.tick(260);
+  assert.strictEqual(fill.style.clipPath, 'inset(0 0.00% 0 0)', '⛔ 다 그렸는데 끝까지 안 찼다');
+  assert.ok(JSON.parse(s.ls.onfLoadMs1).length === 1 && JSON.parse(s.ls.onfLoadMs2).length === 1, '⛔ 단계 시간을 안 배웠다(노크까지 · 다 그림까지)');
+});
+t('단계 곡선 · 남은 만큼 채움 시간 — 순수', () => {
+  const T0 = T(env());
+  assert.strictEqual(T0.stage(0, 2500, null, 2000), 0.08);
+  assert.ok(Math.abs(T0.stage(2500, 2500, null, 2000) - 0.548) < 0.02, '노크 평균 시각 ≈55%');
+  const a = T0.stage(1000, 2500, 1000, 2000);
+  assert.strictEqual(T0.stage(1000, 2500, 1000, 2000), a, '노크 순간 이어진다(튀지 않는다)');
+  assert.ok(T0.stage(1e7, 2500, 1000, 2000) <= 0.92 + 1e-9);
+  assert.ok(T0.fillMs(0.92) < 230 && T0.fillMs(0.3) > 450 && T0.fillMs(0.3) < 500, '남은 양에 비례(0.2~0.6초)');
 });
 
 console.log('[선생님 껍데기 — 로그인 화면을 가리지 않는다]');
@@ -236,17 +249,17 @@ t('⛔ [2026-10-22 아이폰 사고] 학생 홈 — 액자 load 뒤 4초 동안 
   k.ok(); s.tick(4000);                                                   // 말 0 — 종전엔 1.5초에 「스크립트 없는 화면」으로 짐작해 걷었다
   assert.ok(s.box(), '⛔ 말 없는 4초에 걷었다(안 그려진 액자 뒤 고리가 비친다)');
   assert.strictEqual(box.querySelector('.onf-ld-logo').anims.length, 0, '⛔ 자리도 없이 날았다');
-  h.send({ onf: 'hist', op: 'hi' }); h.send(BRAND); s.tick(250 + 120 + 20);
+  h.send({ onf: 'hist', op: 'hi' }); h.send(BRAND); s.tick(600 + 120 + 20);   // 남은 만큼 채움(≤0.6초) + 잠깐 멈춤
   assert.strictEqual(box.querySelector('.onf-ld-logo').anims.length, 1, '⛔ 늦게 온 로고 자리로 안 난다');
   assert.deepStrictEqual(h.user.sent.map((x) => x[0]), ['brandHold']);
   //   스크립트 없는 안내(잠금·_onfNoticePage)는 스스로 k:none 을 보낸다 → 기다리지 않고 걷힌다
   const s2 = env(), h2 = homeFrame(s2), k2 = s2.g.ONF.load.bind(h2.fr, { home: true });
-  k2.ok(); h2.send({ onf: 'brand', k: 'none' }); s2.tick(800);
+  k2.ok(); h2.send({ onf: 'brand', k: 'none' }); s2.tick(1200);   // 남은 만큼 채움(≤0.6초) + 멈춤 + 걷힘
   assert.strictEqual(s2.box(), null, '⛔ 안내 화면이 「자리 없음」을 보냈는데 막이 남는다');
 });
 t('k:none(다 그렸는데 자리 없음 — 못 들어오는 안내 등) → 날지 않고 바로 걷힌다 · 홈 로고 숨김 없음', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true, grace: 15000 }), box = s.box();
-  k.ok(); h.send({ onf: 'brand', k: 'none' }); s.tick(800);
+  k.ok(); h.send({ onf: 'brand', k: 'none' }); s.tick(1200);
   assert.strictEqual(box.querySelector('.onf-ld-logo').anims.length, 0, '⛔ 자리 없이 날았다');
   assert.strictEqual(s.box(), null, '⛔ 「다 그렸다」를 받고도 여유만큼 더 덮는다');
   assert.ok(!h.user.sent.some((x) => x[0] === 'brandHold'));

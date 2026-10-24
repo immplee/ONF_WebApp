@@ -1,8 +1,9 @@
 /* ONF 첫 화면 로고 로딩 — 2026-10-22 Peter 「원형 도넛 + 불러오는 중 대신 로고 모션」
  *
  *   C 채움 → 7 제자리로 → 통통 (목업 ONF_SlackBot docs/검수-목업/2026-10-22-로고로딩/v4.html 에서 고른 조합 · 배경 = 기본 단색)
- *     ① 채움: 흐린 워드마크 위로 주황이 왼→오로 차오른다. **진짜 퍼센트가 아니다** — 껍데기는 구글이 홈을 짓는 동안 안을 못 본다.
- *        그래서 「이 기기 최근 다섯 번 평균」에 맞춰 다가가되 92% 에서 멈춘다(0초 8% · 평균 시각 ≈84%). 다 뜨면 0.25초에 100%.
+ *     ① 채움: 흐린 워드마크 위로 주황이 왼→오로 차오른다. 껍데기가 아는 **진짜 단계 둘**에 맞춘다(Peter 2026-10-24 「로딩 속도에 맞춰 채워지게」):
+ *        화면이 살아남(노크 · ok)까지 60% · 홈이 다 그림(brand)까지 92% — 단계마다 「이 기기 최근 다섯 번 평균」 걸린 시간으로 다가간다(구글이 짓는 동안 안은 못 본다).
+ *        ⛔ 끝나는 길은 **전부** 남은 만큼을 빠르게 끝까지 채운 뒤 넘어간다(0.2~0.6초 · 남은 양에 비례) — 못 엶·안전 시계도(Peter 「다 안 찼을 때 모션을 꺼 버리지 말고」).
  *     ② 제자리로: 홈이 알려 준 자기 로고 자리(`{onf:'brand'}` — Ownify ONF_Home_Html onfBrandTell)로 활처럼 휜 길(세로 먼저·가로 늦게)로 0.95초 긴 감속.
  *        날아가는 동안 바탕이 걷혀 그 밑의 홈이 보인다. ③ 통통: 내려앉으면 왼쪽 글자부터 하나씩 튄다 → 겹쳐 둔 로고를 걷는다.
  *        ⚠️ 날고 튀는 동안 홈의 진짜 로고는 숨는다 — 자리를 받으면 `{onf:'brandHold'}`, 걷을 때 `{onf:'brandDone'}` 를 홈에 보낸다
@@ -27,8 +28,8 @@
   'use strict';
 
   var ON = true;                                   // ⛔ 전 기기 되돌리기 = false
-  var KEY = 'onfLoadFx', HIST = 'onfLoadMs';
-  var SAFE_MS = 30000, HOME_MS = 15000, FILL_MS = 250, HOLD_MS = 120, FLY_MS = 950, FADE_MS = 300;
+  var KEY = 'onfLoadFx', HIST = 'onfLoadMs', HIST1 = 'onfLoadMs1', HIST2 = 'onfLoadMs2';   // 다 뜸까지 · 노크까지 · 노크 뒤 다 그림까지(단계 채움)
+  var SAFE_MS = 30000, HOME_MS = 15000, HOLD_MS = 120, FLY_MS = 950, FADE_MS = 300;
   var HOP_STEP = 75, HOP_MS = 460;
   var ORANGE = '#D2691E';
   var VB = '60 60 712.7 118.7';                    // ⛔ Ownify ONF_Brand_Svg 와 같은 viewBox·같은 글자 — 홈 로고 상자와 1:1 로 겹친다
@@ -47,22 +48,29 @@
     try { if (v === '0' || v === '1') ls.setItem(KEY, v); else v = ls.getItem(KEY); } catch (e) {}
     return ON ? v !== '0' : v === '1';
   }
-  function expected(ls) {
+  function expected(ls, key, def, lo) {
     var a = [];
-    try { a = JSON.parse(ls.getItem(HIST) || '[]'); } catch (e) {}
+    try { a = JSON.parse(ls.getItem(key || HIST) || '[]'); } catch (e) {}
     a = Array.isArray(a) ? a.filter(function (x) { return typeof x === 'number' && x > 0 && x < 60000; }).slice(-5) : [];
-    if (!a.length) return 4000;
+    if (!a.length) return def || 4000;
     var m = a.reduce(function (s, x) { return s + x; }, 0) / a.length;
-    return Math.min(20000, Math.max(800, m));
+    return Math.min(20000, Math.max(lo || 800, m));
   }
-  function remember(ls, ms) {
+  function remember(ls, ms, key) {
     try {
-      var a = JSON.parse(ls.getItem(HIST) || '[]');
+      var a = JSON.parse(ls.getItem(key || HIST) || '[]');
       a = (Array.isArray(a) ? a : []).concat([Math.round(ms)]).slice(-5);
-      ls.setItem(HIST, JSON.stringify(a));
+      ls.setItem(key || HIST, JSON.stringify(a));
     } catch (e) {}
   }
-  function curve(t, E) { return 0.08 + 0.84 * (1 - Math.exp(-2.3 * t / E)); }   // 0초 8% · E 에 ≈84% · 끝없이 기다려도 92%
+  function curve(t, E) { return 0.08 + 0.84 * (1 - Math.exp(-2.3 * t / E)); }   // (옛 한 줄 곡선 · 검사가 잰다) 0초 8% · E 에 ≈84% · 끝없이 기다려도 92%
+  /* 단계 채움 — 노크 전: 0초 8% → 노크 평균 시각 ≈52% → 60% 상한 · 노크 뒤: 노크 때 자리에서 → 다 그림 평균 시각 ≈84% 몫 → 92% 상한 */
+  function stage(t, E1, okT, E2) {
+    var p1 = function (x) { return 0.08 + 0.52 * (1 - Math.exp(-2.3 * x / E1)); };
+    if (okT == null || t < okT) return p1(t);
+    var a = p1(okT); return a + (0.92 - a) * (1 - Math.exp(-2.3 * (t - okT) / E2));
+  }
+  function fillMs(p0) { return Math.round(180 + 420 * Math.max(0, Math.min(1, 1 - p0))); }   // 남은 만큼 — 92% 에서 ≈0.21초 · 30% 에서 ≈0.47초
   /* 홈이 보낸 로고 자리 — 안쪽 화면 좌표(px). 모양이 이상하면 null(→ 날지 않고 걷힌다). */
   function brandOk(d, vw, vh) {
     if (!d || d.onf !== 'brand') return null;
@@ -121,7 +129,7 @@
     if (!box) return null;
     opts = opts || {};
     var t0 = global.performance ? performance.now() : Date.now();
-    var E = expected(ls), phase = 'wait', raf = 0, timers = [], anims = [], brand = null, okAt = 0, home = null;   // home = 로고 자리를 보낸 창·출처(숨김·다시 보임을 알린다)
+    var E1 = expected(ls, HIST1, 2500, 300), E2 = expected(ls, HIST2, 2000, 300), phase = 'wait', raf = 0, timers = [], anims = [], brand = null, okAt = 0, home = null;   // home = 로고 자리를 보낸 창·출처(숨김·다시 보임을 알린다)
     var reduced = false;
     try { reduced = global.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
     function now() { return global.performance ? performance.now() : Date.now(); }
@@ -137,25 +145,43 @@
       global.removeEventListener('message', onMsg);
       try { if (box.parentNode) box.parentNode.removeChild(box); } catch (e) {}
     }
+    function pNow() { return stage(now() - t0, E1, okAt ? okAt - t0 : null, E2); }
     function tick() {
       if (phase !== 'wait') return;
-      try { setP(curve(now() - t0, E)); raf = requestAnimationFrame(tick); } catch (e) { gone(); }
+      try { setP(pNow()); raf = requestAnimationFrame(tick); } catch (e) { gone(); }
+    }
+    /* 끝까지 빠르게 채운 뒤 then — 끝나는 길은 전부 여기를 지난다(Peter 2026-10-24) */
+    function fillUp(then) {
+      cancelAnimationFrame(raf);
+      var p0 = pNow(), f0 = now(), d = fillMs(p0);
+      (function up() {
+        if (phase === 'gone') return;
+        try {
+          var k = Math.min(1, (now() - f0) / d);
+          setP(p0 + (1 - p0) * (1 - Math.pow(1 - k, 3)));
+          if (k < 1) { raf = requestAnimationFrame(up); return; }
+          then();
+        } catch (e) { gone(); }
+      })();
+      later(function () { if (phase !== 'gone') { setP(1); then(); } }, d + 400);   // 숨은 탭은 rAF 가 멈춘다 — 시계로도 끝낸다(then 은 두 번 와도 한 번만 돈다)
     }
     function finish() {
       if (phase !== 'wait') return;
       phase = 'fin';
-      cancelAnimationFrame(raf);
-      remember(ls, (okAt || now()) - t0);
-      var p0 = curve(now() - t0, E), f0 = now();
-      (function up() {
-        if (phase !== 'fin') return;
-        try {
-          var k = Math.min(1, (now() - f0) / FILL_MS);
-          setP(p0 + (1 - p0) * (1 - Math.pow(1 - k, 3)));
-          if (k < 1) { raf = requestAnimationFrame(up); return; }
-          later(function () { pick(brand, reduced, typeof box.animate === 'function') === 'fly' ? fly() : fade(); }, HOLD_MS);
-        } catch (e) { gone(); }
-      })();
+      var at = now();
+      remember(ls, (okAt || at) - t0);
+      if (okAt) remember(ls, okAt - t0, HIST1);
+      if (okAt && brand && at > okAt) remember(ls, at - okAt, HIST2);
+      var done = false;
+      fillUp(function () { if (done) return; done = true; later(function () { pick(brand, reduced, typeof box.animate === 'function') === 'fly' ? fly() : fade(); }, HOLD_MS); });
+    }
+    /* 못 엶·안전 시계 — 바로 없애지 않고 끝까지 채운 뒤 살짝 걷는다(안내가 0.4초 안에 보인다) */
+    function quit() {
+      if (phase === 'gone' || phase === 'quit') return;
+      if (phase === 'fly') return gone();
+      phase = 'quit';
+      var done = false;
+      fillUp(function () { if (done) return; done = true; if (typeof box.animate !== 'function') return gone(); anims.push(box.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, fill: 'forwards' })); later(gone, 180); });
     }
     function fade() {
       if (typeof box.animate !== 'function') return gone();
@@ -164,6 +190,7 @@
     }
     /* 활처럼 휜 길 — 가로(바깥 .onf-ld-logo)와 세로·크기(안 .onf-ld-in)를 서로 다른 곡선으로. 끝은 길게 감속. 홈은 안 움직인다(목업 v3 에서 홈이 커지는 중이라 끝이 튀었다). */
     function fly() {
+      phase = 'fly';
       var lg = box.querySelector('.onf-ld-logo'), inn = box.querySelector('.onf-ld-in');
       var fr = frameEl.getBoundingClientRect(), a = inn.getBoundingClientRect();
       if (!a.width) return fade();
@@ -200,7 +227,7 @@
       } catch (e) {}
     }
     global.addEventListener('message', onMsg);
-    later(gone, SAFE_MS);
+    later(quit, SAFE_MS);
     tick();
     return {
       ok: function () {                                                     // 산 화면 — 홈이면 로고 자리를 조금 기다리고, 아니면 바로 끝낸다
@@ -213,12 +240,12 @@
            · 그래도 안 오면(옛 안내·구글 오류 화면) 15초에 걷힌다 · 30초 안전 시계는 그대로. */
         if (opts.home) later(finish, opts.grace || HOME_MS); else finish();
       },
-      stuck: gone                                                           // 못 열었다 — 종전 안내가 보이게 바로 걷는다
+      stuck: quit                                                           // 못 열었다 — 끝까지 채우고 곧바로 걷는다(종전 안내가 0.4초 안에 보인다)
     };
   }
 
   global.ONF = global.ONF || {};
   global.ONF.load = { bind: bind,
     /* 검사용으로만 — 화면 코드에서 부르지 마라 */
-    _t: { readOn: readOn, expected: expected, remember: remember, curve: curve, brandOk: brandOk, pick: pick, on: function () { return !!box; } } };
+    _t: { readOn: readOn, expected: expected, remember: remember, curve: curve, stage: stage, fillMs: fillMs, brandOk: brandOk, pick: pick, on: function () { return !!box; } } };
 })(window);
