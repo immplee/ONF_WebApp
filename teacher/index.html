@@ -879,6 +879,8 @@ function bookOpen(href, left, m, r, home, cf) {   // cf = 📖 ☁️ 홈이 실
 /* 🔄 새로고침 = 열린 창 그대로(Peter 2026-10-24 · ⚠️ 쌍둥이: 학생 assets/onf-frame.js rsSave·rsBoot) — 보이는 판의 연 주소·자리·교재가 알린 상태(bookState)를 이 탭에만(sessionStorage) ·
    다시 읽히면 홈이 처음 노크할 때(bookHello — 로그인이 끝나 홈이 뜬 뒤) 그 주소로 다시 열고 교재 노크 때 bookRestore · 닫으면 지운다 · 12시간 넘은 기억은 버린다 */
 var RS_KEY = 'onfThOpenBook', RS_MS = 12 * 3600 * 1000, rsBooted = false;
+/* 홈 탭도(학생 껍데기 TAB0 와 같다) — 돌려줄 값은 읽힐 때 한 번 잡는다(홈이 처음 그린 오늘 탭이 먼저 와서 덮지 않게) */
+var TAB_KEY = 'onfThHomeTab', TAB0 = (function () { try { return sessionStorage.getItem(TAB_KEY) || ''; } catch (e) { return ''; } })();
 function rsMark(p, href) { if (!p) return; p.href = href; rsSave(p); }
 function rsSave(p) { if (!p || !p.href) return; try { sessionStorage.setItem(RS_KEY, JSON.stringify({ h: p.href, l: p.left, m: p.m, r: p.r, st: p.st || null, at: Date.now() })); } catch (e) {} }
 function rsDrop() { try { sessionStorage.removeItem(RS_KEY); } catch (e) {} }
@@ -1061,10 +1063,12 @@ window.addEventListener('message', function (ev) {
       var cp = { onf: 'caps', book: 1, phone: BOOK_PH ? 1 : 0 };
       if (BOOK_SW) cp.swap = 1;
       try { ev.source.postMessage(cp, ev.origin); } catch (e) {}
+      if (TAB0) { try { ev.source.postMessage({ onf: 'homeTab', v: TAB0 }, ev.origin); } catch (eT) {} TAB0 = ''; }   // 🔄 새로고침 전에 고른 홈 탭(아래 TAB0)
       if (!rsBooted) { bookHome = ev.source; bookHomeOrigin = ev.origin; rsBoot(); }   // 🔄 새로고침 전에 열려 있던 판(위 rsBoot) — 홈이 뜬 뒤 한 번
       return;
     }
-    if (d.onf === 'reload') { var rp = bookShown(); if (rp) rsSave(rp); location.reload(); return; }   // 🔄 홈의 당겨서 새로고침(Ownify ONF_Shell_Js)
+    if (d.onf === 'reload') { var rp = bookShown(); if (rp) rsSave(rp); location.reload(); return; }
+    if (d.onf === 'homeTab') { if (/^[a-z]{1,8}$/.test(String(d.v))) { try { sessionStorage.setItem(TAB_KEY, d.v); } catch (eS) {} } return; }   // 🔄 홈이 고른 탭 — 이 탭에 적는다   // 🔄 홈의 당겨서 새로고침(Ownify ONF_Shell_Js)
     if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left, d.m, d.r, true, d.cf); var hq = bookShown(); if (hq) hq.back = null; return; }   // 홈에서 연 판은 앞 판 기억 없음(종전 · 4.4) · 📖 판이 있으면 갈아 끼움
     if (d.onf === 'bookWarm' && d.panel === 1 && typeof d.href === 'string') { bookPre(d.href, d.left, d.m, d.r); return; }   // 지금·곧 할 수업 교재를 숨긴 판으로 미리(10-13)
     /* 📐 창 크기가 바뀌었다(2026-10-16 · 학생 껍데기와 같다) — 홈이 다시 잰 메뉴 끝·여백·모서리를 판 전부(보이는 판·숨긴 판)에 새로 단다. 보이기·숨기기·주소는 안 건드린다. 내 액자(위 bookFrom)에서 온 말만. */

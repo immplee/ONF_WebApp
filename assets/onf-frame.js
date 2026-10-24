@@ -393,8 +393,10 @@
         var cp = { onf: 'caps', book: 1, phone: opts.phone ? 1 : 0 };
         if (BOOK_SW) cp.swap = 1;
         try { ev.source.postMessage(cp, ev.origin); } catch (eC) {}
+        if (TAB0) { try { ev.source.postMessage({ onf: 'homeTab', v: TAB0 }, ev.origin); } catch (eT) {} TAB0 = ''; }   // 🔄 새로고침 전에 고른 홈 탭(아래 TAB0) — 홈이 처음 노크할 때 한 번
         return;
       }
+      if (ev.data.onf === 'homeTab') { if (/^[a-z]{1,8}$/.test(String(ev.data.v))) { try { global.sessionStorage.setItem(TAB_KEY, ev.data.v); } catch (eS) {} } return; }   // 🔄 홈이 고른 탭 — 이 탭에 적는다
       if (ev.data.onf === 'openBook' && opts.bookSrc && typeof ev.data.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(ev.data.href, ev.data.left, ev.data.m, ev.data.r, true, ev.data.cf, ev.data.out === 1); var hp = bookShown(); if (hp) { hp.back = null; hp.home = true; } return; }   // 홈에서 연 판은 앞 판 기억 없음(종전 · 4.4) · 📖 판이 있으면 갈아 끼움 · home = 판 자격(아래 bookBoard)
       /* 홈이 탭을 바꿨다 → 옆 판을 닫는다(2026-10-12 Peter 「창이 켜진 채 탭을 바꾸면 자동으로 꺼져야」) — bookClose 는 판 액자만 말한다(따로 둔 이름) */
       if (ev.data.onf === 'reload') { rsSaveNow(); global.location.reload(); return; }   // 🔄 홈의 당겨서 새로고침(Ownify ONF_Shell_Js) — 열린 판은 이 탭에 적힌 채(rsSave) 다시 읽고 되살린다
@@ -815,6 +817,9 @@
        다시 읽히면(새로고침 · 당겨서 새로고침 reload) 그 주소로 다시 열고, 교재가 노크하면 bookRestore 로 상태를 돌려준다. 닫으면(bookHide) 지운다.
        ⛔ 상태는 2KB 안 JSON 사본만(기록 칸과 같은 거르개 histSmall) · 12시간 넘은 기억은 버린다 · 다른 탭엔 안 간다(sessionStorage). */
     var RS_KEY = 'onfOpenBook', RS_MS = 12 * 3600 * 1000;
+    /* 홈 탭도 같다(Peter 2026-10-24 「탭을 고르고 새로고침하면 무조건 홈」) — 홈이 탭을 바꿀 때 homeTab 으로 알리면 이 탭에 적고, 다시 읽히면 홈의 첫 노크(bookHello)에 돌려준다.
+       ⛔ 돌려줄 값은 **읽힐 때 한 번** 잡아 둔다(TAB0) — 홈이 뜨자마자 처음 그린 탭(오늘)을 먼저 알리면 적힌 값이 그걸로 덮인다. */
+    var TAB_KEY = 'onfHomeTab', TAB0 = (function () { try { return global.sessionStorage.getItem(TAB_KEY) || ''; } catch (e) { return ''; } })();
     function rsMark(p, href, out) { if (!p) return; p.href = href; p.hout = out ? 1 : 0; rsSave(p); }
     function rsSave(p) { if (!p || !p.href) return; try { global.sessionStorage.setItem(RS_KEY, JSON.stringify({ h: p.href, l: p.left, m: p.m, r: p.r, o: p.hout || 0, st: p.st || null, at: Date.now() })); } catch (e) {} }
     function rsSaveNow() { var p = bookShown(); if (p) rsSave(p); }

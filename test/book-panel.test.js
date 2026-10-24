@@ -950,6 +950,20 @@ t('🔄 새로고침 = 열린 창 그대로(Peter 2026-10-24) — 보이는 판 
   assert.ok(!u.panel(), '⛔ 닫은 뒤 새로고침에 판을 열었다');
 });
 
+t('🔄 홈 탭도 새로고침 뒤 그대로(Peter 2026-10-24) — 홈이 고른 탭(homeTab)을 이 탭에 적고 · 다시 읽히면 홈의 첫 노크(bookHello)에 한 번 돌려준다 · 읽힐 때 잡은 값(홈이 처음 그린 탭이 먼저 와도 안 덮임)', () => {
+  const ss = { v: {}, getItem(k) { return k in this.v ? this.v[k] : null; }, setItem(k, x) { this.v[k] = String(x); }, removeItem(k) { delete this.v[k]; } };
+  const pre = (g) => { g.sessionStorage = ss; };
+  const s = phoneSetup({ wide: true, pre });
+  s.send({ onf: 'homeTab', v: 'th' }, s.homeInner);
+  s.send({ onf: 'homeTab', v: '<x>' }, s.homeInner);
+  assert.strictEqual(ss.getItem('onfHomeTab'), 'th', '⛔ 홈이 고른 탭을 안 적었다(또는 엉뚱한 값을 적었다)');
+  const t = phoneSetup({ wide: true, pre });
+  t.send({ onf: 'homeTab', v: 'tm' }, t.homeInner);   // 홈이 뜨자마자 처음 그린 탭(오늘)을 먼저 알려도
+  t.send({ onf: 'bookHello' }, t.homeInner);
+  t.send({ onf: 'bookHello' }, t.homeInner);
+  assert.deepStrictEqual(js(t.homeInner.sent).filter((x) => x[0].onf === 'homeTab').map((x) => x[0].v), ['th'], '⛔ 새로고침 전 탭을 홈 첫 노크에 한 번 돌려주지 않았다');
+});
+
 t('📱 폰 판 스위치 — 꺼져 있으면(opts.phone 없음) caps 에 phone 0 · 폰 폭이어도 onf-ph·판 칸 없음(종전 PC 판 그대로) · index.html 은 기본 켬(2026-10-16) · phonepanel=0 · 기억값 0 으로만 끈다', () => {
   const s = phoneSetup({ phone: false });
   s.send({ onf: 'bookHello' }, s.homeInner);
