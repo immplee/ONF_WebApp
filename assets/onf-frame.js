@@ -282,7 +282,7 @@
     return { stop: end, stuck: function () { return false; } };
   }
   /* 🌤 밖으로 2(2026-10-24) — 링크 직행 교재(fileId·slug)를 Worker 에 묻는다: q = {f, s?} | {slug} (없는 칸은 안 싣는다 — 빈 글자는 400 bad).
-     POST · text/plain 몸통(사전 요청 없음) · 토큰은 몸통에만. WHO_MS 안 답이 없거나 실패·ok:false 면 null(지금 길) — 늦은 답은 이미 정해진 Promise 라 버려진다.
+     POST · text/plain 몸통(사전 요청 없음) · 토큰은 몸통에만. WHO_MS 안 답이 없거나 실패·ok:false·api≠2(약속 어긋남) 면 null(지금 길) — 늦은 답은 이미 정해진 Promise 라 버려진다.
      ponytail: 800ms = 짐작 시한 — 실측으로 고친다. */
   var ONF_WHO = 'https://onf-media.edia--orker.workers.dev/who';
   var WHO_MS = 800;
@@ -294,7 +294,7 @@
       try {
         global.fetch(ONF_WHO, { method: 'POST', body: JSON.stringify(b) })
           .then(function (r) { return r.ok ? r.json() : null; })
-          .then(function (j) { var x = j && j.ok === true && j.books && j.books[0]; end(x ? { out: !!x.out, cf: x.cf && typeof x.cf === 'object' ? x.cf : null } : null); }, function () { end(null); });
+          .then(function (j) { var x = j && j.ok === true && j.api === 2 && j.books && j.books[0]; end(x ? { out: !!x.out, cf: x.cf && typeof x.cf === 'object' ? x.cf : null } : null); }, function () { end(null); });
       } catch (e) { end(null); }
     });
   }
@@ -1086,6 +1086,7 @@
       try {
         var q = new URL(s).searchParams, f = q.get('fileId'), g = q.get('slug'), h = q.get('sheetName');
         if ((!f && !g) || q.get('ttok') || !outOk(s)) return null;
+        if (q.get('mode') && q.get('mode') !== 'share') return null;   // 공유 교재 링크만(최종 검토 F3) — 다른 화면은 /who 가 모른다
         if (!(Date.now() - Number(global.localStorage.getItem(OUT_USED) || 0) < OUT_USED_MS)) return null;
         return f ? { f: f, s: h } : { slug: g };
       } catch (e) { return null; }

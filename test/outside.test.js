@@ -812,6 +812,29 @@ ta('S4g 첫 판 정적 판이 사는 동안 지금 길 판을 열어도 넘겨�
   assert.strictEqual(flushes(n).length, 1, '⛔ 첫 판이 물러났는데 넘겨주기 판이 안 떴다');
 });
 
+/* 최종 검토 F3·F4·F5 */
+ta('S4h /who 는 공유 교재 링크만 — mode 없음·share 만 묻고 그 밖(print·teacher 등)은 0회 · 바로 지금 길', async () => {
+  const none = wsetup({ src: DSRC.replace('&mode=share', '') });
+  assert.strictEqual(none.calls.length, 1, '⛔ mode 없는 링크인데 /who 를 안 물었다');
+  for (const m of ['print', 'teacher', 'view']) {
+    const src = DSRC.replace('mode=share', 'mode=' + m), s = wsetup({ src });
+    assert.strictEqual(s.calls.length, 0, '⛔ mode=' + m + ' — /who 를 물었다');
+    assert.strictEqual(s.frameEl.src, src, '⛔ mode=' + m + ' — 바로 지금 길로 안 열었다');
+  }
+});
+ta('S4i /who 답의 api 가 2 가 아니면(없음·1·3) 지금 길', async () => {
+  for (const api of [undefined, 1, 3]) {
+    const s = wsetup(), a = ANS(CF); if (api === undefined) delete a.api; else a.api = api;
+    s.calls[0].ok(200, a); await flush();
+    assert.strictEqual(s.frameEl.src, DSRC, '⛔ api ' + api + ' 인데 정적 판으로 갔다: ' + s.frameEl.src);
+  }
+});
+ta('S4j index.html 머리에 Worker preconnect(ONF_WHO 와 같은 출처 · crossorigin)', async () => {
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'), head = html.slice(0, html.indexOf('</head>'));
+  const o = new URL(WHO).origin;
+  assert.ok(head.indexOf('<link rel="preconnect" href="' + o + '" crossorigin>') >= 0, '⛔ preconnect 줄이 없다(출처 ' + o + ')');
+});
+
 (async () => {
   for (const [label, fn] of AT) {
     try { await fn(); console.log('  ✅ ' + label); pass++; }
