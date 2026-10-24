@@ -32,6 +32,7 @@
      ⛔ #app 도 같다(위 display:block) — 안 누르면 로그인 화면 밑에 「숨긴」 액자가 화면 높이만큼 깔려 페이지가 길어지고,
        아이폰(WebKit)은 그 빈 액자를 흰 종이로 칠한다(2026-10-14 Peter 「로그인 화면 아래 절반이 하얗다」 · WKWebView 실측 y=332 부터 흰색). */
   #wait[hidden] { display:none; }
+  .onf-hwbox .onf-wait[hidden], .onf-hwbk .onf-wait[hidden] { display:none; }   /* 과제 판·과제 판 교재의 「불러오는 중」도 — hidden 만 걸고 그대로 보였다(라이브 2026-10-24 · display:flex 실측) */
   #app[hidden] { display:none; }
   /* 8초 뒤 안내는 여러 줄이라 가운데정렬을 눌러 준다(.onf-wait 는 한 줄 기준이라 안 걸어 뒀다).
      ⚠️ 여백·줄바꿈도 여기서 준다 — `.onf-wait` 는 학생 액자와 **같이 쓰는** 조각이라
