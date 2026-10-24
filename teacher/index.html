@@ -217,8 +217,11 @@ function mount() {
      선생님 홈은 노크 뒤 토큰을 받아 자료를 사 와서 그린다) · 안쪽이 「다 그렸다」(brand)를 보내면 그 자리로 날아가거나 걷힌다.
      ⛔ 다시 로그인하라는 노크(stale)·8초 막힘 안내(watch) 땐 바로 걷는다 — 막이 로그인 창·안내를 가리면 안 된다.
      ⛔ 로그인·토큰 배선(onf-knock 블록)은 안 건드린다 — 아래 따로 듣는 손 하나다(dkSeen 과 같은 꼴 · knock 손이 appWin 을 정한 뒤에 돈다). */
+  /* 📝 [2026-10-24 Peter 「로딩 때 OWNIFY 에서 멈춘다」] 「다 그렸다」(brand)를 보내는 화면만 홈이다 — 선생님 홈 · 학생 한 명 창(mode=student).
+     과제 판(mode=hwbook)은 안 보낸다 → home:true 면 노크 뒤 15초 동안 92% 로 덮었다(라이브 노크 2.84초 → 걷힘 18.66초). 모르는 화면은 노크에 바로 걷는다. */
+  var LDHOME = ['', 'student'].indexOf(new URLSearchParams(location.search).get('mode') || '') >= 0;
   var LD = null;
-  try { LD = window.ONF && ONF.load ? ONF.load.bind(frame, { home: true, grace: 15000 }) : null; } catch (eLD) { LD = null; }
+  try { LD = window.ONF && ONF.load ? ONF.load.bind(frame, { home: LDHOME, grace: 15000 }) : null; } catch (eLD) { LD = null; }
   if (LD) window.addEventListener('message', function ldKnock(ev) {
     var d = ev && ev.data;
     if (!d || d.onf !== 'auth-please' || !appWin || ev.source !== appWin) return;

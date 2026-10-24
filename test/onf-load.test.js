@@ -255,7 +255,15 @@ t('선생님 껍데기 배선 — data-lazy 로 싣는다 · mount 에서 bind �
   const th = fs.readFileSync(path.join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
   assert.ok(/<script src="\.\.\/assets\/onf-load\.js" data-lazy><\/script>/.test(th), '⛔ data-lazy 로 안 싣는다(로그인 화면을 가린다)');
   const mt = th.slice(th.indexOf('function mount() {'), th.indexOf('var frameWatch = null;'));
-  assert.ok(/ONF\.load\.bind\(frame, \{ home: true, grace: 15000 \}\)/.test(mt), '⛔ mount 에서 막을 안 묶는다');
+  const bm = mt.match(/var LDHOME = (.+?);[^\n]*\n/);
+  assert.ok(bm && /ONF\.load\.bind\(frame, \{ home: LDHOME, grace: 15000 \}\)/.test(mt), '⛔ mount 에서 막을 안 묶는다');
+  /* 📝 [2026-10-24 Peter 「로딩 때 OWNIFY 에서 멈춘다」] 과제 판(mode=hwbook)은 「다 그렸다」(brand)를 안 보낸다 — home:true 면 노크 뒤 15초를 92% 로 덮었다(라이브 2.84초 노크 → 18.66초 걷힘).
+     brand 를 보내는 화면(홈 · 학생 한 명 창)만 홈이다 — 모르는 mode 는 기다리지 않고 걷는다. */
+  const homeOf = (mode) => vm.runInNewContext(bm[1], { location: { search: mode == null ? '' : '?mode=' + mode + '&t=abc' }, URLSearchParams });
+  assert.strictEqual(homeOf(null), true, '⛔ 선생님 홈을 홈으로 안 친다(날지 않는다)');
+  assert.strictEqual(homeOf('student'), true, '⛔ 학생 한 명 창(brand 보냄)을 홈으로 안 친다');
+  assert.strictEqual(homeOf('hwbook'), false, '⛔ 과제 판(brand 없음)을 홈으로 쳐 15초 덮는다');
+  assert.strictEqual(homeOf('xyz'), false, '⛔ 모르는 화면을 홈으로 쳐 15초 덮는다');
   assert.ok(/if \(d\.stale\) LD\.stuck\(\); else LD\.ok\(\);/.test(mt), '⛔ 다시 로그인 노크에 막을 안 걷는다(로그인 창을 가린다)');
   const w = mt.slice(mt.indexOf('function watch() {'));
   assert.ok(/if \(appWin\) return;\s*if \(LD\) LD\.stuck\(\);/.test(w), '⛔ 막힘 안내 전에 막을 안 걷는다');
