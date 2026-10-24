@@ -599,6 +599,9 @@
          종전엔 주소가 달라 새 판을 받았고, 판이 넷이 되어 가장 오래 숨긴 판 = **미리 띄운 그 교재**가 쫓겨났다(기다림 = 교재 통째).
          'line' 을 할 줄 안다고 노크한 판이면 그 판에 {onf:'bookView', line: N} — 교재가 &line= 으로 연 것과 같은 길(onfJumpOnce)로 굴린다. 줄은 숫자만(아니면 줄로 안 친다 = 종전 새 판). */
     function bookAsk(src) { try { var q = new URL(src).searchParams, l = q.get('line') || ''; return { view: q.get('view') || '', line: /^\d{1,7}$/.test(l) ? Number(l) : 0 }; } catch (e) { return { view: '', line: 0 }; } }
+    function bookBook(src) {   // 🌤 어느 교재(회차 빼고) — fileId 또는 slug(드라마-시즌-회차-이름)의 회차 뺀 값 · 모르면 ''(같은 교재로 안 친다)
+      try { var q = new URL(src).searchParams, f = q.get('fileId'), g = (q.get('slug') || '').split('-'); return f ? 'f:' + f : g.length === 4 ? 's:' + g[0] + '-' + g[1] + '-' + g[3] : ''; } catch (e) { return ''; }
+    }
     function bookBase(src) { try { var u = new URL(src); u.searchParams.delete('view'); u.searchParams.delete('line'); return u.href; } catch (e) { return src; } }
     function bookCan(p, a) { return !!(p && !p.gone && !p.sw && (a.view || a.line) && (!a.view || p.views.indexOf(a.view) >= 0) && (!a.line || p.views.indexOf('line') >= 0)); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 [] · 📖 자격 내린 판(gone)·갈아 끼우는 중(sw — 아직 옛 교재)엔 「열어」를 안 보낸다
     /* 아무것도 안 묻는 열기([이어서 하기])도 **줄 링크로 연 판**(view 없음)이면 그 판(반박 검토 🟡4) — 판은 이미 그 교재다 · 할 말이 없으니 보이기만.
@@ -778,7 +781,7 @@
       var fl = !outWant(src, out);   // 🧺 지금 길로 여는 교재 — 이 기기 정적 판 저장소에 남은 쓰기를 숨긴 판으로 한 번 넘겨준다(아래 bookFlushSoon · 보이는 판이 뜬 뒤)
       if (out) { outSeen[src] = 1; if (preH && opts.bookSrc(preH) === src) preWrite(); }   // 🌤 기억한 첫 교재가 켠 교재였다 — o:1(아래 preEarly)
       var a = bookAsk(src), p = bookFind(src), m = { onf: 'bookView' };
-      if (p && !outSame(p, src, out)) { if (p !== bookBoard(false)) bookRetire(p); p = books.filter(function (q) { return q.src === src && !q.gone && outSame(q, src, out); })[0] || null; }   // 🌤 지금 길 판(판)이 든 다음 회차를 out:1 로 누르면 — 판은 그대로(둘째 교재 몫) · 같은 길 판이 있으면 그 판   // 🌤 길이 다른 판 — 자격 내리고 그 길 새 판: 정적 판 + out 없는 누름(검토 고침 2 — 서버 스위치를 끈 뒤 낡은 o:1 기억) · 지금 길 판 + out:1 누름(T7 F2 — out 모르는 옛 홈 미리 받기 · o 없는 기억)
+      if (p && !outSame(p, src, out)) { bookRetire(p); p = null; }   // 🌤 길이 다른 판 — 자격 내리고 그 길 새 판: 정적 판 + out 없는 누름(검토 고침 2 — 서버 스위치를 끈 뒤 낡은 o:1 기억) · 지금 길 판 + out:1 누름(T7 F2 — out 모르는 옛 홈 미리 받기 · o 없는 기억)
       p = p || bookLike(src, a, out);   // 📖 view·line 만 다른 판이 할 줄 알면 그 판(위 bookLike) — 갈아 끼우기보다 **먼저**(0초 길)
       if (!p && home && (b = bookBoardFor(src, out))) { bookSwapTo(b, src, left, bm, br, cf); if (fl) bookFlushSoon(b, src); return; }
       p = p || bookMake(src, false, out, cf);
@@ -788,9 +791,9 @@
       if (a.line) m.line = a.line;
       if (bookCan(p, a)) { try { p.win.postMessage(m, p.origin); } catch (e) {} }   // 보인다(bookPark) 다음에 — 페이지가 「보임」 손질 뒤 연다
     }
-    /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판·📖 판(bookBoard)·📖 노크 전 판 후보(bookCand)는 안 건드린다(books 는 오래 안 쓴 것이 앞). */
+    /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판·📖 판(bookBoard)·📖 노크 전 판 후보(bookCand)·⭐ 내 문장 판(통제자 판정 2026-10-24 — [복습 시작] 0초)은 안 건드린다(books 는 오래 안 쓴 것이 앞). */
     /* ⛔ 자격 내린 판(gone — 늙음·stale·답 없음)은 **세지도 지우지도 않는다**(2단계 반박 🟠 2026-10-17) — 맺음(안 보낸 칸·실패 카드·오프라인 백업)이 끝나기 전에 지우면 그 글이 사라진다 · 30분 지우기(bookIdle)가 치운다. */
-    function bookRoom(n) { var bd = bookBoard(false) || bookBoard(true), c = 0, i, q; for (i = 0; i < books.length; i++) if (!books[i].gone) c++; for (i = 0; c > n && i < books.length; ) { q = books[i]; if (q.parked && q !== bd && !q.gone && !bookCand(q)) { bookDrop(q); c--; } else i++; } }
+    function bookRoom(n) { var bd = bookBoard(false) || bookBoard(true), c = 0, i, q; for (i = 0; i < books.length; i++) if (!books[i].gone) c++; for (i = 0; c > n && i < books.length; ) { q = books[i]; if (q.parked && q !== bd && !q.gone && !bookCand(q) && !bookMine(q.src)) { bookDrop(q); c--; } else i++; } }
     function bookPre(href, left, m, r, out) {
       var src = opts.bookSrc(href), b, ex;
       if (!src) return;
@@ -799,7 +802,9 @@
       if (b) { bookFetch(b, src); return; }   // 📖 판이 값만 받아 둔다(새 판 0 · 접속 표시 0 · 판이 차례를 맡는다)
       /* 🌤 둘째 교재 고침(2026-10-24 · 검토 고침 1 의 「버림」을 걷음) — 첫 교재가 정적 판이면 안 켠 교재 몫 판이 따로 있어야 한다(정적 판은 판으로 안 쓴다 · I1).
          첫 지금 길 미리 받기(다음 회차든 둘째 교재든)가 숨긴 지금 길 판 하나를 띄우고 나머지는 그 뒤 줄 → 노크하면 값만 받는다(아래 bookCand · bookHi) →
-         판 [정적 첫 교재, 지금 길 판, ⭐ 내 문장] = BOOK_MAX 3 · 둘째 교재 누름 = 갈아 끼우기(≈1~2초 · 버리던 땐 새 판 ≈5초). 정적 판이 없는 학생은 이 길이 종전 그대로다. */
+         판 [정적 첫 교재, 지금 길 판, ⭐ 내 문장] = BOOK_MAX 3 · 둘째 교재 누름 = 갈아 끼우기(≈1~2초 · 버리던 땐 새 판 ≈5초). 정적 판이 없는 학생은 이 길이 종전 그대로다.
+         ⛔ 정적 판이 든 **그 교재**의 다른 회차(다음 회차)는 안 띄운다(통제자 판정 2026-10-24) — 정적 판이 Worker 사본으로 회차를 ≈0.1~0.2초에 바꾼다 · 띄우면 헛 GAS(홈도 안 보낸다 · 이건 옛 홈 몫). */
+      if (!outWant(src, out) && bookBook(src) && books.some(function (q) { return q.out && !q.gone && bookBook(q.src) === bookBook(src); })) return;
       if (!bookMine(src) && !outWant(src, out) && books.some(function (q) { return bookCand(q) && !q.out; })) { if (bookQ.length < BOOK_Q_MAX && bookQ.indexOf(src) < 0) bookQ.push(src); return; }   // 📖 곧 판이 될 판이 노크 전 — 줄에 세운다(아래 bookCand) · 🌤 정적 판 후보 뒤엔 안 선다(그 판엔 흘리지 않는다 — 바로 지금 길 숨긴 판)
       //   ⚠️ 선생님 껍데기의 D1(폰은 미리 판 없음)은 안 가져온다 — 학생 폰은 숨긴 미리 판 하나가 종전 그대로다(설계 §7.2 · 그 판이 곧 판이 된다)
       bookRoom(bookMax() - 1);   // 자리가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 — 종전엔 안 띄웠다 · 📱 폰은 자리 2)

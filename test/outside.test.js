@@ -23,10 +23,11 @@ const LSf = (init) => { const m = Object.assign({}, init || {}); return { m, get
 
 const E1 = 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', E2 = 'https://class.ownify.co.kr/a-s1-e2-b?mode=share';
 const MINE = 'https://class.ownify.co.kr/?mode=mine&v=1', CARDS = 'https://class.ownify.co.kr/a-s1-e1-b?mode=share&view=cards';
-const SRC1 = 'https://script.google.com/x/exec?t=T&mode=share&embed=1', SRC2 = 'https://script.google.com/x/exec?t=T&mode=share&ep=e2&embed=1';
+const SRC1 = 'https://script.google.com/x/exec?t=T&mode=share&slug=a-s1-e1-b&embed=1', SRC2 = 'https://script.google.com/x/exec?t=T&mode=share&slug=a-s1-e2-b&embed=1';   // index.html bookSrc 꼴(slug = 드라마-시즌-회차-이름)
 const SRCM = 'https://script.google.com/x/exec?t=T&mode=mine&embed=1', SRCC = 'https://script.google.com/x/exec?t=T&mode=share&view=cards&embed=1';
-const B2 = 'https://class.ownify.co.kr/b-s1-e1-b?mode=share', SRCB2 = 'https://script.google.com/x/exec?t=T&mode=share&ep=b2&embed=1';   // 둘째 교재(안 켬)
-const BS = (h) => (/view=cards/.test(h) ? SRCC : /mode=mine/.test(h) ? SRCM : /a-s1-e2-b/.test(h) ? SRC2 : /b-s1-e1-b/.test(h) ? SRCB2 : /mode=share/.test(h) ? SRC1 : null);
+const B2 = 'https://class.ownify.co.kr/b-s1-e1-b?mode=share', SRCB2 = 'https://script.google.com/x/exec?t=T&mode=share&slug=b-s1-e1-b&embed=1';   // 둘째 교재(안 켬)
+const B2N = 'https://class.ownify.co.kr/b-s1-e2-b?mode=share', SRCB2N = 'https://script.google.com/x/exec?t=T&mode=share&slug=b-s1-e2-b&embed=1';   // 둘째 교재 다음 회차
+const BS = (h) => (/view=cards/.test(h) ? SRCC : /mode=mine/.test(h) ? SRCM : /a-s1-e2-b/.test(h) ? SRC2 : /b-s1-e1-b/.test(h) ? SRCB2 : /b-s1-e2-b/.test(h) ? SRCB2N : /mode=share/.test(h) ? SRC1 : null);
 const CF = { f: 'FILE_ID_0123456789', s: 'E1', k: 'v1.abc.def' };
 
 /* book-panel.test.js 의 setup 꼴 — mount 에 out·tok 을 더 넘긴다(index.html 과 같게 기본 켬) */
@@ -296,57 +297,75 @@ const execWin = (s, box) => { const bw = win('book-exec', s.top), bi = win('book
 const shown = (s) => s.panels().filter((p) => !p.classList.contains('park'));
 const sentOf = (w, k) => js(w.sent).filter((x) => x[0].onf === k);
 
-/* 둘째 교재 고침(2026-10-24) — 검토 고침 1 은 숨긴 정적 판이 있으면 지금 길 미리 받기를 버렸다 → 안 켠 둘째 교재 누름이 지금 길 새 판(≈5초 · 종전 판 갈아 끼우기 1~2초).
-   이제 첫 지금 길 미리 받기가 숨긴 지금 길 판 하나를 띄우고(판 = 안 켠 교재 몫) 나머지는 그 뒤 줄 → 노크하면 값만 받는다. 정적 판은 판으로 안 쓴다(I1). */
-t('S-F2c 판 모드 넓은 화면 — 첫 교재 out:1 + 다음 회차·안 켠 둘째 교재 → [정적 첫 교재, 내 문장, 지금 길 판] · 둘째 교재는 그 판에 값 받기 → 누르면 갈아 끼움(새 판 0) · 내 문장 안 쫓겨남', () => {
+/* 둘째 교재 고침(2026-10-24) — 검토 고침 1 은 숨긴 정적 판이 있으면 지금 길 미리 받기를 다 버렸다 → 안 켠 둘째 교재 누름이 지금 길 새 판(≈5초 · 종전 판 갈아 끼우기 1~2초).
+   통제자 판정: 지금 길 판(판)은 **안 켠 다른 교재**의 미리 받기만 띄운다 — 켠 교재의 다음 회차는 정적 판이 Worker 사본으로 ≈0.1~0.2초에 바꾸니 미리 받기 = 헛 GAS(홈도 안 보낸다 · Ownify O-F2).
+   켠 교재 하나 학생 [정적, 내 문장](GAS 둘 — 종전과 같다) · 둘 학생 [정적, 내 문장, 지금 길 판(둘째 교재)]. 정적 판은 판으로 안 쓴다(I1). */
+const srcs = (s) => s.panels().map((p) => p.kids[0].src);
+const warmAll = (s, list) => list.forEach(([h, o]) => s.send({ onf: 'bookWarm', href: h, panel: 1, left: 0, out: o }, s.homeInner));
+t('S-F2c 켠 교재 하나 학생 — 판 [정적 첫 교재, 내 문장] 둘뿐(지금 길 판 없음) · 옛 홈이 같은 교재 다음 회차를 out 없이 보내도 안 띄운다', () => {
   const s = setup({ swap: true, phone: false });
-  for (const [h, o] of [[E1, 1], [MINE], [E2], [B2]]) s.send({ onf: 'bookWarm', href: h, panel: 1, left: 0, out: o }, s.homeInner);   // 다음 회차 — 홈은 out 을 안 싣는다(첫 교재만)
-  assert.deepStrictEqual(s.panels().map((p) => p.kids[0].src), [OUT_BOOK, SRCM + '&park=1', SRC2 + '&park=1'], '⛔ 판이 [정적 첫 교재, 내 문장, 지금 길 판] 이 아니다');
-  const [sb, mb, eb] = s.panels(), w = outWin(s, sb);
-  s.send({ onf: 'outHello' }, w, OUT_O); knock(s, sb, OUT_O);
-  execWin(s, eb);
-  const ew = eb.kids[0].contentWindow;
-  s.send({ onf: 'bookHi', views: 'line' }, ew); s.send({ onf: 'bookHi', views: 'line', swap: 1 }, ew);
-  assert.deepStrictEqual(sentOf(ew, 'bookFetch').map((x) => x[0].src), [SRCB2], '⛔ 둘째 교재를 지금 길 판에 값만 받아 두지 않았다');
-  assert.strictEqual(sentOf(w, 'bookFetch').length, 0, '⛔ 정적 판에 bookFetch');
-  s.send({ onf: 'openBook', href: B2, left: 0 }, s.homeInner);
-  assert.deepStrictEqual(sentOf(ew, 'bookSwap').map((x) => x[0].src), [SRCB2], '⛔ 둘째 교재 누름이 지금 길 판 갈아 끼우기가 아니다');
-  assert.deepStrictEqual([s.panels().length, shown(s)[0] === eb, s.panels().includes(mb)], [3, true, true], '⛔ 새 판이 생겼거나 내 문장이 쫓겨났다');
-  s.fire(30 * 60 * 1000);   // 숨긴 채 30분 — 정적 첫 교재 판도 하루 판(종전 판처럼 안 지운다)
-  assert.ok(s.panels().includes(sb), '⛔ 30분 지우기가 정적 첫 교재 판을 지웠다');
-  //   다음 회차 누름(out:1 — 켠 교재)은 정적 새 판 · 지금 길 판(판)을 내리지 않는다 → 다음 둘째 교재 누름도 갈아 끼우기
-  const q = setup({ swap: true, phone: false });
-  for (const [h, o] of [[E1, 1], [MINE], [E2], [B2]]) q.send({ onf: 'bookWarm', href: h, panel: 1, left: 0, out: o }, q.homeInner);
-  const qs = q.panels()[0], qo = outWin(q, qs), qe = q.panels()[2];
-  q.send({ onf: 'outHello' }, qo, OUT_O); knock(q, qs, OUT_O);
-  execWin(q, qe);
-  const qw = qe.kids[0].contentWindow;
-  q.send({ onf: 'bookHi', views: 'line' }, qw); q.send({ onf: 'bookHi', views: 'line', swap: 1 }, qw);
-  q.send({ onf: 'openBook', href: E2, left: 0, out: 1 }, q.homeInner);
-  assert.strictEqual(shown(q)[0].kids[0].src, OUT_BOOK, '⛔ 다음 회차(out:1)가 정적 판으로 안 떴다');
-  assert.ok(q.panels().includes(qe) && !q.obj(qe).gone, '⛔ 다음 회차 누름이 지금 길 판(판)을 내렸다');
-  const nx = shown(q)[0], nw = outWin(q, nx), qn = q.panels().length;
-  q.send({ onf: 'outHello' }, nw, OUT_O); knock(q, nx, OUT_O);   // 그 정적 판이 뜬다(노크 — 숨겨도 남는다)
-  q.send({ onf: 'openBook', href: B2, left: 0 }, q.homeInner);   // 둘째 교재로 갔다가
-  q.send({ onf: 'openBook', href: E2, left: 0, out: 1 }, q.homeInner);   // 다음 회차를 또 누르면 그 정적 판(새 판 0)
-  assert.deepStrictEqual([shown(q)[0] === nx, q.panels().length], [true, qn], '⛔ 다음 회차를 또 누르니 정적 판이 또 생겼다');
-  assert.deepStrictEqual(sentOf(qw, 'bookSwap').map((x) => x[0].src), [SRCB2], '⛔ 다음 회차 뒤 둘째 교재 누름이 갈아 끼우기가 아니다');
-  assert.ok(q.panels().includes(q.panels().find((p) => p.kids[0].src === SRCM + '&park=1')), '⛔ 내 문장이 쫓겨났다');
-  //   정적 판이 먼저 노크한 뒤(다음 방문 — preEarly 판이 2초 안에 노크) 와도 같다
-  const r = setup({ swap: true, phone: false });
-  r.send({ onf: 'bookWarm', href: E1, panel: 1, left: 0, out: 1 }, r.homeInner);
-  const rb = r.panels()[0], rw = outWin(r, rb);
-  r.send({ onf: 'outHello' }, rw, OUT_O); knock(r, rb, OUT_O);
-  for (const h of [MINE, E2, B2]) r.send({ onf: 'bookWarm', href: h, panel: 1, left: 0 }, r.homeInner);
-  assert.deepStrictEqual(r.panels().map((p) => p.kids[0].src), [OUT_BOOK, SRCM + '&park=1', SRC2 + '&park=1'], '⛔ 노크 뒤 — 판이 [정적 첫 교재, 내 문장, 지금 길 판] 이 아니다');
+  warmAll(s, [[E1, 1], [MINE]]);
+  assert.deepStrictEqual(srcs(s), [OUT_BOOK, SRCM + '&park=1'], '⛔ 켠 교재 하나 학생 판이 [정적, 내 문장] 이 아니다');
+  const o = setup({ swap: true, phone: false });
+  warmAll(o, [[E1, 1], [MINE], [E2]]);   // 옛 홈(배포 사이) — 다음 회차를 out 없이
+  assert.deepStrictEqual(srcs(o), [OUT_BOOK, SRCM + '&park=1'], '⛔ 켠 교재의 다음 회차로 지금 길 판을 띄웠다(헛 GAS)');
+  const k = setup({ swap: true, phone: false });   // 정적 판이 먼저 노크한 뒤(다음 방문 — preEarly) 와도 같다
+  warmAll(k, [[E1, 1]]);
+  const kb = k.panels()[0], kw = outWin(k, kb);
+  k.send({ onf: 'outHello' }, kw, OUT_O); knock(k, kb, OUT_O);
+  warmAll(k, [[MINE], [E2]]);
+  assert.deepStrictEqual(srcs(k), [OUT_BOOK, SRCM + '&park=1'], '⛔ 노크 뒤 — 다음 회차로 지금 길 판을 띄웠다');
+});
+t('S-F2d 켠 교재 + 안 켠 둘째 교재 학생 — [정적, 내 문장, 지금 길 판(둘째 교재)] · 둘째 교재 누름 = 그 판(새 판 0) · 둘째 교재 다음 회차 = 갈아 끼움 · 내 문장 안 쫓겨남', () => {
+  for (const list of [[[E1, 1], [MINE], [B2]], [[E1, 1], [MINE], [E2], [B2]]]) {   // 새 홈 · 옛 홈(다음 회차도 보냄)
+    const s = setup({ swap: true, phone: false });
+    warmAll(s, list);
+    assert.deepStrictEqual(srcs(s), [OUT_BOOK, SRCM + '&park=1', SRCB2 + '&park=1'], '⛔ 판이 [정적, 내 문장, 지금 길 판(둘째 교재)] 이 아니다: ' + list.length);
+    const [sb, mb, eb] = s.panels(), w = outWin(s, sb);
+    s.send({ onf: 'outHello' }, w, OUT_O); knock(s, sb, OUT_O);
+    execWin(s, eb);
+    const ew = eb.kids[0].contentWindow;
+    s.send({ onf: 'bookHi', views: 'line' }, ew); s.send({ onf: 'bookHi', views: 'line', swap: 1 }, ew);
+    assert.strictEqual(sentOf(w, 'bookFetch').length, 0, '⛔ 정적 판에 bookFetch');
+    s.send({ onf: 'openBook', href: E1, left: 0, out: 1 }, s.homeInner);   // 첫 교재(정적 판)를 보다가
+    s.send({ onf: 'openBook', href: B2, left: 0 }, s.homeInner);
+    assert.deepStrictEqual([s.panels().length, shown(s)[0] === eb, s.panels().includes(mb)], [3, true, true], '⛔ 둘째 교재 누름이 지금 길 판이 아니거나 내 문장이 쫓겨났다');
+    s.send({ onf: 'openBook', href: B2N, left: 0 }, s.homeInner);
+    assert.deepStrictEqual(sentOf(ew, 'bookSwap').map((x) => x[0].src), [SRCB2N], '⛔ 둘째 교재 다음 회차가 판 갈아 끼우기가 아니다');
+    assert.deepStrictEqual([s.panels().length, s.panels().includes(mb)], [3, true], '⛔ 새 판이 생겼거나 내 문장이 쫓겨났다');
+    s.fire(30 * 60 * 1000);   // 숨긴 채 30분 — 정적 첫 교재 판도 하루 판(종전 판처럼 안 지운다)
+    assert.ok(s.panels().includes(sb), '⛔ 30분 지우기가 정적 첫 교재 판을 지웠다');
+  }
   //   첫 교재가 지금 길이면 종전 그대로(다음 회차·둘째 교재는 첫 교재 뒤 줄 — 판 둘)
   const o = setup({ swap: true, phone: false });
-  for (const h of [E1, MINE, E2, B2]) o.send({ onf: 'bookWarm', href: h, panel: 1, left: 0 }, o.homeInner);
-  assert.deepStrictEqual(o.panels().map((p) => p.kids[0].src), [SRC1 + '&park=1', SRCM + '&park=1'], '종전 — 지금 길 첫 교재 뒤 줄');
+  warmAll(o, [[E1], [MINE], [E2], [B2]]);
+  assert.deepStrictEqual(srcs(o), [SRC1 + '&park=1', SRCM + '&park=1'], '종전 — 지금 길 첫 교재 뒤 줄');
   //   폰(홈은 첫 교재 하나만 미리 보낸다) — 정적 숨긴 판 하나 그대로
   const f = setup({ swap: true, phone: true });
-  f.send({ onf: 'bookWarm', href: E1, panel: 1, left: 0, out: 1 }, f.homeInner);
-  assert.deepStrictEqual(f.panels().map((p) => p.kids[0].src), [OUT_BOOK], '폰 — 정적 숨긴 판 하나');
+  warmAll(f, [[E1, 1]]);
+  assert.deepStrictEqual(srcs(f), [OUT_BOOK], '폰 — 정적 숨긴 판 하나');
+});
+t('S-F2e 넷째 판 — 자리를 낼 때 ⭐ 내 문장 판은 안 지운다 · 가장 오래 안 쓴 숨긴 다른 판을 지운다(보이는 판은 그대로) · 정적 판 없는 학생도', () => {
+  const s = setup({ swap: true, phone: false });
+  warmAll(s, [[E1, 1], [MINE], [B2]]);
+  const [sb, mb, eb] = s.panels(), w = outWin(s, sb);
+  s.send({ onf: 'outHello' }, w, OUT_O); knock(s, sb, OUT_O);
+  execWin(s, eb); const ew = eb.kids[0].contentWindow;
+  s.send({ onf: 'bookHi', views: 'line' }, ew); s.send({ onf: 'bookHi', views: 'line', swap: 1 }, ew);
+  s.send({ onf: 'openBook', href: E1, left: 0, out: 1 }, s.homeInner);   // 정적 판을 보인다 → 내 문장이 가장 오래 안 쓴 판
+  s.send({ onf: 'openBook', href: E2, left: 0, out: 1 }, s.homeInner);   // 미리 안 받은 다음 회차(out:1) → 정적 새 판 = 넷째
+  const v = shown(s)[0];
+  assert.strictEqual(v.kids[0].src, OUT_BOOK, '대역: 다음 회차가 정적 새 판');
+  assert.deepStrictEqual([s.panels().length, s.panels().includes(mb), s.panels().includes(eb), s.panels().includes(sb)], [3, true, true, false], '⛔ 넷째 판 자리 — 내 문장을 지웠거나 엉뚱한 판을 지웠다');
+  //   정적 판 없는 학생(판 모드 아님) — 내 문장을 먼저 열고 교재 셋을 차례로 열어도 내 문장은 남는다
+  const o = setup({ phone: false });
+  o.send({ onf: 'openBook', href: MINE, left: 0 }, o.homeInner);
+  const om = o.panels()[0];
+  execWin(o, om); o.send({ onf: 'bookHi', views: 'line' }, om.kids[0].contentWindow);   // 노크한 판만 숨길 수 있다(대기를 모르는 판은 지운다)
+  for (const h of [E1, E2, B2]) { o.send({ onf: 'openBook', href: h, left: 0 }, o.homeInner); const p = shown(o)[0]; o.send({ onf: 'bookHi', views: 'line' }, (execWin(o, p), p.kids[0].contentWindow)); }
+  assert.ok(o.panels().includes(om), '⛔ 판 자리를 내며 내 문장 판을 지웠다');
+  assert.strictEqual(o.panels().length, 3, '⛔ 판이 셋이 아니다: ' + o.panels().length);
+  assert.strictEqual(shown(o)[0].kids[0].src, SRCB2, '⛔ 보이는 판이 바뀌었다');
 });
 
 t('I1 정적 판이 판(board)이 돼도 안 켠 교재(out 없음)를 그 판에 갈아 끼우지 않는다 — 새 지금 길 판', () => {
@@ -386,11 +405,11 @@ t('I1 노크 전 정적 판 후보 뒤에 미리(bookWarm) 주소를 줄 세우�
   const s = setup({ swap: true });
   s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
   const box = s.panels()[0], w = outWin(s, box);
-  s.send({ onf: 'bookWarm', href: E2, panel: 1 }, s.homeInner);
+  s.send({ onf: 'bookWarm', href: B2, panel: 1 }, s.homeInner);
   knock(s, box, OUT_O);
   s.send({ onf: 'bookHi', views: 'line', swap: 1 }, w, OUT_O);
   assert.strictEqual(sentOf(w, 'bookFetch').length, 0, '⛔ 안 켠 미리 주소를 정적 판에 bookFetch 했다');
-  assert.ok(s.panels().some((p) => p.kids[0].src === SRC2 + '&park=1'), '⛔ 미리 주소를 지금 길 숨긴 판으로 안 띄웠다');
+  assert.ok(s.panels().some((p) => p.kids[0].src === SRCB2 + '&park=1'), '⛔ 미리 주소를 지금 길 숨긴 판으로 안 띄웠다');
 });
 
 t('I2 서버 스위치가 꺼진 뒤 — 낡은 o:1 기억으로 띄운 정적 숨긴 판을 out 없는 누름이 쓰지 않는다(자격 내리고 지금 길 새 판)', () => {
