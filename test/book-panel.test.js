@@ -43,7 +43,7 @@ function setup(bs, o) {
   const homeWin = win('home-exec', top), homeInner = win('home-user', homeWin);
   const frameEl = { contentWindow: homeWin, style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 800 }), addEventListener() {} };
   const opened = [];
-  const M = g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { phone: o.phone !== false, swap: o.swap, perf: o.perf, preKey: o.preKey, bookSrc: bs || ((h) => { opened.push(h); const m = /-(e\d+)-/.exec(h);
+  const M = g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { phone: o.phone !== false, swap: o.swap, perf: o.perf, preKey: o.preKey, lg: o.lg, bookSrc: bs || ((h) => { opened.push(h); const m = /-(e\d+)-/.exec(h);
     return /mode=share/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=share' + (m && m[1] !== 'e1' ? '&ep=' + m[1] : '') + '&embed=1' : /mode=mine&v/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=mine&embed=1' : null; }) });
   const send = (data, source, origin) => listeners.message.forEach((fn) => fn({ data, source, origin: origin || 'https://n-abc-0lu-script.googleusercontent.com' }));
   const panel = () => body.kids.find((k) => k.className === 'onf-bookpanel');
@@ -546,7 +546,7 @@ function phoneSetup(o) {
     replaceState(st) { this.st[this.i].state = st; },
     back() { this.backs++; this.to.push(Math.max(0, this.i - 1)); },
     go(n) { this.goes.push(n); this.to.push(Math.max(0, Math.min(this.st.length - 1, this.i + n))); } };
-  const s = setup(o.bs || null, { phone: o.phone, swap: o.swap, perf: o.perf, pre(g, root) {
+  const s = setup(o.bs || null, { phone: o.phone, swap: o.swap, perf: o.perf, lg: o.lg, pre(g, root) {
     g.matchMedia = (q) => { assert.strictEqual(q, '(min-width:1100px) and (hover:hover) and (pointer:fine)', '⛔ 폰 물음이 홈 onfBookWide 와 다르다'); return mq; };
     g.history = H;
     root.classList = { set: new Set(), toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } };
@@ -888,6 +888,41 @@ t('🖥 PC 뒤로(2026-10-24 Peter 「컴퓨터에서도 뒤로 = 교재에서 �
   assert.ok(!a.classList.contains('park'), '⛔ 안쪽 칸 뒤로가 판을 숨겼다');
   s.browserBack();
   assert.ok(a.classList.contains('park') && s.H.state === null, '⛔ 🖥 판 칸 뒤로가 판을 안 숨겼다(앱째 떠난다)');
+});
+
+t('📱 「교재에서 나갈까요?」 칸 = 껍데기가 판 보이기 **전에**(Peter 2026-10-24 「스와이프하면 밀려나는 교재 밑에도 같은 교재」 — 아이폰 밑그림 = 그 칸을 떠날 때 화면) · 뒤로 = 교재에 묻기 · 취소 = 다시 · 확인 = 닫기 · 옛 교재엔 안 민다', () => {
+  const s = phoneSetup({ lg: true }), seen = [];
+  s.send({ onf: 'bookWarm', href: E1, panel: 1 }, s.homeInner);   // 미리 띄운 판(숨김)
+  const p = s.panel(), bw = win('book-exec', s.top), bi = win('book-user', bw);
+  p.kids[0].contentWindow = bw;
+  s.send({ onf: 'bookHi', lg: 1 }, bi);
+  s.hist({ op: 'hi' }, bi);
+  assert.deepStrictEqual(js(bi.sent).filter((x) => x[0].onf === 'hist-on'), [[{ onf: 'hist-on', lg: 1 }, O]], '⛔ 다리 켜기에 lg:1(물음 칸은 껍데기 몫)이 없다 — 교재가 제 칸을 또 민다');
+  const push0 = s.H.pushState.bind(s.H); s.H.pushState = (st) => { seen.push([st.lg ? 'lg' : 'book', p.classList.contains('park')]); push0(st); };
+  s.send({ onf: 'openBook', href: E1 }, s.homeInner);
+  assert.deepStrictEqual(seen, [['book', true], ['lg', true]], '⛔ 판 칸·물음 칸을 판을 보인 **뒤에** 밀었다 — 아이폰 스와이프 밑그림이 같은 교재가 된다');
+  assert.ok(!p.classList.contains('park') && s.H.state.lg === 1 && s.H.state.onfBook === 1 && s.H.st.length === 3, '⛔ 판 칸 위 물음 칸이 아니다: ' + JSON.stringify(s.H.state));
+  bi.sent.length = 0;
+  s.browserBack();   // 물음 칸이 빠졌다(스와이프)
+  assert.ok(!p.classList.contains('park'), '⛔ 물음 칸 뒤로가 판을 숨겼다(먼저 물어야 한다)');
+  assert.deepStrictEqual(js(bi.sent).filter((x) => x[0].onf === 'bookLeaveAsk'), [[{ onf: 'bookLeaveAsk' }, O]], '⛔ 교재에 「나갈까요?」를 안 물었다');
+  bi.sent.length = 0;
+  s.send({ onf: 'bookLeaveKeep' }, bi);   // 취소
+  assert.ok(s.H.state.lg === 1 && s.H.st.length === 3, '⛔ 취소 뒤 물음 칸을 다시 안 밀었다(다음 뒤로가 그냥 닫는다)');
+  assert.deepStrictEqual(js(bi.sent).map((x) => x[0].onf), ['bookLeaveKept'], '⛔ 다시 민 뒤 교재에 알리지 않았다(되묻기를 못 걷는다)');
+  s.browserBack(); bi.sent.length = 0; s.H.goes.length = 0;
+  s.send({ onf: 'bookClose' }, bi);   // 확인
+  assert.ok(p.classList.contains('park') && JSON.stringify(s.H.goes) === '[-1]', '⛔ 확인 = 판 숨김 + 판 칸 걷기가 아니다: ' + JSON.stringify(s.H.goes));
+  //   옛 교재(노크에 lg 없음) — 물음 칸 안 민다(물음을 못 알아들어 뒤로가 헛돈다)
+  const o = phoneSetup({ lg: true });
+  o.send({ onf: 'bookWarm', href: E1, panel: 1 }, o.homeInner);
+  hi(o, o.panel());
+  o.send({ onf: 'openBook', href: E1 }, o.homeInner);
+  assert.ok(o.H.st.length === 2 && !o.H.state.lg, '⛔ 옛 교재에 물음 칸을 밀었다');
+  //   스위치 끔(옛 마운트) — 종전(교재가 제 칸)
+  const f = phoneSetup();
+  f.send({ onf: 'openBook', href: E1 }, f.homeInner);
+  assert.ok(f.H.st.length === 2 && !f.H.state.lg, '⛔ lg 없이 마운트했는데 물음 칸을 밀었다');
 });
 
 t('📱 폰 판 스위치 — 꺼져 있으면(opts.phone 없음) caps 에 phone 0 · 폰 폭이어도 onf-ph·판 칸 없음(종전 PC 판 그대로) · index.html 은 기본 켬(2026-10-16) · phonepanel=0 · 기억값 0 으로만 끈다', () => {

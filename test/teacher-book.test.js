@@ -272,7 +272,7 @@ function phoneRun(o) {
   const s = run({ hist: true, lsRaw: o.lsRaw, mut: o.mut, pre(g, home) {
     g.history = H; g.URLSearchParams = URLSearchParams; g.location.search = o.search || '';
     g.matchMedia = (q) => { assert.strictEqual(q, WIDE_Q, '⛔ 폰 물음이 선생님 홈 dhBookWide 와 다르다'); return mq; };
-    Object.assign(g.localStorage.s, o.ls || {});
+    Object.assign(g.localStorage.s, o.lg ? {} : { onfThLg: '0' }, o.ls || {});   // 📱 물음 칸(BOOK_LG · 2026-10-24)은 켠 검사(o.lg)만 — 나머지는 판 칸 구조를 그대로 잰다
     g.appWin = home; g.appOrigin = ORIGIN;                    // 로그인 노크(onf-knock)가 정해 두는 홈 창 — 홈 기록 다리가 그 창 말만 받는다
     if (o.vv) g.visualViewport = Object.assign({ addEventListener() {} }, o.vv);
   } });
@@ -287,6 +287,35 @@ function phoneRun(o) {
 }
 const jsn = (x) => JSON.parse(JSON.stringify(x));
 const hp = (w) => jsn(w.sent).filter((x) => x[0].onf === 'hist-pop').map((x) => x[0].id);
+
+t('📱 「교재에서 나갈까요?」 칸(BOOK_LG · Peter 2026-10-24 스와이프 밑그림) — 판 보이기 전에 판 칸·물음 칸 · 뒤로 = 교재에 묻기 · 취소 = 다시 · 확인 = 닫기 · 주소 lg=0 이면 끈다 · 옛 교재엔 안 민다', () => {
+  const s = phoneRun({ lg: true });
+  s.send({ onf: 'openBook', href: E1 }, s.home);
+  const p = s.panel();
+  assert.ok(s.H.st.length === 3 && s.H.state.lg === 1 && s.H.state.onfBook > 0, '⛔ 판 칸 위 물음 칸이 없다: ' + JSON.stringify(s.H.state));
+  const bw = win('book-exec', s.top), bi = win('book-user', win('book-sbx', bw)); p.kids[0].contentWindow = bw;
+  s.send({ onf: 'bookHi', lg: 1 }, bi);
+  s.hist({ op: 'hi' }, bi);
+  assert.ok(jsn(bi.sent).some((x) => x[0].onf === 'hist-on' && x[0].lg === 1), '⛔ 다리 켜기에 lg:1 이 없다');
+  bi.sent.length = 0;
+  s.browserBack();
+  assert.ok(!p.classList.contains('park') && jsn(bi.sent).some((x) => x[0].onf === 'bookLeaveAsk'), '⛔ 물음 칸 뒤로에 교재가 안 물었다(또는 판을 숨겼다)');
+  bi.sent.length = 0;
+  s.send({ onf: 'bookLeaveKeep' }, bi);
+  assert.ok(s.H.state.lg === 1 && jsn(bi.sent).map((x) => x[0].onf).join() === 'bookLeaveKept', '⛔ 취소 뒤 물음 칸을 다시 안 밀었다(또는 교재에 안 알렸다)');
+  s.browserBack(); s.H.goes.length = 0;
+  s.send({ onf: 'bookClose' }, bi);
+  assert.ok(p.classList.contains('park') && JSON.stringify(s.H.goes) === '[-1]', '⛔ 확인 = 판 숨김 + 판 칸 걷기가 아니다: ' + JSON.stringify(s.H.goes));
+  const off = phoneRun({ lg: true, search: '?lg=0' });
+  off.send({ onf: 'openBook', href: E1 }, off.home);
+  assert.ok(off.H.st.length === 2 && !off.H.state.lg && off.g.localStorage.s.onfThLg === '0', '⛔ lg=0 인데 물음 칸을 밀었다(또는 기억 안 했다)');
+  const old = phoneRun({ lg: true });
+  old.send({ onf: 'openBook', href: E1 }, old.home);
+  old.hi(old.panel());   // 옛 교재(노크에 lg 없음)
+  old.browserBack(); old.browserBack();   // 물음 칸·판 칸 빠짐
+  old.send({ onf: 'openBook', href: E1 }, old.home);
+  assert.ok(!old.H.state.lg, '⛔ 옛 교재에 물음 칸을 밀었다(물음을 못 알아들어 뒤로가 헛돈다)');
+});
 
 t('📱 스위치 — 기본 켬(caps phone:1) · 주소 phonepanel=0 이면 끄고 이 기기에 기억(선생님 키 onfThPhonePanel) · 꺼지면 폰 폭이어도 onf-ph·판 칸 없음 · 학생 키(onfPhonePanel)는 안 본다 · phonepanel=1 이 기억된 끔을 이긴다', () => {
   const caps = (s) => { s.send({ onf: 'bookHello' }, s.home); return jsn(s.home.sent.find((x) => x[0].onf === 'caps')[0]); };

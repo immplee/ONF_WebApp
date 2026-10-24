@@ -553,13 +553,26 @@
       p.hb = histRun();                                // 🖥 이 판 칸 밑에 이어진 판 칸 수 — PC ✕ 가 제 칸만 걷는다(아래 bookClose 앞 판 규칙)
       try { history.pushState({ onfBook: p.key, n: histDepth, bd: histRun() + 1 }, ''); } catch (e) {}   // 주소 칸은 비운다
     }
+    /* 「교재에서 나갈까요?」 칸 {onfBook, lg:1} — 껍데기가 판 칸 바로 위에 민다(Peter 2026-10-24 「스와이프하면 밀려나는 교재 밑에도 같은 교재가 보여 이상하다」).
+       아이폰은 뒤로 스와이프 때 밑에 **그 칸을 떠날 때 찍어 둔 화면**을 깐다 — 교재가 뜬 뒤에 이 칸을 밀면(종전: 교재 쪽 onfLeave) 밑그림이 같은 교재였다.
+       → 판을 보이기 **전에**(bookShow 의 park 걷기 앞 · 같은 일 안이라 아직 홈이 그려져 있다) 판 칸과 함께 민다 = 밑그림이 홈.
+       칸이 빠지면(bookPop) 교재에 bookLeaveAsk — 교재가 가운데 되묻기를 띄우고 확인 = bookClose · 취소 = bookLeaveKeep(되묻기가 떠 있는 채 다시 민다 → 다음 밑그림 = 되묻기 뜬 교재 · 이어지는 화면).
+       옛 교재(노크에 lg:1 없음)엔 안 민다(물음을 못 알아들어 뒤로가 한 번 헛돈다). 아직 노크 전인 새 판은 새 교재로 본다. */
+    var lgPop = false;   // bookPop 이 보이는 중 — 뒤로로 돌아온 판엔 물음 칸을 다시 안 민다(방금 빠진 그 칸이다 · 묻기는 bookPop 몫)
+    function histGuard(p) {
+      if (!opts.lg || lgPop || (p.win && !p.lg)) return;   // opts.lg = index.html 이 켠다(검사 대역·옛 마운트는 종전 — 교재가 제 onfLeave 칸을 민다)
+      var t = histTop();
+      if (t && t.lg && bookOwner(t) === p.key) return;   // 맨 위가 이미 이 판의 물음 칸
+      if (bookOwner(t) !== p.key) return;               // 판 칸 위에만(판 안 창 칸이 위에 있으면 그 칸이 먼저 빠진다 — 물음 칸은 이미 그 밑에 있다)
+      try { history.pushState({ onfBook: p.key, n: histDepth, bd: histRun() + 1, lg: 1 }, ''); p.lgOn = true; } catch (e) {}
+    }
     /* 판 안쪽 기록 다리(폰) — 홈 다리(histMsg)와 같은 약속·같은 검증(op · id · 2KB · JSON 사본). hello 는 안 받는다(위 한계). */
     function bookHist(p, ev) {
       var d = ev.data, t, flat;
       if (d.op === 'hi') {
         if (!isAppOrigin(ev.origin)) return;             // 🖥 PC 도 켠다(Peter 2026-10-24 「컴퓨터에서도 뒤로 = 교재에서 나갈까요?」 — 판 안 창·「나갈까요?」 칸이 최상위에)
         p.hw = ev.source; p.ho = ev.origin;
-        try { p.hw.postMessage({ onf: 'hist-on' }, p.ho); } catch (e) {}
+        try { p.hw.postMessage(opts.lg ? { onf: 'hist-on', lg: 1 } : { onf: 'hist-on' }, p.ho); } catch (e) {}   // lg:1 = 「나갈까요?」 칸은 껍데기가 민다(교재는 제 onfLeave 칸을 안 민다)
         return;
       }
       if (!p.hw || ev.source !== p.hw || ev.origin !== p.ho || typeof d.id !== 'string' || !HIST_ID.test(d.id)) return;
@@ -574,11 +587,15 @@
       var k = bookOwner(s), src = k ? bookSrcs[k - 1] : '', p = src ? bookFind(src) : null;
       {   // 🖥 PC 도 같다(2026-10-24) — 종전 PC 는 판 칸이 없어 뒤로가 앱째 떠났다
         if (src && !p) { p = bookBoardFor(src); if (p) { bookSwapTo(p, src); p = bookShown(); } else p = bookMake(src, false); }   // 📖 판이 있으면 그 주소로 갈아 끼운다(새 액자 대신) · 보인 판을 다시 집는다 — 판이 늙었으면 bookSwapTo 안 bookShow 가 새 판으로 바꿨다(옛 p 로 또 보이면 고아 액자 · 2단계 반박 🟡)
-        if (p) bookShow(p); else bookHide();
+        if (p) { lgPop = true; try { bookShow(p); } finally { lgPop = false; } } else bookHide();
       }
       (p ? [p] : k ? [] : books).forEach(function (q) {
         if (q.hw) { try { q.hw.postMessage({ onf: 'hist-pop', id: p && s.onfHist ? s.onfHist : '', s: p && s.onfHist ? (s.s || null) : null }, q.ho); } catch (e) {} }
       });
+      if (p && p.lgOn && s && s.onfBook === p.key && !s.lg) {   // 물음 칸이 빠졌다(뒤로·스와이프) — 판은 그대로 보이고 교재가 묻는다(위 histGuard)
+        p.lgOn = false;
+        if (p.win && p.lg) { try { p.win.postMessage({ onf: 'bookLeaveAsk' }, p.origin); } catch (e) {} } else bookClose(false);   // 물을 교재가 없다(노크 전 · 옛 교재) = 닫기(뒤로가 헛돌지 않게)   // 노크 전(아직 뜨는 중) — 물을 교재가 없다 = 닫기
+      }
     }
     function bookWarm(href) {
       var src = opts.bookSrc(href);
@@ -767,10 +784,10 @@
       if (cur && cur !== p) bookPark(cur, true);
       if (typeof left === 'number') bookPlace(p, left, m, r);
       else bookPlace(p, cur ? cur.left : null, cur ? cur.m : null, cur ? cur.r : null);   // 판 안 갈아 끼우기(left 없음)는 보이던 판 자리·칸 값(left·m·r) 그대로
+      histBook(p); histGuard(p);   // 🖥 PC 도 판 칸(2026-10-24 · 뒤로 = 판 숨김) · 📱 물음 칸 — ⛔ 판을 보이기(park 걷기) **전에**: 아이폰 스와이프 밑그림이 홈이 되게(위 histGuard)
       if (p.parked) bookPark(p, false);
       books.splice(books.indexOf(p), 1); books.push(p);   // 가장 최근
       bookRoom(bookMax());
-      histBook(p);   // 🖥 PC 도 판 칸(2026-10-24 · 뒤로 = 판 숨김 · 교재가 「나갈까요?」 칸을 그 위에)
       sync();
     }
     /* home === true = 홈에서 온 openBook — 📖 같은 주소·할 줄 아는 판(bookLike)이 없고 판(bookBoard)이 있으면 새 판 대신 갈아 끼운다(아래 「교재 판 한 장」).
@@ -932,6 +949,7 @@
         if (!isAppOrigin(ev.origin)) return;
         p.win = ev.source; p.origin = ev.origin;
         p.views = typeof d.views === 'string' ? d.views.split(',') : [];   // 📖 할 줄 아는 view(위 bookLike) — 옛 교재는 안 싣는다 = 없음
+        p.lg = d.lg === 1;   // 📱 「나갈까요?」 물음(bookLeaveAsk)을 알아듣는 교재(위 histGuard)
         p.swap = d.swap === 1;   // 📖 swap:1 은 둘째 노크에 온다 — 첫 노크(없음)가 다시 오면 판이 다시 읽힌 것
         if (p.flushGo) p.flushGo();   // 🧺 보이는 판이 떴다 — 기다리던 넘겨주기(위 bookFlushSoon)
         if (p.real !== p.load || p.sw) { p.real = p.load; if (p.sw) bookSwapEnd(p, p.sw, false, 'fail', ''); p.src = p.load; p.key = bookKey(p.load); }   // 다시 읽힌 판 = 처음 주소
@@ -948,6 +966,7 @@
       if (d.onf === 'frameHello') { p.kb = ev.source; lastH = -1; lastTop = -1; sync(); return; }
       if (p.parked) return;                                 // ⛔ 숨긴 판은 닫기·전체·갈아 끼우기를 못 부른다
       if (d.onf === 'printTitle') { printTitle(d.t); return; }   // 📄 판 안 교재의 PDF 저장 이름(위 printTitle) — 보이는 판만
+      if (d.onf === 'bookLeaveKeep') { histGuard(p); try { p.win.postMessage({ onf: 'bookLeaveKept' }, p.origin); } catch (e) {} return; }   // 📱 「나갈까요?」 취소 — 물음 칸을 다시(되묻기가 떠 있는 채 · 위 histGuard) · 교재는 답을 받고 되묻기를 걷는다
       if (d.onf === 'bookClose') bookClose(d.all === 1);   // all:1 = 교재 머리줄 「홈」 — 앞 판 없이 전부 닫기
       else if (d.onf === 'bookFull') p.box.classList.toggle('full', !!d.on);
       /* 판 안에서 교재 ↔ ⭐ 내 문장을 오갈 때(2026-10-12) — 판만 바꾼다(홈째 넘어가면 「뒤로」에 홈을 다시 읽는다) · 10-13 부터 보이던 판은 숨기고 새 판(돌아가면 0초).
