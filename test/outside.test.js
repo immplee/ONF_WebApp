@@ -1,6 +1,7 @@
 /* 🌤 밖으로 1(2026-10-24) — 홈이 out:1 로 연 교재만 구글 밖 정적 판(ONF_OUT_BOOK)에 띄우고 토큰·사본 힌트는 postMessage 로 넘긴다.
    안 뜨면(OUT_MS 안 outHello 없음 · outFail) 같은 판에 지금 길(exec) · 그날은 그 기기에서 지금 길(onfOutFail) · 기기 끄기 out=0(onfOut).
    잰다: S5a 지금 길 무변 · S5b 정적 판 + outBoot 한 번 · S5c 물러남·하루 기억 · S5d 출처 도우미 하나 · S5e 기기 끄기 · S5f 첫 교재 기억 o:1 · S5g 내 문장·카드 덱은 지금 길
+   밖으로 2 Task 4: S4a 링크 직행 + /who cf → 첫 판 정적 판 · S4b 늦음·실패 → 지금 길 · S4c 토큰은 몸통만 · S4d 홈은 안 물음 · S4e slug · S4f 안 묻는 때
    실행: node test/outside.test.js */
 const assert = require('assert');
 const fs = require('fs');
@@ -57,8 +58,8 @@ function setup(o) {
   vm.runInContext(CODE, g, { filename: 'onf-frame.js' });
   const homeWin = win('home-exec', top), homeInner = win('home-user', homeWin);
   const frameEl = { contentWindow: homeWin, style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 800 }), addEventListener() {} };
-  const M = g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { phone: o.phone !== false, swap: o.swap, preKey: o.preKey, bookSrc: BS,
-    out: o.out !== false, tok: o.tok === undefined ? 'TOK' : o.tok });
+  const M = g.ONF.frame.mount(frameEl, o.src || 'https://script.google.com/x/exec?t=T', { phone: o.phone !== false, swap: o.swap, preKey: o.preKey, bookSrc: BS,
+    out: o.out !== false, tok: o.tok === undefined ? 'TOK' : o.tok, hooks: o.hooks });
   const send = (data, source, origin) => (listeners.message || []).forEach((fn) => fn({ data, source, origin: origin || GO }));
   const panels = () => body.kids.filter((k) => k.className === 'onf-bookpanel');
   const obj = (box) => M && M._books.find((b) => b.box === box);
@@ -667,5 +668,127 @@ t('F-M2 index.html — out=1 이면 onfOutFail 지움 · out=0·없음은 그대
   assert.strictEqual(run('', { onfOutFail: '17' }).onfOutFail, '17', '⛔ out 없는 주소가 onfOutFail 을 건드렸다');
 });
 
-console.log('\n통과 ' + pass + ' / 실패 ' + fail);
-process.exit(fail ? 1 : 0);
+/* ═══ 🌤 밖으로 2 Task 4(2026-10-24) — 링크 직행 교재(?fileId&sheetName · slug)도 Worker /who 가 cf 를 주면 첫 판(큰 화면)을 정적 판으로 ═══
+   묻는 때: 링크 직행 · 토큰 · 기기 out≠0 · 그날 물러남 없음 · 14일 안에 정적 판을 쓴 기기(onfOutUsed) · ⭐ 내 문장·🗂️ 카드 덱·ttok 아님 — 아니면 종전 그대로(요청 0 · 기다림 0).
+   WHO_MS 800 안 답이 없거나 실패·ok:false·cf 없음 = 지금 길 · 늦은 답은 판을 안 바꾼다 · 토큰은 몸통에만. */
+const AT = [];
+function ta(label, fn) { AT.push([label, fn]); }
+const flush = () => new Promise((r) => setImmediate(r));
+const WHO = (/var ONF_WHO = '([^']+)'/.exec(CODE) || [])[1] || 'ONF_WHO 없음';
+const DSRC = 'https://script.google.com/x/exec?t=TOK&fileId=FILE_ID_0123456789&sheetName=E1&mode=share';   // 링크 직행(fileId) 첫 판 주소(index.html appUrl 꼴)
+const SSRC = 'https://script.google.com/x/exec?t=TOK&mode=share&slug=a-s1-e1-b';                          // 짧은 주소(slug)
+const HSRC = 'https://script.google.com/x/exec?t=TOK';                                                     // 홈(/i/<tok>)
+const UL = (o) => LSf(Object.assign({ onfOutUsed: String(1.7e12 - 13 * 86400000) }, o || {}));
+function wsetup(o) {
+  o = o || {};
+  const calls = [], okN = { n: 0 };
+  const s = setup(Object.assign({ ls: UL(), src: DSRC, hooks: { ok() { okN.n++; }, stuck() {} } }, o, {
+    pre: (g) => { g.fetch = (url, init) => new Promise((res, rej) => calls.push({ url, init, ok: (st, body) => res({ ok: st >= 200 && st < 300, status: st, json: () => Promise.resolve(body) }), no: rej })); } }));
+  s.calls = calls; s.okN = okN;
+  return s;
+}
+const ANS = (cf, extra) => ({ ok: true, api: 2, who: 'w', ended: false, books: [Object.assign({ f: 'FILE_ID_0123456789', s: 'E1', title: 'x', slug: 'a-s1-e1-b', out: !!cf, ended: false, cf: cf || null }, extra || {})] });
+
+ta('S4a ?fileId&sheetName 링크 + /who cf → 첫 판 = ONF_OUT_BOOK · 답 전엔 안 연다 · hello 에 outBoot{tok, src, cf(/who 것)} · 로고 ok · onfOutUsed 새로', async () => {
+  assert.strictEqual(WHO, 'https://onf-media.edia--orker.workers.dev/who', '상수 값(브리프)');
+  const s = wsetup();
+  assert.strictEqual(s.calls.length, 1, '⛔ /who 를 안 물었다');
+  assert.ok(!s.frameEl.src, '⛔ /who 답 전에 첫 판을 열었다: ' + s.frameEl.src);
+  assert.deepStrictEqual(JSON.parse(s.calls[0].init.body), { t: 'TOK', f: 'FILE_ID_0123456789', s: 'E1' }, '⛔ 몸통 꼴(slug 칸 없음)');
+  s.g.T += 300;
+  s.calls[0].ok(200, ANS(CF)); await flush();
+  assert.strictEqual(s.frameEl.src, OUT_BOOK, '⛔ 새 길인데 첫 판이 정적 판이 아니다: ' + s.frameEl.src);
+  s.send({ onf: 'outHello' }, win('stranger', s.top), OUT_O);
+  assert.strictEqual(boots(s.homeWin).length, 0, '⛔ 남의 창 hello 에 outBoot');
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  assert.deepStrictEqual(boots(s.homeWin), [[{ onf: 'outBoot', tok: 'TOK', src: DSRC, cf: CF }, OUT_O]], '⛔ outBoot 이 없거나 꼴이 다르다');
+  assert.strictEqual(s.okN.n, 1, '⛔ 정적 판이 떴는데 로고 막(hooks.ok)을 안 걷었다');
+  assert.strictEqual(s.g.localStorage.m.onfOutUsed, String(1.7e12 + 300), '⛔ 정적 판을 띄웠는데 onfOutUsed 를 안 새로 적었다');
+  s.fire(2500);
+  assert.strictEqual(s.frameEl.src, OUT_BOOK, '⛔ hello 뒤 시한으로 물러났다');
+});
+
+ta('S4a 첫 판 정적 판이 outFail(또는 hello 없음) → 같은 액자에 지금 exec 주소 · onfOutFail 하루 기억', async () => {
+  const s = wsetup();
+  s.calls[0].ok(200, ANS(CF)); await flush();
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  s.send({ onf: 'outFail', why: 'bridge' }, s.homeWin, OUT_O);
+  assert.strictEqual(s.frameEl.src, DSRC, '⛔ outFail 인데 지금 길로 안 다시 열었다');
+  assert.strictEqual(s.g.localStorage.m.onfOutFail, String(1.7e12), '⛔ onfOutFail 을 안 적었다');
+  const n = wsetup();
+  n.calls[0].ok(200, ANS(CF)); await flush();
+  n.fire(2500);
+  assert.strictEqual(n.frameEl.src, DSRC, '⛔ hello 없음 — 지금 길로 안 물러났다');
+});
+
+ta('S4b /who 가 WHO_MS(800) 넘김 → 지금 길 · 늦은 답(cf)이 와도 판을 안 바꾼다', async () => {
+  const s = wsetup();
+  s.fire(800); await flush();
+  assert.strictEqual(s.frameEl.src, DSRC, '⛔ 시한 넘었는데 지금 길로 안 열었다');
+  s.calls[0].ok(200, ANS(CF)); await flush();
+  assert.strictEqual(s.frameEl.src, DSRC, '⛔ 늦은 답이 판을 바꿨다');
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  assert.strictEqual(boots(s.homeWin).length, 0, '⛔ 늦은 답 뒤 outBoot');
+});
+
+ta('S4b 500 · 끊김 · ok:false(unknown·stale·other·bad) · cf null · 빈 books → 지금 길(시한 전에 바로)', async () => {
+  const cases = [['500', (c) => c.ok(500, { ok: false })], ['끊김', (c) => c.no(new Error('net'))],
+    ['unknown', (c) => c.ok(200, { ok: false, why: 'unknown' })], ['stale', (c) => c.ok(200, { ok: false, why: 'stale' })],
+    ['other', (c) => c.ok(200, { ok: false, why: 'other' })], ['bad', (c) => c.ok(400, { ok: false, why: 'bad' })],
+    ['cf null', (c) => c.ok(200, ANS(null))], ['끝난 교재', (c) => c.ok(200, ANS(null, { out: true, ended: true }))], ['빈 books', (c) => c.ok(200, { ok: true, api: 2, books: [] })]];
+  for (const [nm, go] of cases) {
+    const s = wsetup();
+    go(s.calls[0]); await flush();
+    assert.strictEqual(s.frameEl.src, DSRC, '⛔ ' + nm + ' — 지금 길로 안 열었다: ' + s.frameEl.src);
+    s.fire(800); await flush();
+    assert.strictEqual(s.frameEl.src, DSRC, '⛔ ' + nm + ' — 시한 뒤 판이 바뀌었다');
+  }
+});
+
+ta('S4c 요청 = POST ONF_WHO · 주소에 토큰 없음(몸통만)', async () => {
+  const s = wsetup();
+  const c = s.calls[0];
+  assert.strictEqual(c.url, WHO, '⛔ 요청 주소가 상수와 다르다(쿼리를 붙였다?): ' + c.url);
+  assert.ok(c.url.indexOf('TOK') < 0, '⛔ 주소에 토큰');
+  assert.strictEqual(c.init.method, 'POST');
+  assert.strictEqual(JSON.parse(c.init.body).t, 'TOK', '⛔ 몸통에 토큰이 없다');
+  assert.ok(!c.init.headers || !/json/i.test(JSON.stringify(c.init.headers)), '⛔ application/json — 사전 요청(preflight)이 붙는다');
+});
+
+ta('S4d 홈(/i/<tok> — 교재 주소 없음) → /who 0회 · 바로 지금 길', async () => {
+  const s = wsetup({ src: HSRC });
+  assert.strictEqual(s.calls.length, 0, '⛔ 홈에서 /who 를 물었다');
+  assert.strictEqual(s.frameEl.src, HSRC, '⛔ 홈이 바로 안 열렸다');
+});
+
+ta('S4e slug 링크 → 몸통 {t, slug}(f·s 칸 없음) · cf 면 정적 판', async () => {
+  const s = wsetup({ src: SSRC });
+  assert.deepStrictEqual(JSON.parse(s.calls[0].init.body), { t: 'TOK', slug: 'a-s1-e1-b' }, '⛔ slug 몸통 꼴');
+  s.calls[0].ok(200, ANS(CF)); await flush();
+  assert.strictEqual(s.frameEl.src, OUT_BOOK, '⛔ slug 링크가 새 길로 안 갔다');
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  assert.deepStrictEqual(boots(s.homeWin).map((x) => x[0].src), [SSRC]);
+  const f = wsetup({ src: DSRC.replace('&sheetName=E1', '') });   // sheetName 없는 fileId 링크 — s 칸을 아예 안 싣는다
+  assert.deepStrictEqual(Object.keys(JSON.parse(f.calls[0].init.body)), ['t', 'f'], '⛔ 없는 칸을 실었다(빈 값은 Worker 가 400 bad)');
+});
+
+ta('S4f 안 묻는 때 — 기기 out=0 · 토큰 없음 · 14일 안에 정적 판 안 씀(없음·15일 전) · 그날 물러남 · ⭐ 내 문장 · 🗂️ 카드 덱 · ttok → /who 0회 · 바로 지금 길', async () => {
+  const D = 86400000;
+  const cases = [['out=0', { out: false }], ['토큰 없음', { tok: '' }], ['정적 판 안 씀', { ls: LSf() }], ['15일 전', { ls: UL({ onfOutUsed: String(1.7e12 - 15 * D) }) }],
+    ['그날 물러남', { ls: UL({ onfOutFail: String(1.7e12 - 1000) }) }],
+    ['내 문장', { src: DSRC.replace('mode=share', 'mode=mine') }], ['카드 덱', { src: DSRC + '&view=cards' }], ['ttok', { src: DSRC + '&ttok=X' }]];
+  for (const [nm, o] of cases) {
+    const s = wsetup(o);
+    assert.strictEqual(s.calls.length, 0, '⛔ ' + nm + ' — /who 를 물었다');
+    assert.strictEqual(s.frameEl.src, o.src || DSRC, '⛔ ' + nm + ' — 바로 지금 길로 안 열었다');
+  }
+});
+
+(async () => {
+  for (const [label, fn] of AT) {
+    try { await fn(); console.log('  ✅ ' + label); pass++; }
+    catch (e) { console.log('  ❌ ' + label + '\n     ' + e.message); fail++; }
+  }
+  console.log('\n통과 ' + pass + ' / 실패 ' + fail);
+  process.exit(fail ? 1 : 0);
+})();

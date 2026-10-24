@@ -261,7 +261,7 @@
   var ONF_OUT_BOOK = 'https://app.ownify.co.kr/book/';
   var OUT_MS = 2500;
   function isAppOrigin(o) { o = String(o); return ONF_OUT_ORIGINS.indexOf(o) >= 0 || /^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(o); }
-  function openApp(el, url, src, cf, onFail, tok) {
+  function openApp(el, url, src, cf, onFail, tok, hooks) {   // hooks = 첫 판만(밖으로 2 · 로고 막 onf-load.js) — 첫 hello 에 ok
     var org = new URL(url).origin, done = false, booted = false, tm;
     function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
     function bad() { if (done) return; end(); onFail(); }
@@ -269,6 +269,7 @@
       if (done || !ev || !ev.data || ev.source !== el.contentWindow || ev.origin !== org) return;   // 그 액자 창 · 그 출처만
       if (ev.data.onf === 'outFail') return bad();
       if (ev.data.onf !== 'outHello') return;
+      if (!booted) { try { if (hooks && typeof hooks.ok === 'function') hooks.ok(); } catch (eH) {} }
       booted = true; clearTimeout(tm);   // 🌤 hello 마다 다시(2026-10-24) — 판이 스스로 다시 읽으면(2시간 · 「다시 열기」) 새 문서가 또 hello · 안 보내면 4초 뒤 outFail 로 지금 길
       try { ev.source.postMessage({ onf: 'outBoot', tok: tok, src: src, cf: cf || null }, org); } catch (e) {}
     }
@@ -276,6 +277,23 @@
     tm = setTimeout(function () { if (!booted) bad(); }, OUT_MS);
     try { if (el.isConnected && el.contentWindow) el.contentWindow.location.replace(url); else el.src = url; } catch (e) { el.src = url; }   // 📱 replace — openExec 끝 주석(WebKit 기록 칸)
     return { stop: end, stuck: function () { return false; } };
+  }
+  /* 🌤 밖으로 2(2026-10-24) — 링크 직행 교재(fileId·slug)를 Worker 에 묻는다: q = {f, s?} | {slug} (없는 칸은 안 싣는다 — 빈 글자는 400 bad).
+     POST · text/plain 몸통(사전 요청 없음) · 토큰은 몸통에만. WHO_MS 안 답이 없거나 실패·ok:false 면 null(지금 길) — 늦은 답은 이미 정해진 Promise 라 버려진다.
+     ponytail: 800ms = 짐작 시한 — 실측으로 고친다. */
+  var ONF_WHO = 'https://onf-media.edia--orker.workers.dev/who';
+  var WHO_MS = 800;
+  function askWho(tok, q) {
+    return new Promise(function (ok) {
+      var tm = setTimeout(function () { ok(null); }, WHO_MS), b = { t: tok };
+      function end(x) { clearTimeout(tm); ok(x); }
+      for (var k in q) if (q[k]) b[k] = q[k];
+      try {
+        global.fetch(ONF_WHO, { method: 'POST', body: JSON.stringify(b) })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (j) { var x = j && j.ok === true && j.books && j.books[0]; end(x ? { out: !!x.out, cf: x.cf && typeof x.cf === 'object' ? x.cf : null } : null); }, function () { end(null); });
+      } catch (e) { end(null); }
+    });
   }
 
   /* iframe 에 GAS 웹앱을 띄우고, 키보드·팬 보정을 붙인다.
@@ -1057,7 +1075,29 @@
       bookPre(v.h, undefined, undefined, undefined, v.o === 1);   // 🌤 o 없는 옛 기억은 지금 길
       preP = bookFind(opts.bookSrc(v.h));   // 🚀 미리 띄운 판(위 preSave 가 오늘 주소와 견준다)
     }
-    openExec(frameEl, src, opts.wait || null, null, true, opts.hooks || null);   // 🟠 hooks = 첫 화면 로고 로딩(index.html · onf-load.js) · 🔐 여러 계정 우회(위) — 못 열면 index.html 의 「불러오는 중」 자리에 안내 · 기억은 홈 액자만 정한다
+    /* 🌤 밖으로 2(2026-10-24 · 판정 2·5) — 링크 직행 교재(fileId·slug)면 /who 를 WHO_MS 안 묻고 cf 가 오면 첫 판을 정적 판(openApp)으로.
+       묻는 때만(아래 whoQ): 토큰 · 기기 out · 그날 물러남 없음 · ⭐ 내 문장·🗂️ 카드 덱 아님(outOk) · ttok 아님 · 14일 안에 정적 판을 쓴 기기(onfOutUsed) — 아니면 종전 그대로(요청·기다림 0).
+       안 뜨면(outFail·hello 없음) 같은 액자에 종전 openExec(여러 계정 우회·로고 신호 그대로) · 그날은 이 기기 지금 길(onfOutFail). 정적 판은 src 의 embed 를 따른다(링크 직행 = 판 단추 없음 · boot.js). */
+    function mainExec() { openExec(frameEl, src, opts.wait || null, null, true, opts.hooks || null); }
+    function whoQ(s) {
+      try {
+        var q = new URL(s).searchParams, f = q.get('fileId'), g = q.get('slug'), h = q.get('sheetName');
+        if ((!f && !g) || q.get('ttok') || !outOk(s)) return null;
+        if (!(Date.now() - Number(global.localStorage.getItem(OUT_USED) || 0) < OUT_USED_MS)) return null;
+        return f ? { f: f, s: h } : { slug: g };
+      } catch (e) { return null; }
+    }
+    var wq = whoQ(src);
+    if (wq) askWho(opts.tok, wq).then(function (a) {
+      if (!a || !a.cf) return mainExec();
+      try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}
+      openApp(frameEl, ONF_OUT_BOOK, src, a.cf, function () {
+        console.info('[onf] 첫 판 정적 판이 안 떴다 — 지금 길로 다시');
+        try { global.localStorage.setItem(OUT_FAIL, String(Date.now())); } catch (e) {}
+        mainExec();
+      }, opts.tok, opts.hooks || null);
+    });
+    else mainExec();   // 🟠 hooks = 첫 화면 로고 로딩(index.html · onf-load.js) · 🔐 여러 계정 우회(위) — 못 열면 index.html 의 「불러오는 중」 자리에 안내 · 기억은 홈 액자만 정한다
     preEarly();   // 🚀 홈 요청이 먼저 나간 **뒤** — 홈이 더 중요하다(둘이 같이 받는다)
     if (opts.bookSrc) rsBoot();   // 🔄 새로고침 전에 열려 있던 판을 그대로(위 rsBoot) — 미리 띄운 판이 같은 교재면 그 판을 보인다
     return { _books: books, _drop: bookDrop };   // 검사용으로만(test/book-panel.test.js 가 판 자격·back 을 본다) — 화면 코드에서 쓰지 마라
