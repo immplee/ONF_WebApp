@@ -161,7 +161,7 @@ t('홈인데 로고 자리가 끝내 안 온다(옛 안내·구글 오류 화면
 t('홈 + 로고 자리 → 홈 로고 숨김 → 난다(가로·세로 따로 · 색 바꿈 · 바탕 걷힘) → 통통 → 걷고 홈 로고 다시 보임', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
   box.querySelector('.onf-ld-in').rect = { left: 45, top: 400, width: 300, height: 50 };
-  k.ok(); s.tick(600); h.send(BRAND);   // 0.5초 넘어 온 자리(안이면 0.2초 걷힘 — 아래 S6e)
+  k.ok(); s.tick(600); h.send(BRAND);
   s.tick(800);   // 남은 만큼 채움(≈0.53초 · fillMs) + 잠깐(120) 뒤 난다
   const lg = box.querySelector('.onf-ld-logo'), inn = box.querySelector('.onf-ld-in');
   assert.strictEqual(lg.anims.length, 1, '⛔ 가로로 안 난다'); assert.strictEqual(inn.anims.length, 1, '⛔ 세로·크기가 안 변한다');
@@ -181,7 +181,7 @@ t('홈 + 로고 자리 → 홈 로고 숨김 → 난다(가로·세로 따로 ·
 t('PC 글자 이름(k=text) → 통통 뒤 홈 글자를 먼저 보이고 겹친 로고를 살짝 걷는다', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
   box.querySelector('.onf-ld-in').rect = { left: 570, top: 425, width: 300, height: 50 };
-  k.ok(); s.tick(600); h.send(Object.assign({}, BRAND, { k: 'text', w: 64, h: 22 }));   // 0.5초 넘어 온 자리(S6e)
+  k.ok(); s.tick(600); h.send(Object.assign({}, BRAND, { k: 'text', w: 64, h: 22 }));
   s.tick(600 + 120 + 950 + 5 * 75 + 460 + 10);
   assert.deepStrictEqual(h.user.sent.map((x) => x[0]), ['brandHold', 'brandDone'], '⛔ 겹친 로고를 걷기 전에 홈 글자를 안 보였다');
   assert.ok(s.box() && s.box().anims.length === 1, '⛔ 글자 이름인데 살짝 걷지 않고 툭 없앴다');
@@ -229,24 +229,25 @@ t('단계 곡선 · 남은 만큼 채움 시간 — 순수', () => {
   assert.ok(T0.fillMs(0.92) < 230 && T0.fillMs(0.3) > 450 && T0.fillMs(0.3) < 500, '남은 양에 비례(0.2~0.6초)');
 });
 
-console.log('[밖으로 3 S6e — 빠르면 0.2초에 걷힌다]');
-t('S6e 막을 띄운 때부터 0.5초 안에 brand(0.4초) → 채움·멈춤·날기 없이 0.2초 투명으로 걷힘 · 걸린 시간은 배운다', () => {
+console.log('[2026-10-25 Peter — 빨라도 로고 모션은 끝까지(채움 → 날기 → 통통) · 옛 S6e 0.2초 걷힘 폐지]');
+t('빠른 brand(0.4초) → 건너뛰지 않는다: 남은 만큼 빨리 채움(≤0.6초) → 멈춤 → 날기 → 통통 · 걸린 시간은 배운다', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
   box.querySelector('.onf-ld-in').rect = { left: 45, top: 400, width: 300, height: 50 };
   s.tick(300); k.ok(); s.tick(100); h.send(BRAND);
-  assert.deepStrictEqual(box.anims.map((a) => [a.kf[0].opacity, a.kf[1].opacity, a.o.duration]), [[1, 0, 200]], '⛔ 0.2초 투명 걷힘이 아니다');
-  s.tick(150);
-  assert.ok(s.box(), '⛔ 0.2초 전에 툭 없앴다');
-  s.tick(100);
-  assert.strictEqual(s.box(), null, '⛔ 0.25초가 지나도 막이 남는다');
-  assert.strictEqual(box.querySelector('.onf-ld-logo').anims.length, 0, '⛔ 빠른데 날았다');
-  assert.ok(!h.user.sent.some((x) => x[0] === 'brandHold'), '⛔ 날지도 않는데 홈 로고를 숨겼다');
-  assert.ok(JSON.parse(s.ls.onfLoadMs).length === 1 && JSON.parse(s.ls.onfLoadMs1).length === 1, '⛔ 빠른 걷힘이 걸린 시간을 안 배웠다(평균이 늦은 쪽으로 쏠린다)');
-  const n = env(), hn = homeFrame(n), kn = n.g.ONF.load.bind(hn.fr, { home: true });   // 지금 길 홈(노크 → brand)도 같다 · k:none 도 「다 그렸다」
+  assert.strictEqual(box.anims.length, 0, '⛔ 빠르다고 바로 걷었다(옛 0.2초 투명 걷힘)');
+  assert.ok(JSON.parse(s.ls.onfLoadMs).length === 1 && JSON.parse(s.ls.onfLoadMs1).length === 1, '⛔ 빠른 열림이 걸린 시간을 안 배웠다');
+  s.tick(1100);   // 채움(≤0.6초 + 시계 여유 0.4초) + 멈춤 0.12초
+  assert.strictEqual(box.querySelector('.onf-ld-logo').anims.length, 1, '⛔ 빠른 brand 인데 날지 않았다');
+  assert.ok(h.user.sent.some((x) => x[0] === 'brandHold'), '⛔ 날면서 홈 로고를 안 숨겼다(둘로 보인다)');
+  s.tick(1000);
+  assert.ok(box.classList.contains('hop'), '⛔ 내려앉은 뒤 글자별 통통이 없다');
+  const n = env(), hn = homeFrame(n), kn = n.g.ONF.load.bind(hn.fr, { home: true });   // k:none(자리 없음)도 빠르다고 툭 끊지 않는다 — 끝까지 채운 뒤 걷힌다
   kn.ok(); n.tick(450); hn.send({ onf: 'brand', k: 'none' });
-  assert.deepStrictEqual(n.box().anims.map((a) => a.o.duration), [200], '⛔ k:none 0.45초 — 0.2초 걷힘이 아니다');
+  assert.strictEqual(n.box().anims.length, 0, '⛔ k:none 0.45초 — 채우기 전에 걷었다');
+  n.tick(1500);
+  assert.strictEqual(n.box(), null, '⛔ k:none — 채운 뒤에도 막이 남는다');
 });
-t('S6e 0.5초를 넘긴 brand(0.7초) → 지금 모션(채움 → 멈춤 → 날기) · 막을 띄운 때 기준(bind 가 늦어도)', () => {
+t('brand(0.7초) → 지금 모션(채움 → 멈춤 → 날기) · 막을 띄운 때 기준(bind 가 늦어도)', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
   box.querySelector('.onf-ld-in').rect = { left: 45, top: 400, width: 300, height: 50 };
   k.ok(); s.tick(700); h.send(BRAND);
