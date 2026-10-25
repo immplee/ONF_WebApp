@@ -37,7 +37,7 @@ function env(o) {
   const body = mkEl('body'), head = mkEl('head');
   const g = {
     console, URL, URLSearchParams, JSON, Math, Date: { now: () => now.v },
-    performance: { now: () => now.v },
+    performance: Object.assign({ now: () => now.v }, o.nav ? { getEntriesByType: (k) => (k === 'navigation' ? [{ type: o.nav }] : []) } : {}),
     location: { search: o.search === undefined ? '?loadfx=1' : o.search },   // 기본 = 이 기기 켬(전 기기 스위치 ON 이 꺼져 있어도 막 검사가 돈다)
     localStorage: { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); } },
     setTimeout: (f, ms) => { timers.push({ f, at: now.v + (ms || 0), on: true }); return timers.length; },
@@ -313,6 +313,13 @@ t('선생님 껍데기 배선 — data-lazy 로 싣는다 · mount 에서 bind �
   assert.ok(/if \(appWin\) return;\s*if \(LD\) LD\.stuck\(\);/.test(w), '⛔ 막힘 안내 전에 막을 안 걷는다');
   const knock = th.slice(th.indexOf('/* onf-knock:begin */'), th.indexOf('/* onf-knock:end */'));
   assert.ok(knock.length > 100 && !/LD\b|ONF\.load/.test(knock), '⛔ 로그인·토큰 블록(onf-knock)에 손을 댔다');
+});
+
+t('새로고침(navigation type reload)이면 막을 안 그린다 — 처음 열기(navigate)·뒤로(back_forward)·못 잼은 종전대로 그린다 · 선생님(lazy)도 bind 가 null (Peter 2026-10-25)', () => {
+  assert.strictEqual(env({ nav: 'reload' }).box(), null, '⛔ 새로고침인데 로고 막을 띄웠다');
+  for (const n of ['navigate', 'back_forward', null]) assert.ok(env(n ? { nav: n } : {}).box(), '⛔ ' + (n || '못 잼') + ' 인데 막이 없다');
+  const lz = env({ nav: 'reload', lazy: true }); assert.strictEqual(lz.g.ONF.load.bind({ getBoundingClientRect() { return {}; } }, { home: true }), null, '⛔ 선생님 껍데기 새로고침에 막을 그렸다');
+  const old = T(env({})); assert.strictEqual(old.isReload({ navigation: { type: 1 } }), true, '옛 사파리 TYPE_RELOAD'); assert.strictEqual(old.isReload({ navigation: { type: 0 } }), false); assert.strictEqual(old.isReload(undefined), false);
 });
 
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패');

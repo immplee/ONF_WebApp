@@ -74,6 +74,15 @@
     var a = p1(okT); return a + (0.92 - a) * (1 - Math.exp(-2.3 * (t - okT) / E2));
   }
   function fillMs(p0) { return Math.round(180 + 420 * Math.max(0, Math.min(1, 1 - p0))); }   // 남은 만큼 — 92% 에서 ≈0.21초 · 30% 에서 ≈0.47초
+  /* 새로고침(⌘R · 당겨서 새로고침)이면 로고 막을 안 띄운다(Peter 2026-10-25 「새로 고침할 때는 로고가 날아와서 튕겨지지 않도록」 · 고른 것 = 「로고 모션 없이 바로 홈」).
+     처음 열기·다시 열기(navigate)·뒤로(back_forward)는 종전대로 막을 띄운다. 못 재는 브라우저는 새로고침이 아니라고 본다(종전 그대로). */
+  function isReload(perf) {
+    try {
+      var n = perf && perf.getEntriesByType && perf.getEntriesByType('navigation');
+      if (n && n[0] && n[0].type) return n[0].type === 'reload';
+      return !!(perf && perf.navigation && perf.navigation.type === 1);   // 옛 사파리(Navigation Timing 1 · TYPE_RELOAD)
+    } catch (e) { return false; }
+  }
   /* 홈이 보낸 로고 자리 — 안쪽 화면 좌표(px). 모양이 이상하면 null(→ 날지 않고 걷힌다). */
   function brandOk(d, vw, vh) {
     if (!d || d.onf !== 'brand') return null;
@@ -122,7 +131,7 @@
   }
   try {
     lazy = !!(doc && doc.currentScript && doc.currentScript.hasAttribute && doc.currentScript.hasAttribute('data-lazy'));
-    on = !!(doc && doc.body) && readOn(new URLSearchParams(global.location.search), ls);
+    on = !!(doc && doc.body) && readOn(new URLSearchParams(global.location.search), ls) && !isReload(global.performance);
     if (on && !lazy) make();
   } catch (e) { on = false; }
 
@@ -251,5 +260,5 @@
   global.ONF = global.ONF || {};
   global.ONF.load = { bind: bind,
     /* 검사용으로만 — 화면 코드에서 부르지 마라 */
-    _t: { readOn: readOn, expected: expected, remember: remember, curve: curve, stage: stage, fillMs: fillMs, brandOk: brandOk, pick: pick, on: function () { return !!box; } } };
+    _t: { readOn: readOn, isReload: isReload, expected: expected, remember: remember, curve: curve, stage: stage, fillMs: fillMs, brandOk: brandOk, pick: pick, on: function () { return !!box; } } };
 })(window);
