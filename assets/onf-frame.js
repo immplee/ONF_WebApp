@@ -536,6 +536,16 @@
       s = history.state;                                  // back — 맨 위가 그 id 일 때만(남의 칸 보호 · 📱 판 칸·판 안쪽 칸은 홈 것이 아니다)
       if (s && s.onfHist === d.id && !bookOwner(s)) history.back();
     }
+    /* 📱 왼쪽 끝 쓸기 = 앱 뒤로(Peter 2026-10-25 ④⑦ · 정본 = Ownify ONF_Shell_Js ONF_EDGE · ⚠️ 쌍둥이: teacher/index.html onf-edge) —
+       아이폰·아이패드 안쪽 화면이 왼쪽 끝 쓸기를 막고(브라우저가 화면을 밀어 내지 않게) 「edge back」 을 보내면 **코드로** history.back() — 움직임 없이 맨 위 칸 주인이 한 칸 되돌린다.
+       맨 위가 우리 칸(홈 칸·판 칸)일 때만 · 바닥이면 아무것도 안 한다(앱 밖으로 안 나간다). ask = 안쪽 노크 → edge-on(이 껍데기가 받는다)으로 답해야 안쪽이 켠다. */
+    global.addEventListener('message', function (ev) {
+      var d = ev && ev.data, s;
+      if (!d || d.onf !== 'edge' || !isAppOrigin(ev.origin)) return;
+      if (d.op === 'ask') { try { ev.source.postMessage({ onf: 'edge-on' }, ev.origin); } catch (e) {} return; }
+      s = history.state;
+      if (d.op === 'back' && s && (s.onfHist || s.onfBook)) history.back();
+    });
     global.addEventListener('popstate', function () {
       var s = history.state, h = (s && s.onfHist) ? s : null;
       histDepth = (h || bookOwner(s)) ? Math.max(0, Number(s.n) || 0) : 0;   // 📱 판 칸의 n = 그 아래 홈 칸 수
@@ -599,7 +609,7 @@
       p.hb = histRun();                                // 🖥 이 판 칸 밑에 이어진 판 칸 수 — PC ✕ 가 제 칸만 걷는다(아래 bookClose 앞 판 규칙)
       try { history.pushState({ onfBook: p.key, n: histDepth, bd: histRun() + 1 }, ''); } catch (e) {}   // 주소 칸은 비운다
     }
-    /* 「교재에서 나갈까요?」 칸 {onfBook, lg:1} — 껍데기가 판 칸 바로 위에 민다(Peter 2026-10-24 「스와이프하면 밀려나는 교재 밑에도 같은 교재가 보여 이상하다」).
+    /* 「홈으로 나갈까요?」 칸 {onfBook, lg:1} — 껍데기가 판 칸 바로 위에 민다(Peter 2026-10-24 「스와이프하면 밀려나는 교재 밑에도 같은 교재가 보여 이상하다」).
        아이폰은 뒤로 스와이프 때 밑에 **그 칸을 떠날 때 찍어 둔 화면**을 깐다 — 교재가 뜬 뒤에 이 칸을 밀면(종전: 교재 쪽 onfLeave) 밑그림이 같은 교재였다.
        → 판을 보이기 **전에**(bookShow 의 park 걷기 앞 · 같은 일 안이라 아직 홈이 그려져 있다) 판 칸과 함께 민다 = 밑그림이 홈.
        칸이 빠지면(bookPop) 교재에 bookLeaveAsk — 교재가 가운데 되묻기를 띄우고 확인 = bookClose · 취소 = bookLeaveKeep(되묻기가 떠 있는 채 다시 민다 → 다음 밑그림 = 되묻기 뜬 교재 · 이어지는 화면).
@@ -616,7 +626,7 @@
     function bookHist(p, ev) {
       var d = ev.data, t, flat;
       if (d.op === 'hi') {
-        if (!isAppOrigin(ev.origin)) return;             // 🖥 PC 도 켠다(Peter 2026-10-24 「컴퓨터에서도 뒤로 = 교재에서 나갈까요?」 — 판 안 창·「나갈까요?」 칸이 최상위에)
+        if (!isAppOrigin(ev.origin)) return;             // 🖥 PC 도 켠다(Peter 2026-10-24 「컴퓨터에서도 뒤로 = 홈으로 나갈까요?」 — 판 안 창·「나갈까요?」 칸이 최상위에)
         p.hw = ev.source; p.ho = ev.origin;
         try { p.hw.postMessage(opts.lg ? { onf: 'hist-on', lg: 1 } : { onf: 'hist-on' }, p.ho); } catch (e) {}   // lg:1 = 「나갈까요?」 칸은 껍데기가 민다(교재는 제 onfLeave 칸을 안 민다)
         return;
