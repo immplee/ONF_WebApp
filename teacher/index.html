@@ -478,8 +478,7 @@ function hwOpen(t, l, f, hwt, au) {
     hwWarmOn = false; clearTimeout(hwWarmTm);
     hwBox.style.visibility = ''; hwBox.style.pointerEvents = '';
     try { hwFr.focus(); } catch (eF) {}
-    var st0 = { onfHw: 1, n: (typeof histDepth === 'number' ? histDepth : 0) };
-    try { if (history.state && history.state.onfHw) history.replaceState(st0, ''); else history.pushState(st0, ''); } catch (e) {}
+    hwHistPush();
     hwGoMsg = { onf: 'hwbookGo', l: l, hw: hwShape(files0, tk0, au) };
     if (hwWin) { try { hwWin.postMessage(hwGoMsg, hwOrigin); } catch (e) {} hwGoMsg = null; }
     return;
@@ -505,8 +504,27 @@ function hwOpen(t, l, f, hwt, au) {
   hwBox.appendChild(wait); hwBox.appendChild(hwFr); hwBox.appendChild(x);
   document.body.appendChild(hwBox);
   try { hwFr.focus(); } catch (eF) {}   // 키보드(Esc·화살표)가 가려진 홈으로 안 가게
-  var st = { onfHw: 1, n: (typeof histDepth === 'number' ? histDepth : 0) };
-  try { if (history.state && history.state.onfHw) history.replaceState(st, ''); else history.pushState(st, ''); } catch (e) {}   // 이미 과제 판 칸이면 덮어쓴다(칸 두 개 = 뒤로 두 번)
+  hwHistPush();
+}
+/* 📱 과제 판 뒤로 한 칸씩(Peter 2026-10-25 ③ 「교재만으로 간 교재에서 뒤로 = 학생 창으로 나가 버린다」) — 칸: 판 {onfHw} · 그 위 물음 칸 {onfHw, lg:1} ·
+   교재(옆에·교재만)를 보이면 그 위 보기 칸 {onfHw, lg:1, hv:1}. 뒤로 = 보기 칸 빠짐 → 사진만 · 물음 칸 빠짐 → 판에 「홈으로 나갈까요?」(hwLeaveAsk · 판의 onfAskHome)
+   → 확인 = hwbookBack(hwBack · 남은 판 칸 걷고 닫음) · 취소 = hwLeaveKeep(물음 칸 다시). ‹·✕ 는 위 칸까지 한 번에 걷는다(hwBack · history.go).
+   이미 과제 판 칸이면 칸을 또 쌓지 않는다(쌓이면 뒤로를 여러 번) — 맨 위가 판 칸이면 물음 칸만 · 물음 칸이면 그대로 · 보기 칸이면 물음 칸으로 덮어쓴다(새로 연 판은 사진만). */
+var hwAsking = false;
+function hwHistPush() {
+  var n = typeof histDepth === 'number' ? histDepth : 0, s = history.state;
+  try {
+    if (!(s && s.onfHw)) { history.pushState({ onfHw: 1, n: n }, ''); history.pushState({ onfHw: 1, n: n, lg: 1 }, ''); }
+    else if (s.hv) history.replaceState({ onfHw: 1, n: s.n || 0, lg: 1 }, '');
+    else if (!s.lg) history.pushState({ onfHw: 1, n: s.n || 0, lg: 1 }, '');
+  } catch (e) {}
+  hwAsking = false;
+}
+function hwHistUp() { var s = history.state; return s && s.onfHw ? 1 + (s.lg ? 1 : 0) + (s.hv ? 1 : 0) : 0; }   // 맨 위에서 이어진 과제 판 칸 수
+function hwViewHist(was, v) {   // 사진만 ↔ 교재 — 보기 칸을 넣고 뺀다(뒤로 = 사진만)
+  var s = history.state;
+  if (was === 'photo' && v !== 'photo' && s && s.onfHw && !s.hv) { try { history.pushState({ onfHw: 1, n: s.n || 0, lg: 1, hv: 1 }, ''); } catch (e) {} }
+  else if (was !== 'photo' && v === 'photo' && s && s.onfHw && s.hv) history.back();   // 뒤따르는 popstate 는 이미 사진만이라 할 일이 없다
 }
 function hwShape(f, hwt, au) {
   var files = Array.isArray(f) ? f.filter(function (x) { return x && /^[A-Za-z0-9_-]{10,200}$/.test(String(x.id || '')) && /^\d{4}-\d{2}-\d{2}$/.test(String(x.ymd || '')); })
@@ -536,7 +554,7 @@ function hwWarm(t) {
    못 뜬 화면(구글 오류 · 홈 화면 앱처럼 뒤로가 없는 곳)에서 갇히지 않게 늦게 하나만 */
 var hwSeen = false;   // 과제 판이 노크했다(= 떴다)
 function hwLateX(x, wait) { var box = hwBox; hwSeen = false; x.hidden = true; setTimeout(function () { if (hwBox && hwBox === box && !hwSeen && wait && !wait.hidden) x.hidden = false; }, 15000); }
-function hwBack() { if (history.state && history.state.onfHw) history.back(); else hwClose(); }
+function hwBack() { var k = hwHistUp(); hwAsking = false; if (k) history.go(-k); else hwClose(); }   // 위 물음·보기 칸까지 한 번에(③ · 뒤따르는 popstate 가 닫는다)
 function hwAuth() {   // 판에 지금 토큰(+ 고른 사진·입장권 한 번)
   if (!hwWin || !pending) return;
   var m = { onf: 'auth', token: pending, hist: 0, side: 1 };   // side = 이 껍데기는 「교재 옆에」를 한다(과제 판 액자만 · 주소로 연 판엔 없다)
@@ -572,15 +590,16 @@ function hwBookFrame(src) {
   }
   return hwBk;
 }
-function hwViewSet(v, href) {
+function hwViewSet(v, href, fromPop) {   // fromPop — 뒤로가 보기 칸을 뺐다(기록은 이미 맞다)
   if (!hwBox || ['photo', 'side', 'book'].indexOf(v) < 0) return;
-  var src = null;
+  var src = null, was = hwView;
   if (v !== 'photo') {
     src = typeof href === 'string' && href ? teacherBookSrc(href) : (hwBk ? hwBk.src : null);
     if (!src) { hwTellView(); return; }   // 못 받은 주소 — 판이 눌린 단추를 지금 보기로 되돌린다
     hwBookFrame(src);
   }
   hwView = v; hwLay(); hwPenSync();
+  if (!fromPop) hwViewHist(was, v);
   if (v === 'book') { try { hwFr.blur(); hwBk.el.focus(); } catch (e) {} }   // 숨은 과제 판이 화살표를 먹지 않게
 }
 /* 📄 교재 옆에 = 경계선(세로 손잡이)을 끌어 폭 조절(페이지 추가 4단계 · 설계 §0-9 · 시제품 10판) — 과제 판 40%~72% · 이 기기에 기억 ·
@@ -647,11 +666,19 @@ function hwClose() {
 /* onf-hist 블록 popstate 가 묻는다 — 과제 판 칸이 맨 위거나 방금 그 칸을 걷었으면 홈에 「뒤로」를 안 보낸다(홈은 안 바뀌었다) */
 function hwSkipPop() { var k = hwSkip || !!(history.state && history.state.onfHw); hwSkip = false; return k; }
 window.addEventListener('popstate', function () {
-  if (hwBox && !hwWarmOn && !(history.state && history.state.onfHw)) { hwClose(); hwSkip = true; }   // 뒤로·스와이프 = 과제 판 닫기(안 보이는 미리 띄운 판은 그대로)
+  var s = history.state;
+  if (hwBox && !hwWarmOn && !(s && s.onfHw)) { hwClose(); hwSkip = true; return; }   // 뒤로·스와이프 = 과제 판 닫기(안 보이는 미리 띄운 판은 그대로)
+  if (!hwBox || hwWarmOn || !s || !s.onfHw) return;
+  if (!s.hv && hwView !== 'photo') { hwViewSet('photo', null, true); hwTellView(); }   // ③ 보기 칸 빠짐 = 교재 → 사진만(한 칸)
+  if (!s.lg && !hwAsking) {   // ③ 물음 칸 빠짐 = 「홈으로 나갈까요?」 — 판이 아직 노크 전이면 묻지 않고 닫는다
+    if (!hwWin) { history.back(); return; }
+    hwAsking = true;
+    try { hwWin.postMessage({ onf: 'hwLeaveAsk' }, hwOrigin); } catch (e) {}
+  }
 });
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
-  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwPen')) return;
+  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwPen' && d.onf !== 'hwLeaveKeep')) return;
   if (hwFr && hwFrom(ev.source)) {   // 과제 판 액자에서 온 말
     try { if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return; } catch (e) { return; }
     if (hwWin && ev.source !== hwWin) return;   // 한 번 정하면 그 창만(노크 자물쇠와 같다)
@@ -672,6 +699,7 @@ window.addEventListener('message', function (ev) {
     }
     if (d.onf === 'themeAsk') { themeAsk(ev); return; }
     if (d.onf === 'hwbookBack') hwBack();
+    if (d.onf === 'hwLeaveKeep') { var sk = history.state; hwAsking = false; if (hwBox && sk && sk.onfHw && !sk.lg) { try { history.pushState({ onfHw: 1, n: sk.n || 0, lg: 1 }, ''); } catch (e) {} } }   // ③ 「홈으로 나갈까요?」 취소 — 물음 칸 다시
     if (d.onf === 'hwbookView') hwViewSet(String(d.v || ''), d.href);
     if (d.onf === 'hwPen') hwPenRelay(d);   // 📖 펜 줄 하나 — 과제 판 도구를 옆 교재로(⑬)   // 📖 교재 옆에 · 교재만 · 사진만(과제 첨삭 5단계)
     return;
@@ -687,6 +715,19 @@ window.addEventListener('message', function (ev) {
   try { appWin.postMessage({ onf: 'hwOpened' }, appOrigin); } catch (e) {}   // 홈 창은 이 말을 받고 모아 보기 창을 닫는다
 });
 /* onf-hwbook:end */
+
+/* onf-edge:begin */
+/* 📱 왼쪽 끝 쓸기 = 앱 뒤로(Peter 2026-10-25 ④⑦ 「교재는 가만히 · 창만 닫히게 · 확인창만 뜨게」 · 정본 = Ownify ONF_Shell_Js ONF_EDGE · ⚠️ 쌍둥이: 학생 assets/onf-frame.js) —
+   아이폰·아이패드 안쪽 화면(홈·교재·과제 판)이 왼쪽 끝 쓸기를 막고 「edge back」 을 보내면 **코드로** history.back() — 브라우저가 화면을 밀어 내지 않고 맨 위 칸 주인이 한 칸 되돌린다.
+   맨 위가 우리 칸(홈 칸·판 칸·과제 판 칸)일 때만 · 바닥이면 아무것도 안 한다. ask = 안쪽 노크 → edge-on 으로 답해야 안쪽이 켠다(옛 껍데기면 브라우저 그대로). */
+window.addEventListener('message', function (ev) {
+  var d = ev && ev.data, o = String(ev && ev.origin), s;
+  if (!d || d.onf !== 'edge' || !(/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(o) || o === 'https://app.ownify.co.kr' || o === 'https://onf-app.pages.dev')) return;
+  if (d.op === 'ask') { try { ev.source.postMessage({ onf: 'edge-on' }, o); } catch (e) {} return; }
+  s = history.state;
+  if (d.op === 'back' && s && (s.onfHist || s.onfBook || s.onfHw)) history.back();
+});
+/* onf-edge:end */
 
 /* ═══ 📖 선생님 홈 옆 판(2026-10-12 Peter 「선생님 홈에서 교재를 열면 왜 새 창으로? 학생 홈처럼 창으로 열리고 전체 화면으로」) ═══
    학생 껍데기 assets/onf-frame.js 의 교재 판과 **같은 꼴**(⚠️ 쌍둥이 — 한쪽을 고치면 다른 쪽도): 홈이 caps 를 받은 뒤 교재·⭐ 내 문장 주소를 보내면
@@ -712,7 +753,7 @@ var BOOK_KEYS = ['t', 'mode', 'fileId', 'sheetName', 'back', 'line', 'view', 'tt
 /* ⚠️ 폰 = 이 물음이 아닌 화면 — Ownify 선생님 홈 dhBookWide 와 **글자까지 같아야** 한다(다르면 홈은 폰으로 보내고 껍데기는 PC 판으로 띄운다). matchMedia 가 없으면 PC(종전). */
 var BOOK_WIDE_Q = '(min-width:1100px) and (hover:hover) and (pointer:fine)', wideMq = null, bookSrcs = [];
 try { wideMq = window.matchMedia ? window.matchMedia(BOOK_WIDE_Q) : null; } catch (eM) {}
-/* 📱 「교재에서 나갈까요?」 칸을 껍데기가 판 보이기 전에 민다(학생 껍데기 opts.lg · histGuard 와 같다 · Peter 2026-10-24) — 주소 lg=1|0 이면 이 기기에 기억(onfThLg) · 없으면 켬 */
+/* 📱 「홈으로 나갈까요?」 칸을 껍데기가 판 보이기 전에 민다(학생 껍데기 opts.lg · histGuard 와 같다 · Peter 2026-10-24) — 주소 lg=1|0 이면 이 기기에 기억(onfThLg) · 없으면 켬 */
 var BOOK_LG = (function () {
   var v = null;
   try { v = new URLSearchParams(location.search).get('lg'); if (v === '1' || v === '0') localStorage.setItem('onfThLg', v); else v = localStorage.getItem('onfThLg'); } catch (e) {}
@@ -745,7 +786,7 @@ function histBook(p) {
   p.hb = histRun();   // 🖥 이 판 칸 밑에 이어진 판 칸 수 — PC ✕ 가 제 칸만 걷는다(아래 bookClose 앞 판 규칙 · 2026-10-24)
   try { history.pushState({ onfBook: p.key, n: homeN(), bd: histRun() + 1 }, ''); } catch (e) {}   // 주소 칸은 비운다
 }
-/* 「교재에서 나갈까요?」 칸 {onfBook, lg:1} — 판 칸 바로 위 · 판을 보이기 **전에**(아이폰 스와이프 밑그림 = 그 칸을 떠날 때 화면 → 홈) · 빠지면 교재에 bookLeaveAsk ·
+/* 「홈으로 나갈까요?」 칸 {onfBook, lg:1} — 판 칸 바로 위 · 판을 보이기 **전에**(아이폰 스와이프 밑그림 = 그 칸을 떠날 때 화면 → 홈) · 빠지면 교재에 bookLeaveAsk ·
    취소 = bookLeaveKeep(되묻기가 떠 있는 채 다시 민다) · 옛 교재(노크에 lg:1 없음)엔 안 민다 · ⚠️ 쌍둥이: 학생 assets/onf-frame.js histGuard */
 var lgPop = false;   // bookPop 이 보이는 중 — 방금 빠진 물음 칸을 다시 안 민다
 function histGuard(p) {
@@ -759,7 +800,7 @@ function histGuard(p) {
 function bookHist(p, ev) {
   var d = ev.data, t, flat;
   if (d.op === 'hi') {
-    if (!/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(String(ev.origin))) return;   // 🖥 PC 도 켠다(Peter 2026-10-24 「컴퓨터에서도 뒤로 = 교재에서 나갈까요?」 · 학생 껍데기와 같이)
+    if (!/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(String(ev.origin))) return;   // 🖥 PC 도 켠다(Peter 2026-10-24 「컴퓨터에서도 뒤로 = 홈으로 나갈까요?」 · 학생 껍데기와 같이)
     p.hw = ev.source; p.ho = ev.origin;
     try { p.hw.postMessage(BOOK_LG ? { onf: 'hist-on', lg: 1 } : { onf: 'hist-on' }, p.ho); } catch (e) {}   // lg:1 = 물음 칸은 껍데기 몫
     return;

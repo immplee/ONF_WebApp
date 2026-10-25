@@ -30,7 +30,9 @@
   var ON = true;                                   // ⛔ 전 기기 되돌리기 = false
   var KEY = 'onfLoadFx', HIST = 'onfLoadMs', HIST1 = 'onfLoadMs1', HIST2 = 'onfLoadMs2';   // 다 뜸까지 · 노크까지 · 노크 뒤 다 그림까지(단계 채움)
   var SAFE_MS = 30000, HOME_MS = 15000, HOLD_MS = 120, FLY_MS = 950, FADE_MS = 300;
-  var QUICK_MS = 500, QUICK_FADE_MS = 200;         // 🌤 밖으로 3(2026-10-24 · 설계 「로고 로딩 모션」) — 막을 띄운 뒤 0.5초 안에 다 그렸으면(brand) 채움·멈춤·날기 없이 0.2초 투명으로 걷는다(두 길 같다)
+  /* ⛔ [2026-10-25 Peter 「로고 모션은 항상 끝까지 — 차오르고, 왼쪽 위로 가서, 글자별로 통통까지. 로딩이 빠르면 차오르는 속도를 빠르게 하면 되잖아, 건너뛰지 말고」]
+     종전 「0.5초 안에 다 그렸으면 0.2초 투명 걷힘」(QUICK_MS · 밖으로 3 · 2026-10-24)을 걷었다 — 정적 홈(시험 학생)이 빨라 늘 그 길을 타서
+     로고가 덜 찬 채 사라지고 밑에서 블럭이 「확인 중」인 홈이 그대로 보였다. 이제 빠르면 fillUp 이 남은 만큼을 짧게(0.2~0.6초) 채우고 언제나 날고 튄다. */
   var HOP_STEP = 75, HOP_MS = 460;
   var ORANGE = '#D2691E';
   var VB = '60 60 712.7 118.7';                    // ⛔ Ownify ONF_Brand_Svg 와 같은 viewBox·같은 글자 — 홈 로고 상자와 1:1 로 겹친다
@@ -105,7 +107,7 @@
     return s + '</svg>';
   }
 
-  var doc = global.document, box = null, fillEl = null, ls = null, on = false, lazy = false, shown = 0;   // shown = 막을 띄운 때(QUICK_MS 기준)
+  var doc = global.document, box = null, fillEl = null, ls = null, on = false, lazy = false;
   try { ls = global.localStorage; } catch (e) {}
   /* 막 만들기 — 학생 껍데기는 이 파일이 실릴 때 바로(고리보다 먼저 보이게) · 선생님 껍데기는 `data-lazy` 라 bind 때(⛔ 로그인 화면을 가리면 안 된다). */
   function make() {
@@ -116,7 +118,6 @@
         + svg('onf-ld-ghost') + '<div class="onf-ld-fill">' + svg('') + '</div></div></div>';
       doc.body.appendChild(box);
       fillEl = box.querySelector('.onf-ld-fill');
-      shown = global.performance ? performance.now() : Date.now();
     } catch (e) { try { if (box && box.parentNode) box.parentNode.removeChild(box); } catch (e2) {} box = null; }
   }
   try {
@@ -174,7 +175,6 @@
       remember(ls, (okAt || at) - t0);
       if (okAt) remember(ls, okAt - t0, HIST1);
       if (okAt && brand && at > okAt) remember(ls, at - okAt, HIST2);
-      if (brand && at - shown < QUICK_MS) return fade(QUICK_FADE_MS);
       var done = false;
       fillUp(function () { if (done) return; done = true; later(function () { pick(brand, reduced, typeof box.animate === 'function') === 'fly' ? fly() : fade(); }, HOLD_MS); });
     }

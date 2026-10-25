@@ -354,5 +354,21 @@ t('⛔ history.state 가 던져도(막힌 문서) mount() 는 끝까지 간다 �
   assert.deepStrictEqual(R.inner.sent.map((x) => x.m.onf), ['kbH'], '⛔ 기록 API 가 막힌 곳에서 키보드 보정이 죽었다');
 });
 
+console.log('\n[📱 왼쪽 끝 쓸기 = 앱 뒤로 (Peter 2026-10-25 ④⑦ · 쌍둥이: teacher/index.html onf-edge)]');
+t('ask 에 edge-on(그 출처로만) · back = 맨 위가 우리 칸(홈 칸·판 칸)일 때만 코드로 뒤로 · 바닥·남의 출처는 아무것도 안 함', () => {
+  const R = boot();
+  R.msg({ onf: 'edge', op: 'ask' });
+  assert.deepStrictEqual(R.inner.sent, [{ m: { onf: 'edge-on' }, o: ORIGIN }], '⛔ 안쪽 노크에 edge-on 으로 답하지 않았다: ' + JSON.stringify(R.inner.sent));
+  R.msg({ onf: 'edge', op: 'ask' }, { origin: 'https://evil.example' });
+  assert.strictEqual(R.inner.sent.length, 1, '⛔ 남의 출처 노크에 답했다');
+  R.msg({ onf: 'edge', op: 'back' });
+  assert.strictEqual(R.H.backs, 0, '⛔ 바닥에서 쓸었는데 뒤로 갔다(앱 밖으로 나간다)');
+  R.hi(); R.push('h1', { onfPeek: 'p1' });
+  R.msg({ onf: 'edge', op: 'back' }, { origin: 'https://evil.example' });
+  assert.strictEqual(R.H.backs, 0, '⛔ 남의 출처 쓸기에 뒤로 갔다');
+  R.msg({ onf: 'edge', op: 'back' });
+  assert.strictEqual(R.H.backs, 1, '⛔ 홈 칸이 맨 위인데 쓸기가 뒤로를 안 했다');
+});
+
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패');
 process.exit(fail ? 1 : 0);

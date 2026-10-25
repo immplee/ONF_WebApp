@@ -43,7 +43,7 @@ function boot(store, opt) {
     document: { getElementById: el, querySelector: (q) => (q === '#wait .onf-spin' && !spin.gone ? spin : null), createElement: (tag) => { const e = el('x' + Math.random()); e.tag = tag; if (tag === 'iframe') e.contentWindow = { name: 'hwwin', postMessage() {} }; created.push(e); return e; }, body: { appendChild(e) { e.parentNode = { removeChild() { e.removed = true; } }; } },
       documentElement: { setAttribute() {}, getAttribute() {} } },
     location: { search: opt.search || '', pathname: '/teacher/', href: 'https://class.ownify.co.kr/teacher', reload() { calls.push('reload'); } },
-    history: { state: null, length: 2, replaceState() {}, pushState(st) { calls.push('push:' + JSON.stringify(st)); g.history.state = st; }, go() {}, back() { calls.push('back'); } },
+    history: { state: null, length: 2, replaceState() {}, pushState(st) { calls.push('push:' + JSON.stringify(st)); g.history.state = st; }, go(n) { calls.push('go:' + n); }, back() { calls.push('back'); } },
     sessionStorage: (() => { const m = {}; return { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } }; })(),
     addEventListener: (type, fn) => { (handlers[type] = handlers[type] || []).push(fn); },
     removeEventListener: (type, fn) => { handlers[type] = (handlers[type] || []).filter((f) => f !== fn); },
@@ -465,7 +465,7 @@ t('📝 과제 판 액자 — 노크엔 지금 토큰 + 고른 사진·입장권
   R.postAs({ onf: 'auth-please', stale: true }, inner);   // 홈이 그새 또 새 토큰을 받았다면 그것을 바로 — 같은 것이면 다시 받기
   assert.equal(got.length, 2);
   R.postAs({ onf: 'hwbookBack' }, inner);
-  assert.ok(R.calls.includes('back'), '⛔ ‹ = 기록 칸 하나 뒤로(닫기)');
+  assert.ok(R.calls.includes('go:-2'), '⛔ ‹ = 과제 판 칸(판 + 「홈으로 나갈까요?」 물음 칸 · Peter 2026-10-25 ③)을 한 번에 걷기(닫기)');
   R.g.history.state = null; R.pop();
   assert.ok(R.created.find((e) => e.className === 'onf-hwbox').removed, '⛔ 뒤로 = 과제 판 액자 닫기');
   assert.ok(!homeGot.some((m) => m.onf === 'hist-pop'), '⛔ 과제 판 칸을 걷은 뒤로를 홈 「뒤로」 로 보냈다(홈 창이 닫힌다)');
@@ -473,7 +473,7 @@ t('📝 과제 판 액자 — 노크엔 지금 토큰 + 고른 사진·입장권
   assert.equal(got.length, 2, '⛔ 닫힌 액자 노크에 답했다');
   // 두 번 열면 과제 판 칸은 하나(덮어쓰기) · 붙이기 전에 주소
   R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L }, me); R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L }, me);
-  assert.equal(R.calls.filter((c) => /^push:\{"onfHw"/.test(c)).length, 2, '⛔ 열려 있는 과제 판 위에 칸을 또 쌓았다(처음 1 + 다시 1 · 그 사이 닫았으므로 2)');
+  assert.equal(R.calls.filter((c) => /^push:\{"onfHw"/.test(c)).length, 4, '⛔ 열려 있는 과제 판 위에 칸을 또 쌓았다(처음 2 = 판 + 물음 칸 · 닫은 뒤 다시 2 · 열려 있는 판을 또 열면 0)');
 });
 
 t('📝 과제 미리 띄우기 — hwbookWarm = 안 보이는 액자(&warm=1 · 뒤로 칸 없음) · 과제 열기 = 그 액자를 보이고 hwbookGo{l,hw} · 다른 학생이면 새로 · 안 보이는 동안 뒤로는 안 닫음', () => {
@@ -494,7 +494,7 @@ t('📝 과제 미리 띄우기 — hwbookWarm = 안 보이는 액자(&warm=1 ·
   R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L, f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT }, me);
   assert.equal(frames().length, 1, '⛔ 과제 열기가 새 액자를 또 만들었다(미리 띄운 것을 써야)');
   assert.equal(box.style.visibility, '', '⛔ 보이지 않았다');
-  assert.equal(pushes(), 1, '보일 때 뒤로 칸 하나');
+  assert.equal(pushes(), 2, '보일 때 뒤로 칸 둘(판 + 「홈으로 나갈까요?」 물음 칸 · ③)');
   assert.deepEqual(JSON.parse(JSON.stringify(got[1])), { onf: 'hwbookGo', l: L, hw: { f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT, a: null } }, '⛔ hwbookGo');
   // 늦게 뜬 판 — 과제 열기 뒤에 노크하면 토큰 다음에 바로 hwbookGo
   const R2 = boot({ onf_id_tok: odk() }), me2 = { parent: R2.els.app.contentWindow, postMessage() {} }; R2.knockAs(me2);
@@ -516,6 +516,58 @@ t('📝 과제 미리 띄우기 — hwbookWarm = 안 보이는 액자(&warm=1 ·
   R3.postAs({ onf: 'hwbookWarm', t: 'Tok_1' }, me3); R3.postAs({ onf: 'hwbook', t: 'Tok_2', l: L }, me3);
   const fr3 = R3.created.filter((e) => e.tag === 'iframe');
   assert.equal(fr3.length, 2); assert.ok(R3.created.filter((e) => e.className === 'onf-hwbox')[0].removed); assert.ok(/t=Tok_2&l=/.test(fr3[1].src));
+});
+
+t('📱 과제 판 뒤로 한 칸씩(Peter 2026-10-25 ③) — 교재만/옆에 = 보기 칸 · 뒤로 = 사진만 · 다시 뒤로 = 판에 「홈으로 나갈까요?」 · 취소 = 물음 칸 다시 · 확인(‹ 길) = 남은 칸 걷고 닫기', () => {
+  const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
+  R.knockAs(me); R.postAs({ onf: 'hwbook', t: 'Tok_1' }, me);
+  const fr = R.created.filter((e) => e.tag === 'iframe')[0], got = [], inner = { parent: { parent: fr.contentWindow }, postMessage: (m) => got.push(m) };
+  R.postAs({ onf: 'auth-please' }, inner);
+  const ce = R.g.document.createElement; R.g.document.createElement = (tag) => { const e = ce(tag); e.style.setProperty = (k, v) => { e.style[k] = v; }; e.blur = () => {}; return e; };
+  R.g.ONF = Object.assign({}, R.g.ONF || {}, { api: { EXEC: R.g.EXEC } });
+  const box = R.created.find((e) => e.className === 'onf-hwbox'), st = () => JSON.parse(JSON.stringify(R.g.history.state));
+  assert.deepStrictEqual(st(), { onfHw: 1, n: 0, lg: 1 }, '⛔ 과제 판을 열면 맨 위가 물음 칸이어야 한다(뒤로 = 홈으로 나갈까요?)');
+  R.postAs({ onf: 'hwbookView', v: 'book', href: 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILEaaaaaaaa01&sheetName=E3' }, inner);
+  assert.deepStrictEqual(st(), { onfHw: 1, n: 0, lg: 1, hv: 1 }, '⛔ 교재만 — 보기 칸을 안 넣었다(뒤로가 학생 창으로 나간다)');
+  R.postAs({ onf: 'hwbookView', v: 'side' }, inner);
+  assert.strictEqual(R.calls.filter((c) => /"hv":1/.test(c)).length, 1, '⛔ 교재만 ↔ 옆에 사이에 보기 칸을 또 쌓았다');
+  got.length = 0;
+  R.g.history.state = { onfHw: 1, n: 0, lg: 1 }; R.pop();   // 뒤로 — 보기 칸 빠짐
+  assert.ok(!box.removed && box.style.visibility === '' && box.style.right === '0px', '⛔ 뒤로 = 사진만이 아니다(판이 닫혔거나 교재가 남았다)');
+  assert.deepStrictEqual(got.map((m) => m.onf), ['hwbookView'], '⛔ 사진만으로 돌아갔는데 판에 안 알렸다(또는 벌써 물었다)');
+  R.g.history.state = { onfHw: 1, n: 0 }; R.pop();   // 다시 뒤로 — 물음 칸 빠짐
+  assert.ok(!box.removed, '⛔ 물음 칸이 빠졌는데 판을 닫았다(묻지 않고 나갔다)');
+  assert.deepStrictEqual(got.slice(-1).map((m) => m.onf), ['hwLeaveAsk'], '⛔ 「홈으로 나갈까요?」 를 판에 안 물었다');
+  R.postAs({ onf: 'hwLeaveKeep' }, inner);
+  assert.deepStrictEqual(st(), { onfHw: 1, n: 0, lg: 1 }, '⛔ 취소 = 물음 칸 다시');
+  R.g.history.state = { onfHw: 1, n: 0 }; R.pop();
+  R.postAs({ onf: 'hwbookBack' }, inner);   // 확인 — ‹ 와 같은 길
+  assert.ok(R.calls.includes('go:-1'), '⛔ 확인 = 남은 판 칸 하나 걷기');
+  R.g.history.state = null; R.pop();
+  assert.ok(box.removed, '⛔ 확인 뒤 판이 안 닫혔다');
+  // 교재 ✕(bookClose) = 사진만 — 보기 칸을 코드로 걷는다
+  const R2 = boot({ onf_id_tok: odk() }), me2 = { parent: R2.els.app.contentWindow, postMessage() {} }; R2.knockAs(me2); R2.postAs({ onf: 'hwbook', t: 'Tok_1' }, me2);
+  const in2 = { parent: { parent: R2.created.filter((e) => e.tag === 'iframe')[0].contentWindow }, postMessage() {} }; R2.postAs({ onf: 'auth-please' }, in2);
+  const ce2 = R2.g.document.createElement; R2.g.document.createElement = (tag) => { const e = ce2(tag); e.style.setProperty = (k, v) => { e.style[k] = v; }; e.blur = () => {}; return e; };
+  R2.g.ONF = Object.assign({}, R2.g.ONF || {}, { api: { EXEC: R2.g.EXEC } });
+  R2.postAs({ onf: 'hwbookView', v: 'book', href: 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILEaaaaaaaa01&sheetName=E3' }, in2);
+  const n0 = R2.calls.filter((c) => c === 'back').length;
+  R2.postAs({ onf: 'hwbookView', v: 'photo' }, in2);
+  assert.strictEqual(R2.calls.filter((c) => c === 'back').length, n0 + 1, '⛔ 사진만으로 돌아가면서 보기 칸을 안 걷었다(뒤로가 한 번 헛돈다)');
+});
+t('📱 왼쪽 끝 쓸기 = 앱 뒤로(Peter 2026-10-25 ④⑦ · onf-edge) — 안쪽 노크(ask)에 edge-on · back 은 맨 위가 우리 칸일 때만 코드로 뒤로 · 바닥·남의 출처는 아무것도 안 함', () => {
+  const R = boot({ onf_id_tok: odk() }), got = [], src = { postMessage: (m, o) => got.push([m, o]) };
+  R.postAs({ onf: 'edge', op: 'ask' }, src);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(got)), [[{ onf: 'edge-on' }, KORIGIN]], '⛔ 안쪽 노크에 edge-on 으로 답하지 않았다');
+  R.postAs({ onf: 'edge', op: 'ask' }, src, 'https://evil.example');
+  assert.strictEqual(got.length, 1, '⛔ 남의 출처 노크에 답했다');
+  const backs = () => R.calls.filter((c) => c === 'back').length;
+  R.g.history.state = null; R.postAs({ onf: 'edge', op: 'back' }, src);
+  assert.strictEqual(backs(), 0, '⛔ 바닥(홈)에서 쓸었는데 뒤로 갔다(앱 밖으로 나간다)');
+  for (const s of [{ onfHist: 'h1', n: 1 }, { onfBook: 'k', n: 0, bd: 1 }, { onfHw: 1, n: 0, lg: 1 }]) { R.g.history.state = s; R.postAs({ onf: 'edge', op: 'back' }, src); }
+  assert.strictEqual(backs(), 3, '⛔ 홈 칸·판 칸·과제 판 칸이 맨 위인데 쓸기가 뒤로를 안 했다');
+  R.g.history.state = { onfHist: 'h1', n: 1 }; R.postAs({ onf: 'edge', op: 'back' }, src, 'https://evil.example');
+  assert.strictEqual(backs(), 3, '⛔ 남의 출처 쓸기에 뒤로 갔다');
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
