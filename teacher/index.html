@@ -957,17 +957,17 @@ function bookOpen(href, left, m, r, home, cf, out) {   // cf = 📖 ☁️ 홈�
   if (!src) return;
   p = bookFind(src);
   if (p && !outSame(p, src, out)) { bookRetire(p); p = null; }   // 🌤 길이 다른 판 — 자격 내리고 그 길 새 판(학생 껍데기와 같다)
-  if (!p && home && (b = bookBoardFor(src, out))) { bookSwapTo(b, src, left, m, r, cf); rsMark(bookShown(), href); return; }
+  if (!p && home && (b = bookBoardFor(src, out))) { bookSwapTo(b, src, left, m, r, cf); rsMark(bookShown(), href, out); return; }
   bookShow(p || bookMake(src, false, out, cf), left, m, r);
-  rsMark(bookShown(), href);
+  rsMark(bookShown(), href, out);
 }
 /* 🔄 새로고침 = 열린 창 그대로(Peter 2026-10-24 · ⚠️ 쌍둥이: 학생 assets/onf-frame.js rsSave·rsBoot) — 보이는 판의 연 주소·자리·교재가 알린 상태(bookState)를 이 탭에만(sessionStorage) ·
    다시 읽히면 홈이 처음 노크할 때(bookHello — 로그인이 끝나 홈이 뜬 뒤) 그 주소로 다시 열고 교재 노크 때 bookRestore · 닫으면 지운다 · 12시간 넘은 기억은 버린다 */
 var RS_KEY = 'onfThOpenBook', RS_MS = 12 * 3600 * 1000, rsBooted = false;
 /* 홈 탭도(학생 껍데기 TAB0 와 같다) — 돌려줄 값은 읽힐 때 한 번 잡는다(홈이 처음 그린 오늘 탭이 먼저 와서 덮지 않게) */
 var TAB_KEY = 'onfThHomeTab', TAB0 = (function () { try { return sessionStorage.getItem(TAB_KEY) || ''; } catch (e) { return ''; } })();
-function rsMark(p, href) { if (!p) return; p.href = href; rsSave(p); }
-function rsSave(p) { if (!p || !p.href) return; try { sessionStorage.setItem(RS_KEY, JSON.stringify({ h: p.href, l: p.left, m: p.m, r: p.r, st: p.st || null, at: Date.now() })); } catch (e) {} }
+function rsMark(p, href, out) { if (!p) return; p.href = href; p.hout = out ? 1 : 0; rsSave(p); }   // 🌤 hout = 홈이 out:1 로 연 판(되살릴 때 같은 길 · 학생 껍데기 rsMark 쌍둥이 · 2026-10-28)
+function rsSave(p) { if (!p || !p.href) return; try { sessionStorage.setItem(RS_KEY, JSON.stringify({ h: p.href, l: p.left, m: p.m, r: p.r, o: p.hout || 0, st: p.st || null, at: Date.now() })); } catch (e) {} }
 function rsDrop() { try { sessionStorage.removeItem(RS_KEY); } catch (e) {} }
 function rsTell(p) { if (!p || !p.rs || !p.win) return; var st = p.rs; p.rs = null; try { p.win.postMessage({ onf: 'bookRestore', st: st }, p.origin); } catch (e) {} }
 function rsBoot() {
@@ -975,7 +975,7 @@ function rsBoot() {
   var v = null;
   try { v = JSON.parse(sessionStorage.getItem(RS_KEY) || 'null'); } catch (e) { v = null; }
   if (!v || typeof v.h !== 'string' || !(Date.now() - Number(v.at) < RS_MS)) return;
-  bookOpen(v.h, typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true);
+  bookOpen(v.h, typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, null, v.o === 1);
   var p = bookShown(); if (!p) return;
   p.st = v.st && typeof v.st === 'object' ? v.st : null; p.rs = p.st; rsTell(p);
 }
@@ -987,6 +987,10 @@ function bookPre(href, left, m, r, out) {
   if (!src || bookFind(src)) return;
   b = bookBoardFor(src, out);
   if (b) { bookFetch(b, src); return; }   // 📖 판이 값만 받아 둔다(새 판 0 · 접속 표시 0 · 판이 차례를 맡는다)
+  /* 🌤 숨긴 정적 판은 하나까지(밖으로 4-① 고침 1 · 2026-10-28) — 정적 판은 판이 안 돼 미리 주소를 못 받고(bookFetch 없음) 노크 전 후보라 bookRoom 도 못 지운다 →
+     홈 목록(thBookList)이 out:1 여섯을 보내면 숨긴 정적 판 여섯 · 다리(GAS) 여섯이 한꺼번에 떴다. 숨긴(또는 뜨는 중인) 정적 판이 이미 있으면 **버린다**(줄에 안 세운다 —
+     흘릴 판이 없다) · 누르면 그때 새 정적 판(사본 겨루기로 빠르다). 구글 미리(out 없음)는 종전 길 그대로. */
+  if (outWant(src, out) && books.some(function (q) { return q.out && !q.gone && (q.parked || bookCand(q)); })) return;
   if (!bookMine(src) && !outWant(src, out) && books.some(function (q) { return bookCand(q) && !q.out; })) { if (bookQ.length < BOOK_Q_MAX && bookQ.indexOf(src) < 0) bookQ.push(src); return; }   // 📖 곧 판이 될 판이 노크 전 — 줄에 세운다(아래 bookQ)   // 🌤 정적 판 미리는 줄에 안 선다(구글 판에 안 흘린다) · 정적 판 후보 뒤엔 안 선다(그 판은 판이 안 된다)
   if (BOOK_SW && phone()) return;   // 📖 D1 — 폰은 미리 판을 안 띄운다(첫 [열기]로 생긴 판을 쓴다)
   bookRoom(bookMax() - 1);   // 자리가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 — 종전엔 안 띄웠다 · 📱 폰은 홈이 안 보낸다)

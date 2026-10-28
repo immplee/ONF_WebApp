@@ -1306,5 +1306,39 @@ t('O7 변이 — 판 자물쇠를 늘 참으로 바꾸면 「남의 출처 버�
   assert.strictEqual(s.g.books[0].win, w, '⛔ 변이가 안 먹었다(남의 출처 검사가 아무것도 못 잡는다)');
 });
 
+t('O8 고침 1 — 홈 목록이 bookWarm{out:1, panel:1} 여섯(다른 교재)을 보내도 숨긴 정적 판은 하나 · 구글 미리(out 없음)는 종전 길(셋까지 숨긴 판)', () => {
+  const HS = [1, 2, 3, 4, 5, 6].map((n) => TURL.replace('e1', 'e' + n));
+  let s = phoneRun({ wide: true, frame: true, search: '?swap=1' });
+  HS.forEach((h) => s.send({ onf: 'bookWarm', href: h, panel: 1, left: 270, out: 1 }, s.home));
+  const st = s.panels().filter((x) => isStatic(x) && x.classList.contains('park'));
+  assert.strictEqual(st.length, 1, '⛔ 숨긴 정적 판이 ' + st.length + '개 — 다리(GAS)가 한꺼번에 뜬다');
+  assert.strictEqual(s.panels().length, 1, '⛔ 정적 미리가 구글 판으로 새어 나갔다');
+  //   노크 뒤(후보가 아님)에도 숨긴 정적 판이 있으면 더 안 띄운다
+  outUp(s, st[0]); s.send({ onf: 'bookHi', swap: 1 }, st[0].kids[0].contentWindow, OUT_O);
+  s.g.books[0].born -= 2 * 60 * 1000;
+  s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e7'), panel: 1, out: 1 }, s.home);
+  assert.strictEqual(s.panels().length, 1, '⛔ 노크한 숨긴 정적 판이 있는데 또 띄웠다');
+  //   구글 미리 — 종전(판 한 장 끔: 셋까지 숨긴 판)
+  s = phoneRun({ wide: true, frame: true });
+  HS.forEach((h) => s.send({ onf: 'bookWarm', href: h, panel: 1, left: 270 }, s.home));
+  assert.ok(s.panels().length === 3 && s.panels().every((x) => !isStatic(x) && x.classList.contains('park')), '⛔ 구글 미리가 종전과 다르다: ' + s.panels().length);
+});
+
+t('O9 고침 2 — 새로고침 되살리기가 길(out)을 기억한다: 정적 판으로 연 교재는 다시 읽힌 뒤에도 정적 판 · 구글 판은 구글 판', () => {
+  const mk = (ss) => run({ frame: true, pre(g) { g.sessionStorage = ss; } });
+  const ss = { s: {}, getItem(k) { return k in this.s ? this.s[k] : null; }, setItem(k, v) { this.s[k] = String(v); }, removeItem(k) { delete this.s[k]; } };
+  let s = mk(ss);
+  s.send({ onf: 'openBook', href: E1, left: 270, out: 1 }, s.home);
+  assert.ok(isStatic(s.panel()) && JSON.parse(ss.s.onfThOpenBook).o === 1, '⛔ 정적 판인데 기억에 o:1 이 없다');
+  s = mk(ss);   // 다시 읽힘
+  s.send({ onf: 'bookHello' }, s.home);
+  assert.ok(s.panel() && isStatic(s.panel()), '⛔ 되살린 판이 구글 판으로 열렸다');
+  const ss2 = { s: {}, getItem: ss.getItem, setItem: ss.setItem, removeItem: ss.removeItem };
+  s = mk(ss2); s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
+  assert.strictEqual(JSON.parse(ss2.s.onfThOpenBook).o, 0, '⛔ 구글 판 기억에 o:0 이 아니다');
+  s = mk(ss2); s.send({ onf: 'bookHello' }, s.home);
+  assert.ok(s.panel() && !isStatic(s.panel()), '⛔ 구글 판을 정적 판으로 되살렸다');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);
