@@ -29,7 +29,8 @@ const SRC1 = 'https://script.google.com/x/exec?t=T&mode=share&slug=a-s1-e1-b&emb
 const SRCM = 'https://script.google.com/x/exec?t=T&mode=mine&embed=1', SRCC = 'https://script.google.com/x/exec?t=T&mode=share&view=cards&embed=1';
 const B2 = 'https://class.ownify.co.kr/b-s1-e1-b?mode=share', SRCB2 = 'https://script.google.com/x/exec?t=T&mode=share&slug=b-s1-e1-b&embed=1';   // 둘째 교재(안 켬)
 const B2N = 'https://class.ownify.co.kr/b-s1-e2-b?mode=share', SRCB2N = 'https://script.google.com/x/exec?t=T&mode=share&slug=b-s1-e2-b&embed=1';   // 둘째 교재 다음 회차
-const BS = (h) => (/view=cards/.test(h) ? SRCC : /mode=mine/.test(h) ? SRCM : /a-s1-e2-b/.test(h) ? SRC2 : /b-s1-e1-b/.test(h) ? SRCB2 : /b-s1-e2-b/.test(h) ? SRCB2N : /mode=share/.test(h) ? SRC1 : null);
+const SRCMR = 'https://script.google.com/x/exec?t=T&mode=mine&view=review&embed=1', SRCMT = 'https://script.google.com/x/exec?t=T&mode=mine&ttok=X&embed=1';   // 🌤 4-② 내 문장 복습 · 선생님 보기(ttok — 진짜 bookSrc 는 떼지만 껍데기가 한 번 더)
+const BS = (h) => (/view=cards/.test(h) ? SRCC : /mode=mine/.test(h) ? (/ttok=/.test(h) ? SRCMT : /view=review/.test(h) ? SRCMR : SRCM) : /a-s1-e2-b/.test(h) ? SRC2 : /b-s1-e1-b/.test(h) ? SRCB2 : /b-s1-e2-b/.test(h) ? SRCB2N : /mode=share/.test(h) ? SRC1 : null);
 const CF = { f: 'FILE_ID_0123456789', s: 'E1', k: 'v1.abc.def' };
 
 /* book-panel.test.js 의 setup 꼴 — mount 에 out·tok 을 더 넘긴다(index.html 과 같게 기본 켬) */
@@ -286,14 +287,62 @@ t('S-F2b out:1 누름이 찾은 판이 지금 길(exec) 판이면 — 자격 내
 
 /* 검토 고침 1(2026-10-24) — 넓은 화면·판 모드 홈은 [첫 교재, 내 문장, 다음 회차, 둘째 교재] 를 한꺼번에 미리 받는다. 종전엔 첫 교재(지금 길 후보) 뒤에 둘이 줄 서
    판에 값만 받아 뒀다([교재, 내 문장]). 첫 교재가 정적 판이면 줄 설 곳이 없어 지금 길 숨긴 판이 하나 더 뜨고(GAS 한 번 더) 판 셋 넘침이 ⭐ 내 문장을 쫓아냈다(복습 ≈4.4초). */
-t('S5g ⭐ 내 문장·카드 덱 주소는 out:1 이어도 지금 길', () => {
+/* 🌤 밖으로 4-②(2026-10-29) — ⭐ 내 문장(/mine/)·🗂️ 카드 덱(/book/)도 정적 판 · 홈이 out:1 을 실었을 때만(학생별 스위치 · Ownify Task 4) */
+const OUT_MINE = (/var OUT_MINE_URL = '([^']+)'/.exec(CODE) || [])[1] || 'OUT_MINE_URL 없음';
+t('S5g ⭐ 내 문장 out:1 → 액자 = /mine/ · hello 에 outBoot{src} · out 없음 → 구글 판(종전)', () => {
+  assert.strictEqual(OUT_MINE, 'https://app.ownify.co.kr/mine/', '상수 값(브리프)');
   const s = setup();
   s.send({ onf: 'openBook', href: MINE, out: 1 }, s.homeInner);
-  assert.strictEqual(s.panels().slice(-1)[0].kids[0].src, SRCM, '⛔ 내 문장이 정적 판으로 갔다');
-  s.send({ onf: 'openBook', href: CARDS, out: 1 }, s.homeInner);
-  assert.strictEqual(s.panels().slice(-1)[0].kids[0].src, SRCC, '⛔ 카드 덱이 정적 판으로 갔다');
+  const box = s.panels()[0];
+  assert.strictEqual(box.kids[0].src, OUT_MINE, '⛔ 켠 내 문장이 /mine/ 이 아니다: ' + box.kids[0].src);
+  const w = outWin(s, box);
+  s.send({ onf: 'outHello' }, w, OUT_O);
+  assert.deepStrictEqual(boots(w), [[{ onf: 'outBoot', tok: 'TOK', src: SRCM, cf: null }, OUT_O]], '⛔ 내 문장 판 outBoot 꼴·출처');
+  const q = setup();
+  q.send({ onf: 'openBook', href: MINE }, q.homeInner);
+  assert.strictEqual(q.panels()[0].kids[0].src, SRCM, '⛔ out 없는 내 문장이 구글 판이 아니다');
 });
-
+t('S5g 내 문장 + ttok(선생님 보기) → out:1 이어도 구글 판', () => {
+  const s = setup();
+  s.send({ onf: 'openBook', href: MINE + '&ttok=X', out: 1 }, s.homeInner);
+  assert.strictEqual(s.panels()[0].kids[0].src, SRCMT, '⛔ ttok 내 문장이 정적 판으로 갔다');
+});
+t('S5g 🗂️ 카드 덱 out:1 → /book/ 정적 판(outBoot src) · out 없음 → 구글 판', () => {
+  const s = setup();
+  s.send({ onf: 'openBook', href: CARDS, out: 1 }, s.homeInner);
+  const box = s.panels()[0];
+  assert.strictEqual(box.kids[0].src, OUT_BOOK, '⛔ 켠 카드 덱이 정적 판이 아니다: ' + box.kids[0].src);
+  const w = outWin(s, box);
+  s.send({ onf: 'outHello' }, w, OUT_O);
+  assert.deepStrictEqual(boots(w).map((x) => x[0].src), [SRCC], '⛔ 덱 outBoot src');
+  const q = setup();
+  q.send({ onf: 'openBook', href: CARDS }, q.homeInner);
+  assert.strictEqual(q.panels()[0].kids[0].src, SRCC, '⛔ out 없는 덱이 구글 판이 아니다');
+});
+t('S5g 덱 정적 판이 hello 뒤 outFail → 같은 판에 구글 exec · onfOutFail 적힘 · 내 문장 판도 같다', () => {
+  for (const [h, g] of [[CARDS, SRCC], [MINE, SRCM]]) {
+    const ls = LSf(), s = setup({ ls });
+    s.send({ onf: 'openBook', href: h, out: 1 }, s.homeInner);
+    const box = s.panels()[0], w = outWin(s, box);
+    s.send({ onf: 'outHello' }, w, OUT_O);
+    s.send({ onf: 'outFail' }, w, OUT_O);
+    assert.ok(s.panels().length === 1 && box.kids[0].src === g, '⛔ ' + h + ' — 같은 판에 구글로 안 물러났다: ' + box.kids[0].src);
+    assert.strictEqual(ls.m.onfOutFail, String(1.7e12), '⛔ ' + h + ' — onfOutFail 안 적힘');
+  }
+});
+t('S5g 숨긴 내 문장 판(bookWarm panel:1 out:1) → /mine/ + park=1 · 그 판이 review 노크하면 [복습 시작] 누름에 bookView 가 그 판으로(새 판 0)', () => {
+  const s = setup({ swap: true });
+  s.send({ onf: 'bookWarm', href: MINE, panel: 1, out: 1 }, s.homeInner);
+  const box = s.panels()[0];
+  assert.ok(box.classList.contains('park') && box.kids[0].src === OUT_MINE, '⛔ 숨긴 내 문장 판이 /mine/ 이 아니다: ' + box.kids[0].src);
+  const w = outWin(s, box);
+  s.send({ onf: 'outHello' }, w, OUT_O);
+  assert.deepStrictEqual(boots(w).map((x) => x[0].src), [SRCM + '&park=1'], '⛔ 숨긴 내 문장 판 outBoot 에 park=1');
+  s.send({ onf: 'bookHi', views: 'review' }, w, OUT_O); w.sent.length = 0;
+  s.send({ onf: 'openBook', href: MINE + '&view=review', out: 1 }, s.homeInner);
+  assert.strictEqual(s.panels().length, 1, '⛔ [복습 시작]이 새 판을 띄웠다');
+  assert.deepStrictEqual(js(w.sent), [[{ onf: 'bookPark', on: false }, OUT_O], [{ onf: 'bookView', view: 'review' }, OUT_O]], '⛔ 숨긴 내 문장 판에 bookView 가 안 갔다');
+});
 console.log('[🌤 검토 고침 1차 — 켠 교재만 · 판 섞지 않기]');
 /* 판 노크 — 첫 노크 뒤 swap:1 노크(정적 판도 지금 교재와 같은 말) */
 function knock(s, box, origin, views) { const w = box.kids[0].contentWindow; s.send({ onf: 'bookHi', views: views || 'line' }, w, origin); s.send({ onf: 'bookHi', views: views || 'line', swap: 1 }, w, origin); w.sent.length = 0; return w; }
@@ -418,11 +467,9 @@ t('I1 카드 덱(view=cards)은 정적 판에 「열어」(bookLike)를 안 보�
   s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
   const box = s.panels()[0], w = outWin(s, box);
   knock(s, box, OUT_O, 'cards,line');
-  for (const o of [{}, { out: 1 }]) {
-    s.send(Object.assign({ onf: 'openBook', href: CARDS }, o), s.homeInner);
-    assert.strictEqual(sentOf(w, 'bookView').length + sentOf(w, 'bookSwap').length, 0, '⛔ 카드 덱을 정적 판에 보냈다 ' + JSON.stringify(o));
-    assert.strictEqual(shown(s)[0].kids[0].src, SRCC, '⛔ 카드 덱이 지금 길 판으로 안 떴다');
-  }
+  s.send({ onf: 'openBook', href: CARDS }, s.homeInner);   // 🌤 4-② — out 없는 덱만 지금 길(out:1 덱은 위 S5g 정적 판)
+  assert.strictEqual(sentOf(w, 'bookView').length + sentOf(w, 'bookSwap').length, 0, '⛔ out 없는 카드 덱을 정적 판에 보냈다');
+  assert.strictEqual(shown(s)[0].kids[0].src, SRCC, '⛔ 카드 덱이 지금 길 판으로 안 떴다');
 });
 
 t('I1 노크 전 정적 판 후보 뒤에 미리(bookWarm) 주소를 줄 세우지 않는다 — 정적 판에 bookFetch 안 감 · 지금 길 숨긴 판으로 미리', () => {
@@ -522,6 +569,13 @@ t('S6a onfOutUsed 없음·14일 넘음·onfOutPending 없음·끈 기기·실패
     settle(s); s.fire(15000);
     assert.ok(s.panels().every((p) => !p.classList.contains('park')), '⛔ ' + why + ' 인데 숨긴 판이 생겼다');
   }
+});
+
+t('S5g 넘겨주기(bookFlush)는 내 문장 주소를 안 다룬다 — 내 문장 회차 표시가 남아도 숨긴 판(/book/·/mine/) 0', () => {
+  const s = setup({ ls: USED({ ['onfOutPending:' + SRCM]: '1' }) });
+  s.send({ onf: 'openBook', href: MINE }, s.homeInner);
+  settle(s); s.fire(15000);
+  assert.ok(s.panels().every((p) => !p.classList.contains('park')), '⛔ 내 문장 주소로 넘겨주기 판을 띄웠다: ' + s.panels().map((p) => p.kids[0].src).join(' '));
 });
 
 t('S6a 정적 판을 띄우면 onfOutUsed 를 적는다 · 넘겨줄 판이 안 뜨면(OUT_MS)·outFail·60초 상한이면 닫고 하루 실패(onfOutFail)는 안 적는다', () => {
