@@ -1421,5 +1421,33 @@ t('P4 보이는 정적 판을 새로 열면 살아 있는 넘겨주기 판을 �
   }
 });
 
+t('O10 기기 스위치 — 주소 out=0 이면 이 기기는 늘 지금 길(openBook{out:1} = 구글 판 · bookWarm{out:1} 정적 판 0) · 기억(onfOut) 이라 다시 읽혀도 · ⚠️ 쌍둥이: 학생 index.html out 줄', () => {
+  let s = phoneRun({ wide: true, frame: true, search: '?out=0' });
+  assert.strictEqual(s.g.localStorage.s.onfOut, '0', '⛔ out=0 을 기억 안 했다');
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
+  assert.ok(!isStatic(s.panel()) && s.panel().kids[0].src === srcOf(s, E1), '⛔ out=0 인데 정적 판');
+  s.send({ onf: 'bookWarm', href: E2, panel: 1, out: 1 }, s.home);
+  assert.ok(s.panels().every((x) => !isStatic(x)), '⛔ out=0 인데 숨긴 정적 판');
+  const ls = Object.assign({}, s.g.localStorage.s);
+  s = phoneRun({ wide: true, frame: true, ls });   // 다시 읽힘(주소에 out 없음)
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
+  assert.ok(!isStatic(s.panel()), '⛔ 기억한 out=0 이 다시 읽힌 뒤 안 먹는다');
+  s = phoneRun({ wide: true, frame: true, ls, search: '?out=1' });
+  assert.strictEqual(s.g.localStorage.s.onfOut, '1', '⛔ out=1 이 기억한 0 을 안 걷었다');
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
+  assert.ok(isStatic(s.panel()), '⛔ out=1 인데 정적 판이 아니다');
+});
+
+t('O11 주소 out=1 은 그날 물러남 기억(onfOutFail)을 지운다 — 다음 openBook{out:1} 은 정적 판', () => {
+  const ls = { onfOutFail: String(Date.now() - 1000), onfOutFailHome: String(Date.now() - 1000) };
+  let s = phoneRun({ wide: true, frame: true, ls: Object.assign({}, ls) });
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
+  assert.ok(!isStatic(s.panel()), '전제: 그날 물러난 기기는 지금 길');
+  s = phoneRun({ wide: true, frame: true, ls: Object.assign({}, ls), search: '?out=1' });
+  assert.ok(!('onfOutFail' in s.g.localStorage.s) && !('onfOutFailHome' in s.g.localStorage.s), '⛔ out=1 이 물러남 기억을 안 지웠다');
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
+  assert.ok(isStatic(s.panel()), '⛔ out=1 뒤에도 그날 지금 길');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);

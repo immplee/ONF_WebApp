@@ -754,6 +754,13 @@ var BOOK_KEYS = ['t', 'mode', 'fileId', 'sheetName', 'back', 'line', 'view', 'tt
 var BOOK_WIDE_Q = '(min-width:1100px) and (hover:hover) and (pointer:fine)', wideMq = null, bookSrcs = [];
 try { wideMq = window.matchMedia ? window.matchMedia(BOOK_WIDE_Q) : null; } catch (eM) {}
 /* 📱 「홈으로 나갈까요?」 칸을 껍데기가 판 보이기 전에 민다(학생 껍데기 opts.lg · histGuard 와 같다 · Peter 2026-10-24) — 주소 lg=1|0 이면 이 기기에 기억(onfThLg) · 없으면 켬 */
+/* 🌤 정적 교재 판 기기 스위치(밖으로 4-① 2026-10-28 · ⚠️ 쌍둥이: 학생 index.html 「밖으로 1」 out 줄) — 주소 out=0|1 이면 이 기기에 기억(onfOut · 학생 껍데기와 같은 출처라 같은 키 = 이 기기 전체) · 없으면 기억값 · 그것도 없으면 켬.
+   out=0 = 이 기기는 늘 지금 길(아래 outOk — 미리·넘겨주기도) · out=1 은 그날 물러남 기억(onfOutFail · onfOutFailHome)도 지운다(한 번 물러난 기기를 그날 다시 시험하게). */
+var BOOK_OUT = (function () {
+  var v = null;
+  try { v = new URLSearchParams(location.search).get('out'); if (v === '1' || v === '0') { localStorage.setItem('onfOut', v); if (v === '1') { localStorage.removeItem('onfOutFail'); localStorage.removeItem('onfOutFailHome'); } } else v = localStorage.getItem('onfOut'); } catch (e) {}
+  return v !== '0';
+})();
 var BOOK_LG = (function () {
   var v = null;
   try { v = new URLSearchParams(location.search).get('lg'); if (v === '1' || v === '0') localStorage.setItem('onfThLg', v); else v = localStorage.getItem('onfThLg'); } catch (e) {}
@@ -874,7 +881,7 @@ function bookPx(p, name, v) {
    outSame = 판 p 가 이 열기와 같은 길인가 — 길이 다른 판엔 갈아 끼우기·미리 받기를 안 보낸다(Review Focus 2). 정적 판은 판(bookBoard)이 안 된다(그 판 다리는 첫 교재에 묶였다 · 학생 껍데기 bookBoardFor). */
 var OUT_FAIL = 'onfOutFail', OUT_FAIL_MS = 86400000, OUT_USED = 'onfOutUsed';
 function outOk(src) {
-  if (!(window.ONF && ONF.frame && ONF.frame.openApp && ONF.frame.OUT_BOOK) || bookMine(src) || /[?&]view=cards(&|$)/.test(src)) return false;
+  if (!BOOK_OUT || !(window.ONF && ONF.frame && ONF.frame.openApp && ONF.frame.OUT_BOOK) || bookMine(src) || /[?&]view=cards(&|$)/.test(src)) return false;
   try { return !(Date.now() - Number(localStorage.getItem(OUT_FAIL) || 0) < OUT_FAIL_MS); } catch (e) { return false; }   // 저장소가 막힌 창 — 실패를 못 기억하니 열 때마다 2.5초를 안 낸다
 }
 function outWant(src, out) { return !!out && outOk(src); }
