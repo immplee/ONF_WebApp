@@ -264,6 +264,7 @@
      · 정적 판 주소는 상수 한 줄(시험 땐 Pages 주소). OUT_MS = 문서 받을 준비까지 짐작 — 0단계 실측으로 고친다. */
   var ONF_OUT_ORIGINS = ['https://app.ownify.co.kr', 'https://onf-app.pages.dev'];
   var ONF_OUT_BOOK = 'https://app.ownify.co.kr/book/';
+  var OUT_MINE_URL = 'https://app.ownify.co.kr/mine/';   // 🌤 밖으로 4-②(2026-10-29) ⭐ 내 문장 정적 판 — Lib 스위치 ONF_OUT_MINE 과 다른 이름
   var OUT_MS = 2500;
   function isAppOrigin(o) { o = String(o); return ONF_OUT_ORIGINS.indexOf(o) >= 0 || /^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(o); }
   function openApp(el, url, src, cf, onFail, tok, hooks) {   // hooks = 첫 판만(밖으로 2 · 로고 막 onf-load.js) — 첫 hello 에 ok
@@ -676,7 +677,7 @@
       try { var q = new URL(src).searchParams, f = q.get('fileId'), g = (q.get('slug') || '').split('-'); return f ? 'f:' + f : g.length === 4 ? 's:' + g[0] + '-' + g[1] + '-' + g[3] : ''; } catch (e) { return ''; }
     }
     function bookBase(src) { try { var u = new URL(src); u.searchParams.delete('view'); u.searchParams.delete('line'); return u.href; } catch (e) { return src; } }
-    function bookCan(p, a) { return !!(p && !p.gone && !p.sw && (a.view || a.line) && (!a.view || p.views.indexOf(a.view) >= 0) && (!a.line || p.views.indexOf('line') >= 0)); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 [] · 📖 자격 내린 판(gone)·갈아 끼우는 중(sw — 아직 옛 교재)엔 「열어」를 안 보낸다
+    function bookCan(p, a) { return !!(p && !p.gone && !p.sw && !(p.out && a.view === 'cards') && (a.view || a.line) && (!a.view || p.views.indexOf(a.view) >= 0) && (!a.line || p.views.indexOf('line') >= 0)); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 [] · 🗂️ 카드 덱(view=cards)은 정적 판(p.out)에 절대 안 맡긴다(4-② 최종 검토 — 정적 /book/ 은 views 'line' 만 노크하지만 시간 맞물림에 기대지 않는다 · onfDeckView 가 정적 판에서 O.boot fail) · 📖 자격 내린 판(gone)·갈아 끼우는 중(sw — 아직 옛 교재)엔 「열어」를 안 보낸다
     /* 아무것도 안 묻는 열기([이어서 하기])도 **줄 링크로 연 판**(view 없음)이면 그 판(반박 검토 🟡4) — 판은 이미 그 교재다 · 할 말이 없으니 보이기만.
        ⛔ view 로 연 판(덱·복습)은 안 맡긴다 — 열자마자 그 창을 띄운 판이다(위 「view 없는 보통 열기」 검사). */
     function bookLike(src, a, out) {
@@ -703,14 +704,15 @@
       return ok ? v : null;
     }
     /* 🌤 밖으로 1(2026-10-24 · 위 openApp) — 이 판을 정적 판으로 띄우나: 기기 스위치(index.html out · onfOut) · 토큰 · 그날 이 기기에서 안 떴던 적 없음(onfOutFail 하루) ·
-       ⭐ 내 문장·🗂️ 카드 덱은 지금 길(홈 onfOutOf 도 0 이지만 껍데기가 한 번 더). outSeen = 홈이 out:1 로 연 판 주소(아래 preWrite 의 o:1). */
+       ⭐ 내 문장 선생님 보기(ttok)는 지금 길(4-② 2026-10-29 · 홈 onfOutOf 도 0 이지만 껍데기가 한 번 더 · 선생님 내 문장은 ④) — 내 문장·🗂️ 카드 덱은 홈이 out:1(학생별 스위치)일 때만 여기 온다.
+       outSeen = 홈이 out:1 로 연 판 주소(아래 preWrite 의 o:1). */
     var OUT_FAIL = 'onfOutFail', OUT_FAIL_MS = 86400000, outSeen = {};
     function outOk(src) {
-      if (!opts.out || !opts.tok || bookMine(src) || bookAsk(src).view === 'cards') return false;
+      if (!opts.out || !opts.tok || (bookMine(src) && /[?&]ttok=/.test(src))) return false;
       try { return !(Date.now() - Number(global.localStorage.getItem(OUT_FAIL) || 0) < OUT_FAIL_MS); } catch (e) { return false; }   // 저장소가 막힌 창 — 실패를 못 기억하니 열 때마다 2.5초를 안 낸다
     }
     /* 🌤 이 열기가 정적 판으로 갈 판인가 · 판 p 가 같은 길인가(검토 고침 1 · 2026-10-24) — 정적 판도 지금 교재와 같은 bookHi swap:1 로 판(board)이 된다.
-       길이 다른 판엔 갈아 끼우기(bookBoardFor)·「열어」(bookLike)·줄 선 미리 주소(bookQ)를 안 보낸다 → 켠 교재만 정적 판 · ⭐ 내 문장·🗂️ 카드 덱(outOk 거짓)은 늘 지금 길 판. */
+       길이 다른 판엔 갈아 끼우기(bookBoardFor)·「열어」(bookLike)·줄 선 미리 주소(bookQ)를 안 보낸다 → 켠 교재만 정적 판 · ⭐ 내 문장·🗂️ 카드 덱도 out:1 일 때만 정적 판(4-②) · 선생님 보기 내 문장(ttok · outOk 거짓)은 늘 지금 길 판. */
     function outWant(src, out) { return !!out && outOk(src); }
     function outSame(p, src, out) { return !!p.out === outWant(src, out); }
     /* 🧺 남은 쓰기 넘겨주기(밖으로 1 Task 6 · 2026-10-24) — 정적 판에서 못 보낸 쓰기는 그 출처(app.ownify.co.kr) 기기 저장소에 남고 정적 판이 다시 열려야 나간다
@@ -724,12 +726,12 @@
        · books 밖 — 판 규칙(판·「열어」·자리 셈)과 노크(아래 판 말 받이는 books 만 본다)에 안 섞인다 · 주소는 view·line 뗀 교재(bookBase) + park=1(접속 신호 0)
        · 사본 힌트는 안 넘긴다 — 사본 표는 확인 전이라 못 보낸 칸을 저절로 안 보낸다(Ownify onfBkGated) · 다리 값으로 그린다
        · 안 뜸·outFail·상한(FLUSH_MS)도 닫는다 — 그날 실패(onfOutFail)는 안 적는다(보이는 판이 아니다) · 남은 것은 기기에 그대로(다음 열기에 또)
-       · 기기 끔·토큰 없음·그날 실패·⭐ 내 문장·🗂️ 카드 덱은 안 한다(위 outOk) · 한 화면에 교재마다 한 번.
+       · 기기 끔·토큰 없음·그날 실패는 안 한다(위 outOk) · ⭐ 내 문장도 안 한다(쓰기가 칸 대기열이 아니다 · 4-②) · 덱은 bookBase 가 view 를 떼어 교재 그대로 · 한 화면에 교재마다 한 번.
        ponytail: 60초 = 저장 재시도 몇 번 · 15초 = 지금 길 첫 그림 넉넉히 — 실측으로 고친다. */
     var mainOut = false, OUT_USED = 'onfOutUsed', OUT_USED_MS = 14 * 86400000, OUT_PEND = 'onfOutPending:', FLUSH_MS = 60000, FLUSH_WAIT_MS = 15000, flushed = {}, flushLive = [], OUT_ORG = new URL(ONF_OUT_BOOK).origin;
     function outPend(b, n) { try { if (typeof n === 'number' && n > 0) global.localStorage.setItem(OUT_PEND + b, '1'); else if (n === 0) global.localStorage.removeItem(OUT_PEND + b); } catch (e) {} }   // b = bookBase(회차 주소)
     function flushWorth(b) {
-      if (flushed[b] || !outOk(b) || mainOut || books.some(function (q) { return q.out; })) return false;   // mainOut = 첫 판(큰 화면)이 정적 판(아래 mount 끝 · 밖으로 2)   // q.out = 정적 판 액자가 산다(gone 이어도 · 지금 길로 물러난 판은 false)
+      if (flushed[b] || bookMine(b) || !outOk(b) || mainOut || books.some(function (q) { return q.out; })) return false;   // mainOut = 첫 판(큰 화면)이 정적 판(아래 mount 끝 · 밖으로 2)   // q.out = 정적 판 액자가 산다(gone 이어도 · 지금 길로 물러난 판은 false)
       try { return global.localStorage.getItem(OUT_PEND + b) === '1' && Date.now() - Number(global.localStorage.getItem(OUT_USED) || 0) < OUT_USED_MS; } catch (e) { return false; }
     }
     /* 판 하나에 기다리는 교재 목록(p.flushQ) — 노크 전에 두 번 걸려도 앞 것을 잃지 않는다(검토 고침 2차) */
@@ -794,12 +796,13 @@
       if (parked) p.idle = setTimeout(function () { bookIdle(p); }, BOOK_IDLE_MS);
       function exec() { p.out = false; p.oe = openExec(p.el, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, wait, bookClose); }   // 🔐 여러 계정 우회(위) — 못 열면 이 판 「불러오는 중」 자리에 안내 + [닫기] · 기억은 읽기만
       /* 🌤 켠 교재(위 outOk)면 정적 판 — 판 열쇠는 그대로 src(exec 주소)이고 정적 판도 같은 주소(숨긴 판은 park=1 까지)를 outBoot 으로 받는다.
-         안 뜨면 같은 판에 지금 길(exec) · 그날은 이 기기 지금 길(onfOutFail). ⚠️ 위 exec 줄 모양은 multilogin.test.js 가 본다. */
+         안 뜨면 같은 판에 지금 길(exec) · 그날은 이 기기 지금 길(onfOutFail). ⚠️ 위 exec 줄 모양은 multilogin.test.js 가 본다.
+         ⭐ 내 문장은 /mine/(4-② 2026-10-29 · 같은 outBoot · 판 한 장 후보 아님 = bookMine 거름 그대로) · 그 밖(🗂️ 덱 포함)은 /book/. */
       if (out && outOk(src)) {
         p.out = true;
         flushStop();   // 🧺 한 출처에 정적 판 둘 금지(위 넘겨주기) — 넘겨주던 판의 못 보낸 것은 기기에 남고 이 판이 다시 열 때 보낸다
         try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}   // 🧺 아래 bookFlush — 이 기기 정적 판 저장소에 쓰기가 남을 수 있다
-        p.oe = openApp(p.el, ONF_OUT_BOOK, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, bookCfOk(cf), function () {
+        p.oe = openApp(p.el, bookMine(src) ? OUT_MINE_URL : ONF_OUT_BOOK, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, bookCfOk(cf), function () {
           console.info('[onf] 정적 판이 안 떴다 — 지금 길로 다시');
           try { global.localStorage.setItem(OUT_FAIL, String(Date.now())); } catch (e) {}
           /* 검토 고침 3 — hello·노크 뒤 outFail 이면 판 창·출처·views·swap·기록 다리·키보드 창이 정적 판을 가리킨다 → 새 판처럼 비운다(죽은 창을 판으로 쳐 갈아 끼우기가 14초 기다렸다).
@@ -1111,13 +1114,13 @@
       preP = bookFind(opts.bookSrc(v.h));   // 🚀 미리 띄운 판(위 preSave 가 오늘 주소와 견준다)
     }
     /* 🌤 밖으로 2(2026-10-24 · 판정 2·5) — 링크 직행 교재(fileId·slug)면 /who 를 WHO_MS 안 묻고 cf 가 오면 첫 판을 정적 판(openApp)으로.
-       묻는 때만(아래 whoQ): 토큰 · 기기 out · 그날 물러남 없음 · ⭐ 내 문장·🗂️ 카드 덱 아님(outOk) · ttok 아님 · 14일 안에 정적 판을 쓴 기기(onfOutUsed) — 아니면 종전 그대로(요청·기다림 0).
+       묻는 때만(아래 whoQ): 토큰 · 기기 out · 그날 물러남 없음 · ⭐ 내 문장(mode)·🗂️ 카드 덱(view) 아님 · ttok 아님 · 14일 안에 정적 판을 쓴 기기(onfOutUsed) — 아니면 종전 그대로(요청·기다림 0).
        안 뜨면(outFail·hello 없음) 같은 액자에 종전 openExec(여러 계정 우회·로고 신호 그대로) · 그날은 이 기기 지금 길(onfOutFail). 정적 판은 src 의 embed 를 따른다(링크 직행 = 판 단추 없음 · boot.js). */
     function mainExec(navStart) { openExec(frameEl, src, opts.wait || null, null, true, opts.hooks || null, navStart === true); }
     function whoQ(s) {
       try {
         var q = new URL(s).searchParams, f = q.get('fileId'), g = q.get('slug'), h = q.get('sheetName');
-        if ((!f && !g) || q.get('ttok') || !outOk(s)) return null;
+        if ((!f && !g) || q.get('ttok') || q.get('view') === 'cards' || !outOk(s)) return null;   // 🗂️ 덱 링크 직행은 지금 길 그대로(4-② — 덱은 홈 out:1 만 · outOk 가 덱을 안 거른다)
         if (q.get('mode') && q.get('mode') !== 'share') return null;   // 공유 교재 링크만(최종 검토 F3) — 다른 화면은 /who 가 모른다
         if (!(Date.now() - Number(global.localStorage.getItem(OUT_USED) || 0) < OUT_USED_MS)) return null;
         return f ? { f: f, s: h } : { slug: g };
