@@ -306,10 +306,10 @@
   }
   /* 🌤 밖으로 3(2026-10-24) — 학생 홈 첫 화면 값(Worker 사본 · 사진 없는 가벼운 답)을 묻는다. 같은 Worker · 몸통 {t} 만(주소에 토큰 X).
      ok·api 3·v 객체일 때만 답 그대로(정적 홈이 outBoot 의 d 로 받는다) · ended·unknown·stale·off·none·실패·늦음 = null(지금 길).
-     ponytail: HOMEGET_MS 800 · HOME_PAINT_MS 2500 = 짐작 시한 — 실측(Task 8)으로 고친다. ⚠️ onf-load.js 의 HOME_MS(15초 막 기다림)와 다른 이름. */
+     HOMEGET_MS 1500(2026-10-28 Peter · 실측 /home/get 10회 중 3회 0.80~0.87초 — 첫 연결 0.18~0.2초 · 800 이면 열에 두셋 놓침) · HOME_PAINT_MS 2500 = 짐작(아이폰으로 고친다). ⚠️ onf-load.js 의 HOME_MS(15초 막 기다림)와 다른 이름. */
   var ONF_OUT_HOME_URL = 'https://app.ownify.co.kr/home/';
   var ONF_HOME_GET = 'https://onf-media.edia--orker.workers.dev/home/get';
-  var HOMEGET_MS = 800, HOME_PAINT_MS = 2500, OUT_HOME_ORG = ONF_OUT_HOME_URL.replace(/^(https:\/\/[^\/]+).*$/, '$1');   // 출처 — 모듈 맨 위라 URL 없이(옛 브라우저·검사 하네스)
+  var HOMEGET_MS = 1500, HOME_PAINT_MS = 2500, OUT_HOME_ORG = ONF_OUT_HOME_URL.replace(/^(https:\/\/[^\/]+).*$/, '$1');   // 출처 — 모듈 맨 위라 URL 없이(옛 브라우저·검사 하네스)
   /* 스위치 꺼짐(`{ok:false,why:'off'}` · HOME_READ=0 롤백의 HTTP 503) = 그날 이 기기는 더 안 묻는다 — onfOutFailHome 을 적는다(homeQ 가 보고 /home/get·정적 홈 미리 받기 0 · ?out=1 이 지움).
      그 밖의 null(unknown·stale·ended·none·시한·끊김)은 종전 그대로(기록 없음). */
   function homeOff() { try { global.localStorage.setItem('onfOutFailHome', String(Date.now())); } catch (e) {} }

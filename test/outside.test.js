@@ -844,7 +844,7 @@ ta('S4j index.html 머리에 Worker preconnect(ONF_WHO 와 같은 출처 · cros
 
 /* ═══ 🌤 밖으로 3 Task 6(2026-10-24) — 켠 학생 홈은 Worker /home/get 답 + 정적 홈(ONF_OUT_HOME_URL)을 같이 시작 ═══
    묻는 때(전역 조건): mount home 표시 · 토큰 · 기기 out≠0 · 14일 안에 정적 판을 쓴 기기(onfOutUsed) · 그날 홈 물러남 없음(onfOutFailHome — 교재 onfOutFail 과 따로).
-   답(ok·api 3·v)을 받아야 outBoot{src, tok, d} · 답 없음(HOMEGET_MS 800 넘김·실패·ok:false·api 다름) = 정적 손잡이를 걷고 지금 길(그날 기록 없음).
+   답(ok·api 3·v)을 받아야 outBoot{src, tok, d} · 답 없음(HOMEGET_MS 1500 넘김·실패·ok:false·api 다름) = 정적 손잡이를 걷고 지금 길(그날 기록 없음).
    outBoot 뒤 HOME_PAINT_MS 안 homeDrawn 없음·그리기 전 outFail = 지금 길 + onfOutFailHome · 그린 뒤 outFail = 지금 길(error·mismatch 만 그날 기록). 로고 ok 는 homeDrawn 에. */
 const HANS = (o) => Object.assign({ ok: true, api: 3, v: { vars: { a: 1 }, books: { ok: true, books: {} } }, at: 1 }, o || {});
 const hsetup = (o) => wsetup(Object.assign({ src: HSRC, home: true }, o || {}));
@@ -872,7 +872,7 @@ ta('S6a 켠 학생·쓴 기기 → /home/get 1회 + 정적 홈을 같이 시작(
   s.send({ onf: 'homeDrawn' }, s.homeWin, OUT_O);
   assert.strictEqual(s.okN.n, 1, '⛔ homeDrawn 에 로고 막을 안 걷었다');
   assert.strictEqual(s.g.localStorage.m.onfOutUsed, String(1.7e12 + 300), '⛔ 정적 홈이 떴는데 onfOutUsed 를 안 새로 적었다(R18)');
-  s.fire(2500); s.fire(800); await flush();
+  s.fire(2500); s.fire(1500); await flush();
   assert.strictEqual(s.frameEl.src, HOME_URL, '⛔ 다 그린 뒤 시한으로 물러났다');
   assert.ok(!('onfOutFailHome' in s.g.localStorage.m));
   const r = hsetup();   // 답이 hello 보다 먼저 와도 hello 에 보낸다
@@ -897,10 +897,10 @@ ta('S6a 안 묻는 때 — 홈 표시 없음·기기 out=0·토큰 없음·안 �
   assert.strictEqual(y.calls.length, 1, '⛔ 하루 지난 홈 물러남이 아직 막는다');
 });
 
-ta('S6b /home/get 이 HOMEGET_MS(800) 넘김 → 지금 길 · 늦은 답은 무시 · 그날 기록 없음', async () => {
+ta('S6b /home/get 이 HOMEGET_MS(1500) 넘김 → 지금 길 · 늦은 답은 무시 · 그날 기록 없음', async () => {
   const s = hsetup();
   s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
-  s.fire(800); await flush();
+  s.fire(1500); await flush();
   assert.strictEqual(s.frameEl.src, HSRC, '⛔ 시한 넘었는데 지금 길로 안 갈아 끼웠다');
   s.calls[0].ok(200, HANS()); await flush();
   s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
@@ -922,7 +922,7 @@ ta('S6b unknown·ended·stale·none · api 다름 · v 없음 · 500 · 끊김 �
     go(s.calls[0]); await flush();
     assert.strictEqual(s.frameEl.src, HSRC, '⛔ ' + nm + ' — 지금 길로 안 갈아 끼웠다: ' + s.frameEl.src);
     assert.strictEqual(boots(s.homeWin).length, 0, '⛔ ' + nm + ' — outBoot 을 보냈다');
-    s.fire(2500); s.fire(800); await flush();
+    s.fire(2500); s.fire(1500); await flush();
     assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ ' + nm + ' — 그날 홈 물러남을 적었다');
   }
 });
