@@ -269,7 +269,7 @@ function phoneRun(o) {
     back() { this.backs++; this.to.push(Math.max(0, this.i - 1)); },
     go(n) { this.goes.push(n); this.to.push(Math.max(0, Math.min(this.st.length - 1, this.i + n))); } };
   const mq = { matches: !!o.wide, fns: [], addEventListener(k, f) { if (k === 'change') this.fns.push(f); } };
-  const s = run({ hist: true, lsRaw: o.lsRaw, mut: o.mut, pre(g, home) {
+  const s = run({ hist: true, lsRaw: o.lsRaw, mut: o.mut, frame: o.frame, pre(g, home) {
     g.history = H; g.URLSearchParams = URLSearchParams; g.location.search = o.search || '';
     g.matchMedia = (q) => { assert.strictEqual(q, WIDE_Q, '⛔ 폰 물음이 선생님 홈 dhBookWide 와 다르다'); return mq; };
     Object.assign(g.localStorage.s, o.lg ? {} : { onfThLg: '0' }, o.ls || {});   // 📱 물음 칸(BOOK_LG · 2026-10-24)은 켠 검사(o.lg)만 — 나머지는 판 칸 구조를 그대로 잰다
@@ -1183,6 +1183,127 @@ t('🟡 📱 폰 뒤로로 판을 갈아 끼울 때 판이 늙었으면(새 판�
   assert.strictEqual(orphan.length, 0, '⛔ 판 목록 밖에 남은 액자(고아)가 있다');
   assert.ok(s.g.books.every((b) => b.box.parentNode), '⛔ 판 목록에 DOM 밖 판이 있다(엉뚱한 판을 뺐다)');
   assert.ok(shownOf(s).length === 1 && shownOf(s)[0] !== P && shownOf(s)[0].kids[0].src === srcOf(s, E2) && s.panels().length === 2, '⛔ 보이는 판이 E2 새 판 하나가 아니다(늙은 판을 또 보였거나 새 판을 둘 띄웠다): ' + s.panels().map((x) => x.kids[0].src.slice(-30)).join(' | '));
+});
+
+/* ═══ 🌤 밖으로 4-①(2026-10-28) — 선생님 껍데기도 정적 교재 판(ONF.frame.openApp) · 홈 말 out:1 일 때만 ═══
+   ⚠️ 쌍둥이: 학생 assets/onf-frame.js bookMake 정적 판 갈래(test/outside.test.js S5b·S5c 가 학생 쪽) — 진짜 onf-frame.js 를 싣고(o.frame) 돈다. */
+console.log('[🌤 밖으로 4-① — 선생님 정적 교재 판]');
+const OUT_O = 'https://app.ownify.co.kr', OUT_BOOK = OUT_O + '/book/';
+const CFT = { f: 'F_th_000001', s: 'E1_Pilot', k: 'v1.eyJmIjoiRjEifQ.sig-test-not-live' };
+/* 판 액자에 정적 판 창을 붙이고 hello 까지 — 정적 판이 받을 준비가 됐을 때 하는 일 */
+function outUp(s, box, n) { const w = win('static' + (n || '')); box.kids[0].contentWindow = w; s.send({ onf: 'outHello' }, w, OUT_O); return w; }
+const bootOf = (w) => jsn(w.sent).filter((x) => x[0].onf === 'outBoot');
+const isStatic = (box) => box.kids[0].src === OUT_BOOK;
+
+t('O1 홈 openBook{out:1} → 판 액자 = 정적 판(주소에 토큰 없음) · hello 에 그 출처로 outBoot{tok:"", src(t·ttok·tas 그대로), cf} · onfOutUsed 적음', () => {
+  const s = phoneRun({ wide: true, frame: true });
+  s.send({ onf: 'openBook', href: E1, left: 270, cf: CFT, out: 1 }, s.home);
+  const P = s.panel();
+  assert.ok(P && isStatic(P), '⛔ out:1 인데 정적 판을 안 열었다: ' + (P && P.kids[0].src));
+  const w = outUp(s, P), b = bootOf(w);
+  assert.strictEqual(b.length, 1, '⛔ outBoot 이 한 번 안 갔다');
+  assert.deepStrictEqual(b[0], [{ onf: 'outBoot', tok: '', src: srcOf(s, E1), cf: CFT }, OUT_O], '⛔ outBoot 값·출처가 다르다');
+  assert.ok(/[?&]t=STUTOK(&|$)/.test(b[0][0].src) && /[?&]ttok=CRED(&|$)/.test(b[0][0].src) && /[?&]tas=Peter(&|$)/.test(b[0][0].src), '⛔ 선생님 보기 값(t·ttok·tas)이 빠졌다');
+  assert.ok(Number(s.g.localStorage.s.onfOutUsed) > 0, '⛔ onfOutUsed 를 안 적었다(Task 5 넘겨주기의 14일 표시)');
+  //   남의 창·남의 출처 hello 엔 안 보낸다(openApp 자물쇠)
+  const s2 = phoneRun({ wide: true, frame: true }); s2.send({ onf: 'openBook', href: E1, out: 1 }, s2.home);
+  const w2 = win('static'); s2.panel().kids[0].contentWindow = w2;
+  s2.send({ onf: 'outHello' }, w2, 'https://evil.example'); s2.send({ onf: 'outHello' }, win('stranger'), OUT_O);
+  assert.strictEqual(bootOf(w2).length, 0, '⛔ 남의 출처 hello 에 outBoot 을 보냈다');
+});
+
+t('O2 out 없음 → 종전 구글 판(openExec) · ⭐ 내 문장(mode=mine)+out:1 → 지금 길(Review Focus 3) · onf-frame.js 가 openApp 을 모르면 지금 길', () => {
+  let s = phoneRun({ wide: true, frame: true });
+  s.send({ onf: 'openBook', href: E1 }, s.home);
+  assert.ok(!isStatic(s.panel()) && s.panel().kids[0].src === srcOf(s, E1), '⛔ out 없는데 정적 판');
+  assert.ok(!('onfOutUsed' in s.g.localStorage.s), '⛔ 지금 길인데 onfOutUsed 를 적었다');
+  s = phoneRun({ wide: true, frame: true });
+  s.send({ onf: 'openBook', href: MYS, out: 1 }, s.home);
+  assert.ok(!isStatic(s.panel()), '⛔ 내 문장을 정적 판으로 열었다');
+  s = phoneRun({ wide: true });   // ONF.frame 없음(못 받은 onf-frame.js)
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
+  assert.ok(s.panel() && s.panel().kids[0].src === srcOf(s, E1), '⛔ openApp 이 없는데 지금 길로 안 열었다');
+});
+
+t('O3 hello 가 OUT_MS 안 없음 → 같은 판에 지금 길(openExec) · onfOutFail 적힘 · 그날 다음 out:1 은 지금 길(Review Focus 4)', () => {
+  const s = phoneRun({ wide: true, frame: true });
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
+  const P = s.panel();
+  assert.ok(isStatic(P), '전제: 정적 판');
+  s.timers.filter((x) => x.on && x.ms === 2500).forEach((x) => { x.on = false; x.f(); });
+  assert.ok(s.panels().length === 1 && s.panel() === P && P.kids[0].src === srcOf(s, E1), '⛔ 같은 판에 지금 길로 다시 안 열었다: ' + P.kids[0].src);
+  assert.ok(Number(s.g.localStorage.s.onfOutFail) > 0, '⛔ onfOutFail 을 안 적었다');
+  assert.strictEqual(s.g.books[0].out, false, '⛔ 물러난 판이 정적 판 표시를 든 채다');
+  s.send({ onf: 'openBook', href: E2, out: 1 }, s.home);
+  assert.ok(!isStatic(s.panel()), '⛔ 그날 실패했는데 또 정적 판');
+  //   하루 지나면 다시 정적 판
+  s.g.localStorage.s.onfOutFail = String(Date.now() - 86400000 - 1000);
+  s.send({ onf: 'openBook', href: E3, out: 1 }, s.home);
+  assert.ok(isStatic(s.panel()), '⛔ 하루 뒤에도 정적 판을 안 연다');
+});
+
+t('O4 자물쇠 — 정적 판(app.ownify.co.kr)의 bookHi·hist hi 는 받는다 · 남의 출처는 버린다 · ⛔ 선생님 **홈** 자물쇠는 그대로 googleusercontent 만', () => {
+  const s = phoneRun({ wide: true, frame: true });
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
+  const P = s.panel(), w = outUp(s, P), obj = s.g.books[0];
+  s.send({ onf: 'bookHi', swap: 1 }, w, 'https://evil.example');
+  assert.strictEqual(obj.win, null, '⛔ 남의 출처 bookHi 를 받았다');
+  s.hist({ op: 'hi' }, w, 'https://evil.example');
+  assert.ok(!jsn(w.sent).some((x) => x[0].onf === 'hist-on'), '⛔ 남의 출처 hist hi 를 받았다');
+  s.send({ onf: 'bookHi', swap: 1 }, w, OUT_O);
+  assert.ok(obj.win === w && obj.origin === OUT_O, '⛔ 정적 판 bookHi 를 안 받았다(p.win)');
+  s.hist({ op: 'hi' }, w, OUT_O);
+  assert.ok(jsn(w.sent).some((x) => x[0].onf === 'hist-on' && x[1] === OUT_O), '⛔ 정적 판 기록 다리(hist hi)를 안 켰다');
+  //   홈 액자 자물쇠 — 정적 판 출처로 온 홈 말은 버린다(홈은 아직 구글)
+  s.home.sent.length = 0;
+  s.send({ onf: 'bookHello' }, s.home, OUT_O);
+  assert.strictEqual(s.home.sent.length, 0, '⛔ 선생님 홈 자물쇠가 넓어졌다(정적 판 출처의 홈 말에 caps)');
+});
+
+t('O5 판 한 장 — 정적 판이 보이는 채 out 없는 교재 → bookSwap 0 · 새 구글 판 · 반대(구글 판 위에 out:1)도 bookSwap 0 · 새 정적 판(Review Focus 2)', () => {
+  const s = phoneRun({ wide: true, frame: true, search: '?swap=1' });
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
+  const S = s.panel(), w = outUp(s, S);
+  s.send({ onf: 'bookHi', swap: 1 }, w, OUT_O);
+  w.sent.length = 0;
+  s.send({ onf: 'openBook', href: E2 }, s.home);
+  assert.strictEqual(sentOf(w).filter((m) => m.onf === 'bookSwap').length, 0, '⛔ 정적 판에 구글 교재를 갈아 끼웠다');
+  const G = shownOf(s)[0];
+  assert.ok(G !== S && !isStatic(G) && G.kids[0].src === srcOf(s, E2) && S.classList.contains('park'), '⛔ 새 구글 판이 안 떴다');
+  //   반대 — 구글 판(판 자격) 위에 out:1
+  const s3 = phoneRun({ wide: true, frame: true, search: '?swap=1' });
+  s3.send({ onf: 'openBook', href: E1, left: 270 }, s3.home);
+  const P3 = s3.panel(), b3 = swapKnock(s3, P3, 1);
+  s3.send({ onf: 'openBook', href: E2, out: 1 }, s3.home);
+  assert.strictEqual(swapMsg(b3).length, 0, '⛔ 구글 판에 정적 교재를 갈아 끼웠다');
+  const N = shownOf(s3)[0];
+  assert.ok(N !== P3 && isStatic(N), '⛔ 새 정적 판이 안 떴다');
+  //   같은 주소 · 길만 다름(구글 판 E1 + out:1 E1) → 그 판 자격 내리고 새 정적 판
+  const s4 = phoneRun({ wide: true, frame: true });
+  s4.send({ onf: 'openBook', href: E1 }, s4.home);
+  const G4 = s4.panel();
+  s4.send({ onf: 'openBook', href: E1, out: 1 }, s4.home);
+  assert.ok(shownOf(s4)[0] !== G4 && isStatic(shownOf(s4)[0]), '⛔ 같은 주소 구글 판을 정적 판 누름에 그대로 보였다');
+});
+
+t('O6 홈 bookWarm{out:1, panel:1} → 숨긴 판이 정적 판 · outBoot src 에 park=1 · out 없으면 종전 구글 숨긴 판', () => {
+  let s = phoneRun({ wide: true, frame: true });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270, out: 1 }, s.home);
+  const P = s.panel();
+  assert.ok(P && P.classList.contains('park') && isStatic(P), '⛔ 숨긴 정적 판이 아니다');
+  const b = bootOf(outUp(s, P));
+  assert.ok(b.length === 1 && b[0][0].src === srcOf(s, E1) + '&park=1' && b[0][0].cf === null, '⛔ 숨긴 정적 판 outBoot src 에 park=1 이 없다: ' + (b[0] && b[0][0].src));
+  s = phoneRun({ wide: true, frame: true });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+  assert.ok(s.panel().kids[0].src === srcOf(s, E1) + '&park=1', '⛔ out 없는 미리 띄우기가 종전 숨긴 판이 아니다');
+});
+
+t('O7 변이 — 판 자물쇠를 늘 참으로 바꾸면 「남의 출처 버림」이 빨갛다', () => {
+  const s = phoneRun({ wide: true, frame: true, mut: (b) => b.replace(/function bookAppOrigin\(o\) \{ return /, 'function bookAppOrigin(o) { return true || ') });
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
+  const w = outUp(s, s.panel());
+  s.send({ onf: 'bookHi', swap: 1 }, w, 'https://evil.example');
+  assert.strictEqual(s.g.books[0].win, w, '⛔ 변이가 안 먹었다(남의 출처 검사가 아무것도 못 잡는다)');
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
