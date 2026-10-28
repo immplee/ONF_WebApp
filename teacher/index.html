@@ -625,12 +625,27 @@ function hwLay() {
   if (!hwBox) return;
   var W = window.innerWidth || 0, cut = Math.round(W * hwSplit), side = hwView === 'side';
   hwBox.style.right = side ? (W - cut) + 'px' : '0px';   // ⛔ 빈 값이면 inset:0 의 right 가 지워져 판 폭이 0 이 된다(사진만으로 돌아오면 「불러오는 중」만 보였다 · 2026-10-24 라이브)
-  hwBox.style.visibility = hwView === 'book' ? 'hidden' : ''; hwBox.style.pointerEvents = hwView === 'book' ? 'none' : '';
+  var rec = hwView === 'book' && hwRecR && hwRecR.length;   // 🎧 교재만이어도 녹음 플레이어는 그 자리에(Peter 2026-10-28) — 과제 판을 플레이어 모양으로만 오려 교재 위에
+  hwBox.style.visibility = hwView === 'book' && !rec ? 'hidden' : ''; hwBox.style.pointerEvents = hwView === 'book' && !rec ? 'none' : '';
+  hwBox.style.clipPath = rec ? hwRecPath(hwRecR) : ''; hwBox.style.zIndex = rec ? '52' : '50';   // ⛔ 빈 값이면 cssText 의 z-index:50 이 지워진다 · 오린 밖은 그리지도 누르지도 않는다(clip-path = 누름 판정도 자른다) · 교재 칸(50) 위
   if (hwBk) { hwBk.box.style.display = hwView === 'photo' ? 'none' : ''; hwBk.box.style.left = side ? cut + 'px' : '0'; }
   if (side) hwDivider().style.left = (cut - 7) + 'px';
   else if (hwDiv) { if (hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null; }
 }
 window.addEventListener('resize', function () { if (hwBox && hwView !== 'photo') hwLay(); });
+/* 🎧 과제 판 녹음 플레이어 자리(판이 알림 · 판 화면 좌표 = 화면 좌표 — 과제 판 액자는 inset:0) — 교재만일 때 이 모양만 과제 판을 보인다.
+   [x, y, w, h, 둥근 귀] 묶음 몇 개(플레이어 · 접은 알약 · 속도 창 · 녹음 고르기) · 꼴이 틀리면 버린다 */
+var hwRecR = null;
+function hwRecSet(rs) {
+  var ok = Array.isArray(rs) && rs.length <= 4 ? rs.filter(function (q) { return Array.isArray(q) && q.length === 5 && q.every(function (n) { return typeof n === 'number' && isFinite(n) && n >= 0 && n <= 20000; }) && q[2] > 0 && q[3] > 0; }) : [];
+  hwRecR = ok.length ? ok.map(function (q) { return q.map(function (n) { return Math.round(n); }); }) : null; hwLay();
+}
+function hwRecPath(rs) {
+  return 'path("' + rs.map(function (q) {
+    var x = q[0], y = q[1], w = q[2], h = q[3], r = Math.min(q[4], w / 2, h / 2), a = function (dx, dy) { return 'a' + r + ' ' + r + ' 0 0 1 ' + dx + ' ' + dy; };
+    return 'M' + (x + r) + ' ' + y + 'h' + (w - 2 * r) + a(r, r) + 'v' + (h - 2 * r) + a(-r, r) + 'h' + (2 * r - w) + a(-r, -r) + 'v' + (2 * r - h) + a(r, -r) + 'z';
+  }).join('') + '")';
+}
 /* 📖 펜 줄 하나(⑬) — 과제 판이 알린 도구·색·굵기를 옆 교재(노크한 창)에 그대로 · 교재가 늦게 뜨면 노크(bookHi) 때 마지막 것을 */
 var hwPenLast = null;
 function hwPenRelay(d) {
@@ -659,7 +674,7 @@ window.addEventListener('message', function (ev) {
 function hwClose() {
   if (hwBox && !hwWarmOn && appWin) { try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (e) {} }   // 홈이 카드 상태(완료 등)를 다시 받게
   if (hwBk) { if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} } if (hwBk.box.parentNode) hwBk.box.parentNode.removeChild(hwBk.box); hwBk = null; }   // 과제 판을 닫으면 그 교재 액자도 지운다
-  hwView = 'photo'; if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;
+  hwView = 'photo'; hwRecR = null; if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;
   if (hwBox && hwBox.parentNode) hwBox.parentNode.removeChild(hwBox);
   hwBox = null; hwFr = null; hwWin = null; hwOrigin = ''; hwGo = null; hwGave = ''; hwWant = false; hwT = ''; hwWarmOn = false; hwGoMsg = null; clearTimeout(hwWarmTm);
 }
@@ -678,7 +693,7 @@ window.addEventListener('popstate', function () {
 });
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
-  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwPen' && d.onf !== 'hwLeaveKeep')) return;
+  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwPen' && d.onf !== 'hwLeaveKeep' && d.onf !== 'hwRec')) return;
   if (hwFr && hwFrom(ev.source)) {   // 과제 판 액자에서 온 말
     try { if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return; } catch (e) { return; }
     if (hwWin && ev.source !== hwWin) return;   // 한 번 정하면 그 창만(노크 자물쇠와 같다)
@@ -701,6 +716,7 @@ window.addEventListener('message', function (ev) {
     if (d.onf === 'hwbookBack') hwBack();
     if (d.onf === 'hwLeaveKeep') { var sk = history.state; hwAsking = false; if (hwBox && sk && sk.onfHw && !sk.lg) { try { history.pushState({ onfHw: 1, n: sk.n || 0, lg: 1 }, ''); } catch (e) {} } }   // ③ 「홈으로 나갈까요?」 취소 — 물음 칸 다시
     if (d.onf === 'hwbookView') hwViewSet(String(d.v || ''), d.href);
+    if (d.onf === 'hwRec') hwRecSet(d.rs);   // 🎧 녹음 플레이어 자리(교재만에서도 보이게)
     if (d.onf === 'hwPen') hwPenRelay(d);   // 📖 펜 줄 하나 — 과제 판 도구를 옆 교재로(⑬)   // 📖 교재 옆에 · 교재만 · 사진만(과제 첨삭 5단계)
     return;
   }

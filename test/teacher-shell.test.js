@@ -433,6 +433,24 @@ t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼�
   assert.strictEqual(box.style.visibility, 'hidden', '⛔ 교재만 — 과제 판이 안 숨었다');
   assert.ok(!R.created.some((e) => e.className === 'onf-hwchip'), '⛔ 교재만 — 「📝 과제로」 칩이 남았다(교재 머리 줄 [과제 사진으로] 가 맡는다 · 페이지 추가 4단계)');
   assert.ok(!R.created.some((e) => e.className === 'onf-hwdiv' && e.parentNode && !e.removed), '⛔ 교재만인데 경계선이 남았다');
+  // 🎧 교재만에서도 녹음 플레이어(Peter 2026-10-28 「교재만 누르니 녹음 듣기 창이 안 따라와」) — 판이 알린 플레이어 모양만 과제 판을 오려 교재 위에
+  R.postAs({ onf: 'hwRec', rs: [[1500, 820, 500, 240, 16]] }, { parent: {}, postMessage() {} });
+  assert.strictEqual(box.style.visibility, 'hidden', '⛔ 과제 판 액자가 아닌 창의 플레이어 자리를 받았다');
+  R.postAs({ onf: 'hwRec', rs: [[1500, 820, 500, 240, 16]] }, inner);
+  assert.ok(box.style.visibility === '' && box.style.pointerEvents === '' && box.style.zIndex === '52', '⛔ 교재만 + 플레이어 — 과제 판(플레이어)이 교재 위에 안 보인다');
+  assert.strictEqual(box.style.clipPath, 'path("M1516 820h468a16 16 0 0 1 16 16v208a16 16 0 0 1 -16 16h-468a16 16 0 0 1 -16 -16v-208a16 16 0 0 1 16 -16z")', '⛔ 플레이어 모양(둥근 귀)으로만 오리지 않았다 — 오린 밖이 교재를 가리거나 누름을 먹는다');
+  R.postAs({ onf: 'hwRec', rs: [[1500, 820, 500, 240, 16], [1700, 700, 220, 110, 0]] }, inner);
+  assert.ok(/^path\("M1516 820.*zM1700 700h220/.test(box.style.clipPath), '⛔ 속도 창이 열렸는데 그 자리를 안 오렸다');
+  R.postAs({ onf: 'hwRec', rs: [['x', 1, 2, 3, 4]] }, inner);
+  assert.ok(box.style.visibility === 'hidden' && box.style.clipPath === '' && box.style.zIndex === '50', '⛔ 꼴이 틀린 자리를 받았다(또는 숨길 때 z-index:50 이 지워졌다)');
+  R.postAs({ onf: 'hwRec', rs: [[1500, 820, 500, 240, 16]] }, inner);
+  R.postAs({ onf: 'hwRec', rs: [] }, inner);
+  assert.ok(box.style.visibility === 'hidden' && box.style.pointerEvents === 'none' && box.style.clipPath === '', '⛔ 플레이어를 닫았는데 교재만에서 과제 판 조각이 남았다');
+  R.postAs({ onf: 'hwRec', rs: [[1500, 820, 500, 240, 16]] }, inner);
+  R.postAs({ onf: 'hwbookView', v: 'side', href: HREF }, inner);
+  assert.ok(box.style.clipPath === '' && box.style.zIndex === '50' && box.style.visibility === '', '⛔ 옆에 — 과제 판이 오린 채로 남았다');
+  R.postAs({ onf: 'hwbookView', v: 'book' }, inner);
+  assert.ok(box.style.visibility === '' && /^path\(/.test(box.style.clipPath), '⛔ 교재만으로 다시 왔는데 떠 있는 플레이어가 안 보인다');
   R.postAs({ onf: 'hwbookView', v: 'photo' }, inner);
   assert.ok(box.style.visibility === '' && box.style.right === '0px', '⛔ 사진만 — 과제 판이 전체로 안 돌아왔다(right 를 비우면 inset:0 의 오른쪽이 지워져 폭 0 — 2026-10-24 라이브)');
   assert.strictEqual(panels()[0].style.display, 'none', '⛔ 사진만 — 교재 액자가 안 숨었다');
