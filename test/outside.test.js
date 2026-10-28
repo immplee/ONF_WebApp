@@ -62,7 +62,7 @@ function setup(o) {
   const frameEl = { contentWindow: homeWin, style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 800 }), addEventListener() {},
     get src() { return this._src || ''; }, set src(v) { this._src = v; if (o.log) o.log.push('frame:' + v); } };
   if (o.log) { const ap = body.appendChild; body.appendChild = function (c) { o.log.push('panel'); return ap.call(this, c); }; }
-  const M = g.ONF.frame.mount(frameEl, o.src || 'https://script.google.com/x/exec?t=T', { phone: o.phone !== false, swap: o.swap, preKey: o.preKey, bookSrc: BS,
+  const M = g.ONF.frame.mount(frameEl, o.src || 'https://script.google.com/x/exec?t=T', { phone: o.phone !== false, swap: o.swap, preKey: o.preKey, bookSrc: o.bs || BS,
     out: o.out !== false, tok: o.tok === undefined ? 'TOK' : o.tok, hooks: o.hooks, home: o.home });
   const send = (data, source, origin) => (listeners.message || []).forEach((fn) => fn({ data, source, origin: origin || GO }));
   const panels = () => body.kids.filter((k) => k.className === 'onf-bookpanel');
@@ -466,10 +466,32 @@ t('I1 카드 덱(view=cards)은 정적 판에 「열어」(bookLike)를 안 보�
   const s = setup({ swap: true });
   s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
   const box = s.panels()[0], w = outWin(s, box);
-  knock(s, box, OUT_O, 'cards,line');
+  knock(s, box, OUT_O);   // 실제 정적 /book/ 은 views 'line' 만 노크한다(ONF_PARK.on 이 DOMContentLoaded 뒤)
   s.send({ onf: 'openBook', href: CARDS }, s.homeInner);   // 🌤 4-② — out 없는 덱만 지금 길(out:1 덱은 위 S5g 정적 판)
   assert.strictEqual(sentOf(w, 'bookView').length + sentOf(w, 'bookSwap').length, 0, '⛔ out 없는 카드 덱을 정적 판에 보냈다');
   assert.strictEqual(shown(s)[0].kids[0].src, SRCC, '⛔ 카드 덱이 지금 길 판으로 안 떴다');
+});
+
+const SRCC0 = SRCC.replace('&view=cards', ''), BSC = (h) => (/plain-base/.test(h) ? SRCC0 : BS(h)), PLAIN = 'https://class.ownify.co.kr/plain-base?mode=share';   // 덱과 같은 교재 주소(view 만 다름) — bookLike 의 base 비교를 통과시키는 대역
+t('I1b 최종 검토 — 실제 노크 views "line" 인 정적 판에 out:1 덱 → 새 정적 /book/ 판 · 기존 판에 bookView 없음', () => {
+  const s = setup({ swap: true, bs: BSC });
+  s.send({ onf: 'openBook', href: PLAIN, out: 1 }, s.homeInner);
+  const box = s.panels()[0], w = outWin(s, box);
+  knock(s, box, OUT_O, 'line');
+  s.send({ onf: 'openBook', href: CARDS, out: 1 }, s.homeInner);
+  assert.strictEqual(sentOf(w, 'bookView').length, 0, '⛔ 기존 정적 판에 덱 bookView 를 보냈다');
+  assert.strictEqual(s.panels().length, 2, '⛔ 새 판이 안 떴다');
+  assert.strictEqual(shown(s)[0].kids[0].src, OUT_BOOK, '⛔ 덱이 새 정적 /book/ 판이 아니다');
+});
+t('I1b 방어 — 정적 판이 "cards,line" 을 노크해도 out:1 덱은 새 판(bookCan 이 p.out 에 cards 를 안 맡긴다)', () => {
+  const s = setup({ swap: true, bs: BSC });
+  s.send({ onf: 'openBook', href: PLAIN, out: 1 }, s.homeInner);
+  const box = s.panels()[0], w = outWin(s, box);
+  knock(s, box, OUT_O, 'cards,line');
+  s.send({ onf: 'openBook', href: CARDS, out: 1 }, s.homeInner);
+  assert.strictEqual(sentOf(w, 'bookView').length, 0, '⛔ cards 를 광고한 정적 판에 덱 bookView 를 보냈다');
+  assert.strictEqual(s.panels().length, 2, '⛔ 새 판이 안 떴다');
+  assert.strictEqual(shown(s)[0].kids[0].src, OUT_BOOK, '⛔ 덱이 새 정적 /book/ 판이 아니다');
 });
 
 t('I1 노크 전 정적 판 후보 뒤에 미리(bookWarm) 주소를 줄 세우지 않는다 — 정적 판에 bookFetch 안 감 · 지금 길 숨긴 판으로 미리', () => {

@@ -677,7 +677,7 @@
       try { var q = new URL(src).searchParams, f = q.get('fileId'), g = (q.get('slug') || '').split('-'); return f ? 'f:' + f : g.length === 4 ? 's:' + g[0] + '-' + g[1] + '-' + g[3] : ''; } catch (e) { return ''; }
     }
     function bookBase(src) { try { var u = new URL(src); u.searchParams.delete('view'); u.searchParams.delete('line'); return u.href; } catch (e) { return src; } }
-    function bookCan(p, a) { return !!(p && !p.gone && !p.sw && (a.view || a.line) && (!a.view || p.views.indexOf(a.view) >= 0) && (!a.line || p.views.indexOf('line') >= 0)); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 [] · 📖 자격 내린 판(gone)·갈아 끼우는 중(sw — 아직 옛 교재)엔 「열어」를 안 보낸다
+    function bookCan(p, a) { return !!(p && !p.gone && !p.sw && !(p.out && a.view === 'cards') && (a.view || a.line) && (!a.view || p.views.indexOf(a.view) >= 0) && (!a.line || p.views.indexOf('line') >= 0)); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 [] · 🗂️ 카드 덱(view=cards)은 정적 판(p.out)에 절대 안 맡긴다(4-② 최종 검토 — 정적 /book/ 은 views 'line' 만 노크하지만 시간 맞물림에 기대지 않는다 · onfDeckView 가 정적 판에서 O.boot fail) · 📖 자격 내린 판(gone)·갈아 끼우는 중(sw — 아직 옛 교재)엔 「열어」를 안 보낸다
     /* 아무것도 안 묻는 열기([이어서 하기])도 **줄 링크로 연 판**(view 없음)이면 그 판(반박 검토 🟡4) — 판은 이미 그 교재다 · 할 말이 없으니 보이기만.
        ⛔ view 로 연 판(덱·복습)은 안 맡긴다 — 열자마자 그 창을 띄운 판이다(위 「view 없는 보통 열기」 검사). */
     function bookLike(src, a, out) {
