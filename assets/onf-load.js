@@ -141,6 +141,9 @@
   }
   try {
     lazy = !!(doc && doc.currentScript && doc.currentScript.hasAttribute && doc.currentScript.hasAttribute('data-lazy'));
+    /* 📏 [2026-10-29 Peter] 걸린 시간 기억은 **껍데기마다 따로** — 학생·선생님 홈이 같은 출처(class.ownify.co.kr)라 같은 칸에 섞였다
+       (같은 기기에서 둘을 번갈아 열면 채움 속도가 남의 평균을 따랐다). 선생님 껍데기 = data-lazy 로 싣는 쪽 → 칸 이름 끝 T. 첫 몇 번은 기본값으로 채우고 다시 배운다. */
+    if (lazy) { HIST += 'T'; HIST1 += 'T'; HIST2 += 'T'; }
     on = !!(doc && doc.body) && readOn(new URLSearchParams(global.location.search), ls) && !isReload(global.performance);
     if (on && !lazy) make();
   } catch (e) { on = false; }

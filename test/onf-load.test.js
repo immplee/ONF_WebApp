@@ -296,6 +296,20 @@ t('grace — 선생님 홈은 노크 뒤 15초까지 「다 그렸다」를 기�
   h.send({ onf: 'auth-please' }); k.ok(); s.tick(14000); assert.ok(s.box(), '⛔ 15초 전에 걷었다');   // 노크가 ok 를 부른다 — 막 손이 먼저 듣는다(bind 가 먼저 달렸다)
   s.tick(2000); assert.strictEqual(s.box(), null, '⛔ 15초가 지나도 안 걷힌다');
 });
+t('걸린 시간 기억은 껍데기마다 따로 — 선생님(data-lazy)은 끝 T 칸에 배우고 그 칸만 읽는다 · 학생은 종전 칸 (Peter 2026-10-29)', () => {
+  const five = (v) => JSON.stringify([v, v, v, v, v]);
+  const base = { onfLoadMs1: five(20000), onfLoadMs1T: five(300) };
+  const dur = (e) => e.box().querySelector('.onf-ld-fill').anims[0].o.duration;
+  const t1 = env({ lazy: true, ls: base }), ht = homeFrame(t1), kt = t1.g.ONF.load.bind(ht.fr, { home: true, grace: 15000 });
+  assert.strictEqual(dur(t1), 1200, '⛔ 선생님 껍데기가 자기 칸(T · 평균 300ms)을 안 읽었다: ' + dur(t1));
+  const s1 = env({ ls: base }), hs = homeFrame(s1); s1.g.ONF.load.bind(hs.fr, { home: true });
+  assert.strictEqual(dur(s1), 80000, '⛔ 학생 껍데기가 종전 칸(평균 20000ms)을 안 읽었다: ' + dur(s1));
+  const t2 = env({ lazy: true }), h2 = homeFrame(t2), k2 = t2.g.ONF.load.bind(h2.fr, { home: true, grace: 15000 });
+  t2.tick(300); k2.ok(); t2.tick(500); h2.send(BRAND); t2.tick(2000);
+  assert.ok(t2.ls.onfLoadMs1T && t2.ls.onfLoadMs2T && t2.ls.onfLoadMsT, '⛔ 선생님 껍데기가 T 칸에 안 배웠다');
+  assert.ok(!('onfLoadMs1' in t2.ls) && !('onfLoadMs2' in t2.ls) && !('onfLoadMs' in t2.ls), '⛔ 선생님 껍데기가 학생 칸에 섞어 썼다');
+  void kt;
+});
 t('⛔ [2026-10-22 아이폰 사고] 학생 홈 — 액자 load 뒤 4초 동안 아무 말이 없어도(아이폰은 홈이 늦게 말한다) 걷지 않고 로고 자리를 기다려 난다', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
   box.querySelector('.onf-ld-in').rect = { left: 45, top: 400, width: 300, height: 50 };
