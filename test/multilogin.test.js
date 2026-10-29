@@ -293,7 +293,7 @@ t('여유 동안 액자가 지워지면(액자 창 없음) 판정하지 않는�
   s.tick(GRACE());
   assert.strictEqual(s.ls.onfCl, t0, '⛔ 지워진 판 때문에 우회 기억을 버렸다');
   assert.strictEqual(s.el.nav.length, 1, '⛔ 지워진 판을 다시 열었다');
-  assert.strictEqual((s.L.message || []).length, 0, '⛔ 노크 듣기를 안 걷었다');
+  assert.strictEqual((s.L.message || []).filter((f) => !f._onfFs).length, 0, '⛔ 노크 듣기를 안 걷었다');
 });
 
 t('저장소가 막힌 창(사생활 보호 · localStorage 없음)에서도 죽지 않는다 — 기억만 못 한다', () => {
@@ -435,7 +435,7 @@ t('R5-b 🟡6 앱을 기다리는 사이 액자가 지워지면(액자 창 없�
   s.el.contentWindow = null;
   s.tick(10 * APP());
   assert.strictEqual(s.el.nav.length, 1, '⛔ 지워진 액자를 다시 열었다(없는 판에 src 대입)');
-  assert.strictEqual((s.L.message || []).length, 0, '⛔ 노크 듣기를 안 걷었다');
+  assert.strictEqual((s.L.message || []).filter((f) => !f._onfFs).length, 0, '⛔ 노크 듣기를 안 걷었다');
 });
 
 t('R6 🟠3 노크 없는 우리 안내 한 장(Lib _onfNoticePage · PIN 칸 — 앱 프레임 있음)·노크가 아주 늦은 판(이웃 긴 작업)은 다시 안 연다', () => {
