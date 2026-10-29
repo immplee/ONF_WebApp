@@ -141,6 +141,9 @@
   }
   try {
     lazy = !!(doc && doc.currentScript && doc.currentScript.hasAttribute && doc.currentScript.hasAttribute('data-lazy'));
+    /* 📏 [2026-10-29 Peter] 걸린 시간 기억은 **껍데기마다 따로** — 학생·선생님 홈이 같은 출처(class.ownify.co.kr)라 같은 칸에 섞였다
+       (같은 기기에서 둘을 번갈아 열면 채움 속도가 남의 평균을 따랐다). 선생님 껍데기 = data-lazy 로 싣는 쪽 → 칸 이름 끝 T. 첫 몇 번은 기본값으로 채우고 다시 배운다. */
+    if (lazy) { HIST += 'T'; HIST1 += 'T'; HIST2 += 'T'; }
     on = !!(doc && doc.body) && readOn(new URLSearchParams(global.location.search), ls) && !isReload(global.performance);
     if (on && !lazy) make();
   } catch (e) { on = false; }
@@ -242,8 +245,12 @@
       anims.push(inn.animate([{ transform: 'none' }, { transform: 'translateY(' + dy + 'px) scale(' + s + ')' }],
         { duration: FLY_MS, easing: 'cubic-bezier(.3,0,.08,1)', fill: 'forwards' }));
       anims.push(fiEl.animate([{ fill: ORANGE }, { fill: brand.c }], { duration: FLY_MS, easing: 'ease-in', fill: 'forwards' }));   // 글자 svg 는 색을 물려받는다
+      /* ⛔ [2026-10-29 Peter 12:29 화면 기록 「왼쪽 위로 가는 과정이 약간 끊긴다」] 바탕은 날기 **뒤쪽 40%**(로고가 감속해 내려앉는 때)에 걷는다.
+         바탕 투명도가 바뀌는 동안은 창 **전체**를 매 프레임 다시 합성한다(밑의 홈이 비친다) — GPU 가 바쁜 기기에선 그 구간만 30fps 로 떨어졌고
+         (기록: 57프레임 중 7 빠짐 · 전부 걷힘 구간), 종전 25~80% 는 로고가 가장 빨리 움직이는 때와 겹쳐 끊김이 눈에 띄었다.
+         빠르게 나는 동안은 불투명 바탕 위라 로고 자리만 다시 그린다(통통처럼). */
       anims.push(box.querySelector('.onf-ld-bg').animate([{ opacity: 1 }, { opacity: 0 }],
-        { duration: FLY_MS * 0.55, delay: FLY_MS * 0.25, easing: 'ease-out', fill: 'forwards' }));
+        { duration: FLY_MS * 0.4, delay: FLY_MS * 0.6, easing: 'ease-out', fill: 'forwards' }));
       later(function () {
         fillEl.style.overflow = 'visible';                                  // ⛔ 가리개를 푼다 — 안 풀면 튀어 오른 글자 윗부분이 막 상자 위에서 잘린다(종전 clip-path 도 잘랐다)
         box.classList.add('hop');                                           // 왼쪽 글자부터 하나씩
