@@ -919,7 +919,7 @@ ta('S4j index.html 머리에 Worker preconnect(ONF_WHO 와 같은 출처 · cros
 });
 
 /* ═══ 🌤 밖으로 3 Task 6(2026-10-24) — 켠 학생 홈은 Worker /home/get 답 + 정적 홈(ONF_OUT_HOME_URL)을 같이 시작 ═══
-   묻는 때(전역 조건): mount home 표시 · 토큰 · 기기 out≠0 · 그날 홈 물러남 없음(onfOutFailHome — 교재 onfOutFail 과 따로). ③-3 부터 안 쓴 기기(onfOutUsed 없음·14일 넘음)도 묻는다(첫 그림 시한 5000 · 시한으로 물러나도 그날 기록 없음 · mismatch 는 기기와 무관하게 그날 기록 없음).
+   묻는 때(전역 조건): mount home 표시 · 토큰 · 기기 out≠0 · 그날 홈 물러남 없음(onfOutFailHome — 교재 onfOutFail 과 따로). ③-3 부터 안 쓴 기기(onfOutUsed 없음·14일 넘음)도 묻는다(첫 그림 시한 5000 · 시한으로 물러나도 그날 기록 없음 · 그리기 전 mismatch 는 기기와 무관하게 그날 기록 없음).
    답(ok·api 3·v)을 받아야 outBoot{src, tok, d} · 답 없음(HOMEGET_MS 1500 넘김·실패·ok:false·api 다름) = 정적 손잡이를 걷고 지금 길(그날 기록 없음).
    outBoot 뒤 HOME_PAINT_MS 안 homeDrawn 없음·그리기 전 outFail = 지금 길 + onfOutFailHome · 그린 뒤 outFail = 지금 길(error·mismatch 만 그날 기록). 로고 ok 는 homeDrawn 에. */
 const HANS = (o) => Object.assign({ ok: true, api: 3, v: { vars: { a: 1 }, books: { ok: true, books: {} } }, at: 1 }, o || {});
@@ -1043,8 +1043,8 @@ ta('S6d 그리기 전 실패 — homeDrawn 이 HOME_PAINT_MS(outBoot 부터) 안
   assert.strictEqual(n.frameEl.src, HSRC, '⛔ 물러난 뒤 온 답이 액자를 바꿨다');
 });
 
-ta('S6d 그린 뒤 outFail — error 는 지금 길 + 그날 기록 · mismatch·notice·stale 은 지금 길만 · 그 뒤 hello·homeDrawn·outFail 은 무시', async () => {
-  for (const [why, kill] of [['error', true], ['mismatch', false], ['notice', false], ['stale', false]]) {
+ta('S6d 그린 뒤 outFail — error·mismatch 는 지금 길 + 그날 기록 · notice·stale 은 지금 길만 · 그 뒤 hello·homeDrawn·outFail 은 무시', async () => {
+  for (const [why, kill] of [['error', true], ['mismatch', true], ['notice', false], ['stale', false]]) {
     const s = hsetup();
     s.calls[0].ok(200, HANS()); await flush();
     s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
@@ -1062,7 +1062,7 @@ ta('S6d 그린 뒤 outFail — error 는 지금 길 + 그날 기록 · mismatch�
 
 /* ═══ ③-3 Task 4(2026-10-29) — 새 기기(onfOutUsed 없음·14일 넘음)도 정적 홈을 시도한다 ═══
    첫 그림 시한 HOME_PAINT_MS_COLD 5000(쓴 기기는 2500) · 시한으로 물러나도 그날 기록(onfOutFailHome) 없음(다음 열기에 다시 시도) ·
-   mismatch(그리기 전 교재 목록 대조 어긋남)는 쓴 기기든 새 기기든 그날 기록 없음 · 쓴 기기의 다른 실패는 종전 그대로. flushWorth·whoQ 는 무변. */
+   그리기 전 mismatch(③-3 교재 목록 대조 어긋남)는 쓴 기기든 새 기기든 그날 기록 없음 · 그린 뒤 mismatch 는 종전 · 쓴 기기의 다른 실패는 종전 그대로. flushWorth·whoQ 는 무변. */
 const D14 = 86400000;
 const NEWS = () => [['onfOutUsed 없음', { ls: LSf() }], ['14일 넘음', { ls: LSf({ onfOutUsed: String(1.7e12 - 14 * D14 - 1) }) }]];   // 부를 때마다 새 저장소(시험끼리 안 섞인다)
 ta('N1 새 기기(onfOutUsed 없음·14일 넘음) → /home/get 1회 + 정적 홈 시작 · 답 뒤 hello 에 outBoot · homeDrawn 에 로고 ok·onfOutUsed 새로', async () => {
@@ -1111,9 +1111,9 @@ ta('N3 새 기기 hello 없음(OUT_MS) → 지금 길 · 그날 기록 없음 (�
     assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ ' + nm + ' — hello 시한으로 물러났는데 그날 기록');
   }
 });
-ta('N4 mismatch → 지금 길 · 그날 기록 없음 — 새 기기든 쓴 기기든 · 그리기 전이든 뒤든', async () => {
+ta('N4 그리기 전 mismatch → 지금 길 · 그날 기록 없음 — 새 기기든 쓴 기기든 (그린 뒤 mismatch 는 종전대로 기록 — S6d)', async () => {
   for (const [nm, o] of NEWS().concat([['쓴 기기', {}]])) {
-    for (const drawn of [false, true]) {
+    for (const drawn of [false]) {
       const s = hsetup(o);
       s.calls[0].ok(200, HANS()); await flush();
       s.send({ onf: 'outHello' }, s.homeWin, OUT_O);

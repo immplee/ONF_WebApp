@@ -1187,7 +1187,7 @@
       function onMsg(ev) {
         if (done || !ev || !ev.data || ev.source !== frameEl.contentWindow || ev.origin !== org) return;   // 그 액자 창 · 정적 홈 출처만
         var k = ev.data.onf;
-        if (k === 'outFail') return back(ev.data.why !== 'mismatch' && (!drawn || (ev.data.why !== 'notice' && ev.data.why !== 'stale')));   // 그리기 전엔 무엇이든 그날 기록 — mismatch 만 면제(다음 열기에 다시)
+        if (k === 'outFail') return back(!drawn ? ev.data.why !== 'mismatch' : (ev.data.why !== 'notice' && ev.data.why !== 'stale'));   // 그리기 전엔 무엇이든 그날 기록 — mismatch 만 면제(③-3 로더가 그리기 전에 대조 · 다음 열기에 다시) · 그린 뒤 mismatch(readCf 없는 학생의 boot 대조)는 종전대로 기록(사본이 굳은 학생이 열 때마다 깜빡이지 않게)
         if (k === 'outHello') { clearTimeout(tm); if (d) boot(ev.source); else pend = ev.source; return; }   // hello 마다(다시 읽힌 홈도 받게 · openApp 과 같다)
         if (k === 'homeDrawn' && d && !drawn) {
           drawn = true; clearTimeout(tm);
