@@ -100,6 +100,7 @@
 
   var CSS =
     '.onf-ld{position:fixed;inset:0;z-index:5;pointer-events:none;contain:strict;fill:' + ORANGE + '}'
+  + '.onf-ld-hold{visibility:hidden}'                                          // 막이 가리는 동안 홈 액자(아래 hold)
   + '.onf-ld-bg{position:absolute;inset:0;background:var(--onf-bg,#1E1611)}'
   + '.onf-ld-logo{position:absolute;left:50%;top:50%;width:min(62vw,300px);transform:translate(-50%,-50%)}'
   + '.onf-ld-in{position:relative;width:100%}'
@@ -149,6 +150,12 @@
     if (on && lazy && !box) make();                                         // 선생님 껍데기 — 로그인 뒤 액자를 열 때 처음 그린다
     if (!box) return null;
     opts = opts || {};
+    /* ⛔ [2026-10-29 Peter 화면 기록 「아직도 끊겨」] 막이 가리는 동안 홈 액자를 **안 그리게** 둔다(visibility:hidden — 크롬은 숨은 액자의 그리기를 쉰다).
+       기록: 채움 뒤쪽(구글 래퍼·샌드박스·홈 문서가 차례로 들어서는 2.7초)에 창 전체가 초당 ≈13번만 그려졌다 — 덮여 안 보이는 액자가 중간 화면을
+       그리고 래스터하느라 GPU 를 잡았다. 홈은 숨어도 돌고(타이머·레이아웃) 로고 자리(brand)도 그대로 잰다 → 채움을 끝내기 시작할 때(finish) 보인다.
+       ⚠️ 클래스로만 — onf-frame.js openExec 가 다시 열기·못 엶에서 쓰는 인라인 visibility 와 안 겹친다(걷어도 그쪽 hidden 은 남는다). */
+    function hold(on) { try { frameEl.classList[on ? 'add' : 'remove']('onf-ld-hold'); } catch (e) {} }
+    hold(true);
     var t0 = global.performance ? performance.now() : Date.now();
     var E1 = expected(ls, HIST1, 2500, 300), E2 = expected(ls, HIST2, 2000, 300), phase = 'wait', timers = [], anims = [], fa = [], brand = null, okAt = 0, home = null;   // home = 로고 자리를 보낸 창·출처(숨김·다시 보임을 알린다)
     var reduced = false;
@@ -180,6 +187,7 @@
     function gone() {
       if (phase === 'gone') return;
       phase = 'gone';
+      hold(false);
       tellHome('brandDone');                                                // 홈 로고 다시 보이기(받은 적 없으면 아무 일 없다)
       timers.forEach(clearTimeout);
       global.removeEventListener('message', onMsg);
@@ -195,6 +203,7 @@
     function finish() {
       if (phase !== 'wait') return;
       phase = 'fin';
+      hold(false);                                                          // 끝까지 채우고(0.2~0.6초) 멈춤 0.12초 동안 홈이 한 번 그려진다 — 날기 전에
       var at = now();
       remember(ls, (okAt || at) - t0);
       if (okAt) remember(ls, okAt - t0, HIST1);
@@ -207,6 +216,7 @@
       if (phase === 'gone' || phase === 'quit') return;
       if (phase === 'fly') return gone();
       phase = 'quit';
+      hold(false);
       var done = false;
       fillUp(function () { if (done) return; done = true; if (typeof box.animate !== 'function') return gone(); anims.push(box.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, fill: 'forwards' })); later(gone, 180); });
     }
