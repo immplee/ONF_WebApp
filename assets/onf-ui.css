@@ -44,7 +44,10 @@ body {
 .onf-spin {
   width: 26px; height: 26px; border: 3px solid var(--onf-line);
   border-top-color: var(--onf-brown); border-radius: 50%;
-  animation: onf-spin .8s linear infinite;
+  /* ⛔ [2026-10-29 Peter 「뭔가 계속 끊긴다」] infinite 금지 — 이 고리는 화면이 뜬 뒤에도 액자 **뒤에서** 계속 돈다(걷는 JS 가 없다 · 위 .onf-wait 는 덮개가 본진).
+     덮여 안 보여도 회전은 화면을 초당 60번 다시 그리게 한다(헤드리스 3초: 도는 고리 180프레임 · 멈춘 고리 1) — 홈을 연 내내 그 탭이 GPU 를 쓴다.
+     ponytail: 40바퀴(32초)면 멈춘다 — 가장 느린 doGet 12.7초 · 막힘 안내 30초보다 길다. 32초 넘게 안 뜨는 화면은 멈춘 고리가 보인다. */
+  animation: onf-spin .8s linear 40;
 }
 @keyframes onf-spin { to { transform: rotate(360deg); } }
 /* 🔐 화면이 안 열렸을 때(onf-frame.js openExec — 구글 계정 여러 개 · 연결) — 「불러오는 중」 자리에 고리 대신. 판이면 [닫기]. */

@@ -172,6 +172,7 @@ t('홈 + 로고 자리 → 홈 로고 숨김 → 난다(가로·세로 따로 ·
   assert.deepStrictEqual(h.user.sent, [['brandHold', 'https://n-abc-0lu-script.googleusercontent.com']], '⛔ 날기 전에 홈 로고를 숨기라고 안 했다(로고가 둘로 보인다) · 또는 출처를 안 좁혔다');
   s.tick(950);
   assert.ok(box.classList.contains('hop'), '⛔ 내려앉고 통통이 없다');
+  assert.strictEqual(box.querySelector('.onf-ld-fill').style.overflow, 'visible', '⛔ 통통 때 채움 가리개를 안 풀었다(튀어 오른 글자 윗부분이 잘린다)');
   assert.strictEqual(h.user.sent.length, 1, '⛔ 통통 전에 홈 로고를 다시 보였다(튀는 글자 밑에 로고가 하나 더 보인다)');
   assert.ok(s.box(), '⛔ 통통 전에 걷었다');
   s.tick(900);
@@ -210,13 +211,20 @@ t('30초 안전 시계 — 아무 소식이 없어도 걷힌다', () => {
 });
 t('채우는 중 — 화면이 살아나기(노크) 전엔 60% · 홈이 다 그리기 전엔 92% 를 안 넘고, 끝나면 100%(Peter 2026-10-24 「로딩 속도에 맞춰」)', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
-  const fill = box.querySelector('.onf-ld-fill'), P = () => 1 - parseFloat(/inset\(0 ([\d.]+)%/.exec(fill.style.clipPath)[1]) / 100;
+  /* 채움은 합성기 애니메이션(가리개 transform) — 값 = 가리개가 갈 수 있는 모든 자리(애니메이션 점 + 스타일). 가리개와 속은 늘 같은 값을 거꾸로 밀어야 한다. */
+  const fill = box.querySelector('.onf-ld-fill'), fi = box.querySelector('.onf-ld-fi');
+  const v = (tr, sign) => 1 + sign * parseFloat(/translateX\(([-\d.]+)%\)/.exec(tr)[1]) / 100;
+  const P = () => v(fill.style.transform, 1), PMAX = () => Math.max(P(), ...fill.anims.flatMap((a) => a.kf.map((f) => v(f.transform, 1))));
+  const SAME = () => fill.anims.every((a, i) => fi.anims[i] && a.kf.every((f, j) => Math.abs(v(f.transform, 1) - v(fi.anims[i].kf[j].transform, -1)) < 1e-9)) && Math.abs(P() - v(fi.style.transform, -1)) < 1e-9;
   s.tick(12000);
-  assert.ok(P() > 0.58 && P() <= 0.6, '⛔ 노크 전 상한이 틀렸다: ' + P());
+  assert.ok(P() > 0.58 && PMAX() <= 0.6, '⛔ 노크 전 상한이 틀렸다: ' + P() + ' · 최고 ' + PMAX());
+  assert.ok(fill.anims.length >= 1 && fill.anims[0].kf.length > 2, '⛔ 채움이 합성기 애니메이션(곡선 점)이 아니다');
   k.ok(); s.tick(14000);
-  assert.ok(P() > 0.9 && P() <= 0.92, '⛔ 노크 뒤 상한이 틀렸다: ' + P());
+  assert.ok(P() > 0.9 && PMAX() <= 0.92, '⛔ 노크 뒤 상한이 틀렸다: ' + P() + ' · 최고 ' + PMAX());
+  assert.ok(fill.anims.length >= 2, '⛔ 노크에 둘째 단계 곡선으로 안 갈아탔다');
   h.send(BRAND); s.tick(260);
-  assert.strictEqual(fill.style.clipPath, 'inset(0 0.00% 0 0)', '⛔ 다 그렸는데 끝까지 안 찼다');
+  assert.strictEqual(P(), 1, '⛔ 다 그렸는데 끝까지 안 찼다');
+  assert.ok(SAME(), '⛔ 가리개와 속이 어긋났다(글자가 같이 밀려 보인다)');
   assert.ok(JSON.parse(s.ls.onfLoadMs1).length === 1 && JSON.parse(s.ls.onfLoadMs2).length === 1, '⛔ 단계 시간을 안 배웠다(노크까지 · 다 그림까지)');
 });
 t('단계 곡선 · 남은 만큼 채움 시간 — 순수', () => {
