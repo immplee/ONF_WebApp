@@ -810,7 +810,7 @@ try { wideMq = window.matchMedia ? window.matchMedia(BOOK_WIDE_Q) : null; } catc
    out=0 = 이 기기는 늘 지금 길(아래 outOk — 미리·넘겨주기도) · out=1 은 그날 물러남 기억(onfOutFail · onfOutFailHome)도 지운다(한 번 물러난 기기를 그날 다시 시험하게). */
 var BOOK_OUT = (function () {
   var v = null;
-  try { v = new URLSearchParams(location.search).get('out'); if (v === '1' || v === '0') { localStorage.setItem('onfOut', v); if (v === '1') { localStorage.removeItem('onfOutFail'); localStorage.removeItem('onfOutFailHome'); } } else v = localStorage.getItem('onfOut'); } catch (e) {}
+  try { v = new URLSearchParams(location.search).get('out'); if (v === '1' || v === '0') { localStorage.setItem('onfOut', v); if (v === '1') { localStorage.removeItem('onfOutFail'); localStorage.removeItem('onfOutFailHome'); localStorage.removeItem('onfOutColdMiss'); } } else v = localStorage.getItem('onfOut'); } catch (e) {}
   return v !== '0';
 })();
 var BOOK_LG = (function () {
