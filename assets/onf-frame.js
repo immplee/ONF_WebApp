@@ -1242,6 +1242,46 @@
     global.addEventListener('message', onFs);
     doc.addEventListener('fullscreenchange', tell);
     doc.addEventListener('webkitfullscreenchange', tell);
+
+    /* 🖥️ 모니터 연결 알림 · 확장 창 열기(2026-10-29 · ONF_Archive 웹-앱/2026-10-29-목요일_교재-시스템_화면확장-미러링-구현계획.md 3단계)
+       ▸ {onf:'monitorHello'} = 선생님 교재가 「모니터가 붙으면 알려 줘」 — 지금 상태를 바로 답하고, 바뀔 때마다 {onf:'monitor', on}(크롬 screen.isExtended · change).
+         screen.isExtended 를 모르는 브라우저(사파리)는 can:false — 교재는 알림 없이 ☰ 줄만.
+       ▸ {onf:'extOpen', url} = 확장 창을 이 맨 위 창이 연다 — 모니터가 붙어 있으면 그 모니터 자리·크기로(getScreenDetails · 처음 한 번 크롬이 「창 관리」 허락을 묻는다).
+         주소는 우리 책 껍데기(script·class.ownify.co.kr)의 ext=1 주소만. 열림·닫힘(1초마다 봄)은 {onf:'extState', on, why} · {onf:'extClose'} = 닫기.
+         ⚠️ 허락을 묻는 사이 누른 손길이 식으면 창이 막힐 수 있다 → why:'blocked' — 교재가 「한 번 더 눌러 주세요」(허락은 남아 다음엔 바로). */
+    var mon = [], scr = global.screen, xw = null, xOwner = null, xIv = 0;
+    function canMon() { return !!scr && typeof scr.isExtended === 'boolean'; }
+    function monTell(a) { var m = { onf: 'monitor', on: canMon() && scr.isExtended, can: canMon() }; (a ? [a] : mon).forEach(function (x) { try { x.win.postMessage(m, x.origin); } catch (e) {} }); }
+    function xTell(on, why) { if (!xOwner) return; try { xOwner.win.postMessage({ onf: 'extState', on: !!on, why: why || '' }, xOwner.origin); } catch (e) {} }
+    function xEnd() { clearInterval(xIv); xIv = 0; var w = xw; xw = null; if (w && !w.closed) try { w.close(); } catch (e) {} xTell(false); }
+    function extOk(u) { try { var x = new URL(String(u)); return /^https:\/\/(script|class)\.ownify\.co\.kr$/.test(x.origin) && x.searchParams.get('ext') === '1'; } catch (e) { return false; } }
+    function xOpen(url, feat) {
+      var w = null;
+      try { w = global.open(url, 'onfExt', 'popup=yes,' + feat); } catch (e) {}
+      if (!w) return xTell(false, 'blocked');
+      xw = w; xTell(true);
+      clearInterval(xIv); xIv = setInterval(function () { if (!xw || xw.closed) xEnd(); }, 1000);
+    }
+    function onMon(ev) {
+      var d = ev && ev.data;
+      if (!d || (d.onf !== 'monitorHello' && d.onf !== 'extOpen' && d.onf !== 'extClose') || !ev.source || !isAppOrigin(ev.origin) || !inside(ev.source)) return;
+      var a = { win: ev.source, origin: ev.origin };
+      if (d.onf === 'monitorHello') { if (!mon.some(function (x) { return x.win === ev.source; })) mon.push(a); monTell(a); return; }
+      if (d.onf === 'extClose') { if (xOwner && xOwner.win === ev.source) xEnd(); return; }
+      if (!extOk(d.url)) return;
+      if (xw && !xw.closed) { if (xOwner && xOwner.win !== ev.source) xTell(false); xOwner = a; try { xw.location.href = d.url; xw.focus(); } catch (e) {} xTell(true); return; }   // 이미 열림 — 그 창에서 새 교재로
+      xOwner = a;
+      var plain = 'width=1280,height=800';
+      if (!canMon() || !scr.isExtended || typeof global.getScreenDetails !== 'function') return xOpen(d.url, plain);
+      global.getScreenDetails().then(function (sd) {
+        var cur = sd.currentScreen, other = (sd.screens || []).filter(function (s) { return s !== cur; })[0];
+        xOpen(d.url, other ? 'left=' + other.availLeft + ',top=' + other.availTop + ',width=' + other.availWidth + ',height=' + other.availHeight : plain);
+      }, function () { xOpen(d.url, plain); });   // 허락 안 함 — 이 화면에 연다(옮기는 건 사람이)
+    }
+    onMon._onfFs = true;   // 늘 듣는 귀(위 onFs 와 같다)
+    global.addEventListener('message', onMon);
+    if (canMon() && typeof scr.addEventListener === 'function') scr.addEventListener('change', function () { monTell(); });
+    global.addEventListener('pagehide', function () { if (xw) xEnd(); });
   })();
 
   global.ONF = global.ONF || {};

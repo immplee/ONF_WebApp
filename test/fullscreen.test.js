@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-function env() {
+function env(extra) {
   const L = {}, DL = {}, calls = [];
   const g = {};
   vm.createContext(g);
@@ -21,11 +21,12 @@ function env() {
     createElement: () => ({ style: {}, setAttribute() {}, classList: { add() {}, remove() {}, toggle() {} } })
   };
   g.document = doc;
+  if (extra) Object.assign(g, extra);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-frame.js'), 'utf8'), g, { filename: 'onf-frame.js' });
   const W = vm.runInContext("window", g);   // 안쪽 전역(바깥 g 와 === 가 아니다)
   const frame = (parent) => { const w = { got: [], postMessage(m, o) { w.got.push([m, o]); } }; w.parent = parent; return w; };
   const send = (data, source, origin) => (L.message || []).forEach((f) => f({ data, source, origin }));
-  return { g: W, doc, calls, frame, send };
+  return { g: W, doc, calls, frame, send, L };
 }
 
 let pass = 0, fail = 0;
@@ -63,5 +64,49 @@ t('이미 켜져 있으면 다시 안 켜고 지금 상태만 알린다', () => 
   assert.deepStrictEqual(s.calls, ['req']);
   assert.deepStrictEqual(last(book), [{ onf: 'fsState', on: true }, OUT]);
 });
+
+(async () => {
+async function ta(label, fn) {
+  try { await fn(); console.log('  ✅ ' + label); pass++; }
+  catch (e) { console.log('  ❌ ' + label + '\n     ' + e.message); fail++; }
+}
+console.log('[🖥️ 모니터 알림 · 확장 창 열기]');
+const EXT = 'https://script.ownify.co.kr/?fileId=F&sheetName=E1&ttok=x&ext=1';
+function mon(isExt, details) {
+  const SL = {}, opened = [];
+  const screen = { isExtended: isExt, addEventListener: (k, f) => { (SL[k] = SL[k] || []).push(f); } };
+  const open = (u, n, f) => { const w = { u, n, f, closed: false, close() { w.closed = true; }, location: {}, focus() {} }; opened.push(w); return w; };
+  const e = env({ screen, open, URL, getScreenDetails: details ? () => Promise.resolve(details) : undefined, setInterval: () => 1, clearInterval() {} });
+  return Object.assign(e, { screen, SL, opened });
+}
+t('monitorHello = 지금 상태 바로 · 꽂으면(change) 알림 · 사파리처럼 모르면 can:false', () => {
+  const s = mon(false), book = s.frame(s.g);
+  s.send({ onf: 'monitorHello' }, book, GAS);
+  assert.deepStrictEqual(last(book)[0], { onf: 'monitor', on: false, can: true });
+  s.screen.isExtended = true; s.SL.change.forEach((f) => f());
+  assert.deepStrictEqual(last(book)[0], { onf: 'monitor', on: true, can: true }, '⛔ 모니터를 꽂았는데 교재에 안 알렸다');
+  const n = mon(undefined), b2 = n.frame(n.g); n.send({ onf: 'monitorHello' }, b2, GAS);
+  assert.deepStrictEqual(last(b2)[0], { onf: 'monitor', on: false, can: false });
+});
+await ta('extOpen — 모니터 없음 = 보통 창 · 붙음 = 그 모니터 자리·크기 · 열림 알림 · ⛔ 우리 ext 주소만', async () => {
+  const s = mon(false), book = s.frame(s.g);
+  s.send({ onf: 'extOpen', url: EXT }, book, GAS);
+  assert.strictEqual(s.opened.length, 1); assert.ok(/width=1280,height=800/.test(s.opened[0].f));
+  assert.deepStrictEqual(last(book)[0], { onf: 'extState', on: true, why: '' });
+  for (const bad of ['https://evil.example/?ext=1', 'https://script.ownify.co.kr/?fileId=F', 'javascript:alert(1)']) s.send({ onf: 'extOpen', url: bad }, book, GAS);
+  assert.strictEqual(s.opened.length, 1, '⛔ 남의 주소·ext 없는 주소로 창을 열었다');
+  const cur = { availLeft: 0, availTop: 0, availWidth: 1440, availHeight: 900 }, mo = { availLeft: 1440, availTop: 0, availWidth: 1920, availHeight: 1080 };
+  const m = mon(true, { currentScreen: cur, screens: [cur, mo] }), b2 = m.frame(m.g);
+  m.send({ onf: 'extOpen', url: EXT }, b2, GAS); await new Promise((r) => setImmediate(r));
+  assert.ok(/left=1440,top=0,width=1920,height=1080/.test(m.opened[0].f), '⛔ 모니터가 붙었는데 그 모니터 자리로 안 열었다: ' + m.opened[0].f);
+  m.send({ onf: 'extClose' }, b2, GAS);
+  assert.ok(m.opened[0].closed, '⛔ 닫기를 안 했다'); assert.deepStrictEqual(last(b2)[0], { onf: 'extState', on: false, why: '' });
+});
+t('창이 막히면 blocked 로 알린다(허락을 묻는 사이 손길이 식은 때)', () => {
+  const s = mon(false); s.g.open = () => null; const book = s.frame(s.g);
+  s.send({ onf: 'extOpen', url: EXT }, book, GAS);
+  assert.deepStrictEqual(last(book)[0], { onf: 'extState', on: false, why: 'blocked' });
+});
 console.log(`${pass}개 통과, ${fail}개 실패`);
 if (fail) process.exit(1);
+})();
