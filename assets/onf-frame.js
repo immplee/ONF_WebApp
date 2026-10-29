@@ -1138,7 +1138,7 @@
     /* 🌤 밖으로 3(2026-10-24 · 판정 R4·R10~R14·R18) — 켠 학생 홈: /home/get 과 정적 홈(ONF_OUT_HOME_URL)을 **같이** 시작한다.
        묻는 때만(homeQ): index.html 의 홈 표시(opts.home — PREBOOK 끔이면 preKey 가 비어 따로 받는다) · 토큰 · 기기 out ·
        그날 홈 물러남 없음(onfOutFailHome — 교재 onfOutFail 과 따로: 홈이 물러나도 정적 교재는 그대로) — 아니면 종전 그대로(요청·기다림 0).
-       · 안 쓴 기기(onfOutUsed 없음·14일 넘음 = cold · ③-3 2026-10-29)도 묻는다 — 첫 그림 시한만 HOME_PAINT_MS_COLD 5000. cold 가 시한(hello 없음·그리기)으로 물러나면 그날 기록을 안 남긴다(다음 열기에 다시 시도).
+       · 안 쓴 기기(onfOutUsed 없음·14일 넘음 = cold · ③-3 2026-10-29)도 묻는다 — 첫 그림 시한만 HOME_PAINT_MS_COLD 5000. cold 가 시한(hello 없음·그리기)으로 물러나면 첫 번째만 그날 기록을 안 남긴다(다음 열기에 다시 시도) — 같은 날 2번째 시한 실패는 기록(coldMissKill · Ruling 6).
        · mismatch(그리기 전 교재 목록 대조 어긋남 — 정적 홈이 그리기 전에만 낸다)는 쓴 기기든 cold 든 그날 기록을 안 남긴다(비용은 /home/get 한 번). 다른 실패는 종전 그대로.
        · 답(d)이 와야 hello 에 outBoot{src, tok, d} · 답 없음 = 정적 손잡이를 **먼저** 걷고(end) 지금 길 — 그날 기록 없음(정적 시계가 두 번째 물러남을 못 한다).
        · hello 없음(OUT_MS) · outBoot 뒤 HOME_PAINT_MS 안 homeDrawn 없음 · 그리기 전 outFail = 지금 길 + 그날 기록.
@@ -1149,6 +1149,16 @@
     function homeQ() {
       if (!opts.home || !opts.out || !opts.tok) return false;
       try { return !(Date.now() - Number(global.localStorage.getItem(OUT_FAIL_HOME) || 0) < OUT_FAIL_MS); } catch (e) { return false; }
+    }
+    /* 안 쓴 기기의 시한 실패(hello 없음·그리기 시한)는 첫 번째만 그날 기록을 면제 — 같은 날(OUT_FAIL_MS) 2번째면 기록(그날 하루 지금 길 · Ruling 6: 정적이 늘 못 뜨는 기기가 열 때마다 5초 기다리는 일을 막는다).
+       셈 = onfOutColdMiss 한 칸(첫 실패 시각) · 정적 홈이 한 번 그리면(homeDrawn) 지운다 · mismatch 는 셈에도 안 넣는다. */
+    var OUT_COLD_MISS = 'onfOutColdMiss';
+    function coldMissKill() {
+      try {
+        var ls = global.localStorage, n = Date.now(), t = Number(ls.getItem(OUT_COLD_MISS) || 0);
+        if (n - t < OUT_FAIL_MS && t <= n) return true;   // 같은 날 2번째
+        ls.setItem(OUT_COLD_MISS, String(n)); return false;
+      } catch (e) { return false; }
     }
     function homeCold() { try { return !(Date.now() - Number(global.localStorage.getItem(OUT_USED) || 0) < OUT_USED_MS); } catch (e) { return true; } }   // 14일 안에 정적 판을 쓰지 않은 기기
     function mainHome() {
@@ -1172,7 +1182,7 @@
       }
       function boot(w) {
         try { w.postMessage({ onf: 'outBoot', src: src, tok: opts.tok, d: aged() }, org); } catch (e) {}
-        if (!drawn) { clearTimeout(tm); tm = setTimeout(function () { back(!cold); }, paintMs); }
+        if (!drawn) { clearTimeout(tm); tm = setTimeout(function () { back(cold ? coldMissKill() : true); }, paintMs); }
       }
       function onMsg(ev) {
         if (done || !ev || !ev.data || ev.source !== frameEl.contentWindow || ev.origin !== org) return;   // 그 액자 창 · 정적 홈 출처만
@@ -1181,7 +1191,7 @@
         if (k === 'outHello') { clearTimeout(tm); if (d) boot(ev.source); else pend = ev.source; return; }   // hello 마다(다시 읽힌 홈도 받게 · openApp 과 같다)
         if (k === 'homeDrawn' && d && !drawn) {
           drawn = true; clearTimeout(tm);
-          try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}
+          try { global.localStorage.setItem(OUT_USED, String(Date.now())); global.localStorage.removeItem(OUT_COLD_MISS); } catch (eU) {}
           try { if (opts.hooks && typeof opts.hooks.ok === 'function') opts.hooks.ok(); } catch (eH) {}
         }
       }
@@ -1192,7 +1202,7 @@
         d = a; dAt = Date.now();
         if (pend) boot(pend);
       });
-      tm = setTimeout(function () { back(!cold); }, OUT_MS);   // hello 없음 — 정적 홈이 안 실렸다(cold 는 그날 기록 없음)
+      tm = setTimeout(function () { back(cold ? coldMissKill() : true); }, OUT_MS);   // hello 없음 — 정적 홈이 안 실렸다(cold 는 그날 기록 없음)
       try { if (frameEl.isConnected && frameEl.contentWindow) frameEl.contentWindow.location.replace(ONF_OUT_HOME_URL); else frameEl.src = ONF_OUT_HOME_URL; } catch (e) { frameEl.src = ONF_OUT_HOME_URL; }   // 📱 replace — openExec 끝 주석
     }
     var wq = whoQ(src);

@@ -1151,6 +1151,38 @@ ta('N6 flushWorth·whoQ 의 onfOutUsed 판정은 그대로(새 기기 홈 시도
   assert.ok(/OUT_USED/.test(at('function whoQ(s)', 700)), '⛔ whoQ 의 onfOutUsed 판정이 사라졌다');
 });
 
+ta('N7 새 기기 시한 실패 상한(Ruling 6) — 같은 날 첫 번째만 기록 면제 · 2번째(그리기·hello 섞여도)는 그날 기록 · 24시간 뒤엔 다시 첫 번째 · mismatch 는 셈에 안 들어감 · 그리면 셈 지움', async () => {
+  const miss = async (ls, how) => {
+    const s = hsetup({ ls });
+    if (how === 'hello') s.fire(2500);
+    else { s.calls[0].ok(200, HANS()); await flush(); s.send({ onf: 'outHello' }, s.homeWin, OUT_O); s.fire(5000); }
+    assert.strictEqual(s.frameEl.src, HSRC); return s;
+  };
+  const ls = LSf();
+  let s = await miss(ls, 'paint');
+  assert.ok(!('onfOutFailHome' in ls.m), '⛔ 첫 시한 실패가 기록을 남겼다');
+  s = await miss(ls, 'hello');
+  assert.ok('onfOutFailHome' in ls.m, '⛔ 같은 날 2번째 시한 실패(hello)가 기록을 안 남겼다');
+  assert.strictEqual(hsetup({ ls }).calls.length, 0, '⛔ 2번째 뒤에도 같은 날 또 정적을 시도한다');
+  const l2 = LSf();   // hello 로 시작해 그리기로 2번째
+  await miss(l2, 'hello'); assert.ok(!('onfOutFailHome' in l2.m));
+  await miss(l2, 'paint'); assert.ok('onfOutFailHome' in l2.m, '⛔ hello→그리기 2번째가 기록을 안 남겼다');
+  const l3 = LSf();   // 24시간 뒤엔 다시 첫 번째
+  const a3 = await miss(l3, 'paint'); a3.g.T += 0;
+  const l4 = LSf(Object.assign({}, l3.m, { onfOutColdMiss: String(1.7e12 - 86400000 - 1) }));
+  await miss(l4, 'paint'); assert.ok(!('onfOutFailHome' in l4.m), '⛔ 하루 지난 첫 실패 셈이 아직 남아 2번째로 셌다');
+  const l5 = LSf();   // mismatch 는 셈에 안 넣는다
+  for (let i = 0; i < 2; i++) { const m = hsetup({ ls: l5 }); m.calls[0].ok(200, HANS()); await flush(); m.send({ onf: 'outHello' }, m.homeWin, OUT_O); m.send({ onf: 'outFail', why: 'mismatch' }, m.homeWin, OUT_O); }
+  assert.ok(!('onfOutFailHome' in l5.m) && !('onfOutColdMiss' in l5.m), '⛔ mismatch 가 셈에 들어갔다');
+  await miss(l5, 'paint'); assert.ok(!('onfOutFailHome' in l5.m), '⛔ mismatch 뒤 첫 시한 실패가 기록을 남겼다');
+  const l6 = LSf();   // 한 번 그리면 셈 지움 — 다음 실패는 (쓴 기기라) 종전 규칙
+  await miss(l6, 'paint'); assert.ok('onfOutColdMiss' in l6.m);
+  const g = hsetup({ ls: l6 }); g.calls[0].ok(200, HANS()); await flush(); g.send({ onf: 'outHello' }, g.homeWin, OUT_O); g.send({ onf: 'homeDrawn' }, g.homeWin, OUT_O);
+  assert.ok(!('onfOutColdMiss' in l6.m), '⛔ 그렸는데 셈이 안 지워졌다');
+  const lu = LSf({ onfOutUsed: String(1.7e12 - D14) });   // 쓴 기기는 셈과 무관(종전: 시한 실패 즉시 기록)
+  const u = hsetup({ ls: lu }); u.calls[0].ok(200, HANS()); await flush(); u.send({ onf: 'outHello' }, u.homeWin, OUT_O); u.fire(2500);
+  assert.ok('onfOutFailHome' in lu.m && !('onfOutColdMiss' in lu.m), '⛔ 쓴 기기 시한 실패가 종전과 다르다');
+});
 ta('S6d 물러나면 죽은 정적 홈 창을 비운다 — 정적 홈이 연 판을 닫아도 그 창엔 bookClosed 를 안 보낸다', async () => {
   const s = hsetup();
   s.calls[0].ok(200, HANS()); await flush();
