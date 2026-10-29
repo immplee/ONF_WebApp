@@ -99,24 +99,33 @@
   function pick(brand, reduced, canAnimate) { return brand && brand.k !== 'none' && !reduced && canAnimate ? 'fly' : 'fade'; }
 
   var CSS =
-    '.onf-ld{position:fixed;inset:0;z-index:5;pointer-events:none;contain:strict}'
+    '.onf-ld{position:fixed;inset:0;z-index:5;pointer-events:none;contain:strict;fill:' + ORANGE + '}'
   + '.onf-ld-bg{position:absolute;inset:0;background:var(--onf-bg,#1E1611)}'
   + '.onf-ld-logo{position:absolute;left:50%;top:50%;width:min(62vw,300px);transform:translate(-50%,-50%)}'
   + '.onf-ld-in{position:relative;width:100%}'
-  + '.onf-ld svg{display:block;width:100%;height:auto;overflow:visible;fill:' + ORANGE + '}'
+  + '.onf-ld svg{display:block;width:100%;height:auto;overflow:visible}'
   + '.onf-ld-ghost{opacity:.16}'
-  + '.onf-ld-fill{position:absolute;inset:0;clip-path:inset(0 92% 0 0)}'
-  + '.onf-ld .L{transform-box:fill-box;transform-origin:50% 100%}'
+  /* 채움 = 가리개(.onf-ld-fill · overflow 로 자름)를 왼쪽으로 밀어 두고 속(.onf-ld-fi)을 같은 만큼 되민다 — 둘 다 transform 이라 합성기에서 돈다(아래 fillRun) */
+  + '.onf-ld-fill{position:absolute;inset:0;overflow:hidden;transform:translateX(-92%)}'
+  + '.onf-ld-fi{position:absolute;inset:0;transform:translateX(92%)}'
+  + '.onf-ld .L{position:absolute;inset:0}'                                     // 글자 하나 = HTML 상자 하나(통통이 합성기에서 돈다 · 아래 svg 주석)
   + '.onf-ld.hop .L{animation:onfLdHop ' + HOP_MS + 'ms cubic-bezier(.3,0,.3,1) both}'
-  + '@keyframes onfLdHop{0%{transform:none}18%{transform:scale(1.06,.9)}48%{transform:translateY(-34%) scale(.96,1.06)}78%{transform:scale(1.05,.93)}100%{transform:none}}';
+  + '@keyframes onfLdHop{0%{transform:none}18%{transform:scale(1.06,.9)}48%{transform:translateY(-32%) scale(.96,1.06)}78%{transform:scale(1.05,.93)}100%{transform:none}}';
 
-  function svg(cls) {
-    var s = '<svg class="' + cls + '" viewBox="' + VB + '" aria-hidden="true" focusable="false">';
-    for (var i = 0; i < LETTERS.length; i++) s += '<g class="L" style="animation-delay:' + (i * HOP_STEP) + 'ms">' + LETTERS[i] + '</g>';
-    return s + '</svg>';
+  function svg(cls, inner) { return '<svg class="' + cls + '" viewBox="' + VB + '" aria-hidden="true" focusable="false">' + inner + '</svg>'; }
+  /* ⛔ [2026-10-29 Peter 「뭔가 계속 끊긴다」] 통통 글자는 svg <g> 가 아니라 **글자마다 HTML 상자**(.L) 다.
+     svg 안 요소의 transform 은 합성기로 못 간다 — 종전엔 튈 때마다 메인 스레드가 레이아웃·칠하기를 다시 했다(헤드리스 트레이스 0.87초에 레이아웃 52·칠하기 156번).
+     상자는 막 전체 크기(겹쳐 둔다) · 튀는 기준점 = 그 글자 아래 가운데(글자 g 의 translate x · 바닥 98%). */
+  function letters() {
+    var s = '', vb = VB.split(' ');
+    for (var i = 0; i < LETTERS.length; i++) {
+      var x = +(/translate\(([\d.]+),/.exec(LETTERS[i]) || [0, 0])[1];
+      s += '<div class="L" style="animation-delay:' + (i * HOP_STEP) + 'ms;transform-origin:' + ((x - vb[0]) / vb[2] * 100).toFixed(2) + '% 98%">' + svg('', LETTERS[i]) + '</div>';
+    }
+    return s;
   }
 
-  var doc = global.document, box = null, fillEl = null, ls = null, on = false, lazy = false;
+  var doc = global.document, box = null, fillEl = null, fiEl = null, ls = null, on = false, lazy = false;
   try { ls = global.localStorage; } catch (e) {}
   /* 막 만들기 — 학생 껍데기는 이 파일이 실릴 때 바로(고리보다 먼저 보이게) · 선생님 껍데기는 `data-lazy` 라 bind 때(⛔ 로그인 화면을 가리면 안 된다). */
   function make() {
@@ -124,9 +133,9 @@
       var st = doc.createElement('style'); st.textContent = CSS; doc.head.appendChild(st);
       box = doc.createElement('div'); box.className = 'onf-ld'; box.setAttribute('aria-hidden', 'true');
       box.innerHTML = '<div class="onf-ld-bg"></div><div class="onf-ld-logo"><div class="onf-ld-in">'
-        + svg('onf-ld-ghost') + '<div class="onf-ld-fill">' + svg('') + '</div></div></div>';
+        + svg('onf-ld-ghost', LETTERS.join('')) + '<div class="onf-ld-fill"><div class="onf-ld-fi">' + letters() + '</div></div></div></div>';
       doc.body.appendChild(box);
-      fillEl = box.querySelector('.onf-ld-fill');
+      fillEl = box.querySelector('.onf-ld-fill'); fiEl = box.querySelector('.onf-ld-fi');
     } catch (e) { try { if (box && box.parentNode) box.parentNode.removeChild(box); } catch (e2) {} box = null; }
   }
   try {
@@ -141,41 +150,47 @@
     if (!box) return null;
     opts = opts || {};
     var t0 = global.performance ? performance.now() : Date.now();
-    var E1 = expected(ls, HIST1, 2500, 300), E2 = expected(ls, HIST2, 2000, 300), phase = 'wait', raf = 0, timers = [], anims = [], brand = null, okAt = 0, home = null;   // home = 로고 자리를 보낸 창·출처(숨김·다시 보임을 알린다)
+    var E1 = expected(ls, HIST1, 2500, 300), E2 = expected(ls, HIST2, 2000, 300), phase = 'wait', timers = [], anims = [], fa = [], brand = null, okAt = 0, home = null;   // home = 로고 자리를 보낸 창·출처(숨김·다시 보임을 알린다)
     var reduced = false;
     try { reduced = global.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
     function now() { return global.performance ? performance.now() : Date.now(); }
     function later(f, ms) { timers.push(setTimeout(function () { try { f(); } catch (e) { gone(); } }, ms)); }
-    function setP(p) { fillEl.style.clipPath = 'inset(0 ' + ((1 - p) * 100).toFixed(2) + '% 0 0)'; }
+    function tr(p) { return ['translateX(' + ((p - 1) * 100).toFixed(2) + '%)', 'translateX(' + ((1 - p) * 100).toFixed(2) + '%)']; }   // [가리개, 속]
+    function setP(p) { var t = tr(p); fillEl.style.transform = t[0]; fiEl.style.transform = t[1]; }
+    /* ⛔ [2026-10-29 Peter 「뭔가 계속 끊긴다」] 채움은 **합성기 애니메이션**이다 — 종전엔 rAF 마다 clip-path 를 바꿨다:
+       ① 프레임마다 칠하기·래스터(헤드리스 6초에 칠하기 693·래스터 347) ② 메인 스레드에 묶여, 액자(구글 화면)가 같은 프로세스에서 도는 폰·아이폰에선
+       구글 스크립트 한 덩이(0.2~0.3초)마다 채움이 그 자리에 멈췄다(헤드리스 폰·한 프로세스·CPU×4 실측 max 317ms).
+       → 지금 곡선(stage)을 점 몇 개로 떠서 WAAPI transform 으로 넘긴다. 노크·다 그림에서 새로 뜬다. ps = 채움 값들 · 균등 간격. */
+    function fillRun(ps, ms, easing) {
+      fa.forEach(function (a) { try { a.cancel(); } catch (e) {} });
+      setP(ps[ps.length - 1]);                                              // 끝값을 스타일에 — 애니메이션이 없거나 끝나도 그 자리
+      if (typeof fillEl.animate !== 'function' || ms <= 0) { fa = []; return; }
+      fa = [0, 1].map(function (k) {
+        return [fillEl, fiEl][k].animate(ps.map(function (p) { return { transform: tr(p)[k] }; }), { duration: ms, easing: easing || 'linear' });
+      });
+    }
+    /* 지금 단계의 곡선을 끝(상한의 99%)까지 — 노크 전 4·E1 · 노크 뒤 4·E2 */
+    function fillCurve() {
+      var t = now() - t0, ok = okAt ? okAt - t0 : null, H = ok == null ? 4 * E1 : ok + 4 * E2, ps = [];
+      if (t >= H) return fillRun([pNow()], 0);
+      for (var i = 0; i <= 16; i++) ps.push(stage(t + (H - t) * i / 16, E1, ok, E2));
+      fillRun(ps, H - t);
+    }
     function tellHome(k) { try { if (home) home.w.postMessage({ onf: k }, home.o); } catch (e) {} }
     function gone() {
       if (phase === 'gone') return;
       phase = 'gone';
       tellHome('brandDone');                                                // 홈 로고 다시 보이기(받은 적 없으면 아무 일 없다)
-      try { cancelAnimationFrame(raf); } catch (e) {}
       timers.forEach(clearTimeout);
       global.removeEventListener('message', onMsg);
       try { if (box.parentNode) box.parentNode.removeChild(box); } catch (e) {}
     }
     function pNow() { return stage(now() - t0, E1, okAt ? okAt - t0 : null, E2); }
-    function tick() {
-      if (phase !== 'wait') return;
-      try { setP(pNow()); raf = requestAnimationFrame(tick); } catch (e) { gone(); }
-    }
-    /* 끝까지 빠르게 채운 뒤 then — 끝나는 길은 전부 여기를 지난다(Peter 2026-10-24) */
+    /* 끝까지 빠르게 채운 뒤 then — 끝나는 길은 전부 여기를 지난다(Peter 2026-10-24) · 끝은 시계로 안다(숨은 탭에서도 · then 은 한 번만 돈다) */
     function fillUp(then) {
-      cancelAnimationFrame(raf);
-      var p0 = pNow(), f0 = now(), d = fillMs(p0);
-      (function up() {
-        if (phase === 'gone') return;
-        try {
-          var k = Math.min(1, (now() - f0) / d);
-          setP(p0 + (1 - p0) * (1 - Math.pow(1 - k, 3)));
-          if (k < 1) { raf = requestAnimationFrame(up); return; }
-          then();
-        } catch (e) { gone(); }
-      })();
-      later(function () { if (phase !== 'gone') { setP(1); then(); } }, d + 400);   // 숨은 탭은 rAF 가 멈춘다 — 시계로도 끝낸다(then 은 두 번 와도 한 번만 돈다)
+      var p0 = pNow(), d = fillMs(p0);
+      fillRun([p0, 1], d, 'cubic-bezier(.33,1,.68,1)');                     // 감속(옛 1-(1-k)³ 과 같은 꼴)
+      later(function () { if (phase !== 'gone') then(); }, d);
     }
     function finish() {
       if (phase !== 'wait') return;
@@ -216,10 +231,11 @@
         { duration: FLY_MS, easing: 'cubic-bezier(.55,0,.12,1)', fill: 'forwards' }));
       anims.push(inn.animate([{ transform: 'none' }, { transform: 'translateY(' + dy + 'px) scale(' + s + ')' }],
         { duration: FLY_MS, easing: 'cubic-bezier(.3,0,.08,1)', fill: 'forwards' }));
-      anims.push(fillEl.querySelector('svg').animate([{ fill: ORANGE }, { fill: brand.c }], { duration: FLY_MS, easing: 'ease-in', fill: 'forwards' }));
+      anims.push(fiEl.animate([{ fill: ORANGE }, { fill: brand.c }], { duration: FLY_MS, easing: 'ease-in', fill: 'forwards' }));   // 글자 svg 는 색을 물려받는다
       anims.push(box.querySelector('.onf-ld-bg').animate([{ opacity: 1 }, { opacity: 0 }],
         { duration: FLY_MS * 0.55, delay: FLY_MS * 0.25, easing: 'ease-out', fill: 'forwards' }));
       later(function () {
+        fillEl.style.overflow = 'visible';                                  // ⛔ 가리개를 푼다 — 안 풀면 튀어 오른 글자 윗부분이 막 상자 위에서 잘린다(종전 clip-path 도 잘랐다)
         box.classList.add('hop');                                           // 왼쪽 글자부터 하나씩
         var end = (LETTERS.length - 1) * HOP_STEP + HOP_MS;
         if (brand.k === 'svg') later(gone, end + 30);                       // 밑의 홈 로고와 같은 자리·같은 모양 — 그냥 걷는다
@@ -241,11 +257,11 @@
     }
     global.addEventListener('message', onMsg);
     later(quit, SAFE_MS);
-    tick();
+    fillCurve();
     return {
       ok: function () {                                                     // 산 화면 — 홈이면 로고 자리를 조금 기다리고, 아니면 바로 끝낸다
         if (phase !== 'wait') return;
-        if (!okAt) okAt = now();
+        if (!okAt) { okAt = now(); fillCurve(); }                           // 노크 — 둘째 단계 곡선으로 갈아탄다
         /* 홈은 「다 그렸다」(brand)만 기다린다 — 두 홈 다 15초(선생님은 노크 뒤 자료를 받아 그리고 · 학생은 load 뒤 첫 그리기가 끝나야 보낸다).
            ⛔ [2026-10-22 Peter 「학생 홈은 날지 않고 『원형 도넛 + 불러오는 중』」 → 아이폰 「또 떠」] 종전 학생은 1.5초만 기다렸고(a883cbc 뒤엔
              「1.5초 안에 말을 안 하면 스크립트 없는 화면」으로 짐작) — 홈이 액자 load 뒤 말을 꺼내기까지 맥 0.04~0.31초 · 아이폰은 더 걸려 그 짐작이 홈에서도 걷었고,
