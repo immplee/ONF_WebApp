@@ -1168,7 +1168,7 @@ ta('N7 새 기기 시한 실패 상한(Ruling 6) — 같은 날 첫 번째만 �
   await miss(l2, 'hello'); assert.ok(!('onfOutFailHome' in l2.m));
   await miss(l2, 'paint'); assert.ok('onfOutFailHome' in l2.m, '⛔ hello→그리기 2번째가 기록을 안 남겼다');
   const l3 = LSf();   // 24시간 뒤엔 다시 첫 번째
-  const a3 = await miss(l3, 'paint'); a3.g.T += 0;
+  await miss(l3, 'paint');
   const l4 = LSf(Object.assign({}, l3.m, { onfOutColdMiss: String(1.7e12 - 86400000 - 1) }));
   await miss(l4, 'paint'); assert.ok(!('onfOutFailHome' in l4.m), '⛔ 하루 지난 첫 실패 셈이 아직 남아 2번째로 셌다');
   const l5 = LSf();   // mismatch 는 셈에 안 넣는다
