@@ -345,6 +345,10 @@ t('📝 주소의 mode — student·hwbook(과제 판 2026-10-23)만 안쪽으�
   assert.ok(/[?&]mode=student(&|$)/.test(src('?mode=student&t=Tok_1')), '학생 한 명 창은 그대로');
   assert.ok(!/mode=/.test(src('?mode=evil&t=Tok_1')), '⛔ 모르는 mode 를 안쪽 doGet 에 흘렸다');
   assert.ok(!/t=/.test(src('?mode=hwbook&t=bad%20tok')), '⛔ 모양이 틀린 t 를 넘겼다');
+  // 🖥️ 과제 판 화면 확장 창(2026-10-29) — mode=hwext · 세트 꼴 s · ext=1 만
+  const S = 'h0123456789abcdef0123', x = src('?mode=hwext&t=Tok_1&s=' + S + '&ext=1');
+  assert.ok(/[?&]mode=hwext(&|$)/.test(x) && /[?&]s=h0123456789abcdef0123(&|$)/.test(x) && /[?&]ext=1(&|$)/.test(x) && /[?&]t=Tok_1(&|$)/.test(x), '⛔ 확장 창 주소가 안쪽에 안 간다: ' + x);
+  assert.ok(!/[?&]s=/.test(src('?mode=hwext&t=Tok_1&s=evil')) && !/[?&]s=/.test(src('?mode=hwbook&t=Tok_1&s=' + S)) && !/ext=/.test(src('?mode=hwbook&t=Tok_1&ext=1')), '⛔ 세트 꼴이 아니거나 다른 화면에 s·ext 를 흘렸다');
 });
 
 t('📝 과제 판 — 「열어 줘(hwbook)」 = 껍데기 주소를 안 바꾸고(새로 읽기 0 = 로그인 다시 안 물음) 위에 과제 판 액자 · 홈(우리 안쪽 창)에서 온 것만 · 모양 거름 · 홈에 hwOpened', () => {

@@ -233,11 +233,14 @@ function mount() {
        안쪽 `doGet` 에 아무 값이나 실어 보낼 수 있다. 값 모양도 여기서 한 번 본다. */
   var q = new URLSearchParams(location.search);
   var pass = new URLSearchParams();
-  if (q.get('mode') === 'student' || q.get('mode') === 'hwbook') pass.set('mode', q.get('mode'));   // 📝 hwbook = 과제 판(과제 첨삭 수업 1단계 · 2026-10-23 · 문은 안쪽 RPC 가 지킨다 · 스위치 ONF_HWBOOK)
+  if (q.get('mode') === 'student' || q.get('mode') === 'hwbook' || q.get('mode') === 'hwext') pass.set('mode', q.get('mode'));   // 🖥️ hwext = 과제 판 화면 확장 창(2026-10-29 · 시트만 · 읽기만 RPC)   // 📝 hwbook = 과제 판(과제 첨삭 수업 1단계 · 2026-10-23 · 문은 안쪽 RPC 가 지킨다 · 스위치 ONF_HWBOOK)
   var st = q.get('t') || '';
   if (/^[A-Za-z0-9_-]{1,40}$/.test(st)) pass.set('t', st);
   var lsn = q.get('l') || '';   // 📝 과제 판 — 「사진 모아 보기」 가 고른 수업(노션 행 id 꼴만)
   if (q.get('mode') === 'hwbook' && /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(lsn)) pass.set('l', lsn);
+  var hset = q.get('s') || '';   // 🖥️ 확장 창이 따라갈 세트(과제 판 세트 id 꼴만) · ext=1 = 확장 창 표시(껍데기 onf-frame.js 가 연 창)
+  if (q.get('mode') === 'hwext' && /^h[0-9a-f]{20}$/.test(hset)) pass.set('s', hset);
+  if (q.get('mode') === 'hwext' && q.get('ext') === '1') pass.set('ext', '1');
   //   느린 구간 표(선생님 홈 `perf=1` — 2026-09-28)도 넘긴다. 값은 「1」 하나만 안다.
   if (q.get('perf') === '1') pass.set('perf', '1');
   var qs = pass.toString(), appSrc = EXEC + (qs ? '?' + qs : '');   // 홈 액자 주소 — 처음 열기·한 번 더 열기가 같이 쓴다(src 속성은 replace 로 열어 비어 있다)
