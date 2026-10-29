@@ -20,7 +20,7 @@ function mkEl(name) {
   const el = {
     name, style: {}, attrs: {}, kids: [], parentNode: null, anims: [], _cls: new Set(),
     set className(v) { el._cls = new Set(String(v).split(/\s+/).filter(Boolean)); }, get className() { return [...el._cls].join(' '); },
-    classList: { add: (c) => el._cls.add(c), contains: (c) => el._cls.has(c) },
+    classList: { add: (c) => el._cls.add(c), remove: (c) => el._cls.delete(c), contains: (c) => el._cls.has(c) },
     setAttribute(k, v) { el.attrs[k] = v; },
     appendChild(c) { el.kids.push(c); c.parentNode = el; return c; },
     removeChild(c) { el.kids = el.kids.filter((x) => x !== c); c.parentNode = null; return c; },
@@ -62,7 +62,7 @@ function win(name, parent) { const w = { name }; w.parent = parent || w; return 
 function homeFrame(s) {
   const top = win('shell'), exec = win('exec', top), user = win('user', win('sandbox', exec));
   user.sent = []; user.postMessage = (m, o) => user.sent.push([m.onf, o]);
-  const fr = { contentWindow: exec, clientWidth: 390, clientHeight: 844, getBoundingClientRect: () => ({ left: 0, top: 0, width: 390, height: 844 }) };
+  const fr = Object.assign(mkEl('frame'), { contentWindow: exec, clientWidth: 390, clientHeight: 844, getBoundingClientRect: () => ({ left: 0, top: 0, width: 390, height: 844 }) });
   s.g.ONF.frame = { _fromOurFrame(w, f) { for (let i = 0; i < 8 && w; i++) { if (w === f.contentWindow) return true; w = w.parent !== w ? w.parent : null; } return false; } };
   const send = (data, source, origin) => (s.L.message || []).slice().forEach((f) => f({ data, source: source || user, origin: origin || 'https://n-abc-0lu-script.googleusercontent.com' }));
   return { fr, send, user, top };
@@ -235,6 +235,19 @@ t('단계 곡선 · 남은 만큼 채움 시간 — 순수', () => {
   assert.strictEqual(T0.stage(1000, 2500, 1000, 2000), a, '노크 순간 이어진다(튀지 않는다)');
   assert.ok(T0.stage(1e7, 2500, 1000, 2000) <= 0.92 + 1e-9);
   assert.ok(T0.fillMs(0.92) < 230 && T0.fillMs(0.3) > 450 && T0.fillMs(0.3) < 500, '남은 양에 비례(0.2~0.6초)');
+});
+
+t('막이 가리는 동안 홈 액자를 안 그린다(onf-ld-hold) — 끝까지 채우기 시작(다 그림)·못 엶·안전 시계·걷힘에서 다시 보인다 (Peter 2026-10-29 화면 기록)', () => {
+  const H = (fr) => fr.classList.contains('onf-ld-hold');
+  const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true });
+  assert.ok(/\.onf-ld-hold\{visibility:hidden\}/.test(s.g.document.head.kids[0].textContent), '⛔ 숨김 규칙이 없다');
+  assert.ok(H(h.fr), '⛔ 막이 가리는데 액자가 그려진다');
+  k.ok(); s.tick(3000); assert.ok(H(h.fr), '⛔ 노크만으로 액자를 보였다(홈은 아직 그리는 중)');
+  h.send(BRAND); assert.ok(!H(h.fr), '⛔ 다 그렸는데(끝까지 채우기 시작) 액자를 안 보였다 — 날기 전에 한 번 그려야 한다');
+  const q = env(), hq = homeFrame(q), kq = q.g.ONF.load.bind(hq.fr, { home: true }); kq.stuck();
+  assert.ok(!H(hq.fr), '⛔ 못 열었는데 액자를 숨긴 채 둔다(안내·구글 화면이 안 보인다)');
+  const z = env(), hz = homeFrame(z); z.g.ONF.load.bind(hz.fr, { home: true }); z.tick(30700);
+  assert.ok(!H(hz.fr) && z.box() === null, '⛔ 안전 시계 뒤에도 액자가 숨어 있다');
 });
 
 console.log('[2026-10-25 Peter — 빨라도 로고 모션은 끝까지(채움 → 날기 → 통통) · 옛 S6e 0.2초 걷힘 폐지]');
