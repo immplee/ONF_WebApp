@@ -919,7 +919,7 @@ ta('S4j index.html 머리에 Worker preconnect(ONF_WHO 와 같은 출처 · cros
 });
 
 /* ═══ 🌤 밖으로 3 Task 6(2026-10-24) — 켠 학생 홈은 Worker /home/get 답 + 정적 홈(ONF_OUT_HOME_URL)을 같이 시작 ═══
-   묻는 때(전역 조건): mount home 표시 · 토큰 · 기기 out≠0 · 14일 안에 정적 판을 쓴 기기(onfOutUsed) · 그날 홈 물러남 없음(onfOutFailHome — 교재 onfOutFail 과 따로).
+   묻는 때(전역 조건): mount home 표시 · 토큰 · 기기 out≠0 · 그날 홈 물러남 없음(onfOutFailHome — 교재 onfOutFail 과 따로). ③-3 부터 안 쓴 기기(onfOutUsed 없음·14일 넘음)도 묻는다(첫 그림 시한 5000 · 시한으로 물러나도 그날 기록 없음 · mismatch 는 기기와 무관하게 그날 기록 없음).
    답(ok·api 3·v)을 받아야 outBoot{src, tok, d} · 답 없음(HOMEGET_MS 1500 넘김·실패·ok:false·api 다름) = 정적 손잡이를 걷고 지금 길(그날 기록 없음).
    outBoot 뒤 HOME_PAINT_MS 안 homeDrawn 없음·그리기 전 outFail = 지금 길 + onfOutFailHome · 그린 뒤 outFail = 지금 길(error·mismatch 만 그날 기록). 로고 ok 는 homeDrawn 에. */
 const HANS = (o) => Object.assign({ ok: true, api: 3, v: { vars: { a: 1 }, books: { ok: true, books: {} } }, at: 1 }, o || {});
@@ -958,10 +958,9 @@ ta('S6a 켠 학생·쓴 기기 → /home/get 1회 + 정적 홈을 같이 시작(
   assert.strictEqual(boots(r.homeWin).length, 1, '⛔ 답 뒤 hello 에 outBoot 을 안 보냈다');
 });
 
-ta('S6a 안 묻는 때 — 홈 표시 없음·기기 out=0·토큰 없음·안 쓴 기기(없음·15일 전)·그날 홈 물러남 → /home/get 0회 · 바로 지금 길(종전 그대로) · 교재 물러남(onfOutFail)은 홈을 안 막는다', async () => {
+ta('S6a 안 묻는 때 — 홈 표시 없음·기기 out=0·토큰 없음·그날 홈 물러남(쓴 기기든 새 기기든) → /home/get 0회 · 바로 지금 길(종전 그대로) · 교재 물러남(onfOutFail)은 홈을 안 막는다', async () => {
   const D = 86400000;
-  const cases = [['홈 표시 없음', { home: false }], ['out=0', { out: false }], ['토큰 없음', { tok: '' }], ['안 쓴 기기', { ls: LSf() }],
-    ['15일 전', { ls: UL({ onfOutUsed: String(1.7e12 - 15 * D) }) }], ['그날 홈 물러남', { ls: UL({ onfOutFailHome: String(1.7e12 - 1000) }) }]];
+  const cases = [['홈 표시 없음', { home: false }], ['out=0', { out: false }], ['토큰 없음', { tok: '' }], ['그날 홈 물러남', { ls: UL({ onfOutFailHome: String(1.7e12 - 1000) }) }], ['새 기기라도 그날 홈 물러남', { ls: LSf({ onfOutFailHome: String(1.7e12 - 1000) }) }]];
   for (const [nm, o] of cases) {
     const s = hsetup(o);
     assert.strictEqual(s.calls.length, 0, '⛔ ' + nm + ' — /home/get 을 물었다');
@@ -1044,8 +1043,8 @@ ta('S6d 그리기 전 실패 — homeDrawn 이 HOME_PAINT_MS(outBoot 부터) 안
   assert.strictEqual(n.frameEl.src, HSRC, '⛔ 물러난 뒤 온 답이 액자를 바꿨다');
 });
 
-ta('S6d 그린 뒤 outFail — error·mismatch 는 지금 길 + 그날 기록 · notice·stale 은 지금 길만 · 그 뒤 hello·homeDrawn·outFail 은 무시', async () => {
-  for (const [why, kill] of [['error', true], ['mismatch', true], ['notice', false], ['stale', false]]) {
+ta('S6d 그린 뒤 outFail — error 는 지금 길 + 그날 기록 · mismatch·notice·stale 은 지금 길만 · 그 뒤 hello·homeDrawn·outFail 은 무시', async () => {
+  for (const [why, kill] of [['error', true], ['mismatch', false], ['notice', false], ['stale', false]]) {
     const s = hsetup();
     s.calls[0].ok(200, HANS()); await flush();
     s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
@@ -1059,6 +1058,97 @@ ta('S6d 그린 뒤 outFail — error·mismatch 는 지금 길 + 그날 기록 ·
     assert.strictEqual(boots(s.homeWin).length, 1, '⛔ ' + why + ' — 물러난 뒤 hello 에 outBoot');
     assert.strictEqual('onfOutFailHome' in s.g.localStorage.m, kill, '⛔ ' + why + ' — 물러난 뒤 말이 그날 기록을 바꿨다');
   }
+});
+
+/* ═══ ③-3 Task 4(2026-10-29) — 새 기기(onfOutUsed 없음·14일 넘음)도 정적 홈을 시도한다 ═══
+   첫 그림 시한 HOME_PAINT_MS_COLD 5000(쓴 기기는 2500) · 시한으로 물러나도 그날 기록(onfOutFailHome) 없음(다음 열기에 다시 시도) ·
+   mismatch(그리기 전 교재 목록 대조 어긋남)는 쓴 기기든 새 기기든 그날 기록 없음 · 쓴 기기의 다른 실패는 종전 그대로. flushWorth·whoQ 는 무변. */
+const D14 = 86400000;
+const NEWS = () => [['onfOutUsed 없음', { ls: LSf() }], ['14일 넘음', { ls: LSf({ onfOutUsed: String(1.7e12 - 14 * D14 - 1) }) }]];   // 부를 때마다 새 저장소(시험끼리 안 섞인다)
+ta('N1 새 기기(onfOutUsed 없음·14일 넘음) → /home/get 1회 + 정적 홈 시작 · 답 뒤 hello 에 outBoot · homeDrawn 에 로고 ok·onfOutUsed 새로', async () => {
+  for (const [nm, o] of NEWS()) {
+    const s = hsetup(o);
+    assert.strictEqual(s.calls.length, 1, '⛔ ' + nm + ' — /home/get 을 안 물었다');
+    assert.strictEqual(s.frameEl.src, HOME_URL, '⛔ ' + nm + ' — 정적 홈을 안 시작했다: ' + s.frameEl.src);
+    const a = HANS();
+    s.calls[0].ok(200, a); await flush();
+    s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+    assert.deepStrictEqual(boots(s.homeWin), [[{ onf: 'outBoot', src: HSRC, tok: 'TOK', d: a }, OUT_O]], '⛔ ' + nm + ' — outBoot 꼴');
+    assert.strictEqual(s.okN.n, 0);
+    s.send({ onf: 'homeDrawn' }, s.homeWin, OUT_O);
+    assert.strictEqual(s.okN.n, 1, '⛔ ' + nm + ' — homeDrawn 에 로고 막을 안 걷었다');
+    assert.strictEqual(s.g.localStorage.m.onfOutUsed, String(1.7e12), '⛔ ' + nm + ' — 처음 그린 기기가 onfOutUsed 를 안 적었다(다음부턴 쓴 기기)');
+  }
+});
+ta('N2 새 기기 첫 그림 시한 = 5000(outBoot 부터) — 2500 에 안 물러나고 5000 에 물러난다 · 그날 기록 없음 · 다음 열기에 다시 시도', async () => {
+  for (const [nm, o] of NEWS()) {
+    const s = hsetup(o);
+    s.calls[0].ok(200, HANS()); await flush();
+    s.g.T += 4000;
+    s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+    s.fire(2500);
+    assert.strictEqual(s.frameEl.src, HOME_URL, '⛔ ' + nm + ' — 새 기기가 2500 에 물러났다(시한이 안 늘었다)');
+    s.fire(5000); await flush();
+    assert.strictEqual(s.frameEl.src, HSRC, '⛔ ' + nm + ' — 5000 이 지나도 지금 길로 안 갔다');
+    assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ ' + nm + ' — 시한으로 물러났는데 그날 기록을 남겼다(다음 열기에 다시 시도해야 한다)');
+    assert.ok(!('onfOutFail' in s.g.localStorage.m), '⛔ ' + nm + ' — 교재 물러남을 적었다');
+    const n = hsetup({ ls: s.g.localStorage });   // 다음 열기
+    assert.strictEqual(n.calls.length, 1, '⛔ ' + nm + ' — 다음 열기에 다시 시도하지 않는다');
+    assert.strictEqual(n.frameEl.src, HOME_URL);
+  }
+  const u = hsetup();   // 쓴 기기 시한은 종전 2500 · 기록도 종전
+  u.calls[0].ok(200, HANS()); await flush();
+  u.send({ onf: 'outHello' }, u.homeWin, OUT_O);
+  u.fire(2500);
+  assert.strictEqual(u.frameEl.src, HSRC, '⛔ 쓴 기기 시한이 바뀌었다');
+  assert.ok('onfOutFailHome' in u.g.localStorage.m, '⛔ 쓴 기기의 시한 실패는 종전대로 그날 기록을 남겨야 한다');
+});
+ta('N3 새 기기 hello 없음(OUT_MS) → 지금 길 · 그날 기록 없음 (쓴 기기는 종전: 기록 있음 — S6d)', async () => {
+  for (const [nm, o] of NEWS()) {
+    const s = hsetup(o);
+    s.fire(2500);
+    assert.strictEqual(s.frameEl.src, HSRC, '⛔ ' + nm + ' — hello 가 없는데 지금 길로 안 갔다');
+    assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ ' + nm + ' — hello 시한으로 물러났는데 그날 기록');
+  }
+});
+ta('N4 mismatch → 지금 길 · 그날 기록 없음 — 새 기기든 쓴 기기든 · 그리기 전이든 뒤든', async () => {
+  for (const [nm, o] of NEWS().concat([['쓴 기기', {}]])) {
+    for (const drawn of [false, true]) {
+      const s = hsetup(o);
+      s.calls[0].ok(200, HANS()); await flush();
+      s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+      if (drawn) s.send({ onf: 'homeDrawn' }, s.homeWin, OUT_O);
+      s.send({ onf: 'outFail', why: 'mismatch' }, s.homeWin, OUT_O);
+      assert.strictEqual(s.frameEl.src, HSRC, '⛔ ' + nm + ' 그림 ' + drawn + ' — 지금 길로 안 갔다');
+      assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ ' + nm + ' 그림 ' + drawn + ' — mismatch 가 그날 기록을 남겼다(다음 열기에 다시 시도해야 한다)');
+      const n = hsetup({ ls: s.g.localStorage });
+      assert.strictEqual(n.calls.length, 1, '⛔ ' + nm + ' — mismatch 뒤 다음 열기에 다시 시도하지 않는다');
+    }
+  }
+});
+ta('N5 새 기기의 다른 실패(error · 그리기 전 notice·stale · 스위치 꺼짐)는 종전 그대로 그날 기록 — 시한·mismatch 만 면제', async () => {
+  for (const why of ['error', 'notice', 'stale']) {
+    const s = hsetup({ ls: LSf() });
+    s.calls[0].ok(200, HANS()); await flush();
+    s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+    s.send({ onf: 'outFail', why }, s.homeWin, OUT_O);
+    assert.strictEqual(s.frameEl.src, HSRC);
+    assert.ok('onfOutFailHome' in s.g.localStorage.m, '⛔ 새 기기 ' + why + ' — 그날 기록이 없다');
+  }
+  const o = hsetup({ ls: LSf() });
+  o.send({ onf: 'outHello' }, o.homeWin, OUT_O);
+  o.calls[0].ok(503, { ok: false, why: 'off' }); await flush();
+  assert.ok('onfOutFailHome' in o.g.localStorage.m, '⛔ 새 기기 스위치 꺼짐 — 그날 기록이 없다');
+  const t = hsetup({ ls: LSf() });   // 답 없음(HOMEGET_MS) = 종전: 지금 길 · 기록 없음
+  t.fire(1500); await flush();
+  assert.strictEqual(t.frameEl.src, HSRC);
+  assert.ok(!('onfOutFailHome' in t.g.localStorage.m));
+});
+ta('N6 flushWorth·whoQ 의 onfOutUsed 판정은 그대로(새 기기 홈 시도가 교재 넘겨주기·링크 직행을 안 연다)', async () => {
+  const src = fs.readFileSync(path.join(ROOT, 'assets', 'onf-frame.js'), 'utf8');
+  const at = (k, n) => src.slice(src.indexOf(k), src.indexOf(k) + n);
+  assert.ok(/OUT_USED/.test(at('function flushWorth(b)', 500)), '⛔ flushWorth 의 onfOutUsed 판정이 사라졌다');
+  assert.ok(/OUT_USED/.test(at('function whoQ(s)', 700)), '⛔ whoQ 의 onfOutUsed 판정이 사라졌다');
 });
 
 ta('S6d 물러나면 죽은 정적 홈 창을 비운다 — 정적 홈이 연 판을 닫아도 그 창엔 bookClosed 를 안 보낸다', async () => {
