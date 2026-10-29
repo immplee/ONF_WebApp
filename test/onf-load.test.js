@@ -169,6 +169,7 @@ t('홈 + 로고 자리 → 홈 로고 숨김 → 난다(가로·세로 따로 ·
   assert.ok(/translateY\(-399\.85px\)/.test(last), '⛔ 홈 로고 세로 가운데로 안 간다: ' + last);
   assert.ok(/translateX\(-136px\)/.test(lg.anims[0].kf[1].transform), '⛔ 홈 로고 가로 가운데로 안 간다: ' + lg.anims[0].kf[1].transform);
   assert.strictEqual(box.querySelector('.onf-ld-bg').anims.length, 1, '⛔ 바탕이 안 걷힌다(홈이 안 보인다)');
+  { const o = box.querySelector('.onf-ld-bg').anims[0].o; assert.ok(o.delay >= 950 * 0.55 && o.delay + o.duration <= 950 + 1, '⛔ 바탕 걷힘이 로고가 빨리 나는 중간과 겹친다(창 전체 다시 합성 = 끊김) · 날기 안에 끝나야 한다: ' + JSON.stringify(o)); }
   assert.deepStrictEqual(h.user.sent, [['brandHold', 'https://n-abc-0lu-script.googleusercontent.com']], '⛔ 날기 전에 홈 로고를 숨기라고 안 했다(로고가 둘로 보인다) · 또는 출처를 안 좁혔다');
   s.tick(950);
   assert.ok(box.classList.contains('hop'), '⛔ 내려앉고 통통이 없다');
