@@ -30,7 +30,7 @@ const UA = {
 const jwt = (p) => 'x.' + Buffer.from(JSON.stringify(p)).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_') + '.y';
 
 /* 껍데기 본 스크립트를 통째로 돌린다(구글 GIS 는 대역) — 돌린 뒤 GIS 에 무엇을 불렀는지 센다. */
-function boot(nav, store) {
+function boot(nav, store, extra) {
   const calls = [], handlers = {}, els = {};
   const el = (id) => els[id] || (els[id] = { id, hidden: id === 'app' || id === 'wait', style: {}, classList: { add() {}, remove() {}, toggle() {} },
     contentWindow: id === 'app' ? { name: 'appwin' } : null, appendChild() {}, setAttribute() {}, addEventListener() {}, parentNode: null, textContent: '', innerHTML: '' });
@@ -46,9 +46,10 @@ function boot(nav, store) {
     addEventListener: (type, fn) => { (handlers[type] = handlers[type] || []).push(fn); },
     setTimeout: () => 0, clearTimeout() {},
     google: { accounts: { id: {
-      initialize: (o) => calls.push('initialize:' + o.itp_support), renderButton: () => calls.push('button'),
+      initialize: (o) => { calls.push('initialize:' + o.itp_support); g.gsiOpt = o; }, renderButton: () => calls.push('button'),
       prompt: () => calls.push('prompt'), cancel: () => calls.push('cancel'), disableAutoSelect: () => calls.push('disableAutoSelect') } } }
   };
+  if (extra) Object.assign(g, extra);
   g.window = g; g.top = g; g.self = g;
   vm.createContext(g); vm.runInContext(main, g);
   const fire = (data, source, origin) => (handlers.message || []).forEach((h) => h({ data, source, origin }));
@@ -103,6 +104,42 @@ t('②④ 다크에선 액자를 밝은 색 체계로 둔다 — 안 그러면 �
   assert.ok(!/iframe[^{]*\{[^}]*color-scheme/.test(after.slice(after.indexOf('}'))), '⛔ 뒤에서 액자 색 체계를 다시 바꾼다');
   assert.ok(!/color-scheme/.test(/<style>([\s\S]*?)<\/style>/.exec(html)[1]), '⛔ 선생님 껍데기가 색 체계를 따로 단다(공용 규칙을 덮는다)');
   assert.ok(html.indexOf('../assets/onf-ui.css') > 0, '전제: 선생님 껍데기가 공용 스타일을 읽는다');
+});
+
+t('📱 홈 화면 앱(standalone)만 리디렉트 로그인 — 브라우저는 GIS 옵션을 하나도 안 보탠다(종전 팝업) · 돌아온 토큰은 한 번 꺼내 바로 연다 (2026-10-29)', () => {
+  for (const k of ['iphone', 'ipadDesktop', 'macChrome', 'android']) {
+    const b = boot(UA[k]);
+    assert.deepStrictEqual(Object.keys(b.g.gsiOpt).sort(), ['auto_select', 'callback', 'client_id', 'hd', 'itp_support'], '⛔ ' + k + ' 브라우저 로그인 옵션이 바뀌었다(팝업 길을 건드렸다)');
+  }
+  const sa = boot(UA.ipadDesktop, {}, { matchMedia: (q) => ({ matches: q === '(display-mode: standalone)' }) });
+  assert.strictEqual(sa.g.gsiOpt.ux_mode, 'redirect', '⛔ 홈 화면 앱이 팝업으로 로그인한다(그 앱에선 400 malformed)');
+  assert.strictEqual(sa.g.gsiOpt.login_uri, sa.g.location.origin + '/api/gsi');
+  const iosSa = boot(UA.iphone, {}, { navigator: Object.assign({}, UA.iphone, { standalone: true }) });
+  assert.strictEqual(iosSa.g.gsiOpt.ux_mode, 'redirect', '⛔ 사파리 홈 화면 앱(navigator.standalone)을 못 알아본다');
+  //   돌아온 토큰 — sessionStorage 에서 한 번 꺼내 지우고 액자를 연다(WebKit 이라도 · 방금 구글을 거쳤다)
+  const now = Math.floor(Date.now() / 1000), tok = jwt({ exp: now + 3000, hd: 'ownify.co.kr', email: 'a@ownify.co.kr' });
+  const ss = { onf_gsi: tok };
+  const back = boot(UA.ipadDesktop, {}, { matchMedia: () => ({ matches: true }), sessionStorage: { getItem: (k) => (k in ss ? ss[k] : null), removeItem: (k) => { delete ss[k]; } } });
+  assert.ok(/AKfycb/.test(String(back.els.app.src || '')), '⛔ 리디렉트로 돌아온 토큰으로 액자를 안 열었다');
+  assert.ok(!('onf_gsi' in ss), '⛔ 쓴 토큰을 sessionStorage 에 남겼다');
+});
+
+t('📱 기기 열쇠 — WebKit 도 이 페이지 동안은 메모리에 든다(과제 판이 1시간 토큰에 묶이지 않게) · 저장은 여전히 안 한다', () => {
+  const now = Math.floor(Date.now() / 1000), tok = jwt({ exp: now + 3000, hd: 'ownify.co.kr', email: 'a@ownify.co.kr' });
+  const key = 'odk1.' + tok.split('.')[1] + '.sig';
+  const w = boot(UA.ipadDesktop);
+  w.g.onCredential({ credential: tok });
+  const src = { parent: w.els.app.contentWindow }, org = 'https://n-abc-0lu-script.googleusercontent.com';
+  w.fire({ onf: 'auth-please' }, src, org);                     // 노크 — appWin·appOrigin 이 정해진다
+  w.fire({ onf: 'devkey', key }, src, org);
+  assert.strictEqual(vm.runInContext('pending', w.g), key, '⛔ WebKit 이 열쇠를 버렸다 — 과제 판이 1시간 뒤 구글로 다시 간다');
+  assert.notStrictEqual(w.ls.onf_id_tok, key, '⛔ WebKit 이 열쇠를 저장했다(다시 열면 구글 창구 없이 열어 「화면이 안 열렸어요」)');
+  const c = boot(UA.macChrome);
+  c.g.onCredential({ credential: tok });
+  const csrc = { parent: c.els.app.contentWindow };
+  c.fire({ onf: 'auth-please' }, csrc, org);
+  c.fire({ onf: 'devkey', key }, csrc, org);
+  assert.strictEqual(c.ls.onf_id_tok, key, '⛔ 크롬은 종전대로 열쇠를 저장해야 한다');
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);

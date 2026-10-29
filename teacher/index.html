@@ -442,8 +442,10 @@ window.addEventListener('message', function (ev) {
   if (!d || d.onf !== 'devkey') return;
   if (!appWin || ev.source !== appWin || ev.origin !== appOrigin) return;     // 우리가 정한 그 창·출처만
   k = (typeof d.key === 'string') ? d.key : '';
-  if (k.indexOf('odk1.') !== 0 || !tokAlive(k) || !tokMine(k) || devkeyOff()) return;   // 못 쓰는 기기(아이폰 등)는 안 받아 둔다
-  tokSave(k);
+  if (k.indexOf('odk1.') !== 0 || !tokAlive(k) || !tokMine(k)) return;
+  /* 📱 [2026-10-29 Peter 아이패드 홈 화면 앱] 못 쓰는 기기(WebKit 등 devkeyOff)도 **이 페이지 동안은 메모리에** 들고 있는다 — 저장은 안 한다(다시 열면 구글 창구부터 · 위 tokLoad).
+     안 그러면 과제 판이 1시간짜리 구글 토큰을 받아 1시간 뒤 다시 구글로 가야 했다(홈 화면 앱 리디렉트 로그인이면 화면째 새로 열린다). 열쇠는 서버 신원 문(_onfTeacherMe)이 받는다. */
+  if (!devkeyOff()) tokSave(k);
   pending = k;
 });
 /* onf-devkey:end */
@@ -1381,7 +1383,17 @@ function offerOther() {
 var reused = false;
 /* ⛔ [2026-10-12 Peter 아이폰] WebKit(아이폰·아이패드·맥 사파리)은 앱을 다시 열면 **구글 창구를 거치기 전엔** 끼운 구글 화면에
    로그인 쿠키를 안 싣는다 — 받아 둔 토큰(1시간 구글 토큰도)으로 바로 열면 「화면이 안 열렸어요」. 이 기기들은 늘 구글 창구부터(devkeyOff). */
+/* 📱 홈 화면 앱(아이패드·아이폰 「홈 화면에 추가」) 로그인 = 리디렉트(2026-10-29 Peter) — 그 앱 안에선 구글 팝업이 「400 malformed」로 끝난다.
+   구글이 /api/gsi 로 credential 을 보내고, 그 쪽이 이 창(같은 출처) sessionStorage 에 놓고 /teacher/ 로 돌려보낸다 → 여기서 한 번 꺼내 onCredential.
+   ⛔ 브라우저(홈 화면 앱 아님)는 종전 팝업 그대로 — homeApp() 이 거짓이면 아래 initialize 도 옛 값 그대로다. */
+function homeApp() { try { return navigator.standalone === true || matchMedia('(display-mode: standalone)').matches; } catch (e) { return false; } }
+(function gsiBack() {
+  var c = '';
+  try { c = sessionStorage.getItem('onf_gsi') || ''; sessionStorage.removeItem('onf_gsi'); } catch (e) {}
+  if (c) onCredential({ credential: c });
+})();
 (function reuse() {
+  if (mounted) return;   // 리디렉트로 막 받은 토큰으로 이미 열었다
   var t = tokLoad();
   if (!t || devkeyOff()) return;
   pending = t;
@@ -1393,13 +1405,17 @@ var reused = false;
 (function start() {
   if (!window.google || !google.accounts || !google.accounts.id) return setTimeout(start, 120);
   if (!CLIENT_ID) return say('아직 클라이언트 ID 가 설정되지 않았어요.');
-  google.accounts.id.initialize({
+  var gsiOpt = {
     client_id: CLIENT_ID,
     callback: onCredential,
     auto_select: true,          // 회사 계정 하나뿐이면 누를 것도 없다
     itp_support: true,
     hd: 'ownify.co.kr'          // 계정 고르는 화면에서 회사 계정만 (⚠️ 이건 편의일 뿐 — **검사는 서버가 한다**)
-  });
+  };
+  /* 📱 홈 화면 앱만 리디렉트(위 gsiBack) — 브라우저는 옵션을 하나도 안 보탠다(종전 팝업 그대로).
+     ⚠️ login_uri 는 구글 클라우드 OAuth 클라이언트 「승인된 리디렉션 URI」에 등록돼 있어야 한다(없으면 구글이 400). */
+  if (homeApp()) { gsiOpt.ux_mode = 'redirect'; gsiOpt.login_uri = location.origin + '/api/gsi'; }
+  google.accounts.id.initialize(gsiOpt);
   google.accounts.id.renderButton(document.getElementById('gsi'),
     { theme: 'outline', size: 'large', text: 'signin_with', locale: 'ko' });
   /* ⛔ [2026-09-23 Peter 「접속은 됐는데 우측 상단에 로그인 알림이 떠」] **이미 들어와 있으면
