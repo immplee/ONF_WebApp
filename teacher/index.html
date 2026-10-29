@@ -595,6 +595,37 @@ function hwBookFrame(src) {
   }
   return hwBk;
 }
+/* 🖥️ 과제 판 확장 창(mode=hwext · 2026-10-29) — 「교재 옆에」 수업에서 공유가 교재로 넘어가면 안쪽(ONF_HwExt_Html)이 그 교재 주소를 보낸다(extBook) →
+   시트만 보는 교재 칸(ext=1)을 위에 겹친다 · 과제 판으로 돌아오면 숨긴다(한 번 띄운 칸은 숨겨 두고 다시 써서 오갈 때 다시 안 읽는다).
+   ⛔ 안쪽 창(appWin)이 보낸 것만 · 주소는 학생 판과 같은 거름(teacherBookSrc) */
+var extBk = null;
+function extBook(href) {
+  if (!href) { if (extBk) extBk.box.style.display = 'none'; return; }
+  var src = teacherBookSrc(href); if (!src) return;
+  src += '&ext=1';
+  if (!extBk) {
+    var box = document.createElement('div'), el = document.createElement('iframe'), wt = document.createElement('div');
+    box.className = 'onf-extbk'; box.style.cssText = 'position:fixed;inset:0;z-index:60;background:var(--bg,#1d1712)';
+    el.setAttribute('allow', 'fullscreen'); el.setAttribute('title', '교재');
+    el.style.cssText = 'position:relative;z-index:1;display:block;width:100%;height:100%;border:0;background:transparent';
+    wt.className = 'onf-wait'; wt.style.cssText = 'position:absolute;inset:0'; wt.innerHTML = '<div class="onf-spin"></div><span>교재를 여는 중</span>';
+    box.appendChild(wt); box.appendChild(el); document.body.appendChild(box);
+    extBk = { box: box, el: el, wt: wt, src: '' };
+  }
+  if (extBk.src !== src) {
+    extBk.src = src;
+    if (extBk.oe) { try { extBk.oe.stop(); } catch (e) {} extBk.oe = null; }
+    if (window.ONF && ONF.frame && ONF.frame.openExec) extBk.oe = ONF.frame.openExec(extBk.el, src, extBk.wt, function () { extBook(''); });
+    else extBk.el.src = src;
+  }
+  extBk.box.style.display = '';
+}
+if (new URLSearchParams(location.search).get('mode') === 'hwext') window.addEventListener('message', function (ev) {
+  var d = ev && ev.data;
+  if (!d) return;
+  if (d.onf === 'extBook' && appWin && ev.source === appWin) { extBook(typeof d.href === 'string' ? d.href : ''); return; }
+  if (d.onf === 'themeAsk' && extBk && bookFrom(ev, extBk.el, true)) themeAsk(ev);
+});
 function hwViewSet(v, href, fromPop) {   // fromPop — 뒤로가 보기 칸을 뺐다(기록은 이미 맞다)
   if (!hwBox || ['photo', 'side', 'book'].indexOf(v) < 0) return;
   var src = null, was = hwView;

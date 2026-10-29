@@ -592,5 +592,26 @@ t('📱 왼쪽 끝 쓸기 = 앱 뒤로(Peter 2026-10-25 ④⑦ · onf-edge) — 
   assert.strictEqual(backs(), 3, '⛔ 남의 출처 쓸기에 뒤로 갔다');
 });
 
+t('🖥️ 과제 판 확장 창(mode=hwext) — 안쪽이 extBook 으로 교재 주소를 주면 시트만 교재 칸(ext=1)을 겹친다 · 빈 주소 = 숨김 · 같은 주소는 다시 안 읽음 · 남의 창·다른 화면·남의 주소는 무시', () => {
+  const BOOK = 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILE1234567&sheetName=E2&ttok=TT&tas=Peter';
+  const R = boot({ onf_id_tok: odk() }, { search: '?mode=hwext&t=Tok_1&s=h0123456789abcdef0123&ext=1' }), me = { parent: R.els.app.contentWindow, postMessage() {} }, other = { parent: R.els.app.contentWindow, postMessage() {} };
+  R.knockAs(me);
+  R.g.ONF = Object.assign({}, R.g.ONF || {}, { api: { EXEC: R.g.EXEC } }); if (R.g.window && R.g.window !== R.g) R.g.window.ONF = R.g.ONF;   // teacherBookSrc 가 쓰는 exec 주소(onf-api.js 몫)
+  const frames = () => R.created.filter((e) => e.tag === 'iframe'), box = () => R.created.find((e) => e.className === 'onf-extbk');
+  R.postAs({ onf: 'extBook', href: BOOK }, other);
+  R.postAs({ onf: 'extBook', href: 'https://evil.example/?mode=share&t=Tok_1&fileId=F' }, me);
+  assert.equal(frames().length, 0, '⛔ 노크한 창이 아닌 창·남의 주소로 교재 칸을 열었다');
+  R.postAs({ onf: 'extBook', href: BOOK }, me);
+  assert.equal(frames().length, 1, '⛔ 교재 칸이 없다');
+  const src = String(frames()[0].src || '');
+  assert.ok(/[?&]ext=1(&|$)/.test(src) && /[?&]fileId=FILE1234567/.test(src) && /[?&]ttok=TT/.test(src), '⛔ 시트만(ext=1) 선생님 교재가 아니다: ' + src);
+  R.postAs({ onf: 'extBook', href: '' }, me); assert.equal(box().style.display, 'none', '⛔ 과제 판으로 돌아왔는데 교재 칸이 덮고 있다');
+  R.postAs({ onf: 'extBook', href: BOOK }, me); assert.equal(frames().length, 1); assert.equal(box().style.display, '', '⛔ 다시 교재로 갔는데 안 보인다');
+  const H = boot({ onf_id_tok: odk() }, { search: '?mode=hwbook&t=Tok_1' }), me2 = { parent: H.els.app.contentWindow, postMessage() {} };
+  H.g.ONF = Object.assign({}, H.g.ONF || {}, { api: { EXEC: H.g.EXEC } }); if (H.g.window && H.g.window !== H.g) H.g.window.ONF = H.g.ONF;
+  H.knockAs(me2); H.postAs({ onf: 'extBook', href: BOOK }, me2);
+  assert.equal(H.created.filter((e) => e.tag === 'iframe').length, 0, '⛔ 확장 창이 아닌 화면이 교재 칸을 열었다');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);

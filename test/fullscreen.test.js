@@ -73,20 +73,20 @@ async function ta(label, fn) {
 console.log('[🖥️ 모니터 알림 · 확장 창 열기]');
 const EXT = 'https://script.ownify.co.kr/?fileId=F&sheetName=E1&ttok=x&ext=1';
 function mon(isExt, details) {
-  const SL = {}, opened = [];
+  const SL = {}, opened = [], TO = [];
   const screen = { isExtended: isExt, addEventListener: (k, f) => { (SL[k] = SL[k] || []).push(f); } };
   const open = (u, n, f) => { const w = { u, n, f, closed: false, close() { w.closed = true; }, location: {}, focus() {} }; opened.push(w); return w; };
-  const e = env({ screen, open, URL, getScreenDetails: details ? () => Promise.resolve(details) : undefined, setInterval: () => 1, clearInterval() {} });
-  return Object.assign(e, { screen, SL, opened });
+  const e = env({ screen, open, URL, getScreenDetails: details ? () => Promise.resolve(details) : undefined, setInterval: () => 1, clearInterval() {}, setTimeout: (f, ms) => { TO.push([f, ms]); return TO.length; }, clearTimeout() {} });
+  return Object.assign(e, { screen, SL, opened, TO });
 }
 t('monitorHello = 지금 상태 바로 · 꽂으면(change) 알림 · 사파리처럼 모르면 can:false', () => {
   const s = mon(false), book = s.frame(s.g);
   s.send({ onf: 'monitorHello' }, book, GAS);
-  assert.deepStrictEqual(last(book)[0], { onf: 'monitor', on: false, can: true });
+  assert.deepStrictEqual(last(book)[0], { onf: 'monitor', on: false, can: true, ext: false });
   s.screen.isExtended = true; s.SL.change.forEach((f) => f());
-  assert.deepStrictEqual(last(book)[0], { onf: 'monitor', on: true, can: true }, '⛔ 모니터를 꽂았는데 교재에 안 알렸다');
+  assert.deepStrictEqual(last(book)[0], { onf: 'monitor', on: true, can: true, ext: false }, '⛔ 모니터를 꽂았는데 교재에 안 알렸다');
   const n = mon(undefined), b2 = n.frame(n.g); n.send({ onf: 'monitorHello' }, b2, GAS);
-  assert.deepStrictEqual(last(b2)[0], { onf: 'monitor', on: false, can: false });
+  assert.deepStrictEqual(last(b2)[0], { onf: 'monitor', on: false, can: false, ext: false });
 });
 await ta('extOpen — 모니터 없음 = 보통 창 · 붙음 = 그 모니터 자리·크기 · 열림 알림 · ⛔ 우리 ext 주소만', async () => {
   const s = mon(false), book = s.frame(s.g);
@@ -106,6 +106,23 @@ t('창이 막히면 blocked 로 알린다(허락을 묻는 사이 손길이 식�
   const s = mon(false); s.g.open = () => null; const book = s.frame(s.g);
   s.send({ onf: 'extOpen', url: EXT }, book, GAS);
   assert.deepStrictEqual(last(book)[0], { onf: 'extState', on: false, why: 'blocked' });
+});
+t('🖥️ 판이 떠나도 창은 남는다(extRelease) — 다음 판 monitorHello 에 ext:true · 그 판 extOpen = 같은 창을 그 주소로(새 창 0) · 10분 주인 없으면 닫음 · 남의 판은 못 놓음', () => {
+  const s = mon(false), a = s.frame(s.g), b = s.frame(s.g), c = s.frame(s.g);
+  s.send({ onf: 'extOpen', url: EXT }, a, GAS); assert.strictEqual(s.opened.length, 1);
+  s.send({ onf: 'extRelease' }, c, GAS); s.send({ onf: 'monitorHello' }, c, GAS);
+  assert.strictEqual(last(c)[0].ext, false, '⛔ 주인 아닌 판이 창을 놓았다');
+  s.send({ onf: 'extRelease' }, a, GAS);
+  assert.ok(!s.opened[0].closed, '⛔ 판이 떠났다고 창을 닫았다(다음 판이 이어 못 쓴다)');
+  s.send({ onf: 'monitorHello' }, b, GAS);
+  assert.deepStrictEqual(last(b)[0], { onf: 'monitor', on: false, can: true, ext: true }, '⛔ 다음 판에 주인 없는 창이 있다고 안 알렸다');
+  const EXT2 = 'https://script.ownify.co.kr/?fileId=G&sheetName=E2&ttok=y&ext=1';
+  s.send({ onf: 'extOpen', url: EXT2 }, b, GAS);
+  assert.strictEqual(s.opened.length, 1, '⛔ 새 창을 또 열었다'); assert.strictEqual(s.opened[0].location.href, EXT2, '⛔ 남은 창을 새 판 주소로 안 옮겼다');
+  assert.deepStrictEqual(last(b)[0], { onf: 'extState', on: true, why: '' });
+  s.send({ onf: 'extRelease' }, b, GAS);
+  const lone = s.TO.filter((x) => x[1] === 600000).pop(); assert.ok(lone, '⛔ 주인 없는 창 10분 시계가 없다');
+  lone[0](); assert.ok(s.opened[0].closed, '⛔ 10분 주인 없는 창을 안 닫았다');
 });
 console.log(`${pass}개 통과, ${fail}개 실패`);
 if (fail) process.exit(1);
