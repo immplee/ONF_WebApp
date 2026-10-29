@@ -1214,6 +1214,36 @@
     return { _books: books, _drop: bookDrop };   // 검사용으로만(test/book-panel.test.js 가 판 자격·back 을 본다) — 화면 코드에서 쓰지 마라
   }
 
+  /* ⛶ 전체 화면 대신 켜기(2026-10-29 Peter 「추천하는 대로」) — 교재는 액자 겹 안이라 스스로 못 켠다(액자마다 allow 가 없다 · 구글 액자는 우리가 못 단다).
+     교재 ☰ 「⛶ 전체 화면」·「🖥️ 화면 미러링」이 {onf:'fullscreen', on} 을 맨 위(이 껍데기)로 보내면 여기서 켠다 — 누른 손길(사용자 활성)은 조상 창에도 인정된다.
+     켜짐·꺼짐은 {onf:'fsState', on} 으로 물어본 창들에 알린다(☰ 줄 이름 · ⌃⌘F·Esc 로 바뀐 것도). 출처 = 우리 교재 출처(isAppOrigin) · 이 창 안 액자에서 온 말만. 선생님·학생 껍데기 같다. */
+  (function () {
+    var doc = global.document, asked = [];
+    if (!doc || typeof doc.addEventListener !== 'function' || typeof global.addEventListener !== 'function') return;   // 검사용 가짜 창
+    function fsEl() { return doc.fullscreenElement || doc.webkitFullscreenElement || null; }
+    function inside(w) { for (var i = 0; i < 8 && w; i++) { try { if (w.parent === global) return true; if (w.parent === w) return false; w = w.parent; } catch (e) { return false; } } return false; }
+    function tell() {
+      var on = !!fsEl();
+      asked.forEach(function (a) { try { a.win.postMessage({ onf: 'fsState', on: on }, a.origin); } catch (e) {} });
+    }
+    function onFs(ev) {
+      var d = ev && ev.data;
+      if (!d || d.onf !== 'fullscreen' || !ev.source || !isAppOrigin(ev.origin) || !inside(ev.source)) return;
+      if (!asked.some(function (a) { return a.win === ev.source; })) asked.push({ win: ev.source, origin: ev.origin });
+      var on = typeof d.on === 'boolean' ? d.on : !fsEl(), de = doc.documentElement, p = null;
+      try {
+        if (on && !fsEl()) p = de.requestFullscreen ? de.requestFullscreen() : (de.webkitRequestFullscreen ? de.webkitRequestFullscreen() : null);
+        else if (!on && fsEl()) p = doc.exitFullscreen ? doc.exitFullscreen() : (doc.webkitExitFullscreen ? doc.webkitExitFullscreen() : null);
+        else tell();
+      } catch (e) { tell(); }
+      if (p && typeof p.catch === 'function') p.catch(function () { tell(); });   // 못 켬(손길 없음 등) — 지금 상태를 다시 알린다
+    }
+    onFs._onfFs = true;   // 늘 듣는 귀 — 검사(multilogin)가 「노크 듣기를 걷었나」를 셀 때 뺀다
+    global.addEventListener('message', onFs);
+    doc.addEventListener('fullscreenchange', tell);
+    doc.addEventListener('webkitfullscreenchange', tell);
+  })();
+
   global.ONF = global.ONF || {};
   global.ONF.frame = {
     hideToken: hideToken, mount: mount, getToken: getToken, withToken: withToken, TOKEN_KEY: TOKEN_KEY,
