@@ -12,6 +12,7 @@ const vm = require('vm');
 
 const html = fs.readFileSync(process.env.SHELL_HTML || path.join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
 const main = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((s) => s.includes('var CLIENT_ID'));
+const SW = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((s) => s.includes('function toutOf'));   // 머리 기기 스위치 판정(본 스크립트 TOUTV 가 부른다)
 let pass = 0, fail = 0;
 function t(label, fn) {
   try { fn(); console.log('  ✅ ' + label); pass++; }
@@ -52,7 +53,7 @@ function boot(store, opt) {
     google: { accounts: { id: { initialize() {}, renderButton() {}, prompt: () => calls.push('prompt'), cancel() {}, disableAutoSelect() {} } } }
   };
   g.window = g; g.top = g; g.self = g;
-  vm.createContext(g); vm.runInContext(main, g);
+  vm.createContext(g); vm.runInContext(SW + '\n' + main, g);
   const app = els.app;
   const R = {
     g, ls, els, calls, created, pop() { (handlers.popstate || []).slice().forEach((h) => h({})); },

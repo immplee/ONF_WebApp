@@ -19,6 +19,16 @@
 <link rel="apple-touch-icon" href="../assets/icon/onf-180.png">
 <link rel="icon" href="../assets/icon/onf-32.png" sizes="32x32">
 <script>/* 🌙 다크 모드 — 안쪽 액자가 알려 준 색(onfTheme · onf-frame.js)을 **그리기 전에** 단다 · 없으면 어둡게(Peter 2026-10-14 「홈페이지 기본은 다크모드로」 — 종전 기기 설정 · 홈에서 「기기 설정 따라」를 고르면 안쪽이 그 색을 알려 남는다) */(function(){try{var v=localStorage.getItem("onfTheme"),d=v!=="light";document.documentElement.setAttribute("data-theme",d?"dark":"light");}catch(e){}})();</script>
+<script>/* 🏫 정적 먼저 기기 스위치 판정 한 곳(2026-10-30 · 넓히기 준비) — 머리 미리 받기(아래 tPre)와 본 스크립트(TOUTV)가 **이 함수 하나**로 정한다.
+   주소 tout(1|2|0) > 이 기기 기억(onf_tout) > 기본 TOUT_DEF → '0'(지금 길) | '1'(정적 먼저 · WebKit·홈 화면 앱 뺌) | '2'(WebKit·홈 화면 앱도).
+   TOUT_DEF: '0' = 시험(?tout 붙인 기기만) · 넓히면 '2'(켜기 커밋 하나) — 크롬 류는 '1' 과 같고, WebKit 은 판이 익명 다리로 쓴다.
+     ⛔ 익명 다리가 꺼진 빌드(Lib ONF_TCH_ANON_ON false → 판 execAnon 빈 값)면 WebKit 판이 그리기 전에 outFail('anon') → 지금 길 + 하루 기억(onf-frame.js fallBack hard) —
+       「익명 다리 켜짐일 때만 WebKit 기본 켬」을 판(빌드)이 정한다(껍데기는 그 스위치를 못 읽는다 · 두 벌 금지).
+   기기에서 끄기 = ?tout=0(기억 · 기본보다 앞선다). ⛔ 읽기만(저장소 쓰기는 본 스크립트 TOUTV) — 머리는 저장소를 안 바꾼다(검사 P1).
+   ⚠️ 학생 껍데기 out 스위치(index.html onfOut · 기본 켬)와 묶지 않는다: 그쪽은 본 스크립트 안(onf-frame.js 뒤)·값 둘·WebKit 갈래 없음 — 이쪽은 스크립트가 뜨기 전 머리에서 정해야 한다. */
+var TOUT_DEF = '0';
+function toutOf(sw, kept) { return sw === '1' || sw === '2' || sw === '0' ? sw : kept === '1' || kept === '2' || kept === '0' ? kept : TOUT_DEF; }
+</script>
 <script>/* 🏫 정적 먼저 사본 미리 받기(2026-10-30 Peter 「새로 고침 딱 2배 더」) — 정적 선생님 홈(아래 onf-tout)의 Worker /t/home/get 을 **HTML 이 오자마자** 묻는다.
    종전: 껍데기 HTML → 스크립트 넷 다시 확인(304 한 왕복) → 판 HTML → 판 outHello → outBoot → **그제서야** 판이 /t/home/get(workers.dev = LAX 왕복 + D1 APAC ≈ 0.3초 · 새 연결이면 0.6초+) → 그리기.
      로컬 흉내 시간선(2026-10-30): 그림 490ms 중 그 묻기 290ms 가 판 hello(170ms) **뒤**에 줄 서 있었다.
@@ -29,7 +39,7 @@
 var tPre = (function () {
   try {
     var q = new URLSearchParams(location.search), sw = q.get('tout'), nv = navigator, ua = nv.userAgent || '', ls = localStorage, day = 86400000;
-    var v = sw === '1' || sw === '2' || sw === '0' ? sw : ls.getItem('onf_tout'), wk = v === '2';                                                // = TOUT · TOUTWK(2 = WebKit·홈 화면 앱도)
+    var v = toutOf(sw, ls.getItem('onf_tout')), wk = v === '2';                                                                                   // = TOUT · TOUTWK(2 = WebKit·홈 화면 앱도) · 판정 한 곳(위 toutOf)
     if (window.top !== window.self || q.get('mode') || (v !== '1' && v !== '2')) return null;
     if (sw !== '1' && sw !== '2' && Date.now() < Number(String(ls.getItem('onfTOutFail') || '').split(',')[0])) return null;                     // 물러남 기억(onf-frame.js fallBlocked 'thome' 과 같은 꼴 '<그때까지>,<연속>' · tout=1·2 는 지운다)
     if (!wk && (/iPhone|iPad|iPod/.test(ua) || (/Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg/.test(ua)) || (nv.platform === 'MacIntel' && nv.maxTouchPoints > 1))) return null;   // = webkitOnly
@@ -247,13 +257,13 @@ function tchLogin(idt) {
       }, function () {});
   } catch (e) {}
 }
-/* 🏫 정적 먼저 기기 스위치 — 주소 tout=1|2|0 이면 이 기기에 기억(onf_tout) · 없으면 기억값 · 기본 꺼짐(= 지금 길) · tout=1·2 는 그날 물러남 기억(onfTOutFail)도 지운다(학생 out=1 과 같이).
+/* 🏫 정적 먼저 기기 스위치 — 주소 tout=1|2|0 이면 이 기기에 기억(onf_tout) · 판정은 머리 toutOf(주소 > 기억 > 기본 TOUT_DEF) · tout=1·2 는 그날 물러남 기억(onfTOutFail)도 지운다(학생 out=1 과 같이).
    📱 2 = WebKit(아이패드·아이폰·사파리)·홈 화면 앱에서도(TOUTWK · 2026-10-30) — 1 은 종전대로 그 기기들을 뺀다. 판 쓰기는 익명 다리(ONF_TeacherBridge)로 가고,
      익명 다리가 꺼져 있으면(빌드 execAnon 빈 값) 판이 그리기 전에 outFail('anon') → 지금 길(구글 홈) + 그날 기억(정적 판 teacher-boot.js). 크롬 등에선 2 = 1. */
 var TOUT_FAIL = 'onfTOutFail', TOUTV = (function () {
-  var v = null;
-  try { v = new URLSearchParams(location.search).get('tout'); if (v === '1' || v === '2' || v === '0') { localStorage.setItem('onf_tout', v); if (v !== '0') localStorage.removeItem(TOUT_FAIL); } else v = localStorage.getItem('onf_tout'); } catch (e) {}
-  return v;
+  var sw = null, kept = null;
+  try { sw = new URLSearchParams(location.search).get('tout'); if (sw === '1' || sw === '2' || sw === '0') { localStorage.setItem('onf_tout', sw); if (sw !== '0') localStorage.removeItem(TOUT_FAIL); } kept = localStorage.getItem('onf_tout'); } catch (e) {}
+  return toutOf(sw, kept);   // 판정 한 곳(머리)
 })(), TOUT = TOUTV === '1' || TOUTV === '2', TOUTWK = TOUTV === '2';
 
 /* ═══ 🔑 기기 열쇠를 못 쓰는 기기 (2026-10-12 Peter 아이폰 실측) ═══
