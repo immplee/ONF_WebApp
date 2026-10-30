@@ -274,6 +274,7 @@
      ⚠️ 선생님 껍데기 머리 tPre 는 이 파일이 뜨기 전이라 칸 앞 숫자만 직접 읽는다(같은 꼴 · 검사 teacher-tout P1). 저장소가 막힌 창 = 막힘(열 때마다 시한을 안 낸다 · 종전 그대로). */
   var FALL_KEY = { book: 'onfOutFail', home: 'onfOutFailHome', thome: 'onfTOutFail' };
   var FALL_STEP = [0, 600000, 3600000, 86400000], FALL_DAY = 86400000, FALL_API = 3600000;
+  var FALL_SLOW_PAN = { thome: ['fail-none', 'fail-stale'] };   // 🏫 선생님 홈 사본 없음·낡음 = 5분 틱이 곧 고쳐 놓는 상태 → 느림 갈래(2026-10-31 · 사본은 3시간·날짜마다 다시 짓는다 #155)
   var FALL_SLOW = ['hello', 'paint', 'fail-time', 'fail-net'], FALL_SKIP = ['fail-mismatch', 'late-notice', 'late-stale', 'nodata'];
   function fallGet(k) { var v = String(global.localStorage.getItem(k) || '').split(','); return { at: Number(v[0]) || 0, n: Number(v[1]) || 0 }; }
   function fallBlocked(pan) { try { return Date.now() < fallGet(FALL_KEY[pan]).at; } catch (e) { return true; } }
@@ -284,7 +285,7 @@
     try { f = fallGet(k); } catch (e) {}
     if (FALL_SKIP.indexOf(why) < 0) {
       f.n += 1;
-      ms = FALL_SLOW.indexOf(why) >= 0 ? FALL_STEP[Math.min(f.n, FALL_STEP.length) - 1] : why === 'fail-api' ? FALL_API : FALL_DAY;
+      ms = (FALL_SLOW.indexOf(why) >= 0 || (FALL_SLOW_PAN[pan] || []).indexOf(why) >= 0) ? FALL_STEP[Math.min(f.n, FALL_STEP.length) - 1] : why === 'fail-api' ? FALL_API : FALL_DAY;
       try { global.localStorage.setItem(k, (ms ? Date.now() + ms : 0) + ',' + f.n); } catch (e) {}   // 0 = 막지 않음(셈만)
     }
     try {

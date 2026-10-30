@@ -1485,6 +1485,13 @@ ta('FB1 까닭별 표 — slow(hello·paint·fail-time·fail-net) 연속 1 = 0 �
     assert.strictEqual(y.F.fallBack('thome', why), -1, '⛔ ' + why + ' 는 skip');
     assert.strictEqual(y.ls.m.onfTOutFail, '0,2', '⛔ ' + why + ' — skip 이 칸·연속을 바꿨다');
   }
+  for (const why of ['fail-none', 'fail-stale']) {   // 🏫 선생님 홈 사본 없음·낡음 = 느림(2026-10-31 · 틱이 곧 다시 짓는다) · 다른 판은 그대로 하루
+    const t = mk();
+    assert.strictEqual(t.F.fallBack('thome', why), 0, '⛔ thome ' + why + ' 1번째는 0(이번만)');
+    assert.strictEqual(t.F.fallBack('thome', why), 600000, '⛔ thome ' + why + ' 2번째는 10분');
+    const b = mk();
+    assert.strictEqual(b.F.fallBack('book', why), D, '⛔ book ' + why + ' 는 하루 그대로');
+  }
   const z = mk({ onfOutFail: String(1.7e12 + D) + ',1' });   // 판마다 칸 따로
   assert.ok(z.F.fallBlocked('book') && !z.F.fallBlocked('home') && !z.F.fallBlocked('thome'), '⛔ 교재 물러남이 다른 판을 막는다');
   z.F.fallBack('home', 'hello'); z.F.fallOk('thome');
