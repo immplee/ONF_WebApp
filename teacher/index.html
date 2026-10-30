@@ -884,8 +884,12 @@ function hwLay() {
   var rec = hwView === 'book' && hwRecR && hwRecR.length;   // 🎧 교재만이어도 녹음 플레이어는 그 자리에(Peter 2026-10-28) — 과제 판을 플레이어 모양으로만 오려 교재 위에
   hwBox.style.visibility = hwView === 'book' && !rec ? 'hidden' : ''; hwBox.style.pointerEvents = hwView === 'book' && !rec ? 'none' : '';
   var clip = band ? hwRecPath([[0, 0, W, band, 0], [0, band, cut, Math.max(1, H - band), 0]].concat(hwRecR || [])) : rec ? hwRecPath(hwRecR) : '';
-  hwBox.style.clipPath = clip; hwBox.style.zIndex = clip ? '52' : '50';   // ⛔ 빈 값이면 cssText 의 z-index:50 이 지워진다 · 오린 밖은 그리지도 누르지도 않는다(clip-path = 누름 판정도 자른다) · 교재 칸(50) 위
-  if (hwBk) { hwBk.box.style.display = hwView === 'photo' ? 'none' : ''; hwBk.box.style.left = side ? cut + 'px' : '0'; hwBk.box.style.top = band + 'px'; }
+  /* 📖 옆에 한 줄이면 교재 칸이 **판 위** — 판 떠 있는 것(플레이어·창)이 교재 칸에 걸칠 때만 판이 위(Peter 2026-10-30 「확대·축소는 되는데 위아래좌우 스크롤이 안 돼」).
+     아이패드(WebKit iOS)는 손가락 굴리기를 UI 쪽에서 판정하는데, 화면 전체 판 액자의 clip-path 를 그 판정이 안 본다 → 교재 굴리기를 위 판이 먹었다
+     (핀치는 페이지 JS 라 clip-path 를 지켜 됐다 · 크롬은 굴리기도 됨 = 실측 0 → 301px). 교재 칸은 띠 아래 오른쪽만이라 띠·사진 칸을 안 가린다. */
+  var over = band && (hwRecR || []).some(function (r) { return r[0] + r[2] > cut && r[1] + r[3] > band; });
+  hwBox.style.clipPath = clip; hwBox.style.zIndex = clip ? (band && !over ? '50' : '52') : '50';   // ⛔ 빈 값이면 cssText 의 z-index:50 이 지워진다 · 오린 밖은 그리지도 누르지도 않는다(clip-path = 누름 판정도 자른다)
+  if (hwBk) { hwBk.box.style.display = hwView === 'photo' ? 'none' : ''; hwBk.box.style.left = side ? cut + 'px' : '0'; hwBk.box.style.top = band + 'px'; hwBk.box.style.zIndex = band && !over ? '51' : '50'; }
   if (side) { var dv = hwDivider(); dv.style.left = (cut - 7) + 'px'; dv.style.top = band + 'px'; }
   else if (hwDiv) { if (hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null; }
 }

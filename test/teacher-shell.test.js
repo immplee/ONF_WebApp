@@ -419,6 +419,14 @@ t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼�
   assert.ok(/\/\d+px$|^\d+px$/.test(box.style.right) && box.style.right !== '', '⛔ 옆에 — 과제 판이 왼쪽 반으로 안 줄었다: ' + box.style.right);
   const dv = R.created.filter((e) => e.className === 'onf-hwdiv')[0];
   assert.ok(dv && dv.parentNode, '⛔ 옆에 — 경계선(폭 끌기)이 없다');
+  // 📖 옆에 한 줄(hwBand) = 교재 칸이 판 위 — 아이패드는 굴리기 판정이 판 액자의 clip-path 를 안 봐 교재가 안 굴렀다(Peter 2026-10-30) · 판 떠 있는 것이 교재 칸에 걸칠 때만 판이 위
+  R.postAs({ onf: 'hwBand', h: 112 }, inner);
+  assert.deepStrictEqual([box.style.zIndex, panels()[0].style.zIndex], ['50', '51'], '⛔ 옆에 한 줄 — 판 액자가 교재 칸 위에 있다(아이패드 교재 굴리기를 먹는다)');
+  R.postAs({ onf: 'hwRec', rs: [[5000, 300, 200, 100, 0]] }, inner);
+  assert.deepStrictEqual([box.style.zIndex, panels()[0].style.zIndex], ['52', '50'], '⛔ 판 창이 교재 칸에 걸쳤는데 판이 교재 아래 — 창이 안 보인다');
+  R.postAs({ onf: 'hwRec', rs: [] }, inner);
+  assert.deepStrictEqual([box.style.zIndex, panels()[0].style.zIndex], ['50', '51'], '⛔ 창이 사라졌는데 판이 계속 교재 위');
+  R.postAs({ onf: 'hwBand', h: 0 }, inner);
   assert.deepStrictEqual([R.g.hwSplitAt(100, 1000), R.g.hwSplitAt(550, 1000), R.g.hwSplitAt(900, 1000), R.g.hwSplitAt(5, 0)], [0.4, 0.55, 0.72, 0.5], '⛔ 경계선 끌기 범위 = 과제 판 40%~72%(설계 §0-9)');
   // ⑬ 펜 줄 하나 — 과제 판 도구 → 껍데기 → 교재(노크한 창) · 늦게 뜬 교재엔 노크 때 마지막 것
   R.postAs({ onf: 'hwPen', tool: 'marker', pick: { pen: { color: '#E5484D', w: 3 }, marker: { color: 'ink', w: 14 } }, stampK: 1 }, inner);
