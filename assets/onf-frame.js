@@ -1309,6 +1309,7 @@
     tokenFromPath: tokenFromPath,
     openExec: openExec,   // 🔐 선생님 껍데기 판도 쓴다(teacher/index.html bookMake)
     openApp: openApp, OUT_BOOK: ONF_OUT_BOOK,   // 🌤 선생님 껍데기 정적 판도 같은 손·같은 주소(밖으로 4-① 2026-10-28 · teacher/index.html bookMake)
+    WORKER: ONF_WHO.replace(/\/who$/, ''),   // 🏫 Worker 바탕 주소(밖으로 4-④-2c 2026-10-30 · 선생님 껍데기 /t/login) — 위 /who 상수에서(새로 적지 않는다)
     printTitle: printTitle,   // 📄 선생님 껍데기(teacher/index.html) 판도 같은 함수
     /* 검사용으로만 낸다 — 순수 판정 함수라 창 없이 잴 수 있다. 화면 코드에서 부르지 마라. */
     _fromOurFrame: _fromOurFrame,
