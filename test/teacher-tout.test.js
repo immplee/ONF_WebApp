@@ -13,6 +13,9 @@ const main = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]
 const FRAMEJS = fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-frame.js'), 'utf8');
 
 const CHROME = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36', platform: 'MacIntel', maxTouchPoints: 0 };
+const MACSAFARI = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15', platform: 'MacIntel', maxTouchPoints: 0 };
+const IPHONE = { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/141.0.7390.96 Mobile/15E148 Safari/604.1', platform: 'iPhone', maxTouchPoints: 5 };
+const IPAD = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15', platform: 'MacIntel', maxTouchPoints: 5 };
 const KORIGIN = 'https://n-abc-0lu-script.googleusercontent.com';
 const APP = 'https://app.ownify.co.kr', TURL = APP + '/teacher/';
 const WORKER = 'https://onf-media.edia--orker.workers.dev';
@@ -123,6 +126,15 @@ t('A2 홈 화면 앱 리디렉트 길(gsiBack · sessionStorage onf_gsi)도 /t/l
   assert.deepStrictEqual(JSON.parse(R.fetches[0].init.body), { idt: tok });
   assert.ok(/^tch\./.test(JSON.parse(R.ls.onf_tch).tk));
   assert.ok(!('onf_gsi' in R.ss), '⛔ 한 번 쓴 리디렉트 토큰이 남았다');
+});
+
+t('A2b WebKit(사파리·아이폰 크롬·아이패드)도 로그인 → /t/login 입장권은 받는다', async () => {
+  for (const nav of [MACSAFARI, IPHONE, IPAD]) {
+    const R = boot({}, { nav });
+    login(R); await tick(); await tick();
+    assert.strictEqual(R.fetches.length, 1, '⛔ WebKit 에서 입장권을 안 받았다: ' + nav.platform);
+    assert.ok(/^tch\./.test(JSON.parse(R.ls.onf_tch).tk));
+  }
 });
 
 t('A3 남은 7일 넘으면 안 묻는다 · 7일 이하·만료·깨진 칸이면 새로', async () => {
@@ -236,10 +248,11 @@ t('B3 물러난 지금 길도 종전처럼 돈다 — 구글 노크에 구글 �
   assert.ok(/AKfycb/.test(Q.nav[Q.nav.length - 1]));
 });
 
-t('B4 입장권 없음·만료 · 학생 한 명 창(mode=student)·과제 판(hwbook) · 홈 화면 앱(standalone) → 정적 먼저 안 함', async () => {
+t('B4 입장권 없음·만료 · 학생 한 명 창(mode=student)·과제 판(hwbook) · 홈 화면 앱(standalone) · WebKit(맥 사파리·아이폰 크롬·아이패드) → 정적 먼저 안 함', async () => {
   const st = (o) => Object.assign({ onf_tout: '1' }, o);
   for (const [store, opt] of [[st({}), {}], [st({ onf_tch: tchCell(-1) }), {}], [st({ onf_tch: tchCell(20) }), { search: '?mode=student&t=Tok_1' }],
-    [st({ onf_tch: tchCell(20) }), { search: '?mode=hwbook&t=Tok_1' }], [st({ onf_tch: tchCell(20) }), { nav: { standalone: true } }]]) {
+    [st({ onf_tch: tchCell(20) }), { search: '?mode=hwbook&t=Tok_1' }], [st({ onf_tch: tchCell(20) }), { nav: { standalone: true } }],
+    [st({ onf_tch: tchCell(20) }), { nav: MACSAFARI }], [st({ onf_tch: tchCell(20) }), { nav: IPHONE }], [st({ onf_tch: tchCell(20) }), { nav: IPAD }]]) {
     const R = boot(store, opt);
     login(R);
     assert.ok(!R.staticOpen() && R.execOpen(), '⛔ 정적 먼저를 했다: ' + JSON.stringify([Object.keys(store), opt]));

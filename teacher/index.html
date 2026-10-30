@@ -391,7 +391,7 @@ var frameWatch = null;
 /* ═══ 🏫 정적 먼저 — 선생님 홈을 구글 밖 정적 판(Pages /teacher/ · Worker 사본)으로 먼저 연다(밖으로 4-④-2c · 2026-10-30) ═══
    ⚠️ 쌍둥이: 학생 껍데기 assets/onf-frame.js mainHome(정본 주석) — 선생님은 /home/get 을 껍데기가 안 묻는다(판이 입장권으로 /t/home/get).
    묻는 때만(tOutQ): 기기 스위치(위 TOUT · 기본 꺼짐) · 홈(mode 없음 — 학생 한 명 창·과제 판은 지금 길) · 입장권 있음(tchGet) · 그날 물러남 없음(onfTOutFail 하루) ·
-     홈 화면 앱(standalone) 아님 — 판의 다리(exec?mode=bridge)가 아직 구글 쿠키를 요구한다(Peter 결정 대기 · 입장권 받기는 그 앱도 한다) · onf-frame.js 가 정적 판 주소를 낸다.
+     WebKit 아님(webkitOnly — 사파리·아이폰 크롬·아이패드 · 2026-10-30 판정) · 홈 화면 앱(standalone) 아님 — 판의 다리(exec?mode=bridge)가 아직 구글 쿠키를 요구한다(Peter 결정 대기 · 입장권 받기는 그 앱도 한다) · onf-frame.js 가 정적 판 주소를 낸다.
    판 말(그 액자 창 · 그 판 출처만): outHello → outBoot{tk}(hello 마다 — 다시 읽힌 판도 · ⛔ 주소엔 안 싣는다) · homeDrawn = 이 기기 정적 홈(그 뒤 outFail·시한 무시 · 로고 막 ok) ·
      그리기 전 outFail·hello 없음(TOUT_HELLO_MS)·outBoot 뒤 그리기 시한(TOUT_PAINT_MS) = 같은 액자에 지금 길(openHome) + 그날 기억 · 물러나면 죽은 정적 창을 노크 칸에서 비운다.
    그린 뒤 화면 노크(auth-please)는 위 onf-knock 이 받는다 — 정적 판 창(직접 자식 · 그 출처)이면 답이 구글 토큰이 아니라 입장권(answer · appTch).
@@ -401,7 +401,7 @@ function tOutLive() { return tOut && !tOut.gone ? tOut.org : ''; }   // 살아 �
 function tOutUrl() { try { return new URL('/teacher/', ONF.frame.OUT_BOOK).href; } catch (e) { return ''; } }   // 정적 판 주소 = 교재 정적 판과 같은 출처(onf-frame.js 상수)
 function tOutQ() {
   try {   // ⛔ 무엇이 던져도 지금 길(mount 안에서 불린다 — 여기서 던지면 로그인이 멈춘다)
-    if (!TOUT || new URLSearchParams(location.search).get('mode') || homeApp() || !tchGet() || !(window.ONF && ONF.frame && ONF.frame.OUT_BOOK) || !bookAppOrigin(new URL(tOutUrl()).origin)) return false;
+    if (!TOUT || new URLSearchParams(location.search).get('mode') || homeApp() || webkitOnly() || !tchGet() || !(window.ONF && ONF.frame && ONF.frame.OUT_BOOK) || !bookAppOrigin(new URL(tOutUrl()).origin)) return false;
     return !(Date.now() - Number(localStorage.getItem(TOUT_FAIL) || 0) < 86400000);
   } catch (e) { return false; }
 }
