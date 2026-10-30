@@ -262,6 +262,38 @@
      · 정적 판 주소엔 토큰을 안 싣는다 — 판이 outHello(받을 준비)를 하면 그 창·그 출처로 outBoot{tok, src, cf}(hello 마다 — 다시 읽힌 판도 받게).
        OUT_MS 안 hello 가 없거나 outFail 이면 onFail(같은 판에 지금 길 · 아래 mount bookMake). ⛔ 구글 겹 액자 깊이 판단(openExec)은 안 쓴다 — 정적 판은 겹이 없다.
      · 정적 판 주소는 상수 한 줄(시험 땐 Pages 주소). OUT_MS = 문서 받을 준비까지 짐작 — 0단계 실측으로 고친다. */
+  /* 🔁 물러남 기억 한 곳(2026-10-30 · 종전 「그날 하루」 → 까닭별) — 정적 판(교재 book · 학생 홈 home · 선생님 홈 thome)이 못 떠 지금 길로 물러날 때
+     이 기기가 정적 판을 언제 다시 시도하나. 학생 껍데기(아래 bookMake·첫 판·mainHome)와 선생님 껍데기(teacher/index.html tOutOpen·bookMake)가 **이 셋만** 쓴다.
+     · 칸 = 판마다 한 키(FALL_KEY) '<다시 시도할 시각 ms>,<연속 n>' · 옛 값(실패 시각 숫자 하나)은 지난 시각이라 곧 다시 시도 · 성공(교재 hello · 홈 homeDrawn)이면 지운다(fallOk).
+     · 까닭(why): 'hello'(hello 시한) · 'paint'(그리기 시한) · 'fail-<판 why>'(그리기 전 outFail) · 'late-<판 why>'(그린 뒤 outFail) · 'nodata'(홈 사본 답 없음) · 'off'(서버 스위치 꺼짐) · 'notch'(입장권 없음)
+       slow  = FALL_SLOW(시한 넘김·망 — 배포 뒤 첫 받기 5.2초 같은 것) → 연속 1번째 0(이번만) · 2번째 10분 · 3번째 1시간 · 4번째부터 하루(FALL_STEP)
+       skip  = FALL_SKIP(데이터 상태·대조 어긋남 — 종전에도 그날 기록 없음) → 칸 그대로(연속도 그대로)
+       api   = 'fail-api'(교재 다리 약속 번호 어긋남 — 대개 구글 배포와 Pages 배포 사이 몇 분 · Peter 2026-10-30) → 1시간(FALL_API) · 연속은 +1
+       hard  = 그 밖(판이 스스로 못 그린다고 말함 · 스위치 off …) → 하루(종전 그대로) · 연속은 +1
+     · 물러날 때마다 clog 한 줄 {k:'err', c:'fallback:<판>:<까닭>:<연속 n>', d:기기 꼴} — 값(토큰·주소) 없음 · sendBeacon 만.
+     ⚠️ 선생님 껍데기 머리 tPre 는 이 파일이 뜨기 전이라 칸 앞 숫자만 직접 읽는다(같은 꼴 · 검사 teacher-tout P1). 저장소가 막힌 창 = 막힘(열 때마다 시한을 안 낸다 · 종전 그대로). */
+  var FALL_KEY = { book: 'onfOutFail', home: 'onfOutFailHome', thome: 'onfTOutFail' };
+  var FALL_STEP = [0, 600000, 3600000, 86400000], FALL_DAY = 86400000, FALL_API = 3600000;
+  var FALL_SLOW = ['hello', 'paint', 'fail-time', 'fail-net'], FALL_SKIP = ['fail-mismatch', 'late-notice', 'late-stale', 'nodata'];
+  function fallGet(k) { var v = String(global.localStorage.getItem(k) || '').split(','); return { at: Number(v[0]) || 0, n: Number(v[1]) || 0 }; }
+  function fallBlocked(pan) { try { return Date.now() < fallGet(FALL_KEY[pan]).at; } catch (e) { return true; } }
+  function fallOk(pan) { try { global.localStorage.removeItem(FALL_KEY[pan]); } catch (e) {} }
+  function fallBack(pan, why) {   // → 막는 ms(skip = -1)
+    var k = FALL_KEY[pan], f = { at: 0, n: 0 }, ms = -1;
+    why = String(why || 'x').replace(/[^a-z-]/g, '').slice(0, 20) || 'x';
+    try { f = fallGet(k); } catch (e) {}
+    if (FALL_SKIP.indexOf(why) < 0) {
+      f.n += 1;
+      ms = FALL_SLOW.indexOf(why) >= 0 ? FALL_STEP[Math.min(f.n, FALL_STEP.length) - 1] : why === 'fail-api' ? FALL_API : FALL_DAY;
+      try { global.localStorage.setItem(k, (ms ? Date.now() + ms : 0) + ',' + f.n); } catch (e) {}   // 0 = 막지 않음(셈만)
+    }
+    try {
+      var v = global.navigator, u = (v && v.userAgent) || '';
+      if (v && typeof v.sendBeacon === 'function') v.sendBeacon(ONF_WHO.replace(/\/who$/, '') + '/clog', JSON.stringify([{ k: 'err', c: 'fallback:' + pan + ':' + why + ':' + f.n,
+        d: /iPad/.test(u) || (/Macintosh/.test(u) && v.maxTouchPoints > 1) ? 'ipad' : /iPhone|iPod/.test(u) ? 'ios' : /Macintosh/.test(u) ? 'mac' : /Windows/.test(u) ? 'win' : /Android/.test(u) ? 'and' : 'other' }]));
+    } catch (e) {}
+    return ms;
+  }
   var ONF_OUT_ORIGINS = ['https://app.ownify.co.kr', 'https://onf-app.pages.dev'];
   var ONF_OUT_BOOK = 'https://app.ownify.co.kr/book/';
   var OUT_MINE_URL = 'https://app.ownify.co.kr/mine/';   // 🌤 밖으로 4-②(2026-10-29) ⭐ 내 문장 정적 판 — Lib 스위치 ONF_OUT_MINE 과 다른 이름
@@ -270,17 +302,17 @@
   function openApp(el, url, src, cf, onFail, tok, hooks) {   // hooks = 첫 판만(밖으로 2 · 로고 막 onf-load.js) — 첫 hello 에 ok
     var org = new URL(url).origin, done = false, booted = false, tm;
     function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
-    function bad() { if (done) return; end(); onFail(); }
+    function bad(why) { if (done) return; end(); onFail(why); }   // why = 위 fallBack 까닭('hello' | 'fail-<판 why>')
     function onMsg(ev) {
       if (done || !ev || !ev.data || ev.source !== el.contentWindow || ev.origin !== org) return;   // 그 액자 창 · 그 출처만
-      if (ev.data.onf === 'outFail') return bad();
+      if (ev.data.onf === 'outFail') return bad('fail-' + ev.data.why);
       if (ev.data.onf !== 'outHello') return;
-      if (!booted) { try { if (hooks && typeof hooks.ok === 'function') hooks.ok(); } catch (eH) {} }
+      if (!booted) { fallOk('book'); try { if (hooks && typeof hooks.ok === 'function') hooks.ok(); } catch (eH) {} }   // 🔁 정적 교재가 떴다 = 연속 물러남 0(넘겨주기 판·선생님 판도 같은 손)
       booted = true; clearTimeout(tm);   // 🌤 hello 마다 다시(2026-10-24) — 판이 스스로 다시 읽으면(2시간 · 「다시 열기」) 새 문서가 또 hello · 안 보내면 4초 뒤 outFail 로 지금 길
       try { ev.source.postMessage({ onf: 'outBoot', tok: tok, src: src, cf: cf || null }, org); } catch (e) {}
     }
     global.addEventListener('message', onMsg);
-    tm = setTimeout(function () { if (!booted) bad(); }, OUT_MS);
+    tm = setTimeout(function () { if (!booted) bad('hello'); }, OUT_MS);
     try { if (el.isConnected && el.contentWindow) el.contentWindow.location.replace(url); else el.src = url; } catch (e) { el.src = url; }   // 📱 replace — openExec 끝 주석(WebKit 기록 칸)
     return { stop: end, stuck: function () { return false; } };
   }
@@ -313,7 +345,7 @@
   var HOMEGET_MS = 1500, HOME_PAINT_MS = 2500, HOME_PAINT_MS_COLD = 5000, OUT_HOME_ORG = ONF_OUT_HOME_URL.replace(/^(https:\/\/[^\/]+).*$/, '$1');   // 출처 — 모듈 맨 위라 URL 없이(옛 브라우저·검사 하네스)
   /* 스위치 꺼짐(`{ok:false,why:'off'}` · HOME_READ=0 롤백의 HTTP 503) = 그날 이 기기는 더 안 묻는다 — onfOutFailHome 을 적는다(homeQ 가 보고 /home/get·정적 홈 미리 받기 0 · ?out=1 이 지움).
      그 밖의 null(unknown·stale·ended·none·시한·끊김)은 종전 그대로(기록 없음). */
-  function homeOff() { try { global.localStorage.setItem('onfOutFailHome', String(Date.now())); } catch (e) {} }
+  function homeOff() { fallBack('home', 'off'); }   // 🔁 위 물러남 기억 — hard(하루)
   function askHome(tok) {
     return askPost(ONF_HOME_GET, { t: tok }, HOMEGET_MS, function (j) {
       if (j.ok === false && j.why === 'off') homeOff();
@@ -703,13 +735,13 @@
       if (ok) p.box.style.setProperty(name, Math.round(v) + 'px'); else p.box.style.removeProperty(name);
       return ok ? v : null;
     }
-    /* 🌤 밖으로 1(2026-10-24 · 위 openApp) — 이 판을 정적 판으로 띄우나: 기기 스위치(index.html out · onfOut) · 토큰 · 그날 이 기기에서 안 떴던 적 없음(onfOutFail 하루) ·
+    /* 🌤 밖으로 1(2026-10-24 · 위 openApp) — 이 판을 정적 판으로 띄우나: 기기 스위치(index.html out · onfOut) · 토큰 · 물러남 기억에 안 막힘(위 fallBlocked 'book' · 까닭별) ·
        ⭐ 내 문장 선생님 보기(ttok)는 지금 길(4-② 2026-10-29 · 홈 onfOutOf 도 0 이지만 껍데기가 한 번 더 · 선생님 내 문장은 ④) — 내 문장·🗂️ 카드 덱은 홈이 out:1(학생별 스위치)일 때만 여기 온다.
        outSeen = 홈이 out:1 로 연 판 주소(아래 preWrite 의 o:1). */
-    var OUT_FAIL = 'onfOutFail', OUT_FAIL_MS = 86400000, outSeen = {};
+    var outSeen = {};
     function outOk(src) {
       if (!opts.out || !opts.tok || (bookMine(src) && /[?&]ttok=/.test(src))) return false;
-      try { return !(Date.now() - Number(global.localStorage.getItem(OUT_FAIL) || 0) < OUT_FAIL_MS); } catch (e) { return false; }   // 저장소가 막힌 창 — 실패를 못 기억하니 열 때마다 2.5초를 안 낸다
+      return !fallBlocked('book');   // 🔁 위 물러남 기억(까닭별 · 저장소가 막힌 창 = 막힘 — 실패를 못 기억하니 열 때마다 2.5초를 안 낸다)
     }
     /* 🌤 이 열기가 정적 판으로 갈 판인가 · 판 p 가 같은 길인가(검토 고침 1 · 2026-10-24) — 정적 판도 지금 교재와 같은 bookHi swap:1 로 판(board)이 된다.
        길이 다른 판엔 갈아 끼우기(bookBoardFor)·「열어」(bookLike)·줄 선 미리 주소(bookQ)를 안 보낸다 → 켠 교재만 정적 판 · ⭐ 내 문장·🗂️ 카드 덱도 out:1 일 때만 정적 판(4-②) · 선생님 보기 내 문장(ttok · outOk 거짓)은 늘 지금 길 판. */
@@ -796,15 +828,15 @@
       if (parked) p.idle = setTimeout(function () { bookIdle(p); }, BOOK_IDLE_MS);
       function exec() { p.out = false; p.oe = openExec(p.el, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, wait, bookClose); }   // 🔐 여러 계정 우회(위) — 못 열면 이 판 「불러오는 중」 자리에 안내 + [닫기] · 기억은 읽기만
       /* 🌤 켠 교재(위 outOk)면 정적 판 — 판 열쇠는 그대로 src(exec 주소)이고 정적 판도 같은 주소(숨긴 판은 park=1 까지)를 outBoot 으로 받는다.
-         안 뜨면 같은 판에 지금 길(exec) · 그날은 이 기기 지금 길(onfOutFail). ⚠️ 위 exec 줄 모양은 multilogin.test.js 가 본다.
+         안 뜨면 같은 판에 지금 길(exec) · 물러남 기억(위 fallBack 'book' · 까닭별). ⚠️ 위 exec 줄 모양은 multilogin.test.js 가 본다.
          ⭐ 내 문장은 /mine/(4-② 2026-10-29 · 같은 outBoot · 판 한 장 후보 아님 = bookMine 거름 그대로) · 그 밖(🗂️ 덱 포함)은 /book/. */
       if (out && outOk(src)) {
         p.out = true;
         flushStop();   // 🧺 한 출처에 정적 판 둘 금지(위 넘겨주기) — 넘겨주던 판의 못 보낸 것은 기기에 남고 이 판이 다시 열 때 보낸다
         try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}   // 🧺 아래 bookFlush — 이 기기 정적 판 저장소에 쓰기가 남을 수 있다
-        p.oe = openApp(p.el, bookMine(src) ? OUT_MINE_URL : ONF_OUT_BOOK, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, bookCfOk(cf), function () {
+        p.oe = openApp(p.el, bookMine(src) ? OUT_MINE_URL : ONF_OUT_BOOK, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, bookCfOk(cf), function (why) {
           console.info('[onf] 정적 판이 안 떴다 — 지금 길로 다시');
-          try { global.localStorage.setItem(OUT_FAIL, String(Date.now())); } catch (e) {}
+          fallBack('book', why);   // 🔁 위 물러남 기억(까닭별)
           /* 검토 고침 3 — hello·노크 뒤 outFail 이면 판 창·출처·views·swap·기록 다리·키보드 창이 정적 판을 가리킨다 → 새 판처럼 비운다(죽은 창을 판으로 쳐 갈아 끼우기가 14초 기다렸다).
              기다리던 갈아 끼우기(sw)는 지금 길 노크(bookHi)가 종전대로 끝낸다. */
           p.win = null; p.origin = ''; p.views = []; p.swap = false; p.hw = null; p.ho = ''; p.kb = null;
@@ -1114,8 +1146,8 @@
       preP = bookFind(opts.bookSrc(v.h));   // 🚀 미리 띄운 판(위 preSave 가 오늘 주소와 견준다)
     }
     /* 🌤 밖으로 2(2026-10-24 · 판정 2·5) — 링크 직행 교재(fileId·slug)면 /who 를 WHO_MS 안 묻고 cf 가 오면 첫 판을 정적 판(openApp)으로.
-       묻는 때만(아래 whoQ): 토큰 · 기기 out · 그날 물러남 없음 · ⭐ 내 문장(mode)·🗂️ 카드 덱(view) 아님 · ttok 아님 · 14일 안에 정적 판을 쓴 기기(onfOutUsed) — 아니면 종전 그대로(요청·기다림 0).
-       안 뜨면(outFail·hello 없음) 같은 액자에 종전 openExec(여러 계정 우회·로고 신호 그대로) · 그날은 이 기기 지금 길(onfOutFail). 정적 판은 src 의 embed 를 따른다(링크 직행 = 판 단추 없음 · boot.js). */
+       묻는 때만(아래 whoQ): 토큰 · 기기 out · 물러남 기억에 안 막힘 · ⭐ 내 문장(mode)·🗂️ 카드 덱(view) 아님 · ttok 아님 · 14일 안에 정적 판을 쓴 기기(onfOutUsed) — 아니면 종전 그대로(요청·기다림 0).
+       안 뜨면(outFail·hello 없음) 같은 액자에 종전 openExec(여러 계정 우회·로고 신호 그대로) · 물러남 기억(위 fallBack 'book'). 정적 판은 src 의 embed 를 따른다(링크 직행 = 판 단추 없음 · boot.js). */
     function mainExec(navStart) { openExec(frameEl, src, opts.wait || null, null, true, opts.hooks || null, navStart === true); }
     function whoQ(s) {
       try {
@@ -1137,38 +1169,24 @@
     }
     /* 🌤 밖으로 3(2026-10-24 · 판정 R4·R10~R14·R18) — 켠 학생 홈: /home/get 과 정적 홈(ONF_OUT_HOME_URL)을 **같이** 시작한다.
        묻는 때만(homeQ): index.html 의 홈 표시(opts.home — PREBOOK 끔이면 preKey 가 비어 따로 받는다) · 토큰 · 기기 out ·
-       그날 홈 물러남 없음(onfOutFailHome — 교재 onfOutFail 과 따로: 홈이 물러나도 정적 교재는 그대로) — 아니면 종전 그대로(요청·기다림 0).
-       · 안 쓴 기기(onfOutUsed 없음·14일 넘음 = cold · ③-3 2026-10-29)도 묻는다 — 첫 그림 시한만 HOME_PAINT_MS_COLD 5000. cold 가 시한(hello 없음·그리기)으로 물러나면 첫 번째만 그날 기록을 안 남긴다(다음 열기에 다시 시도) — 같은 날 2번째 시한 실패는 기록(coldMissKill · Ruling 6).
-       · mismatch(그리기 전 교재 목록 대조 어긋남 — 정적 홈이 그리기 전에만 낸다)는 쓴 기기든 cold 든 그날 기록을 안 남긴다(비용은 /home/get 한 번). 다른 실패는 종전 그대로.
-       · 답(d)이 와야 hello 에 outBoot{src, tok, d} · 답 없음 = 정적 손잡이를 **먼저** 걷고(end) 지금 길 — 그날 기록 없음(정적 시계가 두 번째 물러남을 못 한다).
-       · hello 없음(OUT_MS) · outBoot 뒤 HOME_PAINT_MS 안 homeDrawn 없음 · 그리기 전 outFail = 지금 길 + 그날 기록.
-       · 그린 뒤 outFail = 지금 길 · 그날 기록은 error 만(notice = 끝난 학생 안내 · stale = 다리가 안 와 낡은 교재를 못 엶 — 데이터 상태라 내일도 정적 홈).
+       홈 물러남 기억에 안 막힘(fallBlocked 'home' = onfOutFailHome — 교재 onfOutFail 과 따로: 홈이 물러나도 정적 교재는 그대로) — 아니면 종전 그대로(요청·기다림 0).
+       · 안 쓴 기기(onfOutUsed 없음·14일 넘음 = cold · ③-3 2026-10-29)도 묻는다 — 첫 그림 시한만 HOME_PAINT_MS_COLD 5000.
+       · 기록은 위 「물러남 기억 한 곳」(fallBack 'home') — 시한(hello 없음 'hello' · outBoot 뒤 그리기 'paint')은 slow(연속 1번째 0 · 쓴 기기든 cold 든 · 종전 coldMissKill 을 대신한다) ·
+         그리기 전 outFail = 'fail-<why>'(mismatch 만 skip — 비용은 /home/get 한 번 · 그 밖 hard) · 그린 뒤 outFail = 'late-<why>'(notice = 끝난 학생 안내 · stale = 다리가 안 와 낡은 교재 — 데이터 상태라 skip · 그 밖 hard).
+       · 답(d)이 와야 hello 에 outBoot{src, tok, d} · 답 없음 = 정적 손잡이를 **먼저** 걷고(end) 지금 길 — 'nodata' skip(정적 시계가 두 번째 물러남을 못 한다).
        · 로고 막 ok 와 onfOutUsed 는 homeDrawn 에(첫 hello 가 아니다) · 물러나면 죽은 정적 창(키보드·기록 다리·판을 연 홈)을 비운다 — 지금 길 노크가 다시 정한다.
        ⚠️ flushWorth 는 안 막는다 — 정적 홈은 교재 대기열을 안 든다(그래서 mainOut 을 안 쓴다). */
-    var OUT_FAIL_HOME = 'onfOutFailHome', homeGone = false;   // homeGone = 정적 홈이 물러났다(위 홈 자물쇠가 그 창·그 출처 말을 버린다)
-    function homeQ() {
-      if (!opts.home || !opts.out || !opts.tok) return false;
-      try { return !(Date.now() - Number(global.localStorage.getItem(OUT_FAIL_HOME) || 0) < OUT_FAIL_MS); } catch (e) { return false; }
-    }
-    /* 안 쓴 기기의 시한 실패(hello 없음·그리기 시한)는 첫 번째만 그날 기록을 면제 — 같은 날(OUT_FAIL_MS) 2번째면 기록(그날 하루 지금 길 · Ruling 6: 정적이 늘 못 뜨는 기기가 열 때마다 5초 기다리는 일을 막는다).
-       셈 = onfOutColdMiss 한 칸(첫 실패 시각) · 정적 홈이 한 번 그리면(homeDrawn) 지운다 · mismatch 는 셈에도 안 넣는다. */
-    var OUT_COLD_MISS = 'onfOutColdMiss';
-    function coldMissKill() {
-      try {
-        var ls = global.localStorage, n = Date.now(), t = Number(ls.getItem(OUT_COLD_MISS) || 0);
-        if (n - t < OUT_FAIL_MS && t <= n) return true;   // 같은 날 2번째
-        ls.setItem(OUT_COLD_MISS, String(n)); return false;
-      } catch (e) { return false; }
-    }
+    var homeGone = false;   // homeGone = 정적 홈이 물러났다(위 홈 자물쇠가 그 창·그 출처 말을 버린다)
+    function homeQ() { return !!(opts.home && opts.out && opts.tok) && !fallBlocked('home'); }
     function homeCold() { try { return !(Date.now() - Number(global.localStorage.getItem(OUT_USED) || 0) < OUT_USED_MS); } catch (e) { return true; } }   // 14일 안에 정적 판을 쓰지 않은 기기
     function mainHome() {
       var org = OUT_HOME_ORG, d = null, dAt = 0, drawn = false, done = false, pend = null, tm, cold = homeCold(), paintMs = cold ? HOME_PAINT_MS_COLD : HOME_PAINT_MS;
       function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
-      function back(kill) {
+      function back(why) {
         if (done) return;
         end(); homeGone = true;
         console.info('[onf] 정적 홈이 안 떴다 — 지금 길로 다시');
-        if (kill) { try { global.localStorage.setItem(OUT_FAIL_HOME, String(Date.now())); } catch (e) {} }
+        fallBack('home', why);   // 🔁 위 물러남 기억(까닭별)
         appWin = null; histWin = null; histOrigin = ''; bookHome = null; bookHomeOrigin = '';
         mainExec(true);   // 정적 홈 이동이 아직 안 섰을 수 있다 — 「이동 중」으로 열어 load 가 올 때까지 정적 홈 말·옛 문서 말을 노크로 안 받는다(정적 홈이 커밋되면 자식 0 → 다시 연다)
       }
@@ -1182,27 +1200,28 @@
       }
       function boot(w) {
         try { w.postMessage({ onf: 'outBoot', src: src, tok: opts.tok, d: aged() }, org); } catch (e) {}
-        if (!drawn) { clearTimeout(tm); tm = setTimeout(function () { back(cold ? coldMissKill() : true); }, paintMs); }
+        if (!drawn) { clearTimeout(tm); tm = setTimeout(function () { back('paint'); }, paintMs); }
       }
       function onMsg(ev) {
         if (done || !ev || !ev.data || ev.source !== frameEl.contentWindow || ev.origin !== org) return;   // 그 액자 창 · 정적 홈 출처만
         var k = ev.data.onf;
-        if (k === 'outFail') return back(!drawn ? ev.data.why !== 'mismatch' : (ev.data.why !== 'notice' && ev.data.why !== 'stale'));   // 그리기 전엔 무엇이든 그날 기록 — mismatch 만 면제(③-3 로더가 그리기 전에 대조 · 다음 열기에 다시) · 그린 뒤 mismatch(readCf 없는 학생의 boot 대조)는 종전대로 기록(사본이 굳은 학생이 열 때마다 깜빡이지 않게)
+        if (k === 'outFail') return back((drawn ? 'late-' : 'fail-') + ev.data.why);   // 그리기 전 mismatch 만 skip(③-3 로더가 그리기 전에 대조 · 다음 열기에 다시) · 그린 뒤 mismatch(readCf 없는 학생의 boot 대조)는 종전대로 hard(사본이 굳은 학생이 열 때마다 깜빡이지 않게) — 표는 위 FALL_SKIP
         if (k === 'outHello') { clearTimeout(tm); if (d) boot(ev.source); else pend = ev.source; return; }   // hello 마다(다시 읽힌 홈도 받게 · openApp 과 같다)
         if (k === 'homeDrawn' && d && !drawn) {
           drawn = true; clearTimeout(tm);
-          try { global.localStorage.setItem(OUT_USED, String(Date.now())); global.localStorage.removeItem(OUT_COLD_MISS); } catch (eU) {}
+          try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}
+          fallOk('home');   // 🔁 그렸다 = 연속 물러남 0
           try { if (opts.hooks && typeof opts.hooks.ok === 'function') opts.hooks.ok(); } catch (eH) {}
         }
       }
       global.addEventListener('message', onMsg);
       askHome(opts.tok).then(function (a) {
         if (done) return;
-        if (!a) return back(false);
+        if (!a) return back('nodata');
         d = a; dAt = Date.now();
         if (pend) boot(pend);
       });
-      tm = setTimeout(function () { back(cold ? coldMissKill() : true); }, OUT_MS);   // hello 없음 — 정적 홈이 안 실렸다(cold 는 그날 기록 없음)
+      tm = setTimeout(function () { back('hello'); }, OUT_MS);   // hello 없음 — 정적 홈이 안 실렸다(slow)
       try { if (frameEl.isConnected && frameEl.contentWindow) frameEl.contentWindow.location.replace(ONF_OUT_HOME_URL); else frameEl.src = ONF_OUT_HOME_URL; } catch (e) { frameEl.src = ONF_OUT_HOME_URL; }   // 📱 replace — openExec 끝 주석
     }
     var wq = whoQ(src);
@@ -1213,9 +1232,9 @@
       function onQ(ev) { if (mainOut && ev && ev.data && ev.data.onf === 'outQueue' && ev.source === frameEl.contentWindow && ev.origin === OUT_ORG) outPend(mk, ev.data.n); }   // 🧺 그 액자 창 · 정적 판 출처만
       try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}
       mainOut = true; flushStop(); global.addEventListener('message', onQ);
-      openApp(frameEl, ONF_OUT_BOOK, src, a.cf, function () {
+      openApp(frameEl, ONF_OUT_BOOK, src, a.cf, function (why) {
         console.info('[onf] 첫 판 정적 판이 안 떴다 — 지금 길로 다시');
-        try { global.localStorage.setItem(OUT_FAIL, String(Date.now())); } catch (e) {}
+        fallBack('book', why);   // 🔁 위 물러남 기억(까닭별)
         mainOut = false; global.removeEventListener('message', onQ);
         appWin = null; histWin = null; histOrigin = '';   // 죽은 정적 창을 가리키지 않게(판 물러남과 같게 · 지금 길 노크가 다시 정한다)
         mainExec();
@@ -1309,6 +1328,7 @@
     tokenFromPath: tokenFromPath,
     openExec: openExec,   // 🔐 선생님 껍데기 판도 쓴다(teacher/index.html bookMake)
     openApp: openApp, OUT_BOOK: ONF_OUT_BOOK,   // 🌤 선생님 껍데기 정적 판도 같은 손·같은 주소(밖으로 4-① 2026-10-28 · teacher/index.html bookMake)
+    fallBack: fallBack, fallBlocked: fallBlocked, fallOk: fallOk,   // 🔁 물러남 기억 한 곳(위 FALL_KEY) — 선생님 껍데기 정적 홈·정적 교재도 이 셋만
     WORKER: ONF_WHO.replace(/\/who$/, ''),   // 🏫 Worker 바탕 주소(밖으로 4-④-2c 2026-10-30 · 선생님 껍데기 /t/login) — 위 /who 상수에서(새로 적지 않는다)
     printTitle: printTitle,   // 📄 선생님 껍데기(teacher/index.html) 판도 같은 함수
     /* 검사용으로만 낸다 — 순수 판정 함수라 창 없이 잴 수 있다. 화면 코드에서 부르지 마라. */

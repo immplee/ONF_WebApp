@@ -244,30 +244,45 @@ t('B1 ?tout=1(기억) · 입장권 있음 · 홈 → 정적 판 먼저(주소에
   assert.deepStrictEqual(S.nav, [TURL]);
 });
 
-t('B2 그리기 전 outFail · hello 없음 · 그리기 시한 → 지금 길(같은 액자에 구글 홈) + 그날 기억 → 그날 다음 열기는 바로 지금 길 · ?tout=1 이 기억을 지운다', async () => {
+t('B2 그리기 전 outFail · hello 없음 · 그리기 시한 → 지금 길(같은 액자에 구글 홈) + 물러남 기억(까닭별) — outFail(copy · hard) = 하루 · 시한(slow) = 이번만 → 연달아 2번째 = 10분 · ?tout=1 이 기억을 지운다', async () => {
   const cell = tchCell(20);
   const cases = [
-    (R) => { R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'outFail', why: 'copy' }); },
-    (R) => { R.advance(60000); },
-    (R) => { R.fromApp({ onf: 'outHello' }); R.advance(60000); }
+    ['copy', (R) => { R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'outFail', why: 'copy' }); }],
+    ['hello', (R) => { R.advance(60000); }],
+    ['paint', (R) => { R.fromApp({ onf: 'outHello' }); R.advance(60000); }],
+    ['time', (R) => { R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'outFail', why: 'time' }); }]
   ];
-  for (const go of cases) {
+  for (const [why, go] of cases) {
+    const slow = why !== 'copy';
     const store = { onf_tch: cell, onf_tout: '1' };
     const R = boot(store);
     login(R, gtok());
     go(R);
     assert.strictEqual(R.nav[0], TURL);
-    assert.ok(R.nav.slice(1).some((u) => /AKfycb/.test(u)) || /AKfycb/.test(String(R.els.app.src || '')), '⛔ 물러나 지금 길로 안 갔다: ' + JSON.stringify(R.nav));
-    assert.ok(Number(store.onfTOutFail) > 0, '⛔ 그날 기억을 안 적었다');
+    assert.ok(R.nav.slice(1).some((u) => /AKfycb/.test(u)) || /AKfycb/.test(String(R.els.app.src || '')), '⛔ ' + why + ' — 물러나 지금 길로 안 갔다: ' + JSON.stringify(R.nav));
+    const [at, n] = String(store.onfTOutFail).split(',').map(Number);
+    assert.strictEqual(n, 1, '⛔ ' + why + ' — 연속 1 이 아니다');
+    assert.ok(slow ? at === 0 : at - Date.now() > 86400000 - 60000, '⛔ ' + why + ' — ' + (slow ? '시한(slow)인데 막았다' : 'hard 인데 하루를 안 막았다') + ': ' + store.onfTOutFail);
     //   물러난 뒤 옛 정적 문서의 노크는 버린다 · 구글 노크엔 구글 토큰
     R.sent.length = 0;
     R.fromApp({ onf: 'auth-please', stale: false });
     assert.strictEqual(R.sent.length, 0, '⛔ 물러난 정적 판에 답했다');
     const N = boot(store); login(N);
-    assert.ok(!N.staticOpen() && N.execOpen(), '⛔ 그날 물러난 기기가 또 정적 판을 열었다');
+    if (!slow) { assert.ok(!N.staticOpen() && N.execOpen(), '⛔ hard 로 물러난 기기가 또 정적 판을 열었다'); }
+    else {
+      assert.ok(N.staticOpen(), '⛔ ' + why + ' — 시한 한 번에 다음 열기까지 지금 길로 묶었다');
+      N.advance(60000);   // 연달아 2번째 시한(hello)
+      assert.ok(Number(String(store.onfTOutFail).split(',')[0]) - Date.now() > 600000 - 60000 && /,2$/.test(store.onfTOutFail), '⛔ ' + why + ' — 연달아 2번째가 10분이 아니다: ' + store.onfTOutFail);
+      const M = boot(store); login(M);
+      assert.ok(!M.staticOpen() && M.execOpen(), '⛔ ' + why + ' — 10분 막힘 동안 또 정적 판');
+    }
     const Y = boot(store, { search: '?tout=1' }); login(Y);
-    assert.ok(Y.staticOpen(), '⛔ ?tout=1 이 그날 기억을 안 지웠다');
+    assert.ok(Y.staticOpen(), '⛔ ?tout=1 이 물러남 기억을 안 지웠다');
   }
+  //   그리면(homeDrawn) 연속 0
+  const st = { onf_tch: cell, onf_tout: '1', onfTOutFail: '0,3' }, D = boot(st); login(D, gtok());
+  D.fromApp({ onf: 'outHello' }); D.fromApp({ onf: 'homeDrawn' });
+  assert.ok(!('onfTOutFail' in st), '⛔ 그렸는데 연속 물러남이 남았다');
 });
 
 t('B3 물러난 지금 길도 종전처럼 돈다 — 구글 노크에 구글 토큰 · load 뒤 노크 없으면 8초 안내', async () => {
@@ -447,8 +462,8 @@ function head(store, opt) {
 }
 const eligible = (o) => Object.assign({ onf_tout: '1', onf_tch: tchCell(20) }, o);
 const PRE_CASES = [[eligible({}), {}], [{ onf_tch: tchCell(20) }, { search: '?tout=1' }], [eligible({}), { search: '?tout=0' }], [{ onf_tch: tchCell(20) }, {}],
-  [eligible({ onf_tch: tchCell(-1) }), {}], [eligible({ onf_tch: '{bad' }), {}], [{ onf_tout: '1' }, {}], [eligible({ onfTOutFail: String(Date.now()) }), {}],
-  [eligible({ onfTOutFail: String(Date.now()) }), { search: '?tout=1' }], [eligible({ onfTOutFail: String(Date.now() - 2 * 86400000) }), {}], [eligible({ onf_devkey_off: String(Date.now()) }), {}],
+  [eligible({ onf_tch: tchCell(-1) }), {}], [eligible({ onf_tch: '{bad' }), {}], [{ onf_tout: '1' }, {}], [eligible({ onfTOutFail: (Date.now() + 3600000) + ',3' }), {}],
+  [eligible({ onfTOutFail: (Date.now() + 3600000) + ',3' }), { search: '?tout=1' }], [eligible({ onfTOutFail: String(Date.now() - 2 * 86400000) }), {}], [eligible({ onfTOutFail: '0,1' }), {}], [eligible({ onfTOutFail: (Date.now() - 1) + ',2' }), {}], [eligible({ onf_devkey_off: String(Date.now()) }), {}],
   [eligible({}), { search: '?mode=student&t=Tok_1' }], [eligible({}), { search: '?mode=hwbook&t=Tok_1' }], [eligible({}), { nav: { standalone: true } }],
   [eligible({}), { nav: MACSAFARI }], [eligible({}), { nav: IPHONE }], [eligible({}), { nav: IPAD }],
   //   📱 tout=2(WebKit·홈 화면 앱도) — 기억값 · 주소 · 그날 물러남 · 열쇠 꺼짐 기기도 · mode 는 여전히 안 함
@@ -532,7 +547,7 @@ t('W3 tout=2 WebKit 판이 outFail(anon — 익명 다리 꺼진 빌드) → 지
   const R = boot(store, { nav }); login(R);
   R.fromApp({ onf: 'outFail', why: 'anon' });
   assert.ok(R.nav[0] === TURL && /AKfycb/.test(R.nav[R.nav.length - 1]), '⛔ 익명 다리 꺼짐에 지금 길로 안 갔다: ' + JSON.stringify(R.nav));
-  assert.ok(Number(store.onfTOutFail) > 0 && beacons.indexOf('reopen:tout-fail-anon') >= 0);
+  assert.ok(Number(String(store.onfTOutFail).split(',')[0]) > Date.now() + 3600000 && beacons.indexOf('reopen:tout-fail-anon') >= 0 && beacons.indexOf('fallback:thome:fail-anon:1') >= 0, '⛔ 익명 다리 꺼짐 물러남이 하루(hard) 기억·기록이 아니다: ' + store.onfTOutFail + ' ' + beacons);
   const N = boot(store, { nav: IPAD }); login(N);
   assert.ok(!N.staticOpen() && N.execOpen());
 });
@@ -617,7 +632,8 @@ t('G3 스스로 다시 연 자리 = clog 한 줄(reopen:<까닭> · 기기 꼴 �
   const T = boot({ onf_tch: tchCell(20), onf_tout: '1' }, { nav }); login(T); T.advance(3000);
   const U = boot({ onf_tch: tchCell(20), onf_tout: '1' }, { nav }); login(U); U.fromApp({ onf: 'outHello' }); U.fromApp({ onf: 'outFail', why: 'copy' });
   const V = boot({ onf_tch: tchCell(20), onf_tout: '1' }, { nav }); login(V); V.fromApp({ onf: 'outFail', why: '<b>Bad' });
-  assert.deepStrictEqual(beacons.map((x) => x.b[0].c), ['reopen:tout-hello', 'reopen:tout-fail-copy', 'reopen:tout-fail-x']);
+  assert.deepStrictEqual(beacons.map((x) => x.b[0].c), ['reopen:tout-hello', 'fallback:thome:hello:1', 'reopen:tout-fail-copy', 'fallback:thome:fail-copy:1', 'reopen:tout-fail-x', 'fallback:thome:fail-x:1'], '⛔ 물러남 한 줄(fallback:<판>:<까닭>:<연속>)이 없거나 꼴이 다르다');
+  assert.ok(beacons.every((x) => x.u === WORKER + '/clog' && x.b.length === 1 && x.b[0].k === 'err' && x.b[0].d === 'mac' && Object.keys(x.b[0]).length === 3), '⛔ 물러남 기록에 값 칸이 붙었다');
   beacons.length = 0;
   const S = boot({ onf_id_tok: odk() }, { nav }); S.knockG(); S.fire({ onf: 'auth-please', stale: true }, S.lastSrc, KORIGIN);
   assert.deepStrictEqual(beacons.map((x) => x.b[0].c), ['reopen:stale-key']);
