@@ -837,23 +837,32 @@ function hwDivider() {
   d.addEventListener('pointerup', up); d.addEventListener('pointercancel', up);
   document.body.appendChild(d); hwDiv = d; return d;
 }
+/* 📖 교재 옆에 = 위 줄·펜 줄 공용 한 줄(Peter 2026-10-30 2차 「필기 도구 줄이 왼쪽 사진 위에 올라가 있어 이상해 · 녹음 창이 교재 쪽으로 못 가」) —
+   과제 판에 나눈 자리(hwbookCut w = 사진 칸 폭)를 알리면 판이 펜 줄을 화면 폭 한 줄로 펴고 그 띠 높이(hwBand h)를 답한다.
+   h 를 받으면(새 판만 답한다) 판 액자를 **화면 전체**로 펴고 띠 · 왼쪽 사진 칸 · 판이 알린 떠 있는 것(플레이어·창 · hwRecR)만 오려 보인다(누름도 그 자리만) ·
+   교재 칸은 띠 아래 오른쪽 · 경계 손잡이도 띠 아래. h 가 없으면(옛 판 · 아직 답 전) 종전 반반 배치. */
+var hwBand = 0, hwCutTold = -1;
+function hwCutTell(w) { if (w === hwCutTold || !hwWin) return; hwCutTold = w; try { hwWin.postMessage({ onf: 'hwbookCut', w: w }, hwOrigin); } catch (e) {} }
 function hwLay() {
   if (!hwBox) return;
-  var W = window.innerWidth || 0, cut = Math.round(W * hwSplit), side = hwView === 'side';
-  hwBox.style.right = side ? (W - cut) + 'px' : '0px';   // ⛔ 빈 값이면 inset:0 의 right 가 지워져 판 폭이 0 이 된다(사진만으로 돌아오면 「불러오는 중」만 보였다 · 2026-10-24 라이브)
+  var W = window.innerWidth || 0, H = window.innerHeight || 0, cut = Math.round(W * hwSplit), side = hwView === 'side', band = side && hwBand > 0 ? hwBand : 0;
+  hwCutTell(side ? cut : 0);
+  hwBox.style.right = side && !band ? (W - cut) + 'px' : '0px';   // ⛔ 빈 값이면 inset:0 의 right 가 지워져 판 폭이 0 이 된다(사진만으로 돌아오면 「불러오는 중」만 보였다 · 2026-10-24 라이브)
   var rec = hwView === 'book' && hwRecR && hwRecR.length;   // 🎧 교재만이어도 녹음 플레이어는 그 자리에(Peter 2026-10-28) — 과제 판을 플레이어 모양으로만 오려 교재 위에
   hwBox.style.visibility = hwView === 'book' && !rec ? 'hidden' : ''; hwBox.style.pointerEvents = hwView === 'book' && !rec ? 'none' : '';
-  hwBox.style.clipPath = rec ? hwRecPath(hwRecR) : ''; hwBox.style.zIndex = rec ? '52' : '50';   // ⛔ 빈 값이면 cssText 의 z-index:50 이 지워진다 · 오린 밖은 그리지도 누르지도 않는다(clip-path = 누름 판정도 자른다) · 교재 칸(50) 위
-  if (hwBk) { hwBk.box.style.display = hwView === 'photo' ? 'none' : ''; hwBk.box.style.left = side ? cut + 'px' : '0'; }
-  if (side) hwDivider().style.left = (cut - 7) + 'px';
+  var clip = band ? hwRecPath([[0, 0, W, band, 0], [0, band, cut, Math.max(1, H - band), 0]].concat(hwRecR || [])) : rec ? hwRecPath(hwRecR) : '';
+  hwBox.style.clipPath = clip; hwBox.style.zIndex = clip ? '52' : '50';   // ⛔ 빈 값이면 cssText 의 z-index:50 이 지워진다 · 오린 밖은 그리지도 누르지도 않는다(clip-path = 누름 판정도 자른다) · 교재 칸(50) 위
+  if (hwBk) { hwBk.box.style.display = hwView === 'photo' ? 'none' : ''; hwBk.box.style.left = side ? cut + 'px' : '0'; hwBk.box.style.top = band + 'px'; }
+  if (side) { var dv = hwDivider(); dv.style.left = (cut - 7) + 'px'; dv.style.top = band + 'px'; }
   else if (hwDiv) { if (hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null; }
 }
+function hwBandSet(h) { h = Math.round(+h || 0); hwBand = h >= 40 && h <= 400 ? h : 0; hwLay(); }
 window.addEventListener('resize', function () { if (hwBox && hwView !== 'photo') hwLay(); });
 /* 🎧 과제 판 녹음 플레이어 자리(판이 알림 · 판 화면 좌표 = 화면 좌표 — 과제 판 액자는 inset:0) — 교재만일 때 이 모양만 과제 판을 보인다.
-   [x, y, w, h, 둥근 귀] 묶음 몇 개(플레이어 · 접은 알약 · 속도 창 · 녹음 고르기) · 꼴이 틀리면 버린다 */
+   [x, y, w, h, 둥근 귀] 묶음 몇 개(플레이어 · 접은 알약 · 속도 창 · 녹음 고르기 · 옆에 위 한 줄이면 판의 떠 있는 창들도 — 열여섯까지) · 꼴이 틀리면 버린다 */
 var hwRecR = null;
 function hwRecSet(rs) {
-  var ok = Array.isArray(rs) && rs.length <= 4 ? rs.filter(function (q) { return Array.isArray(q) && q.length === 5 && q.every(function (n) { return typeof n === 'number' && isFinite(n) && n >= 0 && n <= 20000; }) && q[2] > 0 && q[3] > 0; }) : [];
+  var ok = Array.isArray(rs) && rs.length <= 16 ? rs.filter(function (q) { return Array.isArray(q) && q.length === 5 && q.every(function (n) { return typeof n === 'number' && isFinite(n) && n >= 0 && n <= 20000; }) && q[2] > 0 && q[3] > 0; }) : [];
   hwRecR = ok.length ? ok.map(function (q) { return q.map(function (n) { return Math.round(n); }); }) : null; hwLay();
 }
 function hwRecPath(rs) {
@@ -890,7 +899,7 @@ window.addEventListener('message', function (ev) {
 function hwClose() {
   if (hwBox && !hwWarmOn && appWin) { try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (e) {} }   // 홈이 카드 상태(완료 등)를 다시 받게
   if (hwBk) { if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} } if (hwBk.box.parentNode) hwBk.box.parentNode.removeChild(hwBk.box); hwBk = null; }   // 과제 판을 닫으면 그 교재 액자도 지운다
-  hwView = 'photo'; hwRecR = null; if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;
+  hwView = 'photo'; hwRecR = null; hwBand = 0; hwCutTold = -1; if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;
   if (hwBox && hwBox.parentNode) hwBox.parentNode.removeChild(hwBox);
   hwBox = null; hwFr = null; hwWin = null; hwOrigin = ''; hwGo = null; hwGave = ''; hwWant = false; hwT = ''; hwWarmOn = false; hwGoMsg = null; clearTimeout(hwWarmTm);
 }
@@ -909,7 +918,7 @@ window.addEventListener('popstate', function () {
 });
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
-  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwPen' && d.onf !== 'hwLeaveKeep' && d.onf !== 'hwRec')) return;
+  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwPen' && d.onf !== 'hwLeaveKeep' && d.onf !== 'hwRec' && d.onf !== 'hwBand')) return;
   if (hwFr && hwFrom(ev.source)) {   // 과제 판 액자에서 온 말
     try { if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return; } catch (e) { return; }
     if (hwWin && ev.source !== hwWin) return;   // 한 번 정하면 그 창만(노크 자물쇠와 같다)
@@ -933,6 +942,7 @@ window.addEventListener('message', function (ev) {
     if (d.onf === 'hwLeaveKeep') { var sk = history.state; hwAsking = false; if (hwBox && sk && sk.onfHw && !sk.lg) { try { history.pushState({ onfHw: 1, n: sk.n || 0, lg: 1 }, ''); } catch (e) {} } }   // ③ 「홈으로 나갈까요?」 취소 — 물음 칸 다시
     if (d.onf === 'hwbookView') hwViewSet(String(d.v || ''), d.href);
     if (d.onf === 'hwRec') hwRecSet(d.rs);   // 🎧 녹음 플레이어 자리(교재만에서도 보이게)
+    if (d.onf === 'hwBand') hwBandSet(d.h);   // 📖 옆에 = 위 줄·펜 줄 띠 높이(0 = 종전 배치)
     if (d.onf === 'hwPen') hwPenRelay(d);   // 📖 펜 줄 하나 — 과제 판 도구를 옆 교재로(⑬)   // 📖 교재 옆에 · 교재만 · 사진만(과제 첨삭 5단계)
     return;
   }
