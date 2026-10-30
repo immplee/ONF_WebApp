@@ -1387,7 +1387,7 @@ ta('W3 back() 은 액자를 「이동 중」으로 시작 — 아직 about:blank
 });
 
 /* ═══ 🔁 물러남 기억 한 곳(2026-10-30) — 「하루」 → 까닭별 · 학생·선생님·교재 모두 onf-frame.js fallBack/fallBlocked/fallOk 하나 ═══ */
-ta('FB1 까닭별 표 — slow(hello·paint·fail-time·fail-net) 연속 1 = 0 · 2 = 10분 · 3 = 1시간 · 4~ = 하루 · hard(그 밖) = 하루 · skip(fail-mismatch·late-notice·late-stale·nodata) = 그대로 · fallOk = 0 · 판마다 칸 따로', async () => {
+ta('FB1 까닭별 표 — slow(hello·paint·fail-time·fail-net) 연속 1 = 0 · 2 = 10분 · 3 = 1시간 · 4~ = 하루 · fail-api = 1시간 · hard(그 밖) = 하루 · skip(fail-mismatch·late-notice·late-stale·nodata) = 그대로 · fallOk = 0 · 판마다 칸 따로', async () => {
   const mk = (init) => {
     const ls = LSf(init), beacons = [], g = { T: 1.7e12, localStorage: ls, setTimeout, clearTimeout, URL, console: { info() {}, log() {}, warn() {} },
       navigator: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X)', sendBeacon: (u, b) => { beacons.push([u, JSON.parse(b)]); return true; } },
@@ -1403,11 +1403,14 @@ ta('FB1 까닭별 표 — slow(hello·paint·fail-time·fail-net) 연속 1 = 0 �
   }
   x.F.fallOk('book');
   assert.ok(!('onfOutFail' in x.ls.m) && !x.F.fallBlocked('book'), '⛔ 성공(fallOk)인데 연속이 남았다');
-  for (const why of ['fail-api', 'fail-boot', 'fail-bridge', 'fail-copy', 'fail-error', 'late-error', 'late-mismatch', 'off', 'notch', 'fail-x']) {
+  for (const why of ['fail-boot', 'fail-bridge', 'fail-copy', 'fail-error', 'late-error', 'late-mismatch', 'off', 'notch', 'fail-x']) {
     const y = mk();
     assert.strictEqual(y.F.fallBack('home', why), D, '⛔ ' + why + ' 는 hard(하루)');
     assert.strictEqual(y.ls.m.onfOutFailHome, String(1.7e12 + D) + ',1');
   }
+  const api = mk({ onfOutFail: '0,2' });   // 계약 어긋남(api)은 1시간(배포 사이 몇 분 · Peter 2026-10-30) · 연속은 +1
+  assert.strictEqual(api.F.fallBack('book', 'fail-api'), 3600000, '⛔ fail-api 는 1시간');
+  assert.strictEqual(api.ls.m.onfOutFail, String(1.7e12 + 3600000) + ',3');
   for (const why of ['fail-mismatch', 'late-notice', 'late-stale', 'nodata']) {
     const y = mk({ onfTOutFail: '0,2' });
     assert.strictEqual(y.F.fallBack('thome', why), -1, '⛔ ' + why + ' 는 skip');

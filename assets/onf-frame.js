@@ -268,11 +268,12 @@
      · 까닭(why): 'hello'(hello 시한) · 'paint'(그리기 시한) · 'fail-<판 why>'(그리기 전 outFail) · 'late-<판 why>'(그린 뒤 outFail) · 'nodata'(홈 사본 답 없음) · 'off'(서버 스위치 꺼짐) · 'notch'(입장권 없음)
        slow  = FALL_SLOW(시한 넘김·망 — 배포 뒤 첫 받기 5.2초 같은 것) → 연속 1번째 0(이번만) · 2번째 10분 · 3번째 1시간 · 4번째부터 하루(FALL_STEP)
        skip  = FALL_SKIP(데이터 상태·대조 어긋남 — 종전에도 그날 기록 없음) → 칸 그대로(연속도 그대로)
-       hard  = 그 밖(판이 스스로 못 그린다고 말함 · 계약 api · 스위치 off …) → 하루(종전 그대로) · 연속은 +1
+       api   = 'fail-api'(교재 다리 약속 번호 어긋남 — 대개 구글 배포와 Pages 배포 사이 몇 분 · Peter 2026-10-30) → 1시간(FALL_API) · 연속은 +1
+       hard  = 그 밖(판이 스스로 못 그린다고 말함 · 스위치 off …) → 하루(종전 그대로) · 연속은 +1
      · 물러날 때마다 clog 한 줄 {k:'err', c:'fallback:<판>:<까닭>:<연속 n>', d:기기 꼴} — 값(토큰·주소) 없음 · sendBeacon 만.
      ⚠️ 선생님 껍데기 머리 tPre 는 이 파일이 뜨기 전이라 칸 앞 숫자만 직접 읽는다(같은 꼴 · 검사 teacher-tout P1). 저장소가 막힌 창 = 막힘(열 때마다 시한을 안 낸다 · 종전 그대로). */
   var FALL_KEY = { book: 'onfOutFail', home: 'onfOutFailHome', thome: 'onfTOutFail' };
-  var FALL_STEP = [0, 600000, 3600000, 86400000], FALL_DAY = 86400000;
+  var FALL_STEP = [0, 600000, 3600000, 86400000], FALL_DAY = 86400000, FALL_API = 3600000;
   var FALL_SLOW = ['hello', 'paint', 'fail-time', 'fail-net'], FALL_SKIP = ['fail-mismatch', 'late-notice', 'late-stale', 'nodata'];
   function fallGet(k) { var v = String(global.localStorage.getItem(k) || '').split(','); return { at: Number(v[0]) || 0, n: Number(v[1]) || 0 }; }
   function fallBlocked(pan) { try { return Date.now() < fallGet(FALL_KEY[pan]).at; } catch (e) { return true; } }
@@ -283,7 +284,7 @@
     try { f = fallGet(k); } catch (e) {}
     if (FALL_SKIP.indexOf(why) < 0) {
       f.n += 1;
-      ms = FALL_SLOW.indexOf(why) >= 0 ? FALL_STEP[Math.min(f.n, FALL_STEP.length) - 1] : FALL_DAY;
+      ms = FALL_SLOW.indexOf(why) >= 0 ? FALL_STEP[Math.min(f.n, FALL_STEP.length) - 1] : why === 'fail-api' ? FALL_API : FALL_DAY;
       try { global.localStorage.setItem(k, (ms ? Date.now() + ms : 0) + ',' + f.n); } catch (e) {}   // 0 = 막지 않음(셈만)
     }
     try {
