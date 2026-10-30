@@ -258,6 +258,18 @@ function devkeyOff() {
 
 function say(msg) { document.getElementById('why').textContent = msg || ''; }
 
+/* 🔁 스스로 다시 연 자리 기록(2026-10-30 Peter 「몇 번 새로 고침하다 보면 갑자기 자동으로 새로 고침된다」) — 껍데기가 사람 손 없이 다시 읽거나(location.reload)
+   액자를 다시 열거나 다시 로그인하러 가는 자리마다 한 줄: Worker /clog [{k:'err', c:'reopen:<까닭>', d:기기 꼴}] — 라이브에서 어느 자리였는지 보인다.
+   ⛔ 값(토큰·주소·이름)은 안 싣는다 · sendBeacon 만(떠나는 순간에도 간다 · 못 보내면 그만 · 화면 일은 안 바꾼다). Worker 주소 = onf-frame.js 상수(ONF.frame.WORKER). */
+function reopenLog(why) {
+  try {
+    var w = window.ONF && ONF.frame && ONF.frame.WORKER, v = navigator, u = v.userAgent || '';
+    if (!w || !v.sendBeacon || !/^[a-z0-9-]{1,30}$/.test(why)) return;
+    var d = /iPad/.test(u) || (/Macintosh/.test(u) && v.maxTouchPoints > 1) ? 'ipad' : /iPhone|iPod/.test(u) ? 'ios' : /Macintosh/.test(u) ? 'mac' : /Windows/.test(u) ? 'win' : /Android/.test(u) ? 'and' : 'other';
+    v.sendBeacon(w + '/clog', JSON.stringify([{ k: 'err', c: 'reopen:' + why, d: d }]));
+  } catch (e) {}
+}
+
 /* 로그인 결과 — 여기서 받는 건 **구글이 서명한 ID 토큰** 하나뿐이다. */
 function onCredential(res) {
   var tok = res && res.credential;
@@ -362,6 +374,7 @@ function mount() {
     setTimeout(function () {
       if (appWin || appN() !== 0) return;
       console.info('[onf] 래퍼는 떴는데 앱 프레임이 없다(구글 오류?) — 한 번 더 연다');
+      reopenLog('noapp');
       var u = appSrc;
       try { frame.contentWindow.location.replace(u); } catch (e) { frame.src = u; }   // 같은 주소 · replace — 기록 칸을 안 쌓는다(onf-hist 의 go(-n) 전제)
       clearTimeout(frameWatch); frameWatch = setTimeout(watch, 30000);   // 다시 연 문서의 load 가 8초를 다시 센다(위 load 손)
@@ -395,6 +408,7 @@ function mount() {
       try { localStorage.setItem(again ? DK_OFF : DK_TRY, String(Date.now())); if (again) localStorage.removeItem(DK_TRY); } catch (e) {}
       console.warn(again ? '[onf] 기기 열쇠로 열다 두 번 잇달아 안쪽이 안 왔다 — 이 기기에선 7일 동안 열쇠를 안 쓴다(구글 창구로 다시 연다).'
         : '[onf] 기기 열쇠로 열다 안쪽이 안 왔다(한 번) — 구글 창구로 다시 연다 · 다음 열쇠 열기도 막히면 7일 끈다.');
+      reopenLog(again ? 'key-noknock2' : 'key-noknock');
       location.reload();
       return;
     }
@@ -448,9 +462,10 @@ function tOutQ() {
 function tOutOpen(fallback, LD) {
   var url = tOutUrl(), me = { org: new URL(url).origin, gone: false, drawn: false }, tm = 0;
   tOut = me;
-  function back() {
+  function back(why) {
     if (me.gone || me.drawn) return;
     me.gone = true; clearTimeout(tm); window.removeEventListener('message', onMsg);
+    if (typeof reopenLog === 'function') reopenLog('tout-' + why);
     try { localStorage.setItem(TOUT_FAIL, String(Date.now())); } catch (e) {}
     console.info('[onf] 정적 선생님 홈이 안 떴다 — 지금 길로 다시');
     if (appTch) { appWin = null; appOrigin = ''; appTch = false; }
@@ -459,9 +474,9 @@ function tOutOpen(fallback, LD) {
   function onMsg(ev) {
     var d = ev && ev.data, c;
     if (me.gone || !d || ev.source !== frame.contentWindow || ev.origin !== me.org) return;
-    if (d.onf === 'outFail') return back();
+    if (d.onf === 'outFail') return back('fail-' + (/^[a-z]{1,10}$/.test(d.why) ? d.why : 'x'));
     if (d.onf === 'outHello') {
-      if (!(c = tchGet())) return back();
+      if (!(c = tchGet())) return back('notch');
       /* 🏫 머리에서 미리 받은 사본(위 tPre)이 있으면 그 답을 기다려 outBoot{d} 로 싣는다(판은 묻지 않는다) · 없음·못 받음 = 종전 outBoot{tk}(판이 묻는다).
          t0 = 이 껍데기 탐색 시작(판 perf home 표본이 껍데기부터 잰다 · 숫자만). 기다리는 동안 물러났으면(back) 안 보낸다. */
       var src = ev.source, tk = c.tk, p = tPreTake(tk);
@@ -473,13 +488,13 @@ function tOutOpen(fallback, LD) {
         try { src.postMessage(m, me.org); } catch (e) {}
       };
       if (p) p.then(send); else send(null);
-      if (!me.drawn) { clearTimeout(tm); tm = setTimeout(back, TOUT_PAINT_MS); }
+      if (!me.drawn) { clearTimeout(tm); tm = setTimeout(function () { back('paint'); }, TOUT_PAINT_MS); }
       return;
     }
     if (d.onf === 'homeDrawn' && !me.drawn) { me.drawn = true; clearTimeout(tm); if (LD) LD.ok(); }
   }
   window.addEventListener('message', onMsg);
-  tm = setTimeout(back, TOUT_HELLO_MS);
+  tm = setTimeout(function () { back('hello'); }, TOUT_HELLO_MS);
   try { frame.contentWindow.location.replace(url); } catch (e) { frame.src = url; }   // 📱 replace — 지금 길과 같은 까닭(WebKit 기록 칸)
 }
 
@@ -556,6 +571,7 @@ window.addEventListener('message', function (ev) {
     /* 🔑 [2026-10-12] 지금 준 것이 **기기 열쇠**(odk1.)면 서버가 그 열쇠를 거절한 것이다(위조·끊김·만료) — `other` 가 없어도
        칸에서 지우고 pending 도 비운다. ⛔ 안 지우면 새로고침마다 같은 죽은 열쇠를 꺼내(tokLoad 는 exp·hd 만 본다 — 서명은 못 본다) 빙빙 돈다.
        자동 선택은 끄지 않는다 — 계정은 맞으니 구글이 조용히 새 토큰을 주게 둔다. 구글 토큰의 stale 은 종전 그대로(칸을 안 건드린다). */
+    if (typeof reopenLog === 'function') reopenLog(appTch ? 'stale-tch' : String(pending).indexOf('odk1.') === 0 ? 'stale-key' : 'stale');   // 🔁 다시 로그인하러 간다(위 reopenLog)
     if (appTch) tchDrop();   // 🏫 정적 화면이 입장권을 거절당했다 — 칸을 비우고 아래 구글에서 새로(onCredential → tchLogin → answer) · 구글 토큰·열쇠 칸은 그대로
     else if (String(pending).indexOf('odk1.') === 0) {
       pending = '';
@@ -595,6 +611,27 @@ window.addEventListener('message', function (ev) {
   pending = k;
 });
 /* onf-devkey:end */
+
+/* ═══ 🏫 구글이 지은 선생님 입장권 받아 두기(2026-10-30 · Peter 크롬 실측 「기기 열쇠로 다니는 선생님은 영영 정적 먼저를 못 탄다」) ═══
+   입장권(onf_tch)은 구글 로그인(onCredential → tchLogin → Worker /t/login)에서만 생겼다 — 기기 열쇠(odk1.)로 다시 여는 선생님은 그 로그인을 안 거친다.
+   이제 구글 선생님 홈(doGet · 서버 _onfTchMint)이 Worker 와 같은 꼴·같은 비밀로 지어 안쪽이 { onf:'tch', tk } 로 준다 → tchLogin 과 같은 규칙으로 칸에.
+   ⛔ 받는 말 = 우리가 정한 그 안쪽 구글 창·출처뿐(appWin·appOrigin · 기기 열쇠와 같은 자물쇠 · fromOurFrame 을 지나 정해진 창) · 정적 판 창(appTch)은 아니다.
+   ⛔ 다른 계정이면 버린다(입장권 e ≠ 지금 쓰는 구글 토큰·기기 열쇠의 email · 없으면 버림) · 같은 계정 것이 7일 넘게 남았으면 안 바꾼다 · 열쇠 못 쓰는 기기(devkeyOff)는 메모리만.
+   ⚠️ 만료는 입장권 본문 x 에서(따로 온 값을 안 믿는다) · 진짜 검사(서명·끊기)는 Worker·구글 — 여기 꼴 검사는 죽은 값 받아 두기 막이. */
+/* onf-tchgas:begin */
+window.addEventListener('message', function (ev) {
+  var d = ev && ev.data, now = Math.floor(Date.now() / 1000), me, b, v;
+  if (!d || d.onf !== 'tch') return;
+  if (!appWin || appTch || ev.source !== appWin || ev.origin !== appOrigin) return;   // 우리가 정한 그 구글 창·출처만
+  if (typeof d.tk !== 'string' || !TCH_RE.test(d.tk)) return;
+  me = String(jwtBody(pending).email || '').toLowerCase(); b = jwtBody(d.tk);
+  if (!me || String(b.e || '').toLowerCase() !== me || !(Number(b.x) > now)) return;
+  v = tchGet();
+  if (v && String(jwtBody(v.tk).e || '').toLowerCase() === me && v.x - now > TCH_RENEW) return;   // 같은 계정 것이 아직 넉넉하다(tchLogin 의 7일 규칙)
+  var c = { tk: d.tk, x: Number(b.x) };
+  if (devkeyOff()) tchMem = c; else { try { localStorage.setItem(TCHKEY, JSON.stringify(c)); } catch (e) {} }
+});
+/* onf-tchgas:end */
 
 /* ═══ 📝 과제 판(과제 첨삭 수업 2단계 · 2026-10-23) — 선생님 홈 「사진 모아 보기」 가 묶음을 지은 뒤 「과제 판 열어 줘」 · 과제 판 ‹ = 「홈으로」 ═══
    ⛔ 받는 말은 우리가 정한 그 안쪽 창·출처(appWin·appOrigin)에서 온 것뿐(기기 열쇠와 같은 자물쇠) · 값은 모양만(t = 학생 토큰 · l = 노션 행 id) — 진짜 문은 서버 RPC.
@@ -1423,7 +1460,7 @@ window.addEventListener('message', function (ev) {
       if (!rsBooted) { bookHome = ev.source; bookHomeOrigin = ev.origin; rsBoot(); }   // 🔄 새로고침 전에 열려 있던 판(위 rsBoot) — 홈이 뜬 뒤 한 번
       return;
     }
-    if (d.onf === 'reload') { var rp = bookShown(); if (rp) rsSave(rp); location.reload(); return; }
+    if (d.onf === 'reload') { var rp = bookShown(); if (rp) rsSave(rp); reopenLog('pull'); location.reload(); return; }
     if (d.onf === 'homeTab') { if (/^[a-z]{1,8}$/.test(String(d.v))) { try { sessionStorage.setItem(TAB_KEY, d.v); } catch (eS) {} } return; }   // 🔄 홈이 고른 탭 — 이 탭에 적는다   // 🔄 홈의 당겨서 새로고침(Ownify ONF_Shell_Js)
     if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left, d.m, d.r, true, d.cf, d.out === 1); var hq = bookShown(); if (hq) hq.back = null; return; }   // 홈에서 연 판은 앞 판 기억 없음(종전 · 4.4) · 📖 판이 있으면 갈아 끼움
     if (d.onf === 'bookWarm' && d.panel === 1 && typeof d.href === 'string') { bookPre(d.href, d.left, d.m, d.r, d.out === 1); return; }   // 지금·곧 할 수업 교재를 숨긴 판으로 미리(10-13)
@@ -1454,7 +1491,7 @@ window.addEventListener('message', function (ev) {
   if (p.parked) return;                                        // ⛔ 숨긴 판은 닫기·전체·갈아 끼우기를 못 부른다
   if (d.onf === 'printTitle') { if (window.ONF && ONF.frame && ONF.frame.printTitle) ONF.frame.printTitle(d.t); return; }   // 📄 PDF 저장 이름 — 판 안 교재가 인쇄하는 동안만 탭 제목(assets/onf-frame.js printTitle · 쌍둥이)
   if (d.onf === 'bookState') { if (histSmall(d.st)) { try { p.st = JSON.parse(JSON.stringify(d.st)); } catch (e) { return; } rsSave(p); } return; }   // 🔄 보이는 판의 지금 상태
-  if (d.onf === 'reload') { rsSave(p); location.reload(); return; }   // 🔄 교재의 당겨서 새로고침
+  if (d.onf === 'reload') { rsSave(p); reopenLog('pullbook'); location.reload(); return; }   // 🔄 교재의 당겨서 새로고침
   if (d.onf === 'bookLeaveKeep') { histGuard(p); try { p.win.postMessage({ onf: 'bookLeaveKept' }, p.origin); } catch (e) {} return; }   // 📱 「나갈까요?」 취소 — 물음 칸 다시(되묻기가 떠 있는 채)
   if (d.onf === 'bookClose') bookClose(d.all === 1);   // all:1 = 교재 머리줄 「홈」 — 앞 판 없이 전부 닫기
   else if (d.onf === 'bookFull') p.box.classList.toggle('full', !!d.on);
