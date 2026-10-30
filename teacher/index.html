@@ -30,7 +30,7 @@ var tPre = (function () {
   try {
     var q = new URLSearchParams(location.search), sw = q.get('tout'), nv = navigator, ua = nv.userAgent || '', ls = localStorage, day = 86400000;
     if (window.top !== window.self || q.get('mode') || sw === '0' || (sw !== '1' && ls.getItem('onf_tout') !== '1')) return null;
-    if (sw !== '1' && Date.now() - Number(ls.getItem('onfTOutFail') || 0) < day) return null;                                                    // 그날 물러남(tout=1 은 지운다)
+    if (sw !== '1' && Date.now() < Number(String(ls.getItem('onfTOutFail') || '').split(',')[0])) return null;                                   // 물러남 기억(onf-frame.js fallBlocked 'thome' 과 같은 꼴 '<그때까지>,<연속>' · tout=1 은 지운다)
     if (/iPhone|iPad|iPod/.test(ua) || (/Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg/.test(ua)) || (nv.platform === 'MacIntel' && nv.maxTouchPoints > 1)) return null;   // = webkitOnly
     if (nv.standalone === true || matchMedia('(display-mode: standalone)').matches) return null;                                                // = homeApp
     if (Date.now() - Number(ls.getItem('onf_devkey_off') || 0) < 7 * day) return null;                                                         // = devkeyOff(입장권이 메모리뿐 — tchGet 이 빈다)
@@ -438,10 +438,10 @@ var frameWatch = null;
 
 /* ═══ 🏫 정적 먼저 — 선생님 홈을 구글 밖 정적 판(Pages /teacher/ · Worker 사본)으로 먼저 연다(밖으로 4-④-2c · 2026-10-30) ═══
    ⚠️ 쌍둥이: 학생 껍데기 assets/onf-frame.js mainHome(정본 주석) — 선생님은 /home/get 을 껍데기가 안 묻는다(판이 입장권으로 /t/home/get).
-   묻는 때만(tOutQ): 기기 스위치(위 TOUT · 기본 꺼짐) · 홈(mode 없음 — 학생 한 명 창·과제 판은 지금 길) · 입장권 있음(tchGet) · 그날 물러남 없음(onfTOutFail 하루) ·
+   묻는 때만(tOutQ): 기기 스위치(위 TOUT · 기본 꺼짐) · 홈(mode 없음 — 학생 한 명 창·과제 판은 지금 길) · 입장권 있음(tchGet) · 물러남 기억에 안 막힘(onfTOutFail · onf-frame.js fallBlocked 'thome' — 까닭별) ·
      WebKit 아님(webkitOnly — 사파리·아이폰 크롬·아이패드 · 2026-10-30 판정) · 홈 화면 앱(standalone) 아님 — 판의 다리(exec?mode=bridge)가 아직 구글 쿠키를 요구한다(Peter 결정 대기 · 입장권 받기는 그 앱도 한다) · onf-frame.js 가 정적 판 주소를 낸다.
    판 말(그 액자 창 · 그 판 출처만): outHello → outBoot{tk}(hello 마다 — 다시 읽힌 판도 · ⛔ 주소엔 안 싣는다) · homeDrawn = 이 기기 정적 홈(그 뒤 outFail·시한 무시 · 로고 막 ok) ·
-     그리기 전 outFail·hello 없음(TOUT_HELLO_MS)·outBoot 뒤 그리기 시한(TOUT_PAINT_MS) = 같은 액자에 지금 길(openHome) + 그날 기억 · 물러나면 죽은 정적 창을 노크 칸에서 비운다.
+     그리기 전 outFail·hello 없음(TOUT_HELLO_MS)·outBoot 뒤 그리기 시한(TOUT_PAINT_MS) = 같은 액자에 지금 길(openHome) + 물러남 기억(ONF.frame.fallBack 'thome' — hello·paint·fail-time·fail-net 은 slow, 그 밖 hard) · homeDrawn = 연속 0 · 물러나면 죽은 정적 창을 노크 칸에서 비운다.
    그린 뒤 화면 노크(auth-please)는 위 onf-knock 이 받는다 — 정적 판 창(직접 자식 · 그 출처)이면 답이 구글 토큰이 아니라 입장권(answer · appTch).
    ponytail: 시한 둘은 짐작(판 boot 4초 · /t/home/get 4초에 맞춤)·첫 실패 면제(학생 cold) 없음 — 라이브 재기로 고친다. */
 var tOut = null, TOUT_HELLO_MS = 3000, TOUT_PAINT_MS = 8000;
@@ -456,7 +456,7 @@ function tOutUrl() { try { return new URL('/teacher/', ONF.frame.OUT_BOOK).href;
 function tOutQ() {
   try {   // ⛔ 무엇이 던져도 지금 길(mount 안에서 불린다 — 여기서 던지면 로그인이 멈춘다)
     if (!TOUT || new URLSearchParams(location.search).get('mode') || homeApp() || webkitOnly() || !tchGet() || !(window.ONF && ONF.frame && ONF.frame.OUT_BOOK) || !bookAppOrigin(new URL(tOutUrl()).origin)) return false;
-    return !(Date.now() - Number(localStorage.getItem(TOUT_FAIL) || 0) < 86400000);
+    return !ONF.frame.fallBlocked('thome');
   } catch (e) { return false; }
 }
 function tOutOpen(fallback, LD) {
@@ -466,7 +466,7 @@ function tOutOpen(fallback, LD) {
     if (me.gone || me.drawn) return;
     me.gone = true; clearTimeout(tm); window.removeEventListener('message', onMsg);
     if (typeof reopenLog === 'function') reopenLog('tout-' + why);
-    try { localStorage.setItem(TOUT_FAIL, String(Date.now())); } catch (e) {}
+    ONF.frame.fallBack('thome', why);   // 🔁 물러남 기억 한 곳(onf-frame.js · 까닭별 · clog fallback:thome:<까닭>:<연속>)
     console.info('[onf] 정적 선생님 홈이 안 떴다 — 지금 길로 다시');
     if (appTch) { appWin = null; appOrigin = ''; appTch = false; }
     fallback();
@@ -491,7 +491,7 @@ function tOutOpen(fallback, LD) {
       if (!me.drawn) { clearTimeout(tm); tm = setTimeout(function () { back('paint'); }, TOUT_PAINT_MS); }
       return;
     }
-    if (d.onf === 'homeDrawn' && !me.drawn) { me.drawn = true; clearTimeout(tm); if (LD) LD.ok(); }
+    if (d.onf === 'homeDrawn' && !me.drawn) { me.drawn = true; clearTimeout(tm); ONF.frame.fallOk('thome'); if (LD) LD.ok(); }
   }
   window.addEventListener('message', onMsg);
   tm = setTimeout(function () { back('hello'); }, TOUT_HELLO_MS);
@@ -1120,12 +1120,12 @@ function bookPx(p, name, v) {
   return ok ? v : null;
 }
 /* 🌤 밖으로 4-①(2026-10-28) — 홈이 out:1 로 연 교재만 정적 판(ONF.frame.openApp · 학생 껍데기와 같은 손) · ⭐ 내 문장·🗂️ 카드 덱은 지금 길 ·
-   그날 이 기기에서 안 떴으면 지금 길(onfOutFail — 학생 껍데기와 같은 출처 저장소라 같이 쓴다) · onf-frame.js 가 openApp 을 모르면(옛 사본) 지금 길.
+   물러남 기억에 막혔으면 지금 길(onfOutFail · onf-frame.js fallBlocked 'book' — 학생 껍데기와 같은 출처 저장소·같은 함수) · onf-frame.js 가 openApp 을 모르면(옛 사본) 지금 길.
    outSame = 판 p 가 이 열기와 같은 길인가 — 길이 다른 판엔 갈아 끼우기·미리 받기를 안 보낸다(Review Focus 2). 정적 판은 판(bookBoard)이 안 된다(그 판 다리는 첫 교재에 묶였다 · 학생 껍데기 bookBoardFor). */
-var OUT_FAIL = 'onfOutFail', OUT_FAIL_MS = 86400000, OUT_USED = 'onfOutUsed';
+var OUT_USED = 'onfOutUsed';
 function outOk(src) {
-  if (!BOOK_OUT || !(window.ONF && ONF.frame && ONF.frame.openApp && ONF.frame.OUT_BOOK) || bookMine(src) || /[?&]view=cards(&|$)/.test(src)) return false;
-  try { return !(Date.now() - Number(localStorage.getItem(OUT_FAIL) || 0) < OUT_FAIL_MS); } catch (e) { return false; }   // 저장소가 막힌 창 — 실패를 못 기억하니 열 때마다 2.5초를 안 낸다
+  if (!BOOK_OUT || !(window.ONF && ONF.frame && ONF.frame.openApp && ONF.frame.fallBlocked && ONF.frame.OUT_BOOK) || bookMine(src) || /[?&]view=cards(&|$)/.test(src)) return false;
+  return !ONF.frame.fallBlocked('book');   // 🔁 물러남 기억 한 곳(저장소가 막힌 창 = 막힘 — 열 때마다 2.5초를 안 낸다)
 }
 function outWant(src, out) { return !!out && outOk(src); }
 function outSame(p, src, out) { return !!p.out === outWant(src, out); }
@@ -1212,15 +1212,15 @@ function bookMake(src, parked, out, cf) {
     else p.el.src = u;
   }
   /* ⚠️ 쌍둥이: assets/onf-frame.js bookMake 정적 판 갈래 — 판 열쇠는 그대로 src(exec 주소) · 정적 판은 같은 주소(숨긴 판은 park=1 까지)를 outBoot 으로 받는다(t·ttok·tas 를 다리로 넘긴다 ·
-     tok 은 빈 글자 — 선생님 껍데기엔 학생 토큰이 따로 없고 정적 판 boot 는 tok 을 안 읽는다). 안 뜨면(OUT_MS 안 hello 없음 · outFail) 판 칸을 비우고 같은 판에 지금 길 · 그날 기록.
+     tok 은 빈 글자 — 선생님 껍데기엔 학생 토큰이 따로 없고 정적 판 boot 는 tok 을 안 읽는다). 안 뜨면(OUT_MS 안 hello 없음 · outFail) 판 칸을 비우고 같은 판에 지금 길 · 물러남 기억(까닭별).
      학생 쪽 ⭐ 내 문장 /mine/ 갈래(OUT_MINE_URL · 4-② 2026-10-29)는 여기 안 옮겼다 — ④ 에서 맞춤. */
   if (outWant(src, out)) {
     p.out = true;
     flushStop();   // 🧺 한 출처에 정적 판 둘 금지(위 넘겨주기) — 못 보낸 것은 기기에 남고 이 판이 보낸다
     try { localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}   // 🧺 이 기기 정적 판 저장소에 쓰기가 남을 수 있다(넘겨주기의 14일 표시 · 학생 껍데기와 같은 키)
-    p.oe = ONF.frame.openApp(p.el, ONF.frame.OUT_BOOK, u, bookCfOk(cf), function () {
+    p.oe = ONF.frame.openApp(p.el, ONF.frame.OUT_BOOK, u, bookCfOk(cf), function (why) {
       try { console.info('[onf] 정적 판이 안 떴다 — 지금 길로 다시'); } catch (eC) {}
-      try { localStorage.setItem(OUT_FAIL, String(Date.now())); } catch (e) {}
+      ONF.frame.fallBack('book', why);   // 🔁 물러남 기억 한 곳(까닭별)
       p.win = null; p.origin = ''; p.swap = false; p.hw = null; p.ho = ''; p.kb = null; p.ko = '';   // 정적 판을 가리키던 칸 — 새 판처럼(학생 검토 고침 3)
       p.real = p.src = p.load; p.key = bookKey(p.load);
       exec();

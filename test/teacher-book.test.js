@@ -1225,19 +1225,23 @@ t('O2 out 없음 → 종전 구글 판(openExec) · ⭐ 내 문장(mode=mine)+ou
   assert.ok(s.panel() && s.panel().kids[0].src === srcOf(s, E1), '⛔ openApp 이 없는데 지금 길로 안 열었다');
 });
 
-t('O3 hello 가 OUT_MS 안 없음 → 같은 판에 지금 길(openExec) · onfOutFail 적힘 · 그날 다음 out:1 은 지금 길(Review Focus 4)', () => {
+t('O3 hello 가 OUT_MS 안 없음 → 같은 판에 지금 길(openExec) · 시한(slow)은 이번만 · 연달아 2번째 = 10분 막힘 · 막힘 지나면 다시 정적 판(Review Focus 4 · 학생 쪽 같은 함수 onf-frame.js fallBack)', () => {
   const s = phoneRun({ wide: true, frame: true });
   s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
   const P = s.panel();
   assert.ok(isStatic(P), '전제: 정적 판');
   s.timers.filter((x) => x.on && x.ms === 2500).forEach((x) => { x.on = false; x.f(); });
   assert.ok(s.panels().length === 1 && s.panel() === P && P.kids[0].src === srcOf(s, E1), '⛔ 같은 판에 지금 길로 다시 안 열었다: ' + P.kids[0].src);
-  assert.ok(Number(s.g.localStorage.s.onfOutFail) > 0, '⛔ onfOutFail 을 안 적었다');
+  assert.strictEqual(s.g.localStorage.s.onfOutFail, '0,1', '⛔ 첫 시한 — 연속 1 · 막지 않음이 아니다');
   assert.strictEqual(s.g.books[0].out, false, '⛔ 물러난 판이 정적 판 표시를 든 채다');
   s.send({ onf: 'openBook', href: E2, out: 1 }, s.home);
-  assert.ok(!isStatic(s.panel()), '⛔ 그날 실패했는데 또 정적 판');
-  //   하루 지나면 다시 정적 판
-  s.g.localStorage.s.onfOutFail = String(Date.now() - 86400000 - 1000);
+  assert.ok(isStatic(s.panel()), '⛔ 시한 한 번에 다음 out:1 까지 지금 길로 묶었다');
+  s.timers.filter((x) => x.on && x.ms === 2500).forEach((x) => { x.on = false; x.f(); });
+  assert.ok(/,2$/.test(s.g.localStorage.s.onfOutFail) && Number(s.g.localStorage.s.onfOutFail.split(',')[0]) > Date.now() + 500000, '⛔ 연달아 2번째가 10분이 아니다: ' + s.g.localStorage.s.onfOutFail);
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
+  assert.ok(!isStatic(s.panel()), '⛔ 10분 막힘 동안 또 정적 판');
+  //   막힘이 지나면 다시 정적 판
+  s.g.localStorage.s.onfOutFail = String(Date.now() - 1000) + ',2';
   s.send({ onf: 'openBook', href: E3, out: 1 }, s.home);
   assert.ok(isStatic(s.panel()), '⛔ 하루 뒤에도 정적 판을 안 연다');
 });
@@ -1395,7 +1399,7 @@ t('P2 표시 있음 + 지금 길로 같은 교재 → 보이는 판 노크 뒤 �
 
 t('P3 표시 없음 · 14일 지난 onfOutUsed · 그날 onfOutFail · 다른 교재 표시만 · ⭐ 내 문장 · out:1 열기 → 숨긴 넘겨주기 판 0', () => {
   for (const [why, ls, href] of [['표시 없음', { onfOutUsed: String(Date.now()) }], ['14일 넘음', usedLs({ onfOutUsed: String(Date.now() - 14 * DAY - 1000) })],
-    ['onfOutUsed 없음', { [PKEY1]: '1' }], ['그날 실패', usedLs({ onfOutFail: String(Date.now() - 1000) })], ['다른 교재만', { onfOutUsed: String(Date.now()), [PKEY2]: '1' }],
+    ['onfOutUsed 없음', { [PKEY1]: '1' }], ['그날 실패', usedLs({ onfOutFail: String(Date.now() + 3600000) + ',3' })], ['다른 교재만', { onfOutUsed: String(Date.now()), [PKEY2]: '1' }],
     ['내 문장', usedLs(), MYS]]) {
     const s = flushRun(ls, href); fire(s, 15000); fire(s, 0);
     assert.strictEqual(flushes(s).length, 0, '⛔ ' + why + ' 인데 넘겨줄 판이 떴다');
@@ -1439,7 +1443,7 @@ t('O10 기기 스위치 — 주소 out=0 이면 이 기기는 늘 지금 길(ope
 });
 
 t('O11 주소 out=1 은 그날 물러남 기억(onfOutFail)을 지운다 — 다음 openBook{out:1} 은 정적 판', () => {
-  const ls = { onfOutFail: String(Date.now() - 1000), onfOutFailHome: String(Date.now() - 1000) };
+  const ls = { onfOutFail: String(Date.now() + 86400000) + ',1', onfOutFailHome: String(Date.now() + 86400000) + ',1' };
   let s = phoneRun({ wide: true, frame: true, ls: Object.assign({}, ls) });
   s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
   assert.ok(!isStatic(s.panel()), '전제: 그날 물러난 기기는 지금 길');

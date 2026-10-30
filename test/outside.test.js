@@ -1,6 +1,6 @@
 /* 🌤 밖으로 1(2026-10-24) — 홈이 out:1 로 연 교재만 구글 밖 정적 판(ONF_OUT_BOOK)에 띄우고 토큰·사본 힌트는 postMessage 로 넘긴다.
    안 뜨면(OUT_MS 안 outHello 없음 · outFail) 같은 판에 지금 길(exec) · 그날은 그 기기에서 지금 길(onfOutFail) · 기기 끄기 out=0(onfOut).
-   잰다: S5a 지금 길 무변 · S5b 정적 판 + outBoot 한 번 · S5c 물러남·하루 기억 · S5d 출처 도우미 하나 · S5e 기기 끄기 · S5f 첫 교재 기억 o:1 · S5g 내 문장·카드 덱은 지금 길
+   잰다: S5a 지금 길 무변 · S5b 정적 판 + outBoot 한 번 · S5c 물러남·까닭별 기억(FB1~3 공용 함수 onf-frame.js fallBack) · S5d 출처 도우미 하나 · S5e 기기 끄기 · S5f 첫 교재 기억 o:1 · S5g 내 문장·카드 덱은 지금 길
    밖으로 2 Task 4: S4a 링크 직행 + /who cf → 첫 판 정적 판 · S4b 늦음·실패 → 지금 길 · S4c 토큰은 몸통만 · S4d 홈은 안 물음 · S4e slug · S4f 안 묻는 때
    밖으로 3 Task 6: S6a 켠 학생 홈 /home/get + 정적 홈 · S6b 답 없음 → 지금 길 · S6c 토큰은 몸통만 · S6d 정적 홈 실패 → 지금 길 + onfOutFailHome · S6f 미리 받기 무변
    실행: node test/outside.test.js */
@@ -21,6 +21,8 @@ const CODE = fs.readFileSync(path.join(ROOT, 'assets', 'onf-frame.js'), 'utf8');
 const OUT_BOOK = (/var ONF_OUT_BOOK = '([^']+)'/.exec(CODE) || [])[1] || 'ONF_OUT_BOOK 없음';   // 상수 한 줄(시험 땐 Pages 주소로 바뀐다)
 const OUT_O = (() => { try { return new URL(OUT_BOOK).origin; } catch (e) { return 'x'; } })();
 const GO = 'https://n-abc-0lu-script.googleusercontent.com';
+const BLK = String(1.7e12 + 3600000) + ',3';   // 🔁 물러남 기억에 막힌 기기(한 시간 뒤까지 · 연속 3) — onf-frame.js fallBlocked 꼴 '<그때까지>,<연속>'
+const held = (m, k) => Number(String(m[k] || '').split(',')[0]) > 1.7e12 + 60000;   // 🔁 10분 넘게 막혔다(hard 하루·연속 2 이상) — 연속 1(slow 이번만)은 거짓
 const LSf = (init) => { const m = Object.assign({}, init || {}); return { m, getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } }; };
 
 const E1 = 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', E2 = 'https://class.ownify.co.kr/a-s1-e2-b?mode=share';
@@ -116,7 +118,7 @@ t('S5b 사본 힌트가 틀린 꼴이면 cf 는 빼고(null) 보낸다', () => {
   assert.deepStrictEqual(boots(w).map((x) => x[0].cf), [null], '⛔ 틀린 cf 를 그대로 넘겼다');
 });
 
-t('S5c OUT_MS 안 outHello 없음 → 같은 판에 exec 로 다시 · onfOutFail 하루 기억 → 그날 다음 out:1 은 바로 지금 길 · 하루 뒤엔 다시 정적 판', () => {
+t('S5c OUT_MS 안 outHello 없음 → 같은 판에 exec 로 다시 · 시한(slow)은 이번만 — 연속 1 = 0 · 2 = 10분 · 3 = 1시간 · 4~ = 하루 · hello 오면 연속 0 · 옛 꼴(실패 시각 하나)은 곧 다시', () => {
   const ls = LSf();
   const s = setup({ ls });
   s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
@@ -125,12 +127,28 @@ t('S5c OUT_MS 안 outHello 없음 → 같은 판에 exec 로 다시 · onfOutFai
   s.fire(2500);
   assert.ok(s.panels().length === 1 && s.panels()[0] === box, '⛔ 물러날 때 판을 새로 만들었다');
   assert.strictEqual(box.kids[0].src, SRC1, '⛔ 같은 판에 exec 로 다시 안 열었다');
-  assert.strictEqual(ls.m.onfOutFail, String(1.7e12), '⛔ 기기에 onfOutFail 을 안 적었다');
+  assert.strictEqual(ls.m.onfOutFail, '0,1', '⛔ 첫 시한 — 연속 1 · 막는 시간 0 이 아니다');
   s.send({ onf: 'openBook', href: E2, out: 1 }, s.homeInner);
-  assert.strictEqual(s.panels().slice(-1)[0].kids[0].src, SRC2, '⛔ 실패한 날 다음 out:1 이 또 정적 판으로 갔다');
-  const n = setup({ ls: LSf({ onfOutFail: String(1.7e12 - 86400000 - 1) }) });
+  const b2 = s.panels().slice(-1)[0];
+  assert.strictEqual(b2.kids[0].src, OUT_BOOK, '⛔ 시한 한 번에 다음 out:1 까지 지금 길로 묶었다(하루 기억 되살아남)');
+  outWin(s, b2); s.fire(2500);
+  assert.strictEqual(ls.m.onfOutFail, String(1.7e12 + 600000) + ',2', '⛔ 연속 2 — 10분이 아니다');
+  for (const [n, ms] of [[2, 3600000], [3, 86400000], [9, 86400000]]) {
+    const l = LSf({ onfOutFail: '1,' + n }), x = setup({ ls: l });
+    x.send({ onf: 'openBook', href: E1, out: 1 }, x.homeInner);
+    outWin(x, x.panels()[0]); x.fire(2500);
+    assert.strictEqual(l.m.onfOutFail, String(1.7e12 + ms) + ',' + (n + 1), '⛔ 연속 ' + (n + 1) + ' — 막는 시간이 다르다');
+  }
+  const blk = setup({ ls: LSf({ onfOutFail: String(1.7e12 + 600000) + ',2' }) });
+  blk.send({ onf: 'openBook', href: E1, out: 1 }, blk.homeInner);
+  assert.strictEqual(blk.panels()[0].kids[0].src, SRC1, '⛔ 막힌 동안 out:1 이 또 정적 판으로 갔다');
+  const ok = LSf({ onfOutFail: '1,3' }), o = setup({ ls: ok });
+  o.send({ onf: 'openBook', href: E1, out: 1 }, o.homeInner);
+  o.send({ onf: 'outHello' }, outWin(o, o.panels()[0]), OUT_O);
+  assert.ok(!('onfOutFail' in ok.m), '⛔ hello(성공)인데 연속 물러남이 남았다');
+  const n = setup({ ls: LSf({ onfOutFail: String(1.7e12 - 1000) }) });
   n.send({ onf: 'openBook', href: E1, out: 1 }, n.homeInner);
-  assert.strictEqual(n.panels()[0].kids[0].src, OUT_BOOK, '⛔ 하루 지난 기억에도 지금 길로 갔다');
+  assert.strictEqual(n.panels()[0].kids[0].src, OUT_BOOK, '⛔ 옛 꼴(실패 시각 하나 · 종전 하루 기억)에 아직 묶였다');
 });
 
 t('S5c outFail(그 창·그 출처) → 같은 판에 exec 로 다시 · 남의 출처 outFail 은 버림 · hello 뒤에 와도 물러남', () => {
@@ -143,7 +161,7 @@ t('S5c outFail(그 창·그 출처) → 같은 판에 exec 로 다시 · 남의 
   s.send({ onf: 'outFail', why: 'api' }, win('stranger', s.top), OUT_O);
   assert.strictEqual(box.kids[0].src, OUT_BOOK, '⛔ 남의 출처·남의 창 outFail 로 물러났다');
   s.send({ onf: 'outFail', why: 'bridge' }, w, OUT_O);
-  assert.ok(box.kids[0].src === SRC1 && ls.m.onfOutFail, '⛔ outFail 로 물러나지 않았다');
+  assert.ok(box.kids[0].src === SRC1 && ls.m.onfOutFail === String(1.7e12 + 86400000) + ',1', '⛔ outFail(hard) 로 물러나 하루를 안 적었다');
   s.send({ onf: 'outFail', why: 'bridge' }, w, OUT_O);
   assert.strictEqual(box.kids[0].src, SRC1, '물러남은 한 번');
 });
@@ -244,7 +262,7 @@ t('S5f 다음 홈 열기 — o:1 기억이면 정적 판으로 숨긴 판(park �
   s.send({ onf: 'outHello' }, w, OUT_O);
   assert.deepStrictEqual(boots(w).map((x) => x[0].src), [SRC1 + '&park=1'], '⛔ 숨긴 판 outBoot 에 park=1 이 없다');
   for (const [why, o] of [['옛 기억(o 없음)', { ls: LSf(PB()), preKey: 'kA' }], ['끈 기기', { ls: LSf(PB({ o: 1 })), preKey: 'kA', out: false }],
-    ['실패한 날', { ls: LSf(Object.assign(PB({ o: 1 }), { onfOutFail: String(1.7e12 - 1000) })), preKey: 'kA' }]]) {
+    ['실패한 날', { ls: LSf(Object.assign(PB({ o: 1 }), { onfOutFail: BLK })), preKey: 'kA' }]]) {
     const q = setup(o);
     assert.strictEqual(q.panels()[0].kids[0].src, SRC1 + '&park=1', '⛔ ' + why + ' 인데 지금 길이 아니다');
   }
@@ -263,7 +281,7 @@ t('S-F2a bookWarm(panel:1, out:1) → 정적 판으로 숨긴 판(park=1) · 기
   assert.strictEqual(JSON.parse(ls.m.onfPreBook).o, 1, '⛔ out:1 미리 받기인데 기억에 o:1 이 없다(다음 방문 preEarly 가 지금 길)');
   s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
   assert.deepStrictEqual([s.panels().length, vis(s)[0]], [1, box], '⛔ out:1 누름이 미리 띄운 정적 판을 안 썼다');
-  for (const [why, o] of [['끈 기기', { out: false }], ['실패한 날', { ls: LSf({ onfOutFail: String(1.7e12 - 1000) }) }]]) {
+  for (const [why, o] of [['끈 기기', { out: false }], ['실패한 날', { ls: LSf({ onfOutFail: BLK }) }]]) {
     const q = setup(o);
     q.send({ onf: 'bookWarm', href: E1, panel: 1, out: 1 }, q.homeInner);
     assert.strictEqual(q.panels()[0].kids[0].src, SRC1 + '&park=1', '⛔ ' + why + ' 인데 미리 받기가 지금 길이 아니다');
@@ -327,7 +345,7 @@ t('S5g 덱 정적 판이 hello 뒤 outFail → 같은 판에 구글 exec · onfO
     s.send({ onf: 'outHello' }, w, OUT_O);
     s.send({ onf: 'outFail' }, w, OUT_O);
     assert.ok(s.panels().length === 1 && box.kids[0].src === g, '⛔ ' + h + ' — 같은 판에 구글로 안 물러났다: ' + box.kids[0].src);
-    assert.strictEqual(ls.m.onfOutFail, String(1.7e12), '⛔ ' + h + ' — onfOutFail 안 적힘');
+    assert.strictEqual(ls.m.onfOutFail, String(1.7e12 + 86400000) + ',1', '⛔ ' + h + ' — outFail(hard)인데 하루를 안 적었다');
   }
 });
 t('S5g 숨긴 내 문장 판(bookWarm panel:1 out:1) → /mine/ + park=1 · 그 판이 review 노크하면 [복습 시작] 누름에 bookView 가 그 판으로(새 판 0)', () => {
@@ -584,7 +602,7 @@ t('S6a onfOutUsed 없음·14일 넘음·onfOutPending 없음·끈 기기·실패
   for (const [why, o, msg] of [['없음', {}], ['14일 넘음', { ls: USED({ onfOutUsed: String(1.7e12 - 14 * DAY - 1) }) }],
     ['남은 쓰기 없음', { ls: LSf({ onfOutUsed: String(1.7e12) }) }], ['옛 전역 표시만', { ls: LSf({ onfOutUsed: String(1.7e12), onfOutPending: '1' }) }],
     ['다른 교재만 남음', { ls: LSf({ onfOutUsed: String(1.7e12), [PK2]: '1' }) }],
-    ['끈 기기', { out: false, ls: USED() }], ['실패한 날', { ls: USED({ onfOutFail: String(1.7e12 - 1000) }) }],
+    ['끈 기기', { out: false, ls: USED() }], ['실패한 날', { ls: USED({ onfOutFail: BLK }) }],
     ['토큰 없음', { tok: '', ls: USED() }], ['켠 교재', { ls: USED() }, { out: 1 }], ['내 문장', { ls: USED() }, { href: MINE }]]) {
     const s = setup(o);
     s.send(Object.assign({ onf: 'openBook', href: E1 }, msg || {}), s.homeInner);
@@ -789,17 +807,18 @@ ta('S4a ?fileId&sheetName 링크 + /who cf → 첫 판 = ONF_OUT_BOOK · 답 전
   assert.strictEqual(s.frameEl.src, OUT_BOOK, '⛔ hello 뒤 시한으로 물러났다');
 });
 
-ta('S4a 첫 판 정적 판이 outFail(또는 hello 없음) → 같은 액자에 지금 exec 주소 · onfOutFail 하루 기억', async () => {
+ta('S4a 첫 판 정적 판이 outFail(또는 hello 없음) → 같은 액자에 지금 exec 주소 · outFail(hard) = 하루 · hello 없음(slow) = 이번만', async () => {
   const s = wsetup();
   s.calls[0].ok(200, ANS(CF)); await flush();
   s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
   s.send({ onf: 'outFail', why: 'bridge' }, s.homeWin, OUT_O);
   assert.strictEqual(s.frameEl.src, DSRC, '⛔ outFail 인데 지금 길로 안 다시 열었다');
-  assert.strictEqual(s.g.localStorage.m.onfOutFail, String(1.7e12), '⛔ onfOutFail 을 안 적었다');
+  assert.strictEqual(s.g.localStorage.m.onfOutFail, String(1.7e12 + 86400000) + ',1', '⛔ outFail(bridge · hard) — 하루를 안 적었다');
   const n = wsetup();
   n.calls[0].ok(200, ANS(CF)); await flush();
   n.fire(2500);
   assert.strictEqual(n.frameEl.src, DSRC, '⛔ hello 없음 — 지금 길로 안 물러났다');
+  assert.strictEqual(n.g.localStorage.m.onfOutFail, '0,1', '⛔ hello 없음(slow) — 이번만(연속 1 · 0)이 아니다');
 });
 
 ta('S4b /who 가 WHO_MS(800) 넘김 → 지금 길 · 늦은 답(cf)이 와도 판을 안 바꾼다', async () => {
@@ -858,7 +877,7 @@ ta('S4e slug 링크 → 몸통 {t, slug}(f·s 칸 없음) · cf 면 정적 판',
 ta('S4f 안 묻는 때 — 기기 out=0 · 토큰 없음 · 14일 안에 정적 판 안 씀(없음·15일 전) · 그날 물러남 · ⭐ 내 문장 · 🗂️ 카드 덱 · ttok → /who 0회 · 바로 지금 길', async () => {
   const D = 86400000;
   const cases = [['out=0', { out: false }], ['토큰 없음', { tok: '' }], ['정적 판 안 씀', { ls: LSf() }], ['15일 전', { ls: UL({ onfOutUsed: String(1.7e12 - 15 * D) }) }],
-    ['그날 물러남', { ls: UL({ onfOutFail: String(1.7e12 - 1000) }) }],
+    ['그날 물러남', { ls: UL({ onfOutFail: BLK }) }],
     ['내 문장', { src: DSRC.replace('mode=share', 'mode=mine') }], ['카드 덱', { src: DSRC + '&view=cards' }], ['ttok', { src: DSRC + '&ttok=X' }]];
   for (const [nm, o] of cases) {
     const s = wsetup(o);
@@ -950,7 +969,7 @@ ta('S6a 켠 학생·쓴 기기 → /home/get 1회 + 정적 홈을 같이 시작(
   assert.strictEqual(s.g.localStorage.m.onfOutUsed, String(1.7e12 + 300), '⛔ 정적 홈이 떴는데 onfOutUsed 를 안 새로 적었다(R18)');
   s.fire(2500); s.fire(1500); await flush();
   assert.strictEqual(s.frameEl.src, HOME_URL, '⛔ 다 그린 뒤 시한으로 물러났다');
-  assert.ok(!('onfOutFailHome' in s.g.localStorage.m));
+  assert.ok(!(held(s.g.localStorage.m, 'onfOutFailHome')));
   const r = hsetup();   // 답이 hello 보다 먼저 와도 hello 에 보낸다
   r.calls[0].ok(200, a); await flush();
   assert.strictEqual(boots(r.homeWin).length, 0, '⛔ hello 전에 outBoot');
@@ -960,13 +979,13 @@ ta('S6a 켠 학생·쓴 기기 → /home/get 1회 + 정적 홈을 같이 시작(
 
 ta('S6a 안 묻는 때 — 홈 표시 없음·기기 out=0·토큰 없음·그날 홈 물러남(쓴 기기든 새 기기든) → /home/get 0회 · 바로 지금 길(종전 그대로) · 교재 물러남(onfOutFail)은 홈을 안 막는다', async () => {
   const D = 86400000;
-  const cases = [['홈 표시 없음', { home: false }], ['out=0', { out: false }], ['토큰 없음', { tok: '' }], ['그날 홈 물러남', { ls: UL({ onfOutFailHome: String(1.7e12 - 1000) }) }], ['새 기기라도 그날 홈 물러남', { ls: LSf({ onfOutFailHome: String(1.7e12 - 1000) }) }]];
+  const cases = [['홈 표시 없음', { home: false }], ['out=0', { out: false }], ['토큰 없음', { tok: '' }], ['그날 홈 물러남', { ls: UL({ onfOutFailHome: BLK }) }], ['새 기기라도 그날 홈 물러남', { ls: LSf({ onfOutFailHome: BLK }) }]];
   for (const [nm, o] of cases) {
     const s = hsetup(o);
     assert.strictEqual(s.calls.length, 0, '⛔ ' + nm + ' — /home/get 을 물었다');
     assert.strictEqual(s.frameEl.src, HSRC, '⛔ ' + nm + ' — 바로 지금 길로 안 열었다: ' + s.frameEl.src);
   }
-  const b = hsetup({ ls: UL({ onfOutFail: String(1.7e12 - 1000) }) });
+  const b = hsetup({ ls: UL({ onfOutFail: BLK }) });
   assert.strictEqual(b.calls.length, 1, '⛔ 교재 물러남(onfOutFail)이 홈까지 막는다(R11 — 키를 따로)');
   const y = hsetup({ ls: UL({ onfOutFailHome: String(1.7e12 - D - 1) }) });
   assert.strictEqual(y.calls.length, 1, '⛔ 하루 지난 홈 물러남이 아직 막는다');
@@ -982,7 +1001,7 @@ ta('S6b /home/get 이 HOMEGET_MS(1500) 넘김 → 지금 길 · 늦은 답은 �
   assert.strictEqual(boots(s.homeWin).length, 0, '⛔ 늦은 답 뒤 outBoot');
   assert.strictEqual(s.frameEl.src, HSRC, '⛔ 늦은 답이 액자를 바꿨다');
   s.fire(2500);
-  assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ 답 없음인데 그날 홈 물러남을 적었다(R4 — 정적 시계가 두 번째 물러남을 했다)');
+  assert.ok(!(held(s.g.localStorage.m, 'onfOutFailHome')), '⛔ 답 없음인데 그날 홈 물러남을 적었다(R4 — 정적 시계가 두 번째 물러남을 했다)');
   assert.ok(!('onfOutFail' in s.g.localStorage.m), '⛔ 홈 일로 교재 물러남을 적었다');
 });
 
@@ -998,7 +1017,7 @@ ta('S6b unknown·ended·stale·none · api 다름 · v 없음 · 500 · 끊김 �
     assert.strictEqual(s.frameEl.src, HSRC, '⛔ ' + nm + ' — 지금 길로 안 갈아 끼웠다: ' + s.frameEl.src);
     assert.strictEqual(boots(s.homeWin).length, 0, '⛔ ' + nm + ' — outBoot 을 보냈다');
     s.fire(2500); s.fire(1500); await flush();
-    assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ ' + nm + ' — 그날 홈 물러남을 적었다');
+    assert.ok(!(held(s.g.localStorage.m, 'onfOutFailHome')), '⛔ ' + nm + ' — 그날 홈 물러남을 적었다');
   }
 });
 
@@ -1024,7 +1043,7 @@ ta('S6d 그리기 전 실패 — homeDrawn 이 HOME_PAINT_MS(outBoot 부터) 안
   assert.strictEqual(s.frameEl.src, HOME_URL);
   s.fire(2500);
   assert.strictEqual(s.frameEl.src, HSRC, '⛔ homeDrawn 이 안 왔는데 지금 길로 안 갈아 끼웠다');
-  assert.strictEqual(s.g.localStorage.m.onfOutFailHome, String(1.7e12 + 5000), '⛔ 그날 홈 물러남을 안 적었다');
+  assert.strictEqual(s.g.localStorage.m.onfOutFailHome, '0,1', '⛔ 그리기 시한(slow) — 이번만(연속 1 · 막지 않음)이 아니다');
   assert.ok(!('onfOutFail' in s.g.localStorage.m), '⛔ 홈 일로 교재 물러남을 적었다(R11)');
   const e = hsetup();
   e.calls[0].ok(200, HANS()); await flush();
@@ -1033,12 +1052,12 @@ ta('S6d 그리기 전 실패 — homeDrawn 이 HOME_PAINT_MS(outBoot 부터) 안
   assert.strictEqual(e.frameEl.src, HOME_URL, '⛔ 남의 창 outFail 로 물러났다');
   e.send({ onf: 'outFail', why: 'error' }, e.homeWin, OUT_O);
   assert.strictEqual(e.frameEl.src, HSRC, '⛔ outFail 인데 지금 길로 안 갈아 끼웠다');
-  assert.ok('onfOutFailHome' in e.g.localStorage.m, '⛔ 그리기 전 outFail 인데 그날 기록이 없다');
+  assert.ok(held(e.g.localStorage.m, 'onfOutFailHome'), '⛔ 그리기 전 outFail 인데 그날 기록이 없다');
   assert.strictEqual(e.okN.n, 0, '⛔ 못 그린 정적 홈으로 로고 막을 걷었다');
   const n = hsetup();
   n.fire(2500);
   assert.strictEqual(n.frameEl.src, HSRC, '⛔ hello 가 없는데 지금 길로 안 갈아 끼웠다');
-  assert.ok('onfOutFailHome' in n.g.localStorage.m, '⛔ hello 없음인데 그날 기록이 없다');
+  assert.strictEqual(n.g.localStorage.m.onfOutFailHome, '0,1', '⛔ hello 없음(slow) — 이번만(연속 1 · 막지 않음)이 아니다');
   n.calls[0].ok(200, HANS()); await flush();
   assert.strictEqual(n.frameEl.src, HSRC, '⛔ 물러난 뒤 온 답이 액자를 바꿨다');
 });
@@ -1051,12 +1070,12 @@ ta('S6d 그린 뒤 outFail — error·mismatch 는 지금 길 + 그날 기록 ·
     s.send({ onf: 'homeDrawn' }, s.homeWin, OUT_O);
     s.send({ onf: 'outFail', why }, s.homeWin, OUT_O);
     assert.strictEqual(s.frameEl.src, HSRC, '⛔ ' + why + ' — 지금 길로 안 갈아 끼웠다');
-    assert.strictEqual('onfOutFailHome' in s.g.localStorage.m, kill, '⛔ ' + why + ' — 그날 기록이 ' + (kill ? '없다' : '있다'));
+    assert.strictEqual(held(s.g.localStorage.m, 'onfOutFailHome'), kill, '⛔ ' + why + ' — 그날 기록이 ' + (kill ? '없다' : '있다'));
     s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
     s.send({ onf: 'outFail', why: 'error' }, s.homeWin, OUT_O);
     s.fire(2500);
     assert.strictEqual(boots(s.homeWin).length, 1, '⛔ ' + why + ' — 물러난 뒤 hello 에 outBoot');
-    assert.strictEqual('onfOutFailHome' in s.g.localStorage.m, kill, '⛔ ' + why + ' — 물러난 뒤 말이 그날 기록을 바꿨다');
+    assert.strictEqual(held(s.g.localStorage.m, 'onfOutFailHome'), kill, '⛔ ' + why + ' — 물러난 뒤 말이 그날 기록을 바꿨다');
   }
 });
 
@@ -1080,7 +1099,7 @@ ta('N1 새 기기(onfOutUsed 없음·14일 넘음) → /home/get 1회 + 정적 �
     assert.strictEqual(s.g.localStorage.m.onfOutUsed, String(1.7e12), '⛔ ' + nm + ' — 처음 그린 기기가 onfOutUsed 를 안 적었다(다음부턴 쓴 기기)');
   }
 });
-ta('N2 새 기기 첫 그림 시한 = 5000(outBoot 부터) — 2500 에 안 물러나고 5000 에 물러난다 · 그날 기록 없음 · 다음 열기에 다시 시도', async () => {
+ta('N2 새 기기 첫 그림 시한 = 5000(outBoot 부터) — 2500 에 안 물러나고 5000 에 물러난다 · 막지 않음(slow 연속 1) · 다음 열기에 다시 시도 · 쓴 기기는 2500', async () => {
   for (const [nm, o] of NEWS()) {
     const s = hsetup(o);
     s.calls[0].ok(200, HANS()); await flush();
@@ -1090,7 +1109,7 @@ ta('N2 새 기기 첫 그림 시한 = 5000(outBoot 부터) — 2500 에 안 물�
     assert.strictEqual(s.frameEl.src, HOME_URL, '⛔ ' + nm + ' — 새 기기가 2500 에 물러났다(시한이 안 늘었다)');
     s.fire(5000); await flush();
     assert.strictEqual(s.frameEl.src, HSRC, '⛔ ' + nm + ' — 5000 이 지나도 지금 길로 안 갔다');
-    assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ ' + nm + ' — 시한으로 물러났는데 그날 기록을 남겼다(다음 열기에 다시 시도해야 한다)');
+    assert.ok(!(held(s.g.localStorage.m, 'onfOutFailHome')), '⛔ ' + nm + ' — 시한으로 물러났는데 그날 기록을 남겼다(다음 열기에 다시 시도해야 한다)');
     assert.ok(!('onfOutFail' in s.g.localStorage.m), '⛔ ' + nm + ' — 교재 물러남을 적었다');
     const n = hsetup({ ls: s.g.localStorage });   // 다음 열기
     assert.strictEqual(n.calls.length, 1, '⛔ ' + nm + ' — 다음 열기에 다시 시도하지 않는다');
@@ -1101,14 +1120,14 @@ ta('N2 새 기기 첫 그림 시한 = 5000(outBoot 부터) — 2500 에 안 물�
   u.send({ onf: 'outHello' }, u.homeWin, OUT_O);
   u.fire(2500);
   assert.strictEqual(u.frameEl.src, HSRC, '⛔ 쓴 기기 시한이 바뀌었다');
-  assert.ok('onfOutFailHome' in u.g.localStorage.m, '⛔ 쓴 기기의 시한 실패는 종전대로 그날 기록을 남겨야 한다');
+  assert.ok(!held(u.g.localStorage.m, 'onfOutFailHome') && u.g.localStorage.m.onfOutFailHome === '0,1', '⛔ 쓴 기기 첫 시한 실패도 이번만(연속 1)이어야 한다');
 });
 ta('N3 새 기기 hello 없음(OUT_MS) → 지금 길 · 그날 기록 없음 (쓴 기기는 종전: 기록 있음 — S6d)', async () => {
   for (const [nm, o] of NEWS()) {
     const s = hsetup(o);
     s.fire(2500);
     assert.strictEqual(s.frameEl.src, HSRC, '⛔ ' + nm + ' — hello 가 없는데 지금 길로 안 갔다');
-    assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ ' + nm + ' — hello 시한으로 물러났는데 그날 기록');
+    assert.ok(!(held(s.g.localStorage.m, 'onfOutFailHome')), '⛔ ' + nm + ' — hello 시한으로 물러났는데 그날 기록');
   }
 });
 ta('N4 그리기 전 mismatch → 지금 길 · 그날 기록 없음 — 새 기기든 쓴 기기든 (그린 뒤 mismatch 는 종전대로 기록 — S6d)', async () => {
@@ -1120,7 +1139,7 @@ ta('N4 그리기 전 mismatch → 지금 길 · 그날 기록 없음 — 새 기
       if (drawn) s.send({ onf: 'homeDrawn' }, s.homeWin, OUT_O);
       s.send({ onf: 'outFail', why: 'mismatch' }, s.homeWin, OUT_O);
       assert.strictEqual(s.frameEl.src, HSRC, '⛔ ' + nm + ' 그림 ' + drawn + ' — 지금 길로 안 갔다');
-      assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ ' + nm + ' 그림 ' + drawn + ' — mismatch 가 그날 기록을 남겼다(다음 열기에 다시 시도해야 한다)');
+      assert.ok(!(held(s.g.localStorage.m, 'onfOutFailHome')), '⛔ ' + nm + ' 그림 ' + drawn + ' — mismatch 가 그날 기록을 남겼다(다음 열기에 다시 시도해야 한다)');
       const n = hsetup({ ls: s.g.localStorage });
       assert.strictEqual(n.calls.length, 1, '⛔ ' + nm + ' — mismatch 뒤 다음 열기에 다시 시도하지 않는다');
     }
@@ -1133,16 +1152,16 @@ ta('N5 새 기기의 다른 실패(error · 그리기 전 notice·stale · 스�
     s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
     s.send({ onf: 'outFail', why }, s.homeWin, OUT_O);
     assert.strictEqual(s.frameEl.src, HSRC);
-    assert.ok('onfOutFailHome' in s.g.localStorage.m, '⛔ 새 기기 ' + why + ' — 그날 기록이 없다');
+    assert.ok(held(s.g.localStorage.m, 'onfOutFailHome'), '⛔ 새 기기 ' + why + ' — 그날 기록이 없다');
   }
   const o = hsetup({ ls: LSf() });
   o.send({ onf: 'outHello' }, o.homeWin, OUT_O);
   o.calls[0].ok(503, { ok: false, why: 'off' }); await flush();
-  assert.ok('onfOutFailHome' in o.g.localStorage.m, '⛔ 새 기기 스위치 꺼짐 — 그날 기록이 없다');
+  assert.ok(held(o.g.localStorage.m, 'onfOutFailHome'), '⛔ 새 기기 스위치 꺼짐 — 그날 기록이 없다');
   const t = hsetup({ ls: LSf() });   // 답 없음(HOMEGET_MS) = 종전: 지금 길 · 기록 없음
   t.fire(1500); await flush();
   assert.strictEqual(t.frameEl.src, HSRC);
-  assert.ok(!('onfOutFailHome' in t.g.localStorage.m));
+  assert.ok(!(held(t.g.localStorage.m, 'onfOutFailHome')));
 });
 ta('N6 flushWorth·whoQ 의 onfOutUsed 판정은 그대로(새 기기 홈 시도가 교재 넘겨주기·링크 직행을 안 연다)', async () => {
   const src = fs.readFileSync(path.join(ROOT, 'assets', 'onf-frame.js'), 'utf8');
@@ -1151,37 +1170,29 @@ ta('N6 flushWorth·whoQ 의 onfOutUsed 판정은 그대로(새 기기 홈 시도
   assert.ok(/OUT_USED/.test(at('function whoQ(s)', 700)), '⛔ whoQ 의 onfOutUsed 판정이 사라졌다');
 });
 
-ta('N7 새 기기 시한 실패 상한(Ruling 6) — 같은 날 첫 번째만 기록 면제 · 2번째(그리기·hello 섞여도)는 그날 기록 · 24시간 뒤엔 다시 첫 번째 · mismatch 는 셈에 안 들어감 · 그리면 셈 지움', async () => {
+ta('N7 시한 실패 사다리(종전 Ruling 6 「새 기기 첫 번째만 면제」를 대신 · 쓴 기기도 같다) — 연속 1 = 0 · 2 = 10분(그 동안 정적 0) · hello·그리기 섞여도 셈 · mismatch 는 셈에 안 들어감 · 그리면 셈 지움', async () => {
   const miss = async (ls, how) => {
     const s = hsetup({ ls });
     if (how === 'hello') s.fire(2500);
-    else { s.calls[0].ok(200, HANS()); await flush(); s.send({ onf: 'outHello' }, s.homeWin, OUT_O); s.fire(5000); }
+    else { s.calls[0].ok(200, HANS()); await flush(); s.send({ onf: 'outHello' }, s.homeWin, OUT_O); s.fire(5000); s.fire(2500); }
     assert.strictEqual(s.frameEl.src, HSRC); return s;
   };
-  const ls = LSf();
-  let s = await miss(ls, 'paint');
-  assert.ok(!('onfOutFailHome' in ls.m), '⛔ 첫 시한 실패가 기록을 남겼다');
-  s = await miss(ls, 'hello');
-  assert.ok('onfOutFailHome' in ls.m, '⛔ 같은 날 2번째 시한 실패(hello)가 기록을 안 남겼다');
-  assert.strictEqual(hsetup({ ls }).calls.length, 0, '⛔ 2번째 뒤에도 같은 날 또 정적을 시도한다');
-  const l2 = LSf();   // hello 로 시작해 그리기로 2번째
-  await miss(l2, 'hello'); assert.ok(!('onfOutFailHome' in l2.m));
-  await miss(l2, 'paint'); assert.ok('onfOutFailHome' in l2.m, '⛔ hello→그리기 2번째가 기록을 안 남겼다');
-  const l3 = LSf();   // 24시간 뒤엔 다시 첫 번째
-  await miss(l3, 'paint');
-  const l4 = LSf(Object.assign({}, l3.m, { onfOutColdMiss: String(1.7e12 - 86400000 - 1) }));
-  await miss(l4, 'paint'); assert.ok(!('onfOutFailHome' in l4.m), '⛔ 하루 지난 첫 실패 셈이 아직 남아 2번째로 셌다');
+  for (const [nm, mk] of [['새 기기', () => LSf()], ['쓴 기기', () => LSf({ onfOutUsed: String(1.7e12 - D14) })]]) {
+    const ls = mk();
+    await miss(ls, 'paint');
+    assert.ok(!held(ls.m, 'onfOutFailHome') && ls.m.onfOutFailHome === '0,1', '⛔ ' + nm + ' 첫 시한 실패 — 이번만(연속 1 · 0)이 아니다: ' + ls.m.onfOutFailHome);
+    await miss(ls, 'hello');
+    assert.strictEqual(ls.m.onfOutFailHome, String(1.7e12 + 600000) + ',2', '⛔ ' + nm + ' 연속 2(hello) — 10분이 아니다');
+    assert.strictEqual(hsetup({ ls }).calls.length, 0, '⛔ ' + nm + ' 10분 막힘 동안 또 정적을 시도한다');
+  }
   const l5 = LSf();   // mismatch 는 셈에 안 넣는다
   for (let i = 0; i < 2; i++) { const m = hsetup({ ls: l5 }); m.calls[0].ok(200, HANS()); await flush(); m.send({ onf: 'outHello' }, m.homeWin, OUT_O); m.send({ onf: 'outFail', why: 'mismatch' }, m.homeWin, OUT_O); }
-  assert.ok(!('onfOutFailHome' in l5.m) && !('onfOutColdMiss' in l5.m), '⛔ mismatch 가 셈에 들어갔다');
-  await miss(l5, 'paint'); assert.ok(!('onfOutFailHome' in l5.m), '⛔ mismatch 뒤 첫 시한 실패가 기록을 남겼다');
-  const l6 = LSf();   // 한 번 그리면 셈 지움 — 다음 실패는 (쓴 기기라) 종전 규칙
-  await miss(l6, 'paint'); assert.ok('onfOutColdMiss' in l6.m);
+  assert.ok(!('onfOutFailHome' in l5.m), '⛔ mismatch 가 셈에 들어갔다');
+  await miss(l5, 'paint'); assert.strictEqual(l5.m.onfOutFailHome, '0,1', '⛔ mismatch 뒤 첫 시한 실패가 연속 1 이 아니다');
+  const l6 = LSf();   // 한 번 그리면 셈 지움
+  await miss(l6, 'paint'); assert.ok('onfOutFailHome' in l6.m);
   const g = hsetup({ ls: l6 }); g.calls[0].ok(200, HANS()); await flush(); g.send({ onf: 'outHello' }, g.homeWin, OUT_O); g.send({ onf: 'homeDrawn' }, g.homeWin, OUT_O);
-  assert.ok(!('onfOutColdMiss' in l6.m), '⛔ 그렸는데 셈이 안 지워졌다');
-  const lu = LSf({ onfOutUsed: String(1.7e12 - D14) });   // 쓴 기기는 셈과 무관(종전: 시한 실패 즉시 기록)
-  const u = hsetup({ ls: lu }); u.calls[0].ok(200, HANS()); await flush(); u.send({ onf: 'outHello' }, u.homeWin, OUT_O); u.fire(2500);
-  assert.ok('onfOutFailHome' in lu.m && !('onfOutColdMiss' in lu.m), '⛔ 쓴 기기 시한 실패가 종전과 다르다');
+  assert.ok(!('onfOutFailHome' in l6.m), '⛔ 그렸는데 셈이 안 지워졌다');
 });
 ta('S6d 물러나면 죽은 정적 홈 창을 비운다 — 정적 홈이 연 판을 닫아도 그 창엔 bookClosed 를 안 보낸다', async () => {
   const s = hsetup();
@@ -1270,7 +1281,7 @@ ta('R-4 그리기 전 outFail 은 notice·stale 이어도 그날 기록', async 
     s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
     s.send({ onf: 'outFail', why }, s.homeWin, OUT_O);
     assert.strictEqual(s.frameEl.src, HSRC);
-    assert.ok('onfOutFailHome' in s.g.localStorage.m, '⛔ 그리기 전 ' + why + ' 인데 그날 기록이 없다');
+    assert.ok(held(s.g.localStorage.m, 'onfOutFailHome'), '⛔ 그리기 전 ' + why + ' 인데 그날 기록이 없다');
   }
 });
 ta('R-5 물러난 뒤 죽어 가는 정적 홈 창(그 액자 · 정적 홈 출처)의 openBook·hist·bookWarm·frameHello 는 버린다 · 지금 길 구글 홈 말은 받는다', async () => {
@@ -1303,7 +1314,7 @@ ta('I2 스위치 꺼짐(ok:false why off · HTTP 503) → 그날 onfOutFailHome 
     s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
     go(s.calls[0]); await flush();
     assert.strictEqual(s.frameEl.src, HSRC, '⛔ ' + nm + ' — 지금 길로 안 갔다');
-    assert.strictEqual(s.g.localStorage.m.onfOutFailHome, String(1.7e12), '⛔ ' + nm + ' — 그날 홈 물러남을 안 적었다');
+    assert.strictEqual(s.g.localStorage.m.onfOutFailHome, String(1.7e12 + 86400000) + ',1', '⛔ ' + nm + ' — 스위치 꺼짐(hard)인데 하루를 안 적었다');
     assert.ok(!('onfOutFail' in s.g.localStorage.m), '⛔ ' + nm + ' — 교재 물러남까지 적었다');
     const n = hsetup({ ls: s.g.localStorage });   // 같은 날 다음 mount
     assert.strictEqual(n.calls.length, 0, '⛔ ' + nm + ' — 같은 날 다시 /home/get 을 물었다');
@@ -1311,14 +1322,14 @@ ta('I2 스위치 꺼짐(ok:false why off · HTTP 503) → 그날 onfOutFailHome 
   }
   for (const why of ['unknown', 'stale', 'ended', 'none']) {
     const s = hsetup(); s.calls[0].ok(200, { ok: false, why }); await flush();
-    assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ ' + why + ' — 그날 기록을 적었다(종전 그대로여야 한다)');
+    assert.ok(!(held(s.g.localStorage.m, 'onfOutFailHome')), '⛔ ' + why + ' — 그날 기록을 적었다(종전 그대로여야 한다)');
   }
-  for (const st of [500, 404]) { const s = hsetup(); s.calls[0].ok(st, { ok: false }); await flush(); assert.ok(!('onfOutFailHome' in s.g.localStorage.m), '⛔ HTTP ' + st + ' — 기록'); }
+  for (const st of [500, 404]) { const s = hsetup(); s.calls[0].ok(st, { ok: false }); await flush(); assert.ok(!(held(s.g.localStorage.m, 'onfOutFailHome')), '⛔ HTTP ' + st + ' — 기록'); }
 });
 ta('I2 하루 지난 스위치 꺼짐 기록은 다시 묻는다', async () => {
   const s = hsetup(); s.calls[0].ok(503, {}); await flush();
   const stamp = s.g.localStorage.m.onfOutFailHome;
-  const y = hsetup({ ls: LSf(Object.assign({}, s.g.localStorage.m, { onfOutFailHome: String(1.7e12 - 86400000 - 1) })) });
+  const y = hsetup({ ls: LSf(Object.assign({}, s.g.localStorage.m, { onfOutFailHome: String(1.7e12 - 1) + ',1' })) });
   assert.strictEqual(y.calls.length, 1, '⛔ 하루 지난 기록이 아직 막는다(' + stamp + ')');
 });
 ta('M3 outBoot 재전송(정적 홈이 몇 시간 뒤 다시 hello) → pre 칸 age 에 받은 뒤 흐른 시간을 더한다 · 원본 d 와 앞서 보낸 사본은 그대로', async () => {
@@ -1373,6 +1384,81 @@ ta('W3 back() 은 액자를 「이동 중」으로 시작 — 아직 about:blank
   s.commit('https://n-abc-0lu-script.googleusercontent.com/userCodeAppPanel');
   s.send({ onf: 'oldHello' }, s.homeInner, GO);
   assert.strictEqual(s.okN.n, 1, '⛔ load 뒤 노크는 받아야 한다');
+});
+
+/* ═══ 🔁 물러남 기억 한 곳(2026-10-30) — 「하루」 → 까닭별 · 학생·선생님·교재 모두 onf-frame.js fallBack/fallBlocked/fallOk 하나 ═══ */
+ta('FB1 까닭별 표 — slow(hello·paint·fail-time·fail-net) 연속 1 = 0 · 2 = 10분 · 3 = 1시간 · 4~ = 하루 · fail-api = 1시간 · hard(그 밖) = 하루 · skip(fail-mismatch·late-notice·late-stale·nodata) = 그대로 · fallOk = 0 · 판마다 칸 따로', async () => {
+  const mk = (init) => {
+    const ls = LSf(init), beacons = [], g = { T: 1.7e12, localStorage: ls, setTimeout, clearTimeout, URL, console: { info() {}, log() {}, warn() {} },
+      navigator: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X)', sendBeacon: (u, b) => { beacons.push([u, JSON.parse(b)]); return true; } },
+      document: { addEventListener() {} }, addEventListener() {} };
+    g.window = g; g.Date = { now: () => g.T }; vm.createContext(g); vm.runInContext(CODE, g, { filename: 'onf-frame.js' });
+    return { ls, beacons, F: g.ONF.frame, g };
+  };
+  const D = 86400000, x = mk();
+  for (const [why, n, ms] of [['hello', 1, 0], ['paint', 2, 600000], ['fail-net', 3, 3600000], ['fail-time', 4, D], ['hello', 5, D]]) {
+    assert.strictEqual(x.F.fallBack('book', why), ms, '⛔ ' + why + ' 연속 ' + n + ' — 막는 ms');
+    assert.strictEqual(x.ls.m.onfOutFail, (ms ? String(1.7e12 + ms) : '0') + ',' + n, '⛔ ' + why + ' 연속 ' + n + ' — 칸 꼴');
+    assert.strictEqual(x.F.fallBlocked('book'), ms > 0, '⛔ ' + why + ' — 막힘 판정');
+  }
+  x.F.fallOk('book');
+  assert.ok(!('onfOutFail' in x.ls.m) && !x.F.fallBlocked('book'), '⛔ 성공(fallOk)인데 연속이 남았다');
+  for (const why of ['fail-boot', 'fail-bridge', 'fail-copy', 'fail-error', 'late-error', 'late-mismatch', 'off', 'notch', 'fail-x']) {
+    const y = mk();
+    assert.strictEqual(y.F.fallBack('home', why), D, '⛔ ' + why + ' 는 hard(하루)');
+    assert.strictEqual(y.ls.m.onfOutFailHome, String(1.7e12 + D) + ',1');
+  }
+  const api = mk({ onfOutFail: '0,2' });   // 계약 어긋남(api)은 1시간(배포 사이 몇 분 · Peter 2026-10-30) · 연속은 +1
+  assert.strictEqual(api.F.fallBack('book', 'fail-api'), 3600000, '⛔ fail-api 는 1시간');
+  assert.strictEqual(api.ls.m.onfOutFail, String(1.7e12 + 3600000) + ',3');
+  for (const why of ['fail-mismatch', 'late-notice', 'late-stale', 'nodata']) {
+    const y = mk({ onfTOutFail: '0,2' });
+    assert.strictEqual(y.F.fallBack('thome', why), -1, '⛔ ' + why + ' 는 skip');
+    assert.strictEqual(y.ls.m.onfTOutFail, '0,2', '⛔ ' + why + ' — skip 이 칸·연속을 바꿨다');
+  }
+  const z = mk({ onfOutFail: String(1.7e12 + D) + ',1' });   // 판마다 칸 따로
+  assert.ok(z.F.fallBlocked('book') && !z.F.fallBlocked('home') && !z.F.fallBlocked('thome'), '⛔ 교재 물러남이 다른 판을 막는다');
+  z.F.fallBack('home', 'hello'); z.F.fallOk('thome');
+  assert.ok(z.F.fallBlocked('book') && z.ls.m.onfOutFailHome === '0,1', '⛔ 다른 판 기록이 교재 칸을 건드렸다');
+  const old = mk({ onfOutFail: String(1.7e12 - 1000), onfOutFailHome: String(1.7e12 - 1000) });   // 옛 꼴(실패 시각 하나) = 곧 다시 · 연속은 0 부터
+  assert.ok(!old.F.fallBlocked('book') && !old.F.fallBlocked('home'), '⛔ 옛 하루 기억에 아직 묶인다');
+  assert.strictEqual(old.F.fallBack('book', 'hello'), 0, '⛔ 옛 꼴 뒤 첫 시한이 연속 1 이 아니다');
+  const thr = mk(); thr.g.localStorage = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); }, removeItem() { throw new Error('blocked'); } };
+  assert.strictEqual(thr.F.fallBlocked('book'), true, '⛔ 저장소가 막힌 창은 막힘(종전 — 열 때마다 시한을 안 낸다)');
+  assert.doesNotThrow(() => { thr.F.fallBack('book', 'hello'); thr.F.fallOk('book'); });
+});
+ta('FB2 물러날 때마다 clog 한 줄 {k:err, c:fallback:<판>:<까닭>:<연속>, d} — 값 칸 없음 · Worker /clog · 판 글자는 a-z·- 20자로', async () => {
+  const ls = LSf(), beacons = [], g = { T: 1.7e12, localStorage: ls, setTimeout, clearTimeout, URL, console: { info() {}, log() {}, warn() {} },
+    navigator: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X)', sendBeacon: (u, b) => { beacons.push([u, JSON.parse(b)]); return true; } },
+    document: { addEventListener() {} }, addEventListener() {} };
+  g.window = g; g.Date = { now: () => g.T }; vm.createContext(g); vm.runInContext(CODE, g, { filename: 'onf-frame.js' });
+  const F = g.ONF.frame;
+  F.fallBack('book', 'hello'); F.fallBack('book', 'hello'); F.fallBack('home', 'late-notice'); F.fallBack('thome', 'fail-<b>"TOKEN"');
+  assert.deepStrictEqual(beacons.map((b) => b[1]), [[{ k: 'err', c: 'fallback:book:hello:1', d: 'ios' }], [{ k: 'err', c: 'fallback:book:hello:2', d: 'ios' }],
+    [{ k: 'err', c: 'fallback:home:late-notice:0', d: 'ios' }], [{ k: 'err', c: 'fallback:thome:fail-b:1', d: 'ios' }]], '⛔ 기록 꼴');
+  assert.ok(beacons.every((b) => b[0] === F.WORKER + '/clog'), '⛔ Worker /clog 가 아니다');
+  //   학생 껍데기 판 물러남이 실제로 한 줄을 낸다(setup 경로 · 교재 hello 시한)
+  const bs = [], s = setup({ pre: (gg) => { gg.navigator = { userAgent: 'node', sendBeacon: (u, b) => { bs.push(JSON.parse(b)[0].c); return true; } }; } });
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner); outWin(s, s.panels()[0]); s.fire(2500);
+  assert.deepStrictEqual(bs, ['fallback:book:hello:1'], '⛔ 교재 판 물러남 기록이 없다');
+});
+ta('FB3 한 함수 — 물러남 칸(onfOutFail·onfOutFailHome·onfTOutFail)을 적고 읽는 곳은 onf-frame.js fallBack/fallBlocked/fallOk 뿐 · 껍데기들엔 지우기(out=1·tout=1)와 선생님 머리 tPre 읽기만 · 86400000 「하루」 직접 비교 0', async () => {
+  const T = fs.readFileSync(path.join(ROOT, 'teacher', 'index.html'), 'utf8'), I = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  const keys = /onfOutFail(?!Home)|onfOutFailHome|onfTOutFail|OUT_FAIL|TOUT_FAIL/;
+  const bad = [];
+  for (const [nm, src] of [['onf-frame.js', CODE], ['teacher/index.html', T], ['index.html', I]]) {
+    src.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' ')).split('\n').forEach((ln, i) => {   // 덩이 주석은 줄 수만 남기고 비운다
+      const code = ln.replace(/\/\*.*?\*\//g, '').replace(/\/\/.*$/, '');
+      if (!keys.test(code)) return;
+      const ok = /var FALL_KEY = /.test(code) || /removeItem\((?:'onfOutFail|'onfTOutFail|TOUT_FAIL)/.test(code) || /var TOUT_FAIL = 'onfTOutFail'/.test(code)
+        || /ls\.getItem\('onfTOutFail'\) \|\| ''\)\.split\(','\)\[0\]/.test(code);
+      if (!ok) bad.push(nm + ':' + (i + 1) + ' ' + code.trim().slice(0, 120));
+    });
+  }
+  assert.deepStrictEqual(bad, [], '⛔ 물러남 칸을 공용 함수 밖에서 만진다');
+  const bare = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert.ok(!/OUT_FAIL_MS|coldMissKill|OUT_COLD_MISS|86400000\)/.test(bare(CODE) + bare(T)), '⛔ 옛 하루 규칙(OUT_FAIL_MS·coldMissKill)이 남았다');
+  assert.ok(/ONF\.frame\.fallBack\('thome'/.test(T) && /ONF\.frame\.fallBack\('book'/.test(T) && /ONF\.frame\.fallOk\('thome'\)/.test(T) && /ONF\.frame\.fallBlocked\('thome'\)/.test(T) && /ONF\.frame\.fallBlocked\('book'\)/.test(T), '⛔ 선생님 껍데기가 공용 함수를 안 쓴다');
 });
 
 (async () => {
