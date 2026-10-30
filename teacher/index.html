@@ -25,7 +25,7 @@
    이제: 여기서 묻고(⛔ 스타일시트 링크 **앞** 자리 — 뒤면 스타일을 기다린다) · tOutOpen 이 판 hello 에 그 답을 outBoot{d} 로 싣는다(판은 묻지 않고 바로 그린다).
    ⛔ 묻는 조건 = tOutQ 의 앞쪽 몫(기기 스위치·홈·입장권·그날 물러남·WebKit·홈 화면 앱·열쇠 꺼짐 · 최상위) — 쓸지는 tOutQ 가 다시 정한다(여기서 틀려도 답을 안 쓸 뿐 · 묻기 한 번 버림).
    ⛔ 답(학생 열쇠가 든 사본)은 이 페이지 메모리만(저장소 0) · 판엔 그 판 창·출처로만 · 한 번만(tPreTake). 못 받음(끊김·3초·JSON 아님) = 판이 종전대로 스스로 묻는다.
-   ⚠️ Worker 주소는 onf-frame.js ONF_WHO 의 쌍둥이(이 자리엔 아직 안 실렸다 — 검사 TT-pre 가 같은지 본다). */
+   ⚠️ Worker 주소(W·FB)는 onf-frame.js ONF_W_EDGE·ONF_W_FB 의 쌍둥이(이 자리엔 아직 안 실렸다 — 검사 P2 가 같은지 본다). */
 var tPre = (function () {
   try {
     var q = new URLSearchParams(location.search), sw = q.get('tout'), nv = navigator, ua = nv.userAgent || '', ls = localStorage, day = 86400000;
@@ -39,10 +39,23 @@ var tPre = (function () {
     if (!c || !/^tch\.[A-Za-z0-9_-]{10,600}\.[A-Za-z0-9_-]{20,100}$/.test(c.tk) || !(Number(c.x) > Date.now() / 1000)) return null;            // = tchGet
     var ac = typeof AbortController === 'function' ? new AbortController() : null;
     return { tk: c.tk, p: new Promise(function (ok) {
-      var tm = setTimeout(function () { try { if (ac) ac.abort(); } catch (e) {} ok(null); }, 3000);
-      fetch('https://onf-media.edia--orker.workers.dev/t/home/get', { method: 'POST', body: JSON.stringify({ tk: c.tk }), signal: ac ? ac.signal : undefined })
-        .then(function (r) { return r.json(); })
-        .then(function (j) { clearTimeout(tm); ok(j && typeof j === 'object' ? j : null); }, function () { clearTimeout(tm); ok(null); });
+      var fin = false, tm = setTimeout(function () { end(null); try { if (ac) ac.abort(); } catch (e) {} }, 3000);
+      function end(x) { if (fin) return; fin = true; clearTimeout(tm); ok(x); }
+      var W = 'https://app.ownify.co.kr/w', FB = 'https://onf-media.edia--orker.workers.dev', down = false;   // 🇰🇷 서울 길 · 쌍둥이 = onf-frame.js ONF_W_EDGE·ONF_W_FB(검사 P2) · 물러남 = 같은 키 onfEdgeDown(끄기는 onf-frame.js 쪽 한 곳 + 여기 W 비우기)
+      try { down = !!sessionStorage.getItem('onfEdgeDown'); } catch (e) {}
+      function go(base) {
+        fetch(base + '/t/home/get', { method: 'POST', body: JSON.stringify({ tk: c.tk }), signal: ac ? ac.signal : undefined })
+          .then(function (r) { return r.json(); })
+          .then(function (j) { end(j && typeof j === 'object' ? j : null); },
+            function () {
+              if (base === W && !fin) {   // 서울 길을 JSON 으로 못 읽음(시한 abort 는 fin 이 막는다) → 이 탭은 workers.dev 만 · 한 번 더
+                try { sessionStorage.setItem('onfEdgeDown', '1'); } catch (e) {}
+                try { navigator.sendBeacon(FB + '/clog', JSON.stringify([{ k: 'err', c: 'edgeDown', l: 0 }])); } catch (e) {}
+                go(FB);
+              } else end(null);
+            });
+      }
+      go(W && !down ? W : FB);
     }) };
   } catch (e) { return null; }
 })();</script>

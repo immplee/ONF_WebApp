@@ -18,7 +18,7 @@ const IPHONE = { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS
 const IPAD = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15', platform: 'MacIntel', maxTouchPoints: 5 };
 const KORIGIN = 'https://n-abc-0lu-script.googleusercontent.com';
 const APP = 'https://app.ownify.co.kr', TURL = APP + '/teacher/';
-const WORKER = 'https://onf-media.edia--orker.workers.dev';
+const WORKER = APP + '/w', WORKER_FB = 'https://onf-media.edia--orker.workers.dev';   // 🇰🇷 서울 길(2026-10-30) · 물러남 = workers.dev
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 const now = () => Math.floor(Date.now() / 1000);
 const gtok = (em) => 'x.' + b64({ exp: now() + 3000, hd: 'ownify.co.kr', email: em || 't@ownify.co.kr' }) + '.y';
@@ -451,8 +451,9 @@ t('D2 onf-frame.js 없는 옛 사본 — 입장권 받기·정적 먼저 둘 다
 const HEAD = /<script>(\/\* 🏫 정적 먼저 사본 미리 받기[\s\S]*?)<\/script>/.exec(html);
 function head(store, opt) {
   opt = opt || {};
-  const ls = store || {}, fetches = [];
-  const g = { navigator: Object.assign({}, CHROME, opt.nav || {}), location: { search: opt.search || '' }, URLSearchParams, Date, JSON, Math, Promise, Number,
+  const ls = store || {}, fetches = [], ss = opt.ss || {};
+  const g = { navigator: Object.assign({}, CHROME, opt.nav || {}), location: { search: opt.search || '' },
+    sessionStorage: { getItem: (k) => (k in ss ? ss[k] : null), setItem: (k, v) => { ss[k] = String(v); } }, URLSearchParams, Date, JSON, Math, Promise, Number,
     localStorage: { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } },
     matchMedia: () => ({ matches: false }), setTimeout: (f) => { g.__tm = f; return 1; }, clearTimeout() {}, AbortController,
     fetch: (url, init) => { fetches.push({ url, init }); return opt.fetch ? opt.fetch(url, init) : Promise.resolve({ json: () => Promise.resolve({ ok: true, api: 1, c: {} }) }); } };
@@ -552,9 +553,26 @@ t('W3 tout=2 WebKit 판이 outFail(anon — 익명 다리 꺼진 빌드) → 지
   assert.ok(!N.staticOpen() && N.execOpen());
 });
 
-t('P2 머리의 Worker 주소 = onf-frame.js 상수(ONF.frame.WORKER) 쌍둥이 · 머리 말고 본 스크립트엔 여전히 안 적는다', () => {
-  const R = boot({});
-  assert.deepStrictEqual(HEAD[1].match(/https:\/\/[^'"]+\/t\/home\/get/g), [R.g.ONF.frame.WORKER + '/t/home/get'], '⛔ 머리 Worker 주소가 onf-frame.js 와 다르다');
+t('P2 머리의 Worker 주소(W·FB) = onf-frame.js 상수(ONF_W_EDGE·ONF_W_FB) 쌍둥이 · ONF.frame.WORKER 와도 같다 · 머리 말고 본 스크립트엔 여전히 안 적는다', () => {
+  const R = boot({}), fr = (n) => (new RegExp(n + " = '([^']+)'").exec(FRAMEJS) || [])[1], hd = (n) => (new RegExp("var W = '([^']+)', FB = '([^']+)'").exec(HEAD[1]) || [])[n];
+  assert.ok(fr('ONF_W_EDGE') && hd(1), '⛔ 주소를 못 찾았다');
+  assert.strictEqual(hd(1), fr('ONF_W_EDGE'), '⛔ 머리 서울 길 주소가 onf-frame.js ONF_W_EDGE 와 다르다');
+  assert.strictEqual(hd(2), fr('ONF_W_FB'), '⛔ 머리 물러남 주소가 onf-frame.js ONF_W_FB 와 다르다');
+  assert.strictEqual(hd(1), R.g.ONF.frame.WORKER, '⛔ 머리 주소가 ONF.frame.WORKER 와 다르다');
+  assert.ok(!/https:\/\/[^'"\s]*(workers\.dev|ownify\.co\.kr\/w)/.test(main), '⛔ 본 스크립트에 Worker 주소가 적혀 있다(ONF.frame.WORKER 만)');
+});
+
+t('P2b 머리 서울 길 물러남 — JSON 아님/끊김 → workers.dev 로 한 번 더 + sessionStorage onfEdgeDown · 답은 그쪽 것 · 물러난 탭은 곧장 workers.dev · 시한(abort)은 고장 아님 · 둘 다 끊기면 null', async () => {
+  const mk = (ss, seq) => { let i = 0; return head(eligible({}), { ss, fetch: () => seq[i++]() }); };
+  const J = (o) => () => Promise.resolve({ json: () => Promise.resolve(o) }), HTML = () => Promise.resolve({ json: () => Promise.reject(new SyntaxError('html')) }), NET = () => Promise.reject(new TypeError('net'));
+  const D = { ok: true, api: 1, c: {} };
+  let ss = {}, H = mk(ss, [HTML, J(D)]);
+  assert.deepStrictEqual(await H.pre.p, D); assert.deepStrictEqual(H.fetches.map((f) => f.url), [WORKER + '/t/home/get', WORKER_FB + '/t/home/get']); assert.strictEqual(ss.onfEdgeDown, '1');
+  H = mk(ss, [J(D)]); await H.pre.p; assert.deepStrictEqual(H.fetches.map((f) => f.url), [WORKER_FB + '/t/home/get'], '⛔ 물러난 탭이 서울 길을 또 물었다');
+  ss = {}; H = mk(ss, [NET, NET]); assert.strictEqual(await H.pre.p, null); assert.strictEqual(H.fetches.length, 2);
+  ss = {}; H = mk(ss, [J({ ok: false, why: 'off' })]); assert.deepStrictEqual(await H.pre.p, { ok: false, why: 'off' }); assert.strictEqual(H.fetches.length, 1); assert.ok(!ss.onfEdgeDown, '⛔ JSON 답이 고장으로 쳐졌다');
+  ss = {}; let rej; H = mk(ss, [() => new Promise((_, r) => { rej = r; })]); H.g.__tm(); assert.strictEqual(await H.pre.p, null); rej(new Error('aborted')); await tick();
+  assert.strictEqual(H.fetches.length, 1, '⛔ 시한 뒤 다시 물었다'); assert.ok(!ss.onfEdgeDown, '⛔ 시한이 고장으로 쳐졌다');
 });
 
 t('P3 머리 답 → 판 hello 에 outBoot{tk, d} 한 번(다음 hello 는 종전 {tk}) · 답 전엔 안 보냄 · 못 받음(null)·다른 입장권 = 종전 {tk} · 기다리는 새 물러남 = 안 보냄', async () => {
