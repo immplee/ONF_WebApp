@@ -14,6 +14,9 @@ function t(label, fn) {
   try { fn(); console.log('  ✅ ' + label); pass++; }
   catch (e) { console.log('  ❌ ' + label + '\n     ' + e.message); fail++; }
 }
+const AT = [];   // 비동기 검사(맨 끝에 차례로 돈다)
+function ta(label, fn) { AT.push([label, fn]); }
+const flush = () => new Promise((r) => setImmediate(r));
 function win(name, parent) { const w = { name, sent: [] }; w.parent = parent || w; w.postMessage = (m, o) => w.sent.push([m, o]); return w; }
 const js = (x) => JSON.parse(JSON.stringify(x));
 const ROOT = path.join(__dirname, '..');
@@ -110,11 +113,11 @@ t('S5b out:1 → 액자 주소 = ONF_OUT_BOOK(t= 없음) · 그 액자 창의 ou
   assert.strictEqual(p.kids[0].src, OUT_BOOK, '⛔ hello 가 왔는데 시한으로 지금 길로 물러났다');
 });
 
-t('S5b 사본 힌트가 틀린 꼴이면 cf 는 빼고(null) 보낸다', () => {
+ta('S5b 사본 힌트가 틀린 꼴이면 cf 는 빼고(null) 보낸다', async () => {
   const s = setup();
   s.send({ onf: 'openBook', href: E1, out: 1, cf: { f: 'x' } }, s.homeInner);
   const w = outWin(s, s.panels()[0]);
-  s.send({ onf: 'outHello' }, w, OUT_O);
+  s.send({ onf: 'outHello' }, w, OUT_O); await flush();   // 📖 틀린 힌트 = 없음 → /who(이 대역엔 fetch 가 없어 null)
   assert.deepStrictEqual(boots(w).map((x) => x[0].cf), [null], '⛔ 틀린 cf 를 그대로 넘겼다');
 });
 
@@ -254,12 +257,12 @@ t('S5f out:1 교재를 첫 교재로 기억하면 o:1 — bookWarm 뒤 openBook 
   assert.strictEqual(JSON.parse(ls.m.onfPreBook).o, 1, '⛔ out:1 로 먼저 연 교재를 기억할 때 o:1 이 없다');
 });
 
-t('S5f 다음 홈 열기 — o:1 기억이면 정적 판으로 숨긴 판(park · outBoot src 에 park=1) · o 없는 옛 기억·끈 기기·실패한 날은 지금 길', () => {
+ta('S5f 다음 홈 열기 — o:1 기억이면 정적 판으로 숨긴 판(park · outBoot src 에 park=1) · o 없는 옛 기억·끈 기기·실패한 날은 지금 길', async () => {
   const s = setup({ ls: LSf(PB({ o: 1 })), preKey: 'kA' });
   const box = s.panels()[0];
   assert.ok(box && box.classList.contains('park') && box.kids[0].src === OUT_BOOK, '⛔ o:1 기억인데 정적 판 숨긴 판이 아니다: ' + (box && box.kids[0].src));
   const w = outWin(s, box);
-  s.send({ onf: 'outHello' }, w, OUT_O);
+  s.send({ onf: 'outHello' }, w, OUT_O); await flush();
   assert.deepStrictEqual(boots(w).map((x) => x[0].src), [SRC1 + '&park=1'], '⛔ 숨긴 판 outBoot 에 park=1 이 없다');
   for (const [why, o] of [['옛 기억(o 없음)', { ls: LSf(PB()), preKey: 'kA' }], ['끈 기기', { ls: LSf(PB({ o: 1 })), preKey: 'kA', out: false }],
     ['실패한 날', { ls: LSf(Object.assign(PB({ o: 1 }), { onfOutFail: BLK })), preKey: 'kA' }]]) {
@@ -270,13 +273,13 @@ t('S5f 다음 홈 열기 — o:1 기억이면 정적 판으로 숨긴 판(park �
 
 const vis = (s) => s.panels().filter((p) => !p.classList.contains('park'));   // 보이는 판(아래 shown 과 같다 — 그 줄보다 앞이라)
 /* 2026-10-24 T7 라이브 F2 — 첫 방문은 늘 지금 길이었다: 홈 bookWarm 이 out 을 안 실어 지금 길 숨긴 판을 띄웠고 out:1 누름이 그 판(bookFind)을 썼다 */
-t('S-F2a bookWarm(panel:1, out:1) → 정적 판으로 숨긴 판(park=1) · 기억에 o:1 · 그 뒤 out:1 누름은 그 정적 판을 보인다(새 판 0) · 끈 기기·실패한 날은 지금 길', () => {
+ta('S-F2a bookWarm(panel:1, out:1) → 정적 판으로 숨긴 판(park=1) · 기억에 o:1 · 그 뒤 out:1 누름은 그 정적 판을 보인다(새 판 0) · 끈 기기·실패한 날은 지금 길', async () => {
   const ls = LSf(), s = setup({ ls, preKey: 'kA' });
   s.send({ onf: 'bookWarm', href: E1, panel: 1, out: 1 }, s.homeInner);
   const box = s.panels()[0];
   assert.ok(box && box.classList.contains('park') && box.kids[0].src === OUT_BOOK, '⛔ out:1 미리 받기가 정적 숨긴 판이 아니다: ' + (box && box.kids[0].src));
   const w = outWin(s, box);
-  s.send({ onf: 'outHello' }, w, OUT_O);
+  s.send({ onf: 'outHello' }, w, OUT_O); await flush();
   assert.deepStrictEqual(boots(w).map((x) => x[0].src), [SRC1 + '&park=1'], '⛔ 숨긴 정적 판 outBoot 에 park=1');
   assert.strictEqual(JSON.parse(ls.m.onfPreBook).o, 1, '⛔ out:1 미리 받기인데 기억에 o:1 이 없다(다음 방문 preEarly 가 지금 길)');
   s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
@@ -285,6 +288,19 @@ t('S-F2a bookWarm(panel:1, out:1) → 정적 판으로 숨긴 판(park=1) · 기
     const q = setup(o);
     q.send({ onf: 'bookWarm', href: E1, panel: 1, out: 1 }, q.homeInner);
     assert.strictEqual(q.panels()[0].kids[0].src, SRC1 + '&park=1', '⛔ ' + why + ' 인데 미리 받기가 지금 길이 아니다');
+  }
+});
+ta('S-F2c 📖 홈이 bookWarm 에 사본 힌트(cf · openBook 과 같은 onfSwapCfOf)를 실으면 숨긴 정적 판 outBoot 에 그 cf — /who 0 · 안 실으면(옛 홈) /who 답의 cf(링크 직행과 같은 bookCfFor)', async () => {
+  for (const [why, cf, want, asks] of [['홈 힌트', CF, CF, 0], ['힌트 없음 → /who', undefined, CF, 1], ['/who 도 cf 없음', undefined, null, 1]]) {
+    const calls = [];
+    const s = setup({ preKey: 'kA', pre: (g) => { g.fetch = (u, init) => { calls.push({ u, init }); return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(ANS(want)) }); }; } });
+    s.send({ onf: 'bookWarm', href: E1, panel: 1, out: 1, cf }, s.homeInner);
+    const w = outWin(s, s.panels()[0]);
+    s.send({ onf: 'outHello' }, w, OUT_O); await flush(); await flush();
+    assert.deepStrictEqual(boots(w).map((x) => x[0].cf), [want], '⛔ ' + why + ' — 숨긴 판 cf');
+    const who = calls.filter((c) => /\/who$/.test(c.u));
+    assert.strictEqual(who.length, asks, '⛔ ' + why + ' — /who 횟수');
+    if (asks) assert.deepStrictEqual(JSON.parse(who[0].init.body), { t: 'TOK', slug: 'a-s1-e1-b' }, '⛔ ' + why + ' — /who 몸통(링크 직행과 같은 꼴 · 토큰은 몸통만)');
   }
 });
 t('S-F2b out:1 누름이 찾은 판이 지금 길(exec) 판이면 — 자격 내리고 정적 새 판(out 없는 누름이 정적 판을 내리는 것의 거울) · 끈 기기면 그 판 그대로', () => {
@@ -741,7 +757,7 @@ t('G4 넘겨주기 판이 사는 동안 보이는 정적 판을 만들면 넘겨
 console.log('[🌤 최종 검토 고침 — 2026-10-24]');
 /* I1 정적 판(board)엔 홈 out:1 누름도 안 끼운다 — 정적 판의 다리는 첫 교재에 묶여 O.boot 가 바로 fail → bookSwapEnd 가 지금 길 새 판(≈5초)으로 물러났다(오늘 판 갈아 끼우기 0.5~3초보다 느림).
    그래서 out:1 누름은 새 정적 판(사본 겨루기)으로 · out 없는 누름은 이미 정적 판을 못 고른다(위 I1). */
-t('F-I1 홈이 A(out) 다음 B(out) — B 는 새 정적 판 · A 창에 bookSwap 없음', () => {
+ta('F-I1 홈이 A(out) 다음 B(out) — B 는 새 정적 판 · A 창에 bookSwap 없음', async () => {
   const s = setup({ swap: true });
   s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner);
   const box = s.panels()[0], w = outWin(s, box);
@@ -750,7 +766,7 @@ t('F-I1 홈이 A(out) 다음 B(out) — B 는 새 정적 판 · A 창에 bookSwa
   assert.strictEqual(sentOf(w, 'bookSwap').length, 0, '⛔ 켠 교재를 정적 판(board)에 갈아 끼웠다');
   const v = shown(s);
   assert.ok(v.length === 1 && v[0] !== box && v[0].kids[0].src === OUT_BOOK, '⛔ B 가 새 정적 판으로 안 떴다');
-  const w2 = outWin(s, v[0]); s.send({ onf: 'outHello' }, w2, OUT_O);
+  const w2 = outWin(s, v[0]); s.send({ onf: 'outHello' }, w2, OUT_O); await flush();
   assert.deepStrictEqual(boots(w2).map((x) => x[0].src), [SRC2], '⛔ 새 정적 판에 B 를 안 넘겼다');
 });
 
@@ -768,9 +784,6 @@ t('F-M2 index.html — out=1 이면 onfOutFail 지움 · out=0·없음은 그대
 /* ═══ 🌤 밖으로 2 Task 4(2026-10-24) — 링크 직행 교재(?fileId&sheetName · slug)도 Worker /who 가 cf 를 주면 첫 판(큰 화면)을 정적 판으로 ═══
    묻는 때: 링크 직행 · 토큰 · 기기 out≠0 · 그날 물러남 없음 · 14일 안에 정적 판을 쓴 기기(onfOutUsed) · ⭐ 내 문장·🗂️ 카드 덱·ttok 아님 — 아니면 종전 그대로(요청 0 · 기다림 0).
    WHO_MS 800 안 답이 없거나 실패·ok:false·cf 없음 = 지금 길 · 늦은 답은 판을 안 바꾼다 · 토큰은 몸통에만. */
-const AT = [];
-function ta(label, fn) { AT.push([label, fn]); }
-const flush = () => new Promise((r) => setImmediate(r));
 /* 🇰🇷 서울 길(2026-10-30) — 주소는 onf-frame.js 한 곳(ONF_W_EDGE·ONF_W_FB) · ONF_WHO·ONF_HOME_GET 은 길만 */
 const W_EDGE = (/ONF_W_EDGE = '([^']+)'/.exec(CODE) || [])[1] || 'ONF_W_EDGE 없음', W_FB = (/ONF_W_FB = '([^']+)'/.exec(CODE) || [])[1] || 'ONF_W_FB 없음';
 const WHO = W_EDGE + ((/var ONF_WHO = '([^']+)'/.exec(CODE) || [])[1] || 'ONF_WHO 없음');
@@ -1266,13 +1279,15 @@ ta('S6f 미리 받기(preEarly) — 순서·횟수 무변: 홈 요청(정적 홈
   const oldLog = [], newLog = [];
   const o = hsetup({ home: false, preKey: 'kA', ls: UL(pb), log: oldLog });
   const n = hsetup({ preKey: 'kA', ls: UL(pb), log: newLog });
-  assert.deepStrictEqual(oldLog, ['frame:' + HSRC, 'panel'], '옛 길 순서');
-  assert.deepStrictEqual(newLog, ['fetch:' + HOME_GET, 'frame:' + HOME_URL, 'panel'], '⛔ 미리 받기가 홈 요청보다 먼저 나갔거나 한 번이 아니다');
+  assert.deepStrictEqual(oldLog, ['frame:' + HSRC, 'panel', 'fetch:' + WHO], '옛 길 순서');   // 📖 숨긴 판 사본 힌트 /who(2026-10-30 · bookCfFor) — 판을 띄운 뒤
+  assert.deepStrictEqual(newLog, ['fetch:' + HOME_GET, 'frame:' + HOME_URL, 'panel', 'fetch:' + WHO], '⛔ 미리 받기가 홈 요청보다 먼저 나갔거나 한 번이 아니다');
+  [o, n].forEach((x) => x.calls.filter((c) => c.url === WHO).forEach((c) => c.ok(200, ANS(CF)))); await flush();
   const po = o.panels()[0], pn = n.panels()[0];
   assert.strictEqual(pn.kids[0].src, po.kids[0].src, '⛔ 미리 받은 판 주소가 바뀌었다');
   const wo = outWin(o, po), wn = outWin(n, pn);
-  o.send({ onf: 'outHello' }, wo, OUT_O); n.send({ onf: 'outHello' }, wn, OUT_O);
+  o.send({ onf: 'outHello' }, wo, OUT_O); n.send({ onf: 'outHello' }, wn, OUT_O); await flush();
   assert.deepStrictEqual(boots(wn), boots(wo), '⛔ 미리 받은 판 outBoot 이 바뀌었다');
+  assert.deepStrictEqual(boots(wn).map((x) => x[0].cf), [CF], '⛔ 미리 띄운 숨긴 판에 /who 사본 힌트가 안 실렸다(Worker boot 0 · 다리 2.9~4.3초 — 2026-10-30 라이브)');
 });
 
 ta('S6 index.html — mount 에 홈 표시(home)를 넘긴다(PREBOOK 끔과 무관) · out=1 은 홈 물러남(onfOutFailHome)도 지운다', async () => {
