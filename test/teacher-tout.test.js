@@ -10,6 +10,7 @@ const vm = require('vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
 const main = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((s) => s.includes('var CLIENT_ID'));
+const SW = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((s) => s.includes('function toutOf'));   // 머리 기기 스위치 판정(본 스크립트 TOUTV 가 부른다)
 const FRAMEJS = fs.readFileSync(path.join(__dirname, '..', 'assets', 'onf-frame.js'), 'utf8');
 
 const CHROME = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36', platform: 'MacIntel', maxTouchPoints: 0 };
@@ -27,6 +28,8 @@ const odk = () => 'odk1.' + b64({ email: 't@ownify.co.kr', hd: 'ownify.co.kr', i
 const tkMail = (tk) => JSON.parse(Buffer.from(tk.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()).e;
 const tchCell = (days, tag) => JSON.stringify({ tk: tch(tag), x: now() + Math.round(days * 86400) });
 const tick = () => new Promise((r) => setImmediate(r));
+//   🏫 기본값(머리 TOUT_DEF · 2026-10-30 넓히기 준비) — 시험 '0' · 켜기 커밋 '2'. 「스위치 꺼진 기기」를 보는 검사는 OFF 를 깐다(기본 '0' 이면 빈 칸 = 종전 그대로)
+const DEF = /^var TOUT_DEF = '([012])';/m.exec(html)[1], OFF = DEF === '0' ? {} : { onf_tout: '0' };
 
 /* 껍데기 본 스크립트를 통째로 돌린다 — fetch·시계·액자 창은 대역 · 판 말은 손으로 쏜다 */
 function boot(store, opt) {
@@ -66,7 +69,7 @@ function boot(store, opt) {
     vm.createContext(g); g.window = g; g.top = g; g.self = g;
     vm.runInContext(FRAMEJS, g);                                     // 진짜 onf-frame.js — ONF.frame.WORKER·OUT_BOOK·isAppOrigin 을 그쪽에서
   } else { g.window = g; g.top = g; g.self = g; vm.createContext(g); }
-  vm.runInContext(main, g);
+  vm.runInContext(SW + '\n' + main, g);
   const R = {
     g, ls, ss, els, calls, logs, fetches, nav, sent, win,
     advance(ms) {
@@ -132,7 +135,7 @@ t('A2 홈 화면 앱 리디렉트 길(gsiBack · sessionStorage onf_gsi)도 /t/l
 
 t('A2b WebKit(사파리·아이폰 크롬·아이패드 · devkeyOff)도 /t/login 입장권은 받는다 — 기기 열쇠처럼 저장은 안 하고 이 페이지 메모리에만', async () => {
   for (const nav of [MACSAFARI, IPHONE, IPAD]) {
-    const R = boot({}, { nav });
+    const R = boot({ ...OFF }, { nav });
     login(R); await tick(); await tick();
     assert.strictEqual(R.fetches.length, 1, '⛔ WebKit 에서 입장권을 안 받았다: ' + nav.platform);
     assert.ok(!('onf_tch' in R.ls), '⛔ WebKit 이 30일 입장권을 저장소에 남겼다: ' + nav.platform);
@@ -140,7 +143,7 @@ t('A2b WebKit(사파리·아이폰 크롬·아이패드 · devkeyOff)도 /t/logi
     R.g.tchDrop(); assert.strictEqual(R.g.tchGet(), null);
   }
   //   기기 열쇠를 7일 끈 크롬(DK_OFF)도 같은 규칙(devkeyOff)
-  const K = boot({ onf_devkey_off: String(Date.now()) });
+  const K = boot({ onf_devkey_off: String(Date.now()), ...OFF });
   login(K); await tick(); await tick();
   assert.ok(!('onf_tch' in K.ls) && K.g.tchGet());
 });
@@ -168,11 +171,11 @@ t('A2c 계정이 바뀌면(같은 컴퓨터 Mary → Peter) 7일 규칙 없이 �
 });
 
 t('A2d 「다른 계정으로」 두 갈래(잠금 화면 버튼 · 안쪽 🔒 other) 모두 입장권도 버린다', async () => {
-  const R = boot({ onf_tch: tchCell(20) });
+  const R = boot({ onf_tch: tchCell(20), ...OFF });
   login(R, 'x.' + b64({ exp: now() + 3000, email: 'me@gmail.com' }) + '.y');   // 회사 밖 계정 → 버튼이 뜬다
   R.els.other.onclick();
   assert.ok(!('onf_tch' in R.ls), '⛔ 잠금 화면 「다른 계정으로」가 입장권을 남겼다');
-  const K = boot({ onf_tch: tchCell(20) });
+  const K = boot({ onf_tch: tchCell(20), ...OFF });
   login(K); K.knockG();
   K.fire({ onf: 'auth-please', stale: true, other: true }, K.lastSrc, KORIGIN);
   assert.ok(!('onf_tch' in K.ls), '⛔ 안쪽 「다른 계정으로 로그인」이 입장권을 남겼다');
@@ -205,7 +208,7 @@ t('A4 실패·꺼짐 = 조용히 지금 길 — 503 off·unverified · 400 · �
 });
 
 t('B0 꺼짐(tout 없음 · 기본) = 지금 길 그대로 — 입장권이 있어도 정적 판을 안 열고 · 정적 출처 노크·판 말은 버린다 · 구글 노크엔 종전 답', async () => {
-  for (const st of [{ onf_tch: tchCell(20) }, { onf_tch: tchCell(20), onf_tout: '0' }]) {
+  for (const st of [{ onf_tch: tchCell(20), ...OFF }, { onf_tch: tchCell(20), onf_tout: '0' }]) {
     const R = boot(st), tok = gtok();
     login(R, tok);
     assert.ok(!R.staticOpen() && R.execOpen(), '⛔ 꺼짐에 정적 판을 열었다');
@@ -458,7 +461,7 @@ function head(store, opt) {
     matchMedia: () => ({ matches: false }), setTimeout: (f) => { g.__tm = f; return 1; }, clearTimeout() {}, AbortController,
     fetch: (url, init) => { fetches.push({ url, init }); return opt.fetch ? opt.fetch(url, init) : Promise.resolve({ json: () => Promise.resolve({ ok: true, api: 1, c: {} }) }); } };
   g.window = g; g.top = opt.framed ? {} : g; g.self = g;
-  vm.createContext(g); vm.runInContext(HEAD[1], g);
+  vm.createContext(g); vm.runInContext(SW + '\n' + HEAD[1], g);
   return { g, fetches, pre: g.tPre };
 }
 const eligible = (o) => Object.assign({ onf_tout: '1', onf_tch: tchCell(20) }, o);
@@ -519,6 +522,24 @@ t('W1 tout=2 · WebKit·홈 화면 앱 + 입장권 → 구글 버튼 로그인 �
   const Z = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { search: '?tout=0', nav: IPAD }); login(Z);
   assert.ok(Z.ls.onf_tout === '0' && !Z.staticOpen());
 });
+t('D0 기본값 한 곳(머리 toutOf · TOUT_DEF) — 주소 > 기억 > 기본 · 기본은 \'0\'(시험) 또는 \'2\'(넓힘: 크롬 류 + WebKit·홈 화면 앱 — 익명 다리 꺼진 빌드면 판 outFail anon) · ?tout=0 은 기본보다 앞선다 · 머리·본 스크립트 같은 답', async () => {
+  assert.ok(DEF === '0' || DEF === '2', '⛔ 기본값이 0·2 가 아니다(1 이면 익명 다리가 켜져도 WebKit 을 뺀다): ' + DEF);
+  assert.strictEqual((html.match(/function toutOf\(/g) || []).length, 1, '⛔ 판정 함수가 한 벌이 아니다');
+  assert.ok(HEAD[1].includes("toutOf(sw, ls.getItem('onf_tout'))") && !/\? sw : ls\.getItem\('onf_tout'\)/.test(HEAD[1]), '⛔ 머리가 스위치를 따로 판정한다');
+  const T = boot({}).g.toutOf;
+  for (const [sw, kept, want] of [['1', '0', '1'], ['2', null, '2'], ['0', '2', '0'], [null, '1', '1'], [null, '0', '0'], [null, null, DEF], ['x', 'y', DEF], [null, '', DEF]]) assert.strictEqual(T(sw, kept), want, JSON.stringify([sw, kept]));
+  //   주소·기억 없는 기기 — 크롬 = 기본이 0 아니면 정적 먼저 · WebKit(아이패드) = 기본 2 일 때만
+  for (const [nav, on] of [[CHROME, DEF !== '0'], [IPAD, DEF === '2'], [Object.assign({ standalone: true }, IPAD), DEF === '2']]) {
+    const R = boot({ onf_tch: tchCell(20) }, { nav }); login(R); await tick(); await tick();
+    assert.strictEqual(R.staticOpen(), on, '⛔ 기본값 ' + DEF + ' 인데 ' + nav.platform + (nav.standalone ? '(홈 화면 앱)' : '') + ' 정적 먼저=' + R.staticOpen());
+    assert.ok(!('onf_tout' in R.ls), '⛔ 기본값을 기기에 기억했다(다음에 기본을 바꿔도 안 따라온다)');
+    assert.strictEqual(head({ onf_tch: tchCell(20) }, { nav }).fetches.length === 1, on, '⛔ 머리 미리 받기가 기본값을 다르게 본다: ' + nav.platform);
+  }
+  const Z = boot({ onf_tch: tchCell(20) }, { search: '?tout=0' }); login(Z);
+  assert.ok(Z.ls.onf_tout === '0' && !Z.staticOpen(), '⛔ ?tout=0 이 기본을 못 이겼다');
+  const Y = boot({ onf_tch: tchCell(20), onf_tout: '0' }, { nav: IPAD }); login(Y); await tick();
+  assert.ok(!Y.staticOpen(), '⛔ 기억된 0 이 기본을 못 이겼다');
+});
 
 t('W2 tout=2 WebKit 입장권은 저장소에 남는다(다음 열기) — /t/login 답 · 구글 홈이 준 입장권(BOOT.tch) 둘 다 · tout 없으면 종전대로 메모리만 · 저장 실패 = 메모리', async () => {
   for (const nav of [IPHONE, IPAD, Object.assign({ standalone: true }, IPAD)]) {
@@ -536,7 +557,7 @@ t('W2 tout=2 WebKit 입장권은 저장소에 남는다(다음 열기) — /t/lo
     const N = boot({ onf_tout: '2', onf_tch: G.ls.onf_tch }, { nav }); login(N);
     assert.deepStrictEqual(N.nav, [TURL], '⛔ 받아 둔 입장권으로 다음 열기가 정적 먼저를 안 탔다');
   }
-  const M = boot({}, { nav: IPAD }); login(M); await tick(); await tick();
+  const M = boot({ ...OFF }, { nav: IPAD }); login(M); await tick(); await tick();
   assert.ok(!('onf_tch' in M.ls) && M.g.tchGet(), '⛔ tout 없는 WebKit 이 입장권을 저장소에 남겼다(또는 메모리에도 없다)');
   const F = boot({ onf_tout: '2' }, { nav: IPAD }); F.g.localStorage.setItem = () => { throw new Error('QuotaExceeded'); };
   login(F); await tick(); await tick();
@@ -598,7 +619,7 @@ t('P3 머리 답 → 판 hello 에 outBoot{tk, d} 한 번(다음 hello 는 종�
   R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'outFail', why: 'error' }); res2(D); await tick(); await tick();
   assert.ok(!R.sentTo(APP).some((m) => m.onf === 'outBoot'), '⛔ 물러난 판에 사본을 보냈다');
   //   정적 먼저를 안 타면(스위치 꺼짐) 사본을 버린다
-  const K = boot({ onf_tch: tchCell(20) }); K.g.tPre = { tk: 'x', p: Promise.resolve(D) }; login(K);
+  const K = boot({ onf_tch: tchCell(20), ...OFF }); K.g.tPre = { tk: 'x', p: Promise.resolve(D) }; login(K);
   assert.ok(K.execOpen() && K.g.tPre === null, '⛔ 안 쓰는 사본을 잡고 있다');
 });
 
@@ -626,13 +647,13 @@ t('G1 기기 열쇠(odk1 · reuse)로 연 구글 홈이 넘긴 입장권 { onf:\
 
 t('G2 구글 홈 입장권 — 같은 계정 것이 7일 넘게 남았으면 안 바꾼다 · 7일 이하·다른 계정 것은 바꾼다 · 열쇠 못 쓰는 기기(devkeyOff)는 메모리만 · 정적 판 창은 못 넣는다', async () => {
   const keep = tchCell(20, 'old');
-  const A = boot({ onf_id_tok: odk(), onf_tch: keep }); A.knockG(); A.fire({ onf: 'tch', tk: tch('new') }, A.lastSrc, KORIGIN);
+  const A = boot({ onf_id_tok: odk(), onf_tch: keep, ...OFF }); A.knockG(); A.fire({ onf: 'tch', tk: tch('new') }, A.lastSrc, KORIGIN);
   assert.strictEqual(A.ls.onf_tch, keep, '⛔ 넉넉한 입장권을 갈아 끼웠다');
-  const B = boot({ onf_id_tok: odk(), onf_tch: tchCell(5, 'old') }); B.knockG(); const nt = tch('new'); B.fire({ onf: 'tch', tk: nt }, B.lastSrc, KORIGIN);
+  const B = boot({ onf_id_tok: odk(), onf_tch: tchCell(5, 'old'), ...OFF }); B.knockG(); const nt = tch('new'); B.fire({ onf: 'tch', tk: nt }, B.lastSrc, KORIGIN);
   assert.strictEqual(JSON.parse(B.ls.onf_tch).tk, nt, '⛔ 7일 이하 입장권을 안 바꿨다');
-  const M = boot({ onf_id_tok: odk(), onf_tch: JSON.stringify({ tk: tch('m', 'mary@ownify.co.kr'), x: now() + 25 * 86400 }) }); M.knockG(); M.fire({ onf: 'tch', tk: nt }, M.lastSrc, KORIGIN);
+  const M = boot({ onf_id_tok: odk(), onf_tch: JSON.stringify({ tk: tch('m', 'mary@ownify.co.kr'), x: now() + 25 * 86400 }), ...OFF }); M.knockG(); M.fire({ onf: 'tch', tk: nt }, M.lastSrc, KORIGIN);
   assert.strictEqual(JSON.parse(M.ls.onf_tch).tk, nt, '⛔ 다른 계정 입장권을 남겼다');
-  const K = boot({ onf_devkey_off: String(Date.now()) }, { fetch: () => ({ status: 503, body: { ok: false, reason: 'off' } }) });
+  const K = boot({ onf_devkey_off: String(Date.now()), ...OFF }, { fetch: () => ({ status: 503, body: { ok: false, reason: 'off' } }) });
   login(K); K.knockG(); K.fire({ onf: 'tch', tk: nt }, K.lastSrc, KORIGIN);
   assert.ok(!('onf_tch' in K.ls) && K.g.tchGet().tk === nt, '⛔ 열쇠 못 쓰는 기기가 입장권을 저장소에 남겼다(또는 메모리에도 없다)');
   const S = boot({ onf_tch: tchCell(20), onf_tout: '1' }); login(S); S.fromApp({ onf: 'outHello' }); S.fromApp({ onf: 'auth-please' });

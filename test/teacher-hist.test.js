@@ -348,6 +348,7 @@ t('토큰 전의 노크: appWin 은 정하되 아무것도 안 보낸다 → 로
 console.log('\n[껍데기 기기 열쇠]');
 const DA = src.indexOf('/* onf-devkey:begin */'), DB = src.indexOf('/* onf-devkey:end */');
 const TA = src.indexOf('var TOKKEY'), TB = src.indexOf('function say(');
+const SW = [...src.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((s) => s.includes('function toutOf'));   // 머리 기기 스위치 판정(TOUTV 가 부른다)
 const NOW = () => Math.floor(Date.now() / 1000);
 const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 /** 서버 꼴의 가짜 열쇠 — 본문 {email,hd,iat,exp} · 서명은 가짜. o 로 칸을 바꾼다(undefined 면 빠진다). */
@@ -367,7 +368,7 @@ function runDevkey(opt) {
     localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { calls.push('setItem'); store[k] = String(v); },
       removeItem: (k) => { calls.push('removeItem'); delete store[k]; } } };
   vm.createContext(c);
-  vm.runInContext(src.slice(TA, TB) + src.slice(KA, KB) + src.slice(DA, DB), c, { filename: 'onf-devkey-block' });
+  vm.runInContext(SW + '\n' + src.slice(TA, TB) + src.slice(KA, KB) + src.slice(DA, DB), c, { filename: 'onf-devkey-block' });
   const inner = mkWin('inner2', mkWin('inner1', exec, sent), sent);       // 라이브 깊이 2(exec → sandboxFrame → userHtmlFrame)
   const R = { c, sent, calls, store, inner,
     post: (d, o) => L.message.forEach((f) => f({ data: d, source: (o && 'source' in o) ? o.source : inner, origin: (o && 'origin' in o) ? o.origin : KORIGIN })),
