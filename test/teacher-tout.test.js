@@ -506,6 +506,65 @@ t('P3 머리 답 → 판 hello 에 outBoot{tk, d} 한 번(다음 hello 는 종�
   assert.ok(K.execOpen() && K.g.tPre === null, '⛔ 안 쓰는 사본을 잡고 있다');
 });
 
+t('G1 기기 열쇠(odk1 · reuse)로 연 구글 홈이 넘긴 입장권 { onf:\'tch\', tk } — 정한 그 구글 창·출처만 · 같은 계정만 · 만료는 본문 x · 칸 꼴 {tk, x}', () => {
+  const R = boot({ onf_id_tok: odk() });
+  assert.ok(R.execOpen() && !R.staticOpen(), '전제: 입장권 없는 열쇠 길 = 지금 길');
+  const tk = tch('gas');
+  R.fire({ onf: 'tch', tk }, R.win, KORIGIN);
+  assert.ok(!('onf_tch' in R.ls), '⛔ 노크 전(창을 정하기 전)에 받았다');
+  R.knockG();
+  R.fire({ onf: 'tch', tk }, { parent: null }, KORIGIN);
+  R.fire({ onf: 'tch', tk }, R.lastSrc, 'https://evil.googleusercontent.com.example');
+  assert.ok(!('onf_tch' in R.ls), '⛔ 정한 창·출처가 아닌 말을 받았다');
+  for (const bad of [tch('m', 'mary@ownify.co.kr'), 'odk1.' + tk.slice(4), 'tch.' + b64({ e: 't@ownify.co.kr', x: now() - 5 }) + '.' + 'S'.repeat(43), 'tch.x.y', 7, null])
+    R.fire({ onf: 'tch', tk: bad }, R.lastSrc, KORIGIN);
+  assert.ok(!('onf_tch' in R.ls), '⛔ 다른 계정·꼴 틀림·만료 입장권을 받았다');
+  R.fire({ onf: 'tch', tk, x: now() + 999 * 86400 }, R.lastSrc, KORIGIN);
+  const c = JSON.parse(R.ls.onf_tch);
+  assert.deepStrictEqual(c, { tk, x: JSON.parse(Buffer.from(tk.split('.')[1], 'base64').toString()).x }, '⛔ 칸 꼴 · 만료는 본문 x 에서');
+  assert.ok(R.fetches.every((f) => !/\/t\/login$/.test(f.url)), '⛔ 받은 입장권으로 /t/login 을 또 불렀다');
+  //   다음 열기 = 정적 먼저(기기 스위치 켠 기기)
+  const N = boot({ onf_id_tok: odk(), onf_tch: R.ls.onf_tch, onf_tout: '1' });
+  assert.ok(N.staticOpen(), '⛔ 받아 둔 입장권으로 다음 열기가 정적 먼저를 안 탔다');
+});
+
+t('G2 구글 홈 입장권 — 같은 계정 것이 7일 넘게 남았으면 안 바꾼다 · 7일 이하·다른 계정 것은 바꾼다 · 열쇠 못 쓰는 기기(devkeyOff)는 메모리만 · 정적 판 창은 못 넣는다', async () => {
+  const keep = tchCell(20, 'old');
+  const A = boot({ onf_id_tok: odk(), onf_tch: keep }); A.knockG(); A.fire({ onf: 'tch', tk: tch('new') }, A.lastSrc, KORIGIN);
+  assert.strictEqual(A.ls.onf_tch, keep, '⛔ 넉넉한 입장권을 갈아 끼웠다');
+  const B = boot({ onf_id_tok: odk(), onf_tch: tchCell(5, 'old') }); B.knockG(); const nt = tch('new'); B.fire({ onf: 'tch', tk: nt }, B.lastSrc, KORIGIN);
+  assert.strictEqual(JSON.parse(B.ls.onf_tch).tk, nt, '⛔ 7일 이하 입장권을 안 바꿨다');
+  const M = boot({ onf_id_tok: odk(), onf_tch: JSON.stringify({ tk: tch('m', 'mary@ownify.co.kr'), x: now() + 25 * 86400 }) }); M.knockG(); M.fire({ onf: 'tch', tk: nt }, M.lastSrc, KORIGIN);
+  assert.strictEqual(JSON.parse(M.ls.onf_tch).tk, nt, '⛔ 다른 계정 입장권을 남겼다');
+  const K = boot({ onf_devkey_off: String(Date.now()) }, { fetch: () => ({ status: 503, body: { ok: false, reason: 'off' } }) });
+  login(K); K.knockG(); K.fire({ onf: 'tch', tk: nt }, K.lastSrc, KORIGIN);
+  assert.ok(!('onf_tch' in K.ls) && K.g.tchGet().tk === nt, '⛔ 열쇠 못 쓰는 기기가 입장권을 저장소에 남겼다(또는 메모리에도 없다)');
+  const S = boot({ onf_tch: tchCell(20), onf_tout: '1' }); login(S); S.fromApp({ onf: 'outHello' }); S.fromApp({ onf: 'auth-please' });
+  const before = S.ls.onf_tch; S.fromApp({ onf: 'tch', tk: tch('static') });
+  assert.strictEqual(S.ls.onf_tch, before, '⛔ 정적 판 창이 입장권을 갈아 끼웠다');
+});
+
+t('G3 스스로 다시 연 자리 = clog 한 줄(reopen:<까닭> · 기기 꼴 · 값 없음 · sendBeacon) — 열쇠 덫 새로 읽기 · 정적 먼저 물러남(hello·fail) · 다시 로그인(stale)', () => {
+  const beacons = [], nav = { sendBeacon: (u, b) => { beacons.push({ u, b: JSON.parse(b) }); return true; } };
+  const K = boot({ onf_id_tok: odk() }, { nav }); K.load(); K.advance(8000);
+  assert.strictEqual(K.calls.filter((c) => c === 'reload').length, 1, '전제: 열쇠 덫이 새로 읽었다');
+  assert.deepStrictEqual(beacons.map((x) => x.b), [[{ k: 'err', c: 'reopen:key-noknock', d: 'mac' }]], '⛔ 열쇠 덫 새로 읽기 기록이 없다');
+  assert.strictEqual(beacons[0].u, WORKER + '/clog');
+  beacons.length = 0;
+  const T = boot({ onf_tch: tchCell(20), onf_tout: '1' }, { nav }); login(T); T.advance(3000);
+  const U = boot({ onf_tch: tchCell(20), onf_tout: '1' }, { nav }); login(U); U.fromApp({ onf: 'outHello' }); U.fromApp({ onf: 'outFail', why: 'copy' });
+  const V = boot({ onf_tch: tchCell(20), onf_tout: '1' }, { nav }); login(V); V.fromApp({ onf: 'outFail', why: '<b>Bad' });
+  assert.deepStrictEqual(beacons.map((x) => x.b[0].c), ['reopen:tout-hello', 'reopen:tout-fail-copy', 'reopen:tout-fail-x']);
+  beacons.length = 0;
+  const S = boot({ onf_id_tok: odk() }, { nav }); S.knockG(); S.fire({ onf: 'auth-please', stale: true }, S.lastSrc, KORIGIN);
+  assert.deepStrictEqual(beacons.map((x) => x.b[0].c), ['reopen:stale-key']);
+  const all = JSON.stringify(beacons);
+  assert.ok(all.indexOf('tch.') < 0 && all.indexOf('odk1.') < 0 && all.indexOf('@') < 0, '⛔ 기록에 토큰·이메일');
+  //   sendBeacon 없는 브라우저 = 조용히 안 보낸다(화면 일은 그대로)
+  const Q = boot({ onf_id_tok: odk() }); Q.load(); Q.advance(8000);
+  assert.strictEqual(Q.calls.filter((c) => c === 'reload').length, 1);
+});
+
 (async () => {
   for (const [label, fn] of tests) {
     try { await fn(); console.log('  ✅ ' + label); pass++; }
