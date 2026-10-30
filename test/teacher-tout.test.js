@@ -21,8 +21,10 @@ const APP = 'https://app.ownify.co.kr', TURL = APP + '/teacher/';
 const WORKER = 'https://onf-media.edia--orker.workers.dev';
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 const now = () => Math.floor(Date.now() / 1000);
-const gtok = () => 'x.' + b64({ exp: now() + 3000, hd: 'ownify.co.kr', email: 't@ownify.co.kr' }) + '.y';
-const tch = (tag) => 'tch.' + b64({ e: 't@ownify.co.kr', n: 'Luna', o: 0, iat: now(), x: now() + 30 * 86400, z: tag || 'a' }) + '.' + 'S'.repeat(43);
+const gtok = (em) => 'x.' + b64({ exp: now() + 3000, hd: 'ownify.co.kr', email: em || 't@ownify.co.kr' }) + '.y';
+const tch = (tag, em) => 'tch.' + b64({ e: em || 't@ownify.co.kr', n: 'Luna', o: 0, iat: now(), x: now() + 30 * 86400, z: tag || 'a' }) + '.' + 'S'.repeat(43);
+const odk = () => 'odk1.' + b64({ email: 't@ownify.co.kr', hd: 'ownify.co.kr', iat: now(), exp: now() + 30 * 86400 }) + '.sig';
+const tkMail = (tk) => JSON.parse(Buffer.from(tk.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()).e;
 const tchCell = (days, tag) => JSON.stringify({ tk: tch(tag), x: now() + Math.round(days * 86400) });
 const tick = () => new Promise((r) => setImmediate(r));
 
@@ -80,7 +82,7 @@ function boot(store, opt) {
     load() { (els.app._on.load || []).forEach((f) => f({ type: 'load' })); },
     fire(data, source, origin) { (handlers.message || []).slice().forEach((h) => h({ data, source, origin })); },
     fromApp(data) { R.fire(data, win, APP); },                       // 정적 판(액자 직접 자식 · 정적 출처)
-    knockG(src) { R.fire({ onf: 'auth-please', stale: false }, src || { parent: win, postMessage(m, o) { sent.push({ m: JSON.parse(JSON.stringify(m)), o, g: 1 }); } }, KORIGIN); },
+    knockG(src) { R.lastSrc = src || { parent: win, postMessage(m, o) { sent.push({ m: JSON.parse(JSON.stringify(m)), o, g: 1 }); } }; R.fire({ onf: 'auth-please', stale: false }, R.lastSrc, KORIGIN); },
     opened: () => nav.concat([String(els.app.src || '')]).filter(Boolean),
     execOpen: () => R.opened().some((u) => /AKfycb/.test(u)),
     staticOpen: () => R.opened().some((u) => u === TURL),
@@ -128,13 +130,52 @@ t('A2 홈 화면 앱 리디렉트 길(gsiBack · sessionStorage onf_gsi)도 /t/l
   assert.ok(!('onf_gsi' in R.ss), '⛔ 한 번 쓴 리디렉트 토큰이 남았다');
 });
 
-t('A2b WebKit(사파리·아이폰 크롬·아이패드)도 로그인 → /t/login 입장권은 받는다', async () => {
+t('A2b WebKit(사파리·아이폰 크롬·아이패드 · devkeyOff)도 /t/login 입장권은 받는다 — 기기 열쇠처럼 저장은 안 하고 이 페이지 메모리에만', async () => {
   for (const nav of [MACSAFARI, IPHONE, IPAD]) {
     const R = boot({}, { nav });
     login(R); await tick(); await tick();
     assert.strictEqual(R.fetches.length, 1, '⛔ WebKit 에서 입장권을 안 받았다: ' + nav.platform);
-    assert.ok(/^tch\./.test(JSON.parse(R.ls.onf_tch).tk));
+    assert.ok(!('onf_tch' in R.ls), '⛔ WebKit 이 30일 입장권을 저장소에 남겼다: ' + nav.platform);
+    assert.ok(/^tch\./.test(R.g.tchGet().tk), '⛔ 메모리에도 없다');
+    R.g.tchDrop(); assert.strictEqual(R.g.tchGet(), null);
   }
+  //   기기 열쇠를 7일 끈 크롬(DK_OFF)도 같은 규칙(devkeyOff)
+  const K = boot({ onf_devkey_off: String(Date.now()) });
+  login(K); await tick(); await tick();
+  assert.ok(!('onf_tch' in K.ls) && K.g.tchGet());
+});
+
+t('A2c 계정이 바뀌면(같은 컴퓨터 Mary → Peter) 7일 규칙 없이 옛 입장권을 버리고 새로 묻는다 · 그 사이 옛 계정으로 정적 먼저를 안 연다', async () => {
+  const R = boot({ onf_tch: JSON.stringify({ tk: tch('m', 'mary@ownify.co.kr'), x: now() + 25 * 86400 }), onf_tout: '1' });
+  login(R, gtok('peter@ownify.co.kr'));
+  assert.ok(!R.staticOpen() && R.execOpen(), '⛔ 다른 계정의 입장권으로 정적 먼저를 열었다');
+  R.fromApp({ onf: 'outHello' });
+  assert.ok(!R.sent.some((x) => x.m.onf === 'outBoot'), '⛔ 다른 계정의 입장권을 줬다');
+  await tick(); await tick();
+  assert.strictEqual(R.fetches.length, 1, '⛔ 다른 계정인데 /t/login 을 안 불렀다');
+  //   대소문자만 다르면 같은 계정(안 묻는다)
+  const S = boot({ onf_tch: JSON.stringify({ tk: tch('p', 'peter@ownify.co.kr'), x: now() + 25 * 86400 }), onf_tout: '1' });
+  login(S, gtok('Peter@Ownify.co.kr')); await tick();
+  assert.strictEqual(S.fetches.length, 0); assert.ok(S.staticOpen());
+  //   실패해도 옛 계정 칸은 안 돌아온다
+  const F = boot({ onf_tch: JSON.stringify({ tk: tch('m', 'mary@ownify.co.kr'), x: now() + 25 * 86400 }) }, { fetch: () => ({ status: 503, body: { ok: false, reason: 'off' } }) });
+  login(F, gtok('peter@ownify.co.kr')); await tick(); await tick();
+  assert.ok(!('onf_tch' in F.ls), '⛔ 다른 계정 입장권이 남았다');
+  //   새로 받은 것은 새 계정
+  const N = boot({ onf_tch: JSON.stringify({ tk: tch('m', 'mary@ownify.co.kr'), x: now() + 25 * 86400 }) }, { fetch: () => ({ status: 200, body: { ok: true, tk: tch('p', 'peter@ownify.co.kr'), x: now() + 30 * 86400 } }) });
+  login(N, gtok('peter@ownify.co.kr')); await tick(); await tick();
+  assert.strictEqual(tkMail(JSON.parse(N.ls.onf_tch).tk), 'peter@ownify.co.kr');
+});
+
+t('A2d 「다른 계정으로」 두 갈래(잠금 화면 버튼 · 안쪽 🔒 other) 모두 입장권도 버린다', async () => {
+  const R = boot({ onf_tch: tchCell(20) });
+  login(R, 'x.' + b64({ exp: now() + 3000, email: 'me@gmail.com' }) + '.y');   // 회사 밖 계정 → 버튼이 뜬다
+  R.els.other.onclick();
+  assert.ok(!('onf_tch' in R.ls), '⛔ 잠금 화면 「다른 계정으로」가 입장권을 남겼다');
+  const K = boot({ onf_tch: tchCell(20) });
+  login(K); K.knockG();
+  K.fire({ onf: 'auth-please', stale: true, other: true }, K.lastSrc, KORIGIN);
+  assert.ok(!('onf_tch' in K.ls), '⛔ 안쪽 「다른 계정으로 로그인」이 입장권을 남겼다');
 });
 
 t('A3 남은 7일 넘으면 안 묻는다 · 7일 이하·만료·깨진 칸이면 새로', async () => {
@@ -307,6 +348,69 @@ t('C1 출처 자물쇠 — 정적 먼저 동안 노크·판 말(bookFrom 홈)은
 t('C2 과제 판(hwbook) 노크 자물쇠는 그대로 googleusercontent 만', () => {
   const blk = main.slice(main.indexOf('/* onf-hwbook:begin */'));
   assert.ok(/if \(hwFr && hwFrom\(ev\.source\)\) \{[^\n]*\n\s*try \{ if \(!\/\(\^\|\\\.\)googleusercontent\\\.com\$\/\.test\(new URL\(ev\.origin\)\.hostname\)\) return; \}/.test(blk), '⛔ 과제 판 노크 자물쇠가 바뀌었다');
+});
+
+t('E1 정적 화면이 노크한 뒤 그리기 전 outFail → 노크 칸을 비워 지금 길 구글 노크를 받는다(구글 토큰으로 답)', async () => {
+  const R = boot({ onf_tch: tchCell(20), onf_tout: '1' }), tok = gtok();
+  login(R, tok); R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'auth-please', stale: false });
+  R.fromApp({ onf: 'outFail', why: 'error' });
+  R.sent.length = 0; R.knockG();
+  assert.deepStrictEqual(R.sent.map((x) => x.m), [{ onf: 'auth', token: tok, hist: 1 }], '⛔ 물러난 뒤에도 노크 칸이 정적 창에 박혔다');
+});
+
+t('E2 열쇠 길(받아 둔 odk1 · reuse) + 정적 먼저 — 정적 문서 load 를 8초 덫이 안 세고 · 정적 노크가 「한 번 막힘」을 안 지운다 · 물러난 뒤엔 덫이 종전대로', async () => {
+  const store = { onf_id_tok: odk(), onf_tch: tchCell(20), onf_tout: '1', onf_devkey_try: String(Date.now()) };
+  const R = boot(store);
+  assert.deepStrictEqual(R.nav, [TURL], '⛔ 열쇠 길에서 정적 먼저를 안 했다');
+  R.load(); R.fromApp({ onf: 'outHello' }); R.advance(2000); R.fromApp({ onf: 'homeDrawn' }); R.fromApp({ onf: 'auth-please' });
+  R.advance(60000);
+  assert.strictEqual(R.calls.filter((c) => c === 'reload').length, 0, '⛔ 정적 문서 load 를 열쇠 덫이 셌다(새로 읽기)');
+  assert.ok('onf_devkey_try' in store, '⛔ 정적 홈이 뜬 것을 열쇠 길이 뜬 것으로 쳤다');
+  assert.ok('onf_id_tok' in store);
+  const Q = boot({ onf_id_tok: odk(), onf_tch: tchCell(20), onf_tout: '1' });
+  Q.load(); Q.fromApp({ onf: 'outFail', why: 'none' });
+  Q.load(); Q.advance(8000);
+  assert.strictEqual(Q.calls.filter((c) => c === 'reload').length, 1, '⛔ 물러난 지금 길(열쇠)의 8초 덫이 안 돈다');
+});
+
+t('E3 판 말은 그 판 출처만 — 다른 출처(pages.dev·구글)의 outFail 은 물러나게 못 하고 homeDrawn 은 확정 못 한다', async () => {
+  for (const o of ['https://onf-app.pages.dev', KORIGIN]) {
+    const R = boot({ onf_tch: tchCell(20), onf_tout: '1' });
+    login(R); R.fromApp({ onf: 'outHello' });
+    R.fire({ onf: 'outFail', why: 'x' }, R.win, o);
+    assert.deepStrictEqual(R.nav, [TURL], '⛔ 다른 출처 outFail 로 물러났다: ' + o);
+    R.fire({ onf: 'homeDrawn' }, R.win, o);
+    R.advance(60000);
+    assert.ok(R.nav.length > 1 && /AKfycb/.test(R.nav[1]), '⛔ 다른 출처 homeDrawn 으로 확정됐다: ' + o);
+  }
+});
+
+t('E4 hello 때 입장권이 사라졌으면 outBoot 없이 물러난다 · 꼴 틀린 입장권 칸은 없는 것', async () => {
+  const R = boot({ onf_tch: tchCell(20), onf_tout: '1' });
+  login(R); delete R.ls.onf_tch;
+  R.fromApp({ onf: 'outHello' });
+  assert.ok(!R.sent.some((x) => x.m.onf === 'outBoot'), '⛔ 빈 입장권을 보냈다');
+  assert.ok(R.nav.length > 1 && /AKfycb/.test(R.nav[1]), '⛔ 입장권 없이 정적 판에 머물렀다');
+  const body = b64({ e: 't@ownify.co.kr' });   // 계정은 맞고(계정 대조를 지나) 꼴만 틀린 칸
+  for (const tk of ['tch.' + body + '.' + 'S'.repeat(10), 'tch.' + body + '.' + 'S'.repeat(43) + '<', 'xtch.' + body + '.' + 'S'.repeat(43), 'tch.' + body]) {
+    const B = boot({ onf_tch: JSON.stringify({ tk, x: now() + 20 * 86400 }), onf_tout: '1' });
+    login(B); await tick(); await tick();
+    assert.ok(!B.staticOpen(), '⛔ 꼴 틀린 입장권으로 정적 먼저: ' + tk);
+    assert.strictEqual(B.fetches.length, 1, '⛔ 꼴 틀린 칸이 있다고 새로 안 물었다: ' + tk);
+  }
+});
+
+t('E5 이중 잠금 한 겹씩 — 정적 먼저 동안 pages.dev(우리 다른 정적 출처) 직접 자식 노크·bookHello 는 버린다 · 판 출처라도 판 안 후손의 bookHello 는 버린다', async () => {
+  const R = boot({ onf_tch: tchCell(20), onf_tout: '1' });
+  login(R); R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'homeDrawn' });
+  R.sent.length = 0;
+  R.fire({ onf: 'auth-please' }, R.win, 'https://onf-app.pages.dev');
+  R.fire({ onf: 'bookHello' }, R.win, 'https://onf-app.pages.dev');
+  const kid = { parent: R.win, postMessage(m, o) { R.sent.push({ m: JSON.parse(JSON.stringify(m)), o, kid: 1 }); } };
+  R.fire({ onf: 'bookHello' }, kid, APP);
+  assert.strictEqual(R.sent.length, 0, '⛔ 잠금 한 겹을 넘었다: ' + JSON.stringify(R.sent));
+  R.fromApp({ onf: 'bookHello' });
+  assert.ok(R.sent.some((x) => x.m.onf === 'caps'), '전제: 그 판 창 bookHello 는 받는다');
 });
 
 t('D1 입장권은 주소·기록·로그 어디에도 안 실린다(정적 먼저 성공·물러남·새로 받기 전부)', async () => {
