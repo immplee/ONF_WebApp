@@ -95,10 +95,10 @@ t('전 기기 되돌리기(ON=false) → 안 그린다 · ?loadfx=1 기기만 �
 });
 
 console.log('[채움 — 평균 학습 · 92% 상한]');
-t('평균 — 없으면 4초 · 최근 다섯 · 엉뚱한 값 버림 · 0.8~20초로 자름', () => {
+t('짐작 — 없으면 4초 · 최근 다섯 중 가장 긴 것(평균 아님 · 2026-10-30) · 엉뚱한 값 버림 · 0.8~20초로 자름', () => {
   const ls = (v) => ({ getItem: () => v });
   assert.strictEqual(T(env()).expected(ls(null)), 4000);
-  assert.strictEqual(T(env()).expected(ls('[1500,3600]')), 2550);
+  assert.strictEqual(T(env()).expected(ls('[1500,3600]')), 3600, '⛔ 평균으로 짐작한다(짧게 짐작하면 92% 에서 멈춘다)');
   assert.strictEqual(T(env()).expected(ls('[9000,1000,1000,1000,1000,1000]')), 1000, '⛔ 다섯 개만 봐야 한다');
   assert.strictEqual(T(env()).expected(ls('["x",-5,1e9,2000]')), 2000);
   assert.strictEqual(T(env()).expected(ls('[100]')), 800);
@@ -249,6 +249,21 @@ t('막이 가리는 동안 홈 액자를 안 그린다(onf-ld-hold) — 끝까�
   assert.ok(!H(hq.fr), '⛔ 못 열었는데 액자를 숨긴 채 둔다(안내·구글 화면이 안 보인다)');
   const z = env(), hz = homeFrame(z); z.g.ONF.load.bind(hz.fr, { home: true }); z.tick(30700);
   assert.ok(!H(hz.fr) && z.box() === null, '⛔ 안전 시계 뒤에도 액자가 숨어 있다');
+});
+
+t('⛔ [2026-10-30 Peter 「가끔 Y 가 절반쯤 찼을 때 가만히 멈춘다」] 섞인 기록(정적 0.3초 · 구글 4초) → 오늘 3.8초 걸려도 brand 전 92% 근처에서 서 있지 않는다', () => {
+  /* Y 절반 = 92% 상한 자리. 종전(평균 1.78초 짐작)은 노크 뒤 ≈2.7초에 상한에 붙어 brand 까지 1.1초 넘게 섰다(헤드리스 실측 1.26초).
+     잰다: 노크 뒤 곡선(합성기 애니메이션 점)을 20ms 마다 읽어 「300ms 동안 0.5% 미만 움직임」이 이어진 가장 긴 구간 — 300ms 아래여야 한다. */
+  const mix = JSON.stringify([300, 3800, 300, 4200, 300]);
+  const s = env({ ls: { onfLoadMs1: JSON.stringify([600, 2600, 500, 2400, 700]), onfLoadMs2: mix } }), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true });
+  const fill = s.box().querySelector('.onf-ld-fill');
+  s.tick(2500); k.ok();
+  const a = fill.anims[fill.anims.length - 1], kf = a.kf.map((f) => 1 + parseFloat(/translateX\(([-\d.]+)%\)/.exec(f.transform)[1]) / 100), D = a.o.duration;
+  const at = (x) => { if (x >= D) return kf[kf.length - 1]; const u = x / D * (kf.length - 1), i = Math.floor(u); return kf[i] + (kf[i + 1] - kf[i]) * (u - i); };
+  let run = 0, longest = 0;
+  for (let x = 300; x <= 3800; x += 20) { if (at(x) - at(x - 300) < 0.005) { run += 20; longest = Math.max(longest, run); } else run = 0; }
+  assert.ok(longest < 300, '⛔ brand 전에 ' + longest + 'ms 동안 채움이 섰다(' + (at(3800) * 100).toFixed(1) + '% · Y 절반 = 92%)');
+  assert.ok(at(3800) <= 0.92 + 1e-9, '⛔ 92% 상한을 넘었다');
 });
 
 console.log('[2026-10-25 Peter — 빨라도 로고 모션은 끝까지(채움 → 날기 → 통통) · 옛 S6e 0.2초 걷힘 폐지]');
