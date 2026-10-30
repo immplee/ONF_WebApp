@@ -19,6 +19,32 @@
 <link rel="apple-touch-icon" href="../assets/icon/onf-180.png">
 <link rel="icon" href="../assets/icon/onf-32.png" sizes="32x32">
 <script>/* 🌙 다크 모드 — 안쪽 액자가 알려 준 색(onfTheme · onf-frame.js)을 **그리기 전에** 단다 · 없으면 어둡게(Peter 2026-10-14 「홈페이지 기본은 다크모드로」 — 종전 기기 설정 · 홈에서 「기기 설정 따라」를 고르면 안쪽이 그 색을 알려 남는다) */(function(){try{var v=localStorage.getItem("onfTheme"),d=v!=="light";document.documentElement.setAttribute("data-theme",d?"dark":"light");}catch(e){}})();</script>
+<script>/* 🏫 정적 먼저 사본 미리 받기(2026-10-30 Peter 「새로 고침 딱 2배 더」) — 정적 선생님 홈(아래 onf-tout)의 Worker /t/home/get 을 **HTML 이 오자마자** 묻는다.
+   종전: 껍데기 HTML → 스크립트 넷 다시 확인(304 한 왕복) → 판 HTML → 판 outHello → outBoot → **그제서야** 판이 /t/home/get(workers.dev = LAX 왕복 + D1 APAC ≈ 0.3초 · 새 연결이면 0.6초+) → 그리기.
+     로컬 흉내 시간선(2026-10-30): 그림 490ms 중 그 묻기 290ms 가 판 hello(170ms) **뒤**에 줄 서 있었다.
+   이제: 여기서 묻고(⛔ 스타일시트 링크 **앞** 자리 — 뒤면 스타일을 기다린다) · tOutOpen 이 판 hello 에 그 답을 outBoot{d} 로 싣는다(판은 묻지 않고 바로 그린다).
+   ⛔ 묻는 조건 = tOutQ 의 앞쪽 몫(기기 스위치·홈·입장권·그날 물러남·WebKit·홈 화면 앱·열쇠 꺼짐 · 최상위) — 쓸지는 tOutQ 가 다시 정한다(여기서 틀려도 답을 안 쓸 뿐 · 묻기 한 번 버림).
+   ⛔ 답(학생 열쇠가 든 사본)은 이 페이지 메모리만(저장소 0) · 판엔 그 판 창·출처로만 · 한 번만(tPreTake). 못 받음(끊김·3초·JSON 아님) = 판이 종전대로 스스로 묻는다.
+   ⚠️ Worker 주소는 onf-frame.js ONF_WHO 의 쌍둥이(이 자리엔 아직 안 실렸다 — 검사 TT-pre 가 같은지 본다). */
+var tPre = (function () {
+  try {
+    var q = new URLSearchParams(location.search), sw = q.get('tout'), nv = navigator, ua = nv.userAgent || '', ls = localStorage, day = 86400000;
+    if (window.top !== window.self || q.get('mode') || sw === '0' || (sw !== '1' && ls.getItem('onf_tout') !== '1')) return null;
+    if (sw !== '1' && Date.now() - Number(ls.getItem('onfTOutFail') || 0) < day) return null;                                                    // 그날 물러남(tout=1 은 지운다)
+    if (/iPhone|iPad|iPod/.test(ua) || (/Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg/.test(ua)) || (nv.platform === 'MacIntel' && nv.maxTouchPoints > 1)) return null;   // = webkitOnly
+    if (nv.standalone === true || matchMedia('(display-mode: standalone)').matches) return null;                                                // = homeApp
+    if (Date.now() - Number(ls.getItem('onf_devkey_off') || 0) < 7 * day) return null;                                                         // = devkeyOff(입장권이 메모리뿐 — tchGet 이 빈다)
+    var c = JSON.parse(ls.getItem('onf_tch') || 'null');
+    if (!c || !/^tch\.[A-Za-z0-9_-]{10,600}\.[A-Za-z0-9_-]{20,100}$/.test(c.tk) || !(Number(c.x) > Date.now() / 1000)) return null;            // = tchGet
+    var ac = typeof AbortController === 'function' ? new AbortController() : null;
+    return { tk: c.tk, p: new Promise(function (ok) {
+      var tm = setTimeout(function () { try { if (ac) ac.abort(); } catch (e) {} ok(null); }, 3000);
+      fetch('https://onf-media.edia--orker.workers.dev/t/home/get', { method: 'POST', body: JSON.stringify({ tk: c.tk }), signal: ac ? ac.signal : undefined })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { clearTimeout(tm); ok(j && typeof j === 'object' ? j : null); }, function () { clearTimeout(tm); ok(null); });
+    }) };
+  } catch (e) { return null; }
+})();</script>
 <link rel="stylesheet" href="../assets/onf-ui.css">
 <style>
   html, body { margin:0; height:100%; background:var(--onf-bg); }
@@ -344,7 +370,7 @@ function mount() {
   /* 📱 replace 로 연다(2026-10-23 · 까닭은 학생 껍데기 onf-frame.js 「처음 열기도 replace」 주석) — mount 는 구글 로그인 뒤(onCredential)에도 불린다:
      다 뜬 페이지의 붙은 빈 액자에 src 를 넣으면 WebKit(아이폰·아이패드)은 기록 칸을 하나 쌓아, 홈에서 뒤로 = 이 액자만 빈 문서로 되감긴다(선생님 홈이 흰 화면). */
   /* 🏫 정적 먼저(아래 onf-tout · tOutQ) — 켠 기기는 정적 선생님 홈을 먼저 · 안 뜨면 이 openHome(지금 길)으로. 꺼짐이면 종전 그대로 바로 openHome. */
-  if (tOutQ()) tOutOpen(openHome, LD); else openHome();
+  if (tOutQ()) tOutOpen(openHome, LD); else { tPreTake(''); openHome(); }   // 정적 먼저를 안 타면 미리 받은 사본도 버린다
   function openHome() {
   try { frame.contentWindow.location.replace(appSrc); } catch (e) { frame.src = appSrc; }
   /* ⛔ 프레임이 **막혔는지**를 화면이 말해야 한다. 안쪽이 살아 있으면 몇백 ms 안에 노크가 온다.
@@ -406,6 +432,12 @@ var frameWatch = null;
    ponytail: 시한 둘은 짐작(판 boot 4초 · /t/home/get 4초에 맞춤)·첫 실패 면제(학생 cold) 없음 — 라이브 재기로 고친다. */
 var tOut = null, TOUT_HELLO_MS = 3000, TOUT_PAINT_MS = 8000;
 function tOutLive() { return tOut && !tOut.gone ? tOut.org : ''; }   // 살아 있는 정적 먼저의 판 출처 · 없으면 ''
+/** 미리 받은 사본(머리 tPre) 약속 — 한 번만 · 같은 입장권일 때만 · 없으면 null. 꺼낸 뒤 잡고 있지 않는다(학생 열쇠가 든 답) */
+function tPreTake(tk) {
+  if (typeof tPre === 'undefined' || !tPre) return null;
+  var x = tPre; tPre = null;
+  return x.tk === tk && x.p && typeof x.p.then === 'function' ? x.p : null;
+}
 function tOutUrl() { try { return new URL('/teacher/', ONF.frame.OUT_BOOK).href; } catch (e) { return ''; } }   // 정적 판 주소 = 교재 정적 판과 같은 출처(onf-frame.js 상수)
 function tOutQ() {
   try {   // ⛔ 무엇이 던져도 지금 길(mount 안에서 불린다 — 여기서 던지면 로그인이 멈춘다)
@@ -430,7 +462,17 @@ function tOutOpen(fallback, LD) {
     if (d.onf === 'outFail') return back();
     if (d.onf === 'outHello') {
       if (!(c = tchGet())) return back();
-      try { ev.source.postMessage({ onf: 'outBoot', tk: c.tk }, me.org); } catch (e) {}
+      /* 🏫 머리에서 미리 받은 사본(위 tPre)이 있으면 그 답을 기다려 outBoot{d} 로 싣는다(판은 묻지 않는다) · 없음·못 받음 = 종전 outBoot{tk}(판이 묻는다).
+         t0 = 이 껍데기 탐색 시작(판 perf home 표본이 껍데기부터 잰다 · 숫자만). 기다리는 동안 물러났으면(back) 안 보낸다. */
+      var src = ev.source, tk = c.tk, p = tPreTake(tk);
+      var send = function (j) {
+        if (me.gone) return;
+        var m = { onf: 'outBoot', tk: tk };
+        if (j) m.d = j;
+        try { if (typeof performance !== 'undefined' && performance.timeOrigin > 0) m.t0 = performance.timeOrigin; } catch (e) {}
+        try { src.postMessage(m, me.org); } catch (e) {}
+      };
+      if (p) p.then(send); else send(null);
       if (!me.drawn) { clearTimeout(tm); tm = setTimeout(back, TOUT_PAINT_MS); }
       return;
     }
