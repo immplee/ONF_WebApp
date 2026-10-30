@@ -523,7 +523,7 @@ t('W1 tout=2 · WebKit·홈 화면 앱 + 입장권 → 구글 버튼 로그인 �
   assert.ok(Z.ls.onf_tout === '0' && !Z.staticOpen());
 });
 t('D0 기본값 한 곳(머리 toutOf · TOUT_DEF) — 주소 > 기억 > 기본 · 기본은 \'0\'(시험) 또는 \'2\'(넓힘: 크롬 류 + WebKit·홈 화면 앱 — 익명 다리 꺼진 빌드면 판 outFail anon) · ?tout=0 은 기본보다 앞선다 · 머리·본 스크립트 같은 답', async () => {
-  assert.ok(DEF === '0' || DEF === '2', '⛔ 기본값이 0·2 가 아니다(1 이면 익명 다리가 켜져도 WebKit 을 뺀다): ' + DEF);
+  assert.ok(DEF === '0' || DEF === '1' || DEF === '2', '⛔ 기본값이 0·1·2 가 아니다: ' + DEF);   // '1' = 크롬 류만 기본 켬(2026-10-31 · WebKit 은 아이패드 실기기 확인 뒤 '2')
   assert.strictEqual((html.match(/function toutOf\(/g) || []).length, 1, '⛔ 판정 함수가 한 벌이 아니다');
   assert.ok(HEAD[1].includes("toutOf(sw, ls.getItem('onf_tout'))") && !/\? sw : ls\.getItem\('onf_tout'\)/.test(HEAD[1]), '⛔ 머리가 스위치를 따로 판정한다');
   const T = boot({}).g.toutOf;
