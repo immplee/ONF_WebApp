@@ -309,7 +309,8 @@
       if (ev.data.onf !== 'outHello') return;
       if (!booted) { fallOk('book'); try { if (hooks && typeof hooks.ok === 'function') hooks.ok(); } catch (eH) {} }   // 🔁 정적 교재가 떴다 = 연속 물러남 0(넘겨주기 판·선생님 판도 같은 손)
       booted = true; clearTimeout(tm);   // 🌤 hello 마다 다시(2026-10-24) — 판이 스스로 다시 읽으면(2시간 · 「다시 열기」) 새 문서가 또 hello · 안 보내면 4초 뒤 outFail 로 지금 길
-      try { ev.source.postMessage({ onf: 'outBoot', tok: tok, src: src, cf: cf || null }, org); } catch (e) {}
+      var w = ev.source, say = function (c) { if (done) return; try { w.postMessage({ onf: 'outBoot', tok: tok, src: src, cf: c || null }, org); } catch (e) {} };
+      if (cf && typeof cf.then === 'function') cf.then(say, function () { say(null); }); else say(cf);   // 📖 cf 가 묻는 중(bookCfFor · /who)이면 답 뒤에 — 판은 outBoot 을 4초 기다린다(WHO_MS 800 안)
     }
     global.addEventListener('message', onMsg);
     tm = setTimeout(function () { if (!booted) bad('hello'); }, OUT_MS);
@@ -348,6 +349,15 @@
       }
       go(wBase());
     });
+  }
+  /** 📖 교재 주소 → /who 몸통(교재 하나) — 공유 교재 주소(fileId(+sheetName) · slug)만 · 선생님(ttok)·덱(view=cards)·다른 화면(mode) = null.
+      링크 직행(whoQ)과 판 사본 힌트(bookCfFor)가 같이 쓴다(2026-10-30 「같은 지붕」). */
+  function whoAsk(s) {
+    try {
+      var q = new URL(s).searchParams, f = q.get('fileId'), g = q.get('slug'), h = q.get('sheetName');
+      if ((!f && !g) || q.get('ttok') || q.get('view') === 'cards' || (q.get('mode') && q.get('mode') !== 'share')) return null;   // 공유 교재 링크만(최종 검토 F3) — 다른 화면은 /who 가 모른다
+      return f ? { f: f, s: h } : { slug: g };
+    } catch (e) { return null; }
   }
   function askWho(tok, q) {
     var b = { t: tok };
@@ -501,7 +511,7 @@
         if (ev.data.panel !== 1) { bookWarm(ev.data.href); return; }
         var wout = ev.data.out === 1, wsrc = wout && opts.bookSrc(ev.data.href);   // 🌤 T7 라이브 F2(2026-10-24) — 홈이 미리 받기에도 out:1 을 싣는다 → 숨긴 판도 정적 판 · 기억에 o:1(openBook 과 같은 outSeen)
         if (wsrc) outSeen[wsrc] = 1;
-        preSave(ev.data.href); bookPre(ev.data.href, ev.data.left, ev.data.m, ev.data.r, wout);
+        preSave(ev.data.href); bookPre(ev.data.href, ev.data.left, ev.data.m, ev.data.r, wout, ev.data.cf);   // 📖 cf = 홈이 openBook 과 같은 손(onfSwapCfOf)으로 실은 사본 힌트
         return;
       }
       /* 📐 창 크기가 바뀌었다(2026-10-16 Peter 「B로 가자」 · 설계서 §4.1) — 홈이 다시 잰 메뉴 끝·여백·모서리를 **판 전부**(보이는 판·숨긴 판)에 새로 단다.
@@ -851,7 +861,7 @@
         p.out = true;
         flushStop();   // 🧺 한 출처에 정적 판 둘 금지(위 넘겨주기) — 넘겨주던 판의 못 보낸 것은 기기에 남고 이 판이 다시 열 때 보낸다
         try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}   // 🧺 아래 bookFlush — 이 기기 정적 판 저장소에 쓰기가 남을 수 있다
-        p.oe = openApp(p.el, bookMine(src) ? OUT_MINE_URL : ONF_OUT_BOOK, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, bookCfOk(cf), function (why) {
+        p.oe = openApp(p.el, bookMine(src) ? OUT_MINE_URL : ONF_OUT_BOOK, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, bookCfOk(cf) || bookCfFor(src, null), function (why) {   // 📖 홈이 힌트를 안 실은 판(미리 띄우기 preEarly · 옛 홈)도 /who 로 — 링크 직행과 같은 손
           console.info('[onf] 정적 판이 안 떴다 — 지금 길로 다시');
           fallBack('book', why);   // 🔁 위 물러남 기억(까닭별)
           /* 검토 고침 3 — hello·노크 뒤 outFail 이면 판 창·출처·views·swap·기록 다리·키보드 창이 정적 판을 가리킨다 → 새 판처럼 비운다(죽은 창을 판으로 쳐 갈아 끼우기가 14초 기다렸다).
@@ -945,7 +955,7 @@
       for (i = 0; i < books.length; i++) if (!books[i].gone) c++;
       for (k = pin ? 0 : 1; k < 2; k++) for (i = 0; c > n && i < books.length; ) { q = books[i]; if (q.parked && q !== bd && !q.gone && !bookCand(q) && !(k === 0 && bookMine(q.src))) { bookDrop(q); c--; } else i++; }   // 첫 바퀴에 못 줄였으면 내 문장도(판 수는 안 넘는다)
     }
-    function bookPre(href, left, m, r, out) {
+    function bookPre(href, left, m, r, out, cf) {   // cf = 홈 사본 힌트(없으면 bookMake 가 /who · bookCfFor)
       var src = opts.bookSrc(href), b, ex;
       if (!src) return;
       if ((ex = bookFind(src))) { if (ex.parked) bookPlace(ex, left, m, r); return; }   // 🚀 이미 있는 숨긴 판(미리 띄운 판 · 자리값 없이 만든 것)에 홈이 잰 자리를 단다(반박 🟡2 — 보일 때 폭이 바뀌어 다시 그리던 것)
@@ -959,7 +969,7 @@
       if (!bookMine(src) && !outWant(src, out) && books.some(function (q) { return bookCand(q) && !q.out; })) { if (bookQ.length < BOOK_Q_MAX && bookQ.indexOf(src) < 0) bookQ.push(src); return; }   // 📖 곧 판이 될 판이 노크 전 — 줄에 세운다(아래 bookCand) · 🌤 정적 판 후보 뒤엔 안 선다(그 판엔 흘리지 않는다 — 바로 지금 길 숨긴 판)
       //   ⚠️ 선생님 껍데기의 D1(폰은 미리 판 없음)은 안 가져온다 — 학생 폰은 숨긴 미리 판 하나가 종전 그대로다(설계 §7.2 · 그 판이 곧 판이 된다)
       bookRoom(bookMax() - 1);   // 자리가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 — 종전엔 안 띄웠다 · 📱 폰은 자리 2)
-      var np = bookMake(src, true, out); np.home = true;   // 📖 홈이 미리 띄운 판 — 노크하면 판이 된다
+      var np = bookMake(src, true, out, cf); np.home = true;   // 📖 홈이 미리 띄운 판 — 노크하면 판이 된다
       bookPlace(np, left, m, r);
     }
     /* ═══ 📖 교재 판 한 장 2단계(학생 · 2026-10-17 · 설계 ONF_SlackBot docs/2026-10-15-교재판-한장-설계.md §5.2 · §7.2 갈래 표 4) ═══
@@ -984,6 +994,16 @@
     function bookCand(p) { return BOOK_SW && p.home && !p.win && !bookMine(p.src) && Date.now() - p.born < BOOK_HI_MS; }
     function bookAged(p) { return BOOK_SW && p.home && p.swap && p.parked && Date.now() - p.born > BOOK_AGE_MS; }   // 홈 판만(판 안에서 연 판은 30분 지우기가 있어 종전 · 2단계 반박 🟡)
     /* 📖 ☁️ 사본 힌트 꼴(2026-10-21 · ⚠️ 쌍둥이: teacher/index.html bookCfOk 가 정본 · 판 쪽 Ownify onfSwapCfHint 가 같은 꼴을 다시 본다) — 맞으면 세 칸 그대로 · 틀리면 뺀다 */
+    /** 📖 판 사본 힌트 한 지붕(2026-10-30 · 밖으로 4-③-4b-2 라이브 「홈에서 미리 띄운 숨긴 교재는 cf 가 없어 Worker boot 0 · 다리 2.9~4.3초」).
+        given = 홈이 실은 힌트(openBook·bookWarm — 홈 onfSwapCfOf) → 그것 · 없으면 /who(교재 하나 · 링크 직행과 같은 askWho) → Promise(cf | null).
+        물을 수 없는 주소(내 문장·덱·선생님 · 토큰 없음)는 null(곧장 · 종전 그대로 cf 없음). q = 이미 뽑은 /who 몸통(링크 직행). */
+    function bookCfFor(src, given, q) {
+      var c = bookCfOk(given);
+      if (c) return Promise.resolve(c);
+      q = q || whoAsk(src);
+      if (!q || !opts.tok) return null;
+      return askWho(opts.tok, q).then(function (a) { return a && a.cf ? bookCfOk(a.cf) : null; });
+    }
     function bookCfOk(c) {
       return (c && typeof c === 'object' && typeof c.f === 'string' && /^[A-Za-z0-9_-]{10,200}$/.test(c.f) && typeof c.s === 'string' && c.s.length >= 1 && c.s.length <= 100
         && typeof c.k === 'string' && c.k.length <= 700 && /^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(c.k)) ? { f: c.f, s: c.s, k: c.k } : null;
@@ -1166,13 +1186,12 @@
        묻는 때만(아래 whoQ): 토큰 · 기기 out · 물러남 기억에 안 막힘 · ⭐ 내 문장(mode)·🗂️ 카드 덱(view) 아님 · ttok 아님 · 14일 안에 정적 판을 쓴 기기(onfOutUsed) — 아니면 종전 그대로(요청·기다림 0).
        안 뜨면(outFail·hello 없음) 같은 액자에 종전 openExec(여러 계정 우회·로고 신호 그대로) · 물러남 기억(위 fallBack 'book'). 정적 판은 src 의 embed 를 따른다(링크 직행 = 판 단추 없음 · boot.js). */
     function mainExec(navStart) { openExec(frameEl, src, opts.wait || null, null, true, opts.hooks || null, navStart === true); }
-    function whoQ(s) {
+    function whoQ(s) {   // 🗂️ 덱 링크 직행은 지금 길 그대로(4-② — 덱은 홈 out:1 만 · outOk 가 덱을 안 거른다 · whoAsk 가 거른다)
       try {
-        var q = new URL(s).searchParams, f = q.get('fileId'), g = q.get('slug'), h = q.get('sheetName');
-        if ((!f && !g) || q.get('ttok') || q.get('view') === 'cards' || !outOk(s)) return null;   // 🗂️ 덱 링크 직행은 지금 길 그대로(4-② — 덱은 홈 out:1 만 · outOk 가 덱을 안 거른다)
-        if (q.get('mode') && q.get('mode') !== 'share') return null;   // 공유 교재 링크만(최종 검토 F3) — 다른 화면은 /who 가 모른다
+        var a = whoAsk(s);
+        if (!a || !outOk(s)) return null;
         if (!(Date.now() - Number(global.localStorage.getItem(OUT_USED) || 0) < OUT_USED_MS)) return null;
-        return f ? { f: f, s: h } : { slug: g };
+        return a;
       } catch (e) { return null; }
     }
     /* 🧺 첫 판 교재의 남은 쓰기 표시 열쇠 — 판과 같은 교재 주소(bookSrc 꼴 · bookBase)라야 다음에 지금 길 판으로 열 때 넘겨주기(flushWorth)가 찾는다(검토 고침 1).
@@ -1243,13 +1262,13 @@
     }
     var wq = whoQ(src);
     if (homeQ()) mainHome();   // 홈 표시면 교재 주소가 없어 whoQ 는 늘 null
-    else if (wq) askWho(opts.tok, wq).then(function (a) {
-      if (!a || !a.cf) return mainExec();
+    else if (wq) (bookCfFor(src, null, wq) || Promise.resolve(null)).then(function (cf) {   // 📖 판 사본 힌트와 한 지붕(bookCfFor)
+      if (!cf) return mainExec();
       var mk = mainBook(src);
       function onQ(ev) { if (mainOut && ev && ev.data && ev.data.onf === 'outQueue' && ev.source === frameEl.contentWindow && ev.origin === OUT_ORG) outPend(mk, ev.data.n); }   // 🧺 그 액자 창 · 정적 판 출처만
       try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}
       mainOut = true; flushStop(); global.addEventListener('message', onQ);
-      openApp(frameEl, ONF_OUT_BOOK, src, a.cf, function (why) {
+      openApp(frameEl, ONF_OUT_BOOK, src, cf, function (why) {
         console.info('[onf] 첫 판 정적 판이 안 떴다 — 지금 길로 다시');
         fallBack('book', why);   // 🔁 위 물러남 기억(까닭별)
         mainOut = false; global.removeEventListener('message', onQ);
