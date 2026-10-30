@@ -432,6 +432,80 @@ t('D2 onf-frame.js 없는 옛 사본 — 입장권 받기·정적 먼저 둘 다
   assert.ok(!R.staticOpen() && R.execOpen());
 });
 
+/* ── 🏫 머리 미리 받기(tPre · 2026-10-30 「새로 고침 2배」) — 머리 스크립트를 따로 돌린다(본 스크립트보다 먼저 · ONF 없이) ── */
+const HEAD = /<script>(\/\* 🏫 정적 먼저 사본 미리 받기[\s\S]*?)<\/script>/.exec(html);
+function head(store, opt) {
+  opt = opt || {};
+  const ls = store || {}, fetches = [];
+  const g = { navigator: Object.assign({}, CHROME, opt.nav || {}), location: { search: opt.search || '' }, URLSearchParams, Date, JSON, Math, Promise, Number,
+    localStorage: { getItem: (k) => (k in ls ? ls[k] : null), setItem: (k, v) => { ls[k] = String(v); }, removeItem: (k) => { delete ls[k]; } },
+    matchMedia: () => ({ matches: false }), setTimeout: (f) => { g.__tm = f; return 1; }, clearTimeout() {}, AbortController,
+    fetch: (url, init) => { fetches.push({ url, init }); return opt.fetch ? opt.fetch(url, init) : Promise.resolve({ json: () => Promise.resolve({ ok: true, api: 1, c: {} }) }); } };
+  g.window = g; g.top = opt.framed ? {} : g; g.self = g;
+  vm.createContext(g); vm.runInContext(HEAD[1], g);
+  return { g, fetches, pre: g.tPre };
+}
+const eligible = (o) => Object.assign({ onf_tout: '1', onf_tch: tchCell(20) }, o);
+const PRE_CASES = [[eligible({}), {}], [{ onf_tch: tchCell(20) }, { search: '?tout=1' }], [eligible({}), { search: '?tout=0' }], [{ onf_tch: tchCell(20) }, {}],
+  [eligible({ onf_tch: tchCell(-1) }), {}], [eligible({ onf_tch: '{bad' }), {}], [{ onf_tout: '1' }, {}], [eligible({ onfTOutFail: String(Date.now()) }), {}],
+  [eligible({ onfTOutFail: String(Date.now()) }), { search: '?tout=1' }], [eligible({ onfTOutFail: String(Date.now() - 2 * 86400000) }), {}], [eligible({ onf_devkey_off: String(Date.now()) }), {}],
+  [eligible({}), { search: '?mode=student&t=Tok_1' }], [eligible({}), { search: '?mode=hwbook&t=Tok_1' }], [eligible({}), { nav: { standalone: true } }],
+  [eligible({}), { nav: MACSAFARI }], [eligible({}), { nav: IPHONE }], [eligible({}), { nav: IPAD }]];
+
+t('P1 머리 미리 받기 — 묻는 때 = tOutQ 와 같다(스위치·주소·입장권·그날 물러남·열쇠 꺼짐·mode·홈 화면 앱·WebKit 전부) · POST <Worker>/t/home/get {tk} 머리말 없음 · 저장소에 안 쓴다', () => {
+  assert.ok(HEAD, '⛔ 머리 미리 받기 스크립트가 없다');
+  assert.ok(html.indexOf(HEAD[0]) < html.indexOf('<link rel="stylesheet"'), '⛔ 스타일시트 뒤에 있다(스타일을 기다린다)');
+  let fired = 0;
+  for (const [store, opt] of PRE_CASES) {
+    const before = JSON.stringify(store), hs = JSON.parse(before), H = head(hs, opt), R = boot(JSON.parse(before), opt);
+    const q = R.g.tOutQ();
+    assert.strictEqual(H.fetches.length === 1, q, '⛔ 머리 미리 받기와 tOutQ 가 다르다: ' + JSON.stringify([Object.keys(store), opt.search, opt.nav && opt.nav.platform]) + ' 머리=' + H.fetches.length + ' tOutQ=' + q);
+    if (H.fetches.length) {
+      fired++;
+      const f = H.fetches[0], tk = JSON.parse(store.onf_tch).tk;
+      assert.strictEqual(f.url, WORKER + '/t/home/get');
+      assert.strictEqual(f.init.method, 'POST'); assert.ok(!f.init.headers, '⛔ 머리말 = 사전 요청');
+      assert.deepStrictEqual(JSON.parse(f.init.body), { tk });
+      assert.strictEqual(H.pre.tk, tk);
+    } else assert.strictEqual(H.pre, null);
+    assert.strictEqual(JSON.stringify(hs), before, '⛔ 머리 스크립트가 저장소를 바꿨다');
+  }
+  assert.ok(fired >= 3, '전제: 묻는 경우가 셋 넘게 있었다 — ' + fired);
+  assert.strictEqual(head(eligible({}), { framed: true }).fetches.length, 0, '⛔ 남의 액자 안에서 물었다');
+});
+
+t('P2 머리의 Worker 주소 = onf-frame.js 상수(ONF.frame.WORKER) 쌍둥이 · 머리 말고 본 스크립트엔 여전히 안 적는다', () => {
+  const R = boot({});
+  assert.deepStrictEqual(HEAD[1].match(/https:\/\/[^'"]+\/t\/home\/get/g), [R.g.ONF.frame.WORKER + '/t/home/get'], '⛔ 머리 Worker 주소가 onf-frame.js 와 다르다');
+});
+
+t('P3 머리 답 → 판 hello 에 outBoot{tk, d} 한 번(다음 hello 는 종전 {tk}) · 답 전엔 안 보냄 · 못 받음(null)·다른 입장권 = 종전 {tk} · 기다리는 새 물러남 = 안 보냄', async () => {
+  const D = { ok: true, api: 1, c: { boot: { ts: 1, age: 0, v: { ok: true } } } };
+  const go = (pre, cell) => { cell = cell || tchCell(20); const R = boot({ onf_tch: cell, onf_tout: '1' }); R.g.tPre = pre(JSON.parse(cell).tk); login(R); return { R, tk: JSON.parse(cell).tk }; };
+  let res; const later = new Promise((r) => { res = r; });
+  let { R, tk } = go((tk) => ({ tk, p: later }));
+  assert.deepStrictEqual(R.nav, [TURL]);
+  R.fromApp({ onf: 'outHello' }); await tick();
+  assert.deepStrictEqual(R.sentTo(APP), [], '⛔ 머리 답 전에 outBoot 을 보냈다(판이 따로 묻는다)');
+  res(D); await tick(); await tick();
+  assert.deepStrictEqual(R.sentTo(APP), [{ onf: 'outBoot', tk, d: D }], '⛔ 머리 답을 안 실었다: ' + JSON.stringify(R.sentTo(APP)));
+  assert.strictEqual(R.g.tPre, null, '⛔ 넘긴 사본을 계속 잡고 있다');
+  R.fromApp({ onf: 'outHello' }); await tick();
+  assert.deepStrictEqual(R.sentTo(APP).slice(1), [{ onf: 'outBoot', tk }], '⛔ 다시 읽힌 판에 옛 사본을 또 줬다');
+  ({ R, tk } = go((tk) => ({ tk, p: Promise.resolve(null) })));
+  R.fromApp({ onf: 'outHello' }); await tick(); await tick();
+  assert.deepStrictEqual(R.sentTo(APP), [{ onf: 'outBoot', tk }], '⛔ 못 받은 머리 답에 종전 outBoot 이 아니다');
+  ({ R, tk } = go(() => ({ tk: JSON.parse(tchCell(20, 'other')).tk, p: Promise.resolve(D) })));
+  R.fromApp({ onf: 'outHello' }); await tick(); await tick();
+  assert.deepStrictEqual(R.sentTo(APP), [{ onf: 'outBoot', tk }], '⛔ 다른 입장권으로 받은 사본을 실었다');
+  let res2; ({ R, tk } = go((tk) => ({ tk, p: new Promise((r) => { res2 = r; }) })));
+  R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'outFail', why: 'error' }); res2(D); await tick(); await tick();
+  assert.ok(!R.sentTo(APP).some((m) => m.onf === 'outBoot'), '⛔ 물러난 판에 사본을 보냈다');
+  //   정적 먼저를 안 타면(스위치 꺼짐) 사본을 버린다
+  const K = boot({ onf_tch: tchCell(20) }); K.g.tPre = { tk: 'x', p: Promise.resolve(D) }; login(K);
+  assert.ok(K.execOpen() && K.g.tPre === null, '⛔ 안 쓰는 사본을 잡고 있다');
+});
+
 (async () => {
   for (const [label, fn] of tests) {
     try { await fn(); console.log('  ✅ ' + label); pass++; }
