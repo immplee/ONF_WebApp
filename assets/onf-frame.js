@@ -289,7 +289,7 @@
     }
     try {
       var v = global.navigator, u = (v && v.userAgent) || '';
-      if (v && typeof v.sendBeacon === 'function') v.sendBeacon(ONF_WHO.replace(/\/who$/, '') + '/clog', JSON.stringify([{ k: 'err', c: 'fallback:' + pan + ':' + why + ':' + f.n,
+      if (v && typeof v.sendBeacon === 'function') v.sendBeacon(wBase() + '/clog', JSON.stringify([{ k: 'err', c: 'fallback:' + pan + ':' + why + ':' + f.n,
         d: /iPad/.test(u) || (/Macintosh/.test(u) && v.maxTouchPoints > 1) ? 'ipad' : /iPhone|iPod/.test(u) ? 'ios' : /Macintosh/.test(u) ? 'mac' : /Windows/.test(u) ? 'win' : /Android/.test(u) ? 'and' : 'other' }]));
     } catch (e) {}
     return ms;
@@ -319,17 +319,34 @@
   /* 🌤 밖으로 2(2026-10-24) — 링크 직행 교재(fileId·slug)를 Worker 에 묻는다: q = {f, s?} | {slug} (없는 칸은 안 싣는다 — 빈 글자는 400 bad).
      POST · text/plain 몸통(사전 요청 없음) · 토큰은 몸통에만. WHO_MS 안 답이 없거나 실패·ok:false·api≠2(약속 어긋남) 면 null(지금 길) — 늦은 답은 이미 정해진 Promise 라 버려진다.
      ponytail: 800ms = 짐작 시한 — 실측으로 고친다. */
-  var ONF_WHO = 'https://onf-media.edia--orker.workers.dev/who';
+  /* 🇰🇷 서울 길(2026-10-30) — Worker 주소는 **여기 한 곳**(학생·선생님 껍데기 공용 · teacher/index.html 머리가 쌍둥이를 따로 적고 검사가 같은지 본다).
+     ONF_W_EDGE = app.ownify.co.kr/w/*(Pages 함수 → 서비스 바인딩 Worker · 한국에서 ICN) · ONF_W_FB = 종전 workers.dev(LAX). Ownify 정적 판(ONF_WebApp.js ONF_EDGE_CF)과 같은 값·같은 뜻.
+     서울 길 응답을 JSON 으로 못 읽으면(정적 404 판·오류 판·끊김) workers.dev 로 **한 번 더** 묻고 이 탭은 sessionStorage onfEdgeDown 으로 workers.dev 만 쓴다(+clog edgeDown).
+     시한 넘김(WHO_MS 등)은 고장으로 안 친다 · 다시 묻는 건 읽기(/who·/home/get)뿐 — 쓰기(/t/login)는 안 다시 묻는다. 끄기 = ONF_W_EDGE = ''. */
+  var ONF_W_FB = 'https://onf-media.edia--orker.workers.dev', ONF_W_EDGE = 'https://app.ownify.co.kr/w';
+  var edgeDown = (function () { try { return !!global.sessionStorage.getItem('onfEdgeDown'); } catch (e) { return false; } })();
+  function wBase() { return ONF_W_EDGE && !edgeDown ? ONF_W_EDGE : ONF_W_FB; }
+  function edgeFail() {
+    if (edgeDown) return;
+    edgeDown = true;
+    try { global.sessionStorage.setItem('onfEdgeDown', '1'); } catch (e) {}
+    try { global.navigator.sendBeacon(ONF_W_FB + '/clog', JSON.stringify([{ k: 'err', c: 'edgeDown', l: 0 }])); } catch (e) {}
+  }
+  var ONF_WHO = '/who';   // 길만 — 바탕은 wBase()
   var WHO_MS = 800;
-  function askPost(url, b, ms, pick, bad) {   // Worker 에 묻기 — 시한 안 답(pick 이 고른 값) · 아니면 null · bad(상태) = 2xx 아닌 답
+  function askPost(path, b, ms, pick, bad) {   // Worker 에 묻기 — 시한 안 답(pick 이 고른 값) · 아니면 null · bad(상태) = 2xx 아닌 답
     return new Promise(function (ok) {
-      var tm = setTimeout(function () { ok(null); }, ms);
-      function end(x) { clearTimeout(tm); ok(x); }
-      try {
-        global.fetch(url, { method: 'POST', body: JSON.stringify(b) })
-          .then(function (r) { if (r.ok) return r.json(); if (bad) bad(r.status); return null; })
-          .then(function (j) { end(j ? pick(j) : null); }, function () { end(null); });
-      } catch (e) { end(null); }
+      var done = false, tm = setTimeout(function () { end(null); }, ms);
+      function end(x) { if (done) return; done = true; clearTimeout(tm); ok(x); }
+      function go(base) {
+        try {
+          global.fetch(base + path, { method: 'POST', body: JSON.stringify(b) })
+            .then(function (r) { if (r.ok) return r.json(); if (bad) bad(r.status); return r.json().then(function () { return null; }); })   // 2xx 아닌 답도 JSON 이면 읽는다(Worker 503 off) — 정적 404 HTML 은 여기서 던져 물러남으로
+            .then(function (j) { end(j ? pick(j) : null); },
+              function () { if (base === ONF_W_EDGE && !done) { edgeFail(); go(ONF_W_FB); } else end(null); });
+        } catch (e) { end(null); }
+      }
+      go(wBase());
     });
   }
   function askWho(tok, q) {
@@ -341,7 +358,7 @@
      ok·api 3·v 객체일 때만 답 그대로(정적 홈이 outBoot 의 d 로 받는다) · ended·unknown·stale·off·none·실패·늦음 = null(지금 길).
      HOMEGET_MS 1500(2026-10-28 Peter · 실측 /home/get 10회 중 3회 0.80~0.87초 — 첫 연결 0.18~0.2초 · 800 이면 열에 두셋 놓침) · HOME_PAINT_MS 2500 = 짐작(아이폰으로 고친다) · HOME_PAINT_MS_COLD 5000 = 안 쓴 기기(캐시가 비어 첫 그림이 느리다 · 2026-10-29 ③-3). ⚠️ onf-load.js 의 HOME_MS(15초 막 기다림)와 다른 이름. */
   var ONF_OUT_HOME_URL = 'https://app.ownify.co.kr/home/';
-  var ONF_HOME_GET = 'https://onf-media.edia--orker.workers.dev/home/get';
+  var ONF_HOME_GET = '/home/get';
   var HOMEGET_MS = 1500, HOME_PAINT_MS = 2500, HOME_PAINT_MS_COLD = 5000, OUT_HOME_ORG = ONF_OUT_HOME_URL.replace(/^(https:\/\/[^\/]+).*$/, '$1');   // 출처 — 모듈 맨 위라 URL 없이(옛 브라우저·검사 하네스)
   /* 스위치 꺼짐(`{ok:false,why:'off'}` · HOME_READ=0 롤백의 HTTP 503) = 그날 이 기기는 더 안 묻는다 — onfOutFailHome 을 적는다(homeQ 가 보고 /home/get·정적 홈 미리 받기 0 · ?out=1 이 지움).
      그 밖의 null(unknown·stale·ended·none·시한·끊김)은 종전 그대로(기록 없음). */
@@ -1329,7 +1346,7 @@
     openExec: openExec,   // 🔐 선생님 껍데기 판도 쓴다(teacher/index.html bookMake)
     openApp: openApp, OUT_BOOK: ONF_OUT_BOOK,   // 🌤 선생님 껍데기 정적 판도 같은 손·같은 주소(밖으로 4-① 2026-10-28 · teacher/index.html bookMake)
     fallBack: fallBack, fallBlocked: fallBlocked, fallOk: fallOk,   // 🔁 물러남 기억 한 곳(위 FALL_KEY) — 선생님 껍데기 정적 홈·정적 교재도 이 셋만
-    WORKER: ONF_WHO.replace(/\/who$/, ''),   // 🏫 Worker 바탕 주소(밖으로 4-④-2c 2026-10-30 · 선생님 껍데기 /t/login) — 위 /who 상수에서(새로 적지 않는다)
+    get WORKER() { return wBase(); },   // 🏫 Worker 바탕 주소(밖으로 4-④-2c 2026-10-30 · 선생님 껍데기 /t/login·/clog) — 위 wBase() 한 곳에서(서울 길 · 물러나면 workers.dev)
     printTitle: printTitle,   // 📄 선생님 껍데기(teacher/index.html) 판도 같은 함수
     /* 검사용으로만 낸다 — 순수 판정 함수라 창 없이 잴 수 있다. 화면 코드에서 부르지 마라. */
     _fromOurFrame: _fromOurFrame,

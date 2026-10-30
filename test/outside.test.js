@@ -51,7 +51,7 @@ function setup(o) {
     clearTimeout: (id) => { if (timers[id - 1]) timers[id - 1].on = false; } };
   vm.createContext(g);
   g.window = g; g.URL = URL; g.localStorage = o.ls || LSf(); g.innerWidth = 1440;
-  g.T = 1.7e12; g.Date = { now: () => g.T };
+  g.T = 1.7e12; g.Date = { now: () => g.T }; g.sessionStorage = o.ss || LSf();
   g.navigator = { userAgent: 'node' }; g.history = { state: null, replaceState() {}, pushState() {} };
   g.console = { info() {}, warn() {}, log() {} };
   const root = { attrs: {}, setAttribute(k, v) { root.attrs[k] = v; } };
@@ -771,8 +771,10 @@ t('F-M2 index.html — out=1 이면 onfOutFail 지움 · out=0·없음은 그대
 const AT = [];
 function ta(label, fn) { AT.push([label, fn]); }
 const flush = () => new Promise((r) => setImmediate(r));
-const WHO = (/var ONF_WHO = '([^']+)'/.exec(CODE) || [])[1] || 'ONF_WHO 없음';
-const HOME_GET = (/var ONF_HOME_GET = '([^']+)'/.exec(CODE) || [])[1] || 'ONF_HOME_GET 없음';
+/* 🇰🇷 서울 길(2026-10-30) — 주소는 onf-frame.js 한 곳(ONF_W_EDGE·ONF_W_FB) · ONF_WHO·ONF_HOME_GET 은 길만 */
+const W_EDGE = (/ONF_W_EDGE = '([^']+)'/.exec(CODE) || [])[1] || 'ONF_W_EDGE 없음', W_FB = (/ONF_W_FB = '([^']+)'/.exec(CODE) || [])[1] || 'ONF_W_FB 없음';
+const WHO = W_EDGE + ((/var ONF_WHO = '([^']+)'/.exec(CODE) || [])[1] || 'ONF_WHO 없음');
+const HOME_GET = W_EDGE + ((/var ONF_HOME_GET = '([^']+)'/.exec(CODE) || [])[1] || 'ONF_HOME_GET 없음');
 const HOME_URL = (/var ONF_OUT_HOME_URL = '([^']+)'/.exec(CODE) || [])[1] || 'ONF_OUT_HOME_URL 없음';
 const DSRC = 'https://script.google.com/x/exec?t=TOK&fileId=FILE_ID_0123456789&sheetName=E1&mode=share';   // 링크 직행(fileId) 첫 판 주소(index.html appUrl 꼴)
 const SSRC = 'https://script.google.com/x/exec?t=TOK&mode=share&slug=a-s1-e1-b';                          // 짧은 주소(slug)
@@ -782,14 +784,14 @@ function wsetup(o) {
   o = o || {};
   const calls = [], okN = { n: 0 };
   const s = setup(Object.assign({ ls: UL(), src: DSRC, hooks: { ok() { okN.n++; }, stuck() {} } }, o, {
-    pre: (g) => { g.fetch = (url, init) => new Promise((res, rej) => { if (o.log) o.log.push('fetch:' + url); calls.push({ url, init, ok: (st, body) => res({ ok: st >= 200 && st < 300, status: st, json: () => Promise.resolve(body) }), no: rej }); }); } }));
+    pre: (g) => { g.fetch = (url, init) => new Promise((res, rej) => { if (o.log) o.log.push('fetch:' + url); calls.push({ url, init, ok: (st, body) => res({ ok: st >= 200 && st < 300, status: st, json: () => Promise.resolve(body) }), html: (st) => res({ ok: st >= 200 && st < 300, status: st, json: () => Promise.reject(new SyntaxError('html')) }), no: rej }); }); } }));
   s.calls = calls; s.okN = okN;
   return s;
 }
 const ANS = (cf, extra) => ({ ok: true, api: 2, who: 'w', ended: false, books: [Object.assign({ f: 'FILE_ID_0123456789', s: 'E1', title: 'x', slug: 'a-s1-e1-b', out: !!cf, ended: false, cf: cf || null }, extra || {})] });
 
 ta('S4a ?fileId&sheetName 링크 + /who cf → 첫 판 = ONF_OUT_BOOK · 답 전엔 안 연다 · hello 에 outBoot{tok, src, cf(/who 것)} · 로고 ok · onfOutUsed 새로', async () => {
-  assert.strictEqual(WHO, 'https://onf-media.edia--orker.workers.dev/who', '상수 값(브리프)');
+  assert.strictEqual(WHO, 'https://app.ownify.co.kr/w/who', '상수 값(서울 길)');
   const s = wsetup();
   assert.strictEqual(s.calls.length, 1, '⛔ /who 를 안 물었다');
   assert.ok(!s.frameEl.src, '⛔ /who 답 전에 첫 판을 열었다: ' + s.frameEl.src);
@@ -838,7 +840,7 @@ ta('S4b 500 · 끊김 · ok:false(unknown·stale·other·bad) · cf null · 빈 
     ['cf null', (c) => c.ok(200, ANS(null))], ['끝난 교재', (c) => c.ok(200, ANS(null, { out: true, ended: true }))], ['빈 books', (c) => c.ok(200, { ok: true, api: 2, books: [] })]];
   for (const [nm, go] of cases) {
     const s = wsetup();
-    go(s.calls[0]); await flush();
+    go(s.calls[0]); await flush(); if (s.calls[1]) go(s.calls[1]); await flush();   // 끊김은 workers.dev 로 한 번 더(서울 길 물러남) — 그것도 끊기면 지금 길
     assert.strictEqual(s.frameEl.src, DSRC, '⛔ ' + nm + ' — 지금 길로 안 열었다: ' + s.frameEl.src);
     s.fire(800); await flush();
     assert.strictEqual(s.frameEl.src, DSRC, '⛔ ' + nm + ' — 시한 뒤 판이 바뀌었다');
@@ -933,8 +935,60 @@ ta('S4i /who 답의 api 가 2 가 아니면(없음·1·3) 지금 길', async () 
 });
 ta('S4j index.html 머리에 Worker preconnect(ONF_WHO 와 같은 출처 · crossorigin)', async () => {
   const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'), head = html.slice(0, html.indexOf('</head>'));
-  const o = new URL(WHO).origin;
+  const o = new URL(W_EDGE).origin;
   assert.ok(head.indexOf('<link rel="preconnect" href="' + o + '" crossorigin>') >= 0, '⛔ preconnect 줄이 없다(출처 ' + o + ')');
+});
+
+/* ═══ 🇰🇷 서울 길(2026-10-30) — 주소 한 곳 · JSON 못 읽으면 workers.dev 로 한 번 더 · 그 탭은 onfEdgeDown 으로 workers.dev 만 · 끄기 = ONF_W_EDGE 비우기 ═══ */
+ta('SE1 주소 한 곳 — ONF_W_EDGE·ONF_W_FB 정의는 onf-frame.js 에 한 번씩 · 다른 곳(index.html 머리 빼고)에 workers.dev 주소를 적지 않는다', async () => {
+  assert.strictEqual((CODE.match(/onf-media\.edia--orker\.workers\.dev/g) || []).length, 1, '⛔ onf-frame.js 에 workers.dev 주소가 둘 이상');
+  assert.strictEqual((CODE.match(/app\.ownify\.co\.kr\/w'/g) || []).length, 1, '⛔ 서울 길 주소가 둘 이상');
+  assert.strictEqual(W_FB, 'https://onf-media.edia--orker.workers.dev');
+  const idx = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert.ok(idx.indexOf('workers.dev') < 0, '⛔ index.html 에 workers.dev 가 남았다');
+});
+ta('SE2 서울 길이 JSON 이 아님(정적 404 HTML) → workers.dev 로 한 번 더 · 그 탭은 onfEdgeDown · 답은 그쪽 것 · 다음 묻기는 곧장 workers.dev', async () => {
+  const ss = LSf(), s = wsetup({ ss });
+  assert.strictEqual(s.calls[0].url, WHO);
+  s.calls[0].html(404); await flush();
+  assert.strictEqual(s.calls.length, 2, '⛔ workers.dev 로 다시 안 물었다');
+  assert.strictEqual(s.calls[1].url, W_FB + '/who');
+  assert.strictEqual(ss.m.onfEdgeDown, '1', '⛔ 이 탭 물러남 표시(onfEdgeDown)가 없다');
+  s.calls[1].ok(200, ANS(CF)); await flush();
+  assert.strictEqual(s.frameEl.src, OUT_BOOK, '⛔ 물러난 길의 답으로 정적 판을 못 열었다');
+  const n = wsetup({ ss });
+  assert.strictEqual(n.calls.length, 1); assert.strictEqual(n.calls[0].url, W_FB + '/who', '⛔ 물러난 탭이 서울 길을 또 물었다');
+});
+ta('SE3 서울 길 끊김(fetch 실패)도 한 번 더 · 두 번 다 끊기면 지금 길', async () => {
+  const ss = LSf(), s = wsetup({ ss });
+  s.calls[0].no(new Error('net')); await flush();
+  assert.strictEqual(s.calls.length, 2); assert.strictEqual(ss.m.onfEdgeDown, '1');
+  s.calls[1].no(new Error('net')); await flush();
+  assert.strictEqual(s.calls.length, 2, '⛔ 세 번째로 물었다'); assert.strictEqual(s.frameEl.src, DSRC);
+});
+ta('SE4 다시 안 묻는 것 — JSON 503(off) 은 bad(503) 그대로(홈 꺼짐 기억) · 시한 넘김(abort 아님 · 고장 아님)은 물러남 표시 안 함', async () => {
+  const ss = LSf(), s = hsetup({ ss });
+  s.calls[0].ok(503, { ok: false, why: 'off' }); await flush();
+  assert.strictEqual(s.calls.length, 1, '⛔ JSON 503 을 다시 물었다'); assert.ok(!ss.m.onfEdgeDown, '⛔ JSON 503 이 서울 길 고장으로 쳐졌다');
+  assert.ok(held(s.g.localStorage.m, 'onfOutFailHome'), '⛔ 503 off 를 기억 안 했다');
+  const t = wsetup({ ss });
+  t.fire(800); await flush(); t.calls[0].no(new Error('late')); await flush();
+  assert.strictEqual(t.calls.length, 1, '⛔ 시한 뒤 늦은 끊김에 다시 물었다'); assert.ok(!ss.m.onfEdgeDown, '⛔ 시한이 고장으로 쳐졌다');
+});
+ta('SE5 끄기 = ONF_W_EDGE 비우기 → 처음부터 workers.dev · 물러남 표시도 안 남김', async () => {
+  const off = CODE.replace(/ONF_W_EDGE = '[^']+'/, "ONF_W_EDGE = ''");
+  assert.notStrictEqual(off, CODE);
+  const ss = LSf(), calls = [];
+  const g = { T: 1.7e12, sessionStorage: ss, localStorage: LSf(), setTimeout, clearTimeout, URL, console: { info() {}, log() {}, warn() {} }, navigator: { userAgent: 'node' },
+    fetch: (url) => { calls.push(url); return Promise.reject(new Error('net')); }, document: { addEventListener() {} }, addEventListener() {} };
+  g.window = g; g.Date = { now: () => g.T }; vm.createContext(g); vm.runInContext(off, g, { filename: 'onf-frame.js' });
+  assert.strictEqual(g.ONF.frame.WORKER, W_FB, '⛔ 끄면 WORKER 도 workers.dev');
+});
+ta('SE6 WORKER 바탕(선생님 /t/login·/clog) = 서울 길 · 물러난 탭은 workers.dev', async () => {
+  const ss = LSf(), s = wsetup({ ss });
+  assert.strictEqual(s.g.ONF.frame.WORKER, W_EDGE);
+  s.calls[0].no(new Error('net')); await flush();
+  assert.strictEqual(s.g.ONF.frame.WORKER, W_FB, '⛔ 물러난 뒤에도 WORKER 가 서울 길');
 });
 
 /* ═══ 🌤 밖으로 3 Task 6(2026-10-24) — 켠 학생 홈은 Worker /home/get 답 + 정적 홈(ONF_OUT_HOME_URL)을 같이 시작 ═══
@@ -945,7 +999,7 @@ const HANS = (o) => Object.assign({ ok: true, api: 3, v: { vars: { a: 1 }, books
 const hsetup = (o) => wsetup(Object.assign({ src: HSRC, home: true }, o || {}));
 
 ta('S6a 켠 학생·쓴 기기 → /home/get 1회 + 정적 홈을 같이 시작(답 전에 액자 주소 = 정적 홈) · 답 뒤 hello 에 outBoot{src, tok, d} · 로고 ok 와 onfOutUsed 는 homeDrawn 에', async () => {
-  assert.strictEqual(HOME_GET, 'https://onf-media.edia--orker.workers.dev/home/get', '상수 값(브리프)');
+  assert.strictEqual(HOME_GET, 'https://app.ownify.co.kr/w/home/get', '상수 값(서울 길)');
   assert.strictEqual(HOME_URL, 'https://app.ownify.co.kr/home/', '상수 값(브리프)');
   const s = hsetup();
   assert.strictEqual(s.calls.length, 1, '⛔ /home/get 을 안 물었다');
@@ -1013,7 +1067,7 @@ ta('S6b unknown·ended·stale·none · api 다름 · v 없음 · 500 · 끊김 �
   for (const [nm, go] of cases) {
     const s = hsetup();
     s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
-    go(s.calls[0]); await flush();
+    go(s.calls[0]); await flush(); if (s.calls[1]) go(s.calls[1]); await flush();
     assert.strictEqual(s.frameEl.src, HSRC, '⛔ ' + nm + ' — 지금 길로 안 갈아 끼웠다: ' + s.frameEl.src);
     assert.strictEqual(boots(s.homeWin).length, 0, '⛔ ' + nm + ' — outBoot 을 보냈다');
     s.fire(2500); s.fire(1500); await flush();
