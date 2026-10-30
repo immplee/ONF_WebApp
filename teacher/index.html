@@ -29,11 +29,12 @@
 var tPre = (function () {
   try {
     var q = new URLSearchParams(location.search), sw = q.get('tout'), nv = navigator, ua = nv.userAgent || '', ls = localStorage, day = 86400000;
-    if (window.top !== window.self || q.get('mode') || sw === '0' || (sw !== '1' && ls.getItem('onf_tout') !== '1')) return null;
-    if (sw !== '1' && Date.now() < Number(String(ls.getItem('onfTOutFail') || '').split(',')[0])) return null;                                   // 물러남 기억(onf-frame.js fallBlocked 'thome' 과 같은 꼴 '<그때까지>,<연속>' · tout=1 은 지운다)
-    if (/iPhone|iPad|iPod/.test(ua) || (/Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg/.test(ua)) || (nv.platform === 'MacIntel' && nv.maxTouchPoints > 1)) return null;   // = webkitOnly
-    if (nv.standalone === true || matchMedia('(display-mode: standalone)').matches) return null;                                                // = homeApp
-    if (Date.now() - Number(ls.getItem('onf_devkey_off') || 0) < 7 * day) return null;                                                         // = devkeyOff(입장권이 메모리뿐 — tchGet 이 빈다)
+    var v = sw === '1' || sw === '2' || sw === '0' ? sw : ls.getItem('onf_tout'), wk = v === '2';                                                // = TOUT · TOUTWK(2 = WebKit·홈 화면 앱도)
+    if (window.top !== window.self || q.get('mode') || (v !== '1' && v !== '2')) return null;
+    if (sw !== '1' && sw !== '2' && Date.now() < Number(String(ls.getItem('onfTOutFail') || '').split(',')[0])) return null;                     // 물러남 기억(onf-frame.js fallBlocked 'thome' 과 같은 꼴 '<그때까지>,<연속>' · tout=1·2 는 지운다)
+    if (!wk && (/iPhone|iPad|iPod/.test(ua) || (/Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg/.test(ua)) || (nv.platform === 'MacIntel' && nv.maxTouchPoints > 1))) return null;   // = webkitOnly
+    if (!wk && (nv.standalone === true || matchMedia('(display-mode: standalone)').matches)) return null;                                       // = homeApp
+    if (!wk && Date.now() - Number(ls.getItem('onf_devkey_off') || 0) < 7 * day) return null;                                                  // = devkeyOff(입장권이 메모리뿐 — tchGet 이 빈다 · tchKeep)
     var c = JSON.parse(ls.getItem('onf_tch') || 'null');
     if (!c || !/^tch\.[A-Za-z0-9_-]{10,600}\.[A-Za-z0-9_-]{20,100}$/.test(c.tk) || !(Number(c.x) > Date.now() / 1000)) return null;            // = tchGet
     var ac = typeof AbortController === 'function' ? new AbortController() : null;
@@ -200,19 +201,24 @@ function tokLoad() {
    ⚠️ 진짜 검사(서명·aud·hd·exp·끊기 목록)는 Worker 가 한다 — 여기 꼴 검사는 왕복 아끼기다. */
 /* ⚠️ 계정이 바뀌면(같은 컴퓨터 Peter↔Mary · 「다른 계정으로」) 옛 입장권을 버린다 — 입장권 본문 e 와 새 구글 토큰 email 이 다르면 7일 규칙 없이 지우고 새로 묻는다
      (mount 가 바로 뒤에 돈다 — 지우기는 그 전에 · 옛 계정으로 정적 먼저가 열리지 않게). 두 「다른 계정으로」 갈래도 지운다.
-   ⚠️ 기기 열쇠를 못 쓰는 기기(devkeyOff — WebKit 등)는 기기 열쇠처럼 **저장하지 않고 이 페이지 메모리에만**(tchMem) — 그 기기는 정적 먼저도 꺼짐(WebKit 판정). */
+   ⚠️ 기기 열쇠를 못 쓰는 기기(devkeyOff — WebKit 등)는 기기 열쇠처럼 **저장하지 않고 이 페이지 메모리에만**(tchMem) — 그 기기는 정적 먼저도 꺼짐(WebKit 판정).
+     📱 단 WebKit 도 정적 먼저를 켠 기기(?tout=2 · TOUTWK · 2026-10-30 아이패드)는 저장한다(tchKeep) — 입장권은 쿠키가 아니라 이 껍데기(class.ownify.co.kr) 최상위 자기 저장소라
+       WebKit 도 남는다(남의 출처 저장소 분리와 무관). 홈 화면 앱은 사파리와 저장소가 따로라 각자 한 번씩 받는다 · 사파리 ITP 7일(그 사이 이 사이트를 안 열면 지움) = 다음 로그인에 다시 받는다 · 못 쓰면(사생활 보호 등) 메모리. */
 var TCHKEY = 'onf_tch', TCH_RENEW = 7 * 86400, TCH_RE = /^tch\.[A-Za-z0-9_-]{10,600}\.[A-Za-z0-9_-]{20,100}$/, tchMem = null;
+function tchKeep() { return !devkeyOff() || TOUTWK; }   // 입장권을 저장소에 둘 기기인가(아니면 이 페이지 메모리만)
 function jwtBody(t) {   // 점 둘 꼴의 가운데 base64url JSON · 못 읽으면 {}
   try { var b = String(t).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'); while (b.length % 4) b += '='; var j = JSON.parse(atob(b)); return j && typeof j === 'object' ? j : {}; } catch (e) { return {}; }
 }
 function tchGet() {
   try {
-    var v = devkeyOff() ? tchMem : JSON.parse(localStorage.getItem(TCHKEY) || 'null');
+    var v = tchKeep() ? JSON.parse(localStorage.getItem(TCHKEY) || 'null') : tchMem;
+    if (!v && tchMem) v = tchMem;   // 저장을 못 한 기기(사생활 보호·가득 참)는 메모리 것
     if (v && typeof v.tk === 'string' && TCH_RE.test(v.tk) && Number(v.x) > Math.floor(Date.now() / 1000)) return v;
   } catch (e) {}
   return null;
 }
 function tchDrop() { tchMem = null; try { localStorage.removeItem(TCHKEY); } catch (e) {} }
+function tchPut(c) { tchMem = c; if (tchKeep()) { try { localStorage.setItem(TCHKEY, JSON.stringify(c)); } catch (e) {} } }   // 메모리엔 늘(저장 실패 대비) · 저장소는 tchKeep 기기만
 function tchLogin(idt) {
   var v = tchGet(), w = window.ONF && ONF.frame && ONF.frame.WORKER;
   if (v && String(jwtBody(v.tk).e || '').toLowerCase() !== String(jwtBody(idt).email || '').toLowerCase()) { tchDrop(); v = null; }   // 다른 계정의 입장권
@@ -223,17 +229,19 @@ function tchLogin(idt) {
       .then(function (j) {
         if (!j || j.ok !== true || typeof j.tk !== 'string' || !TCH_RE.test(j.tk) || !(Number(j.x) > Math.floor(Date.now() / 1000))) return;
         var c = { tk: j.tk, x: Number(j.x) };
-        if (devkeyOff()) tchMem = c; else { try { localStorage.setItem(TCHKEY, JSON.stringify(c)); } catch (e) {} }
+        tchPut(c);
         if (appTch) answer();   // 정적 화면이 새 입장권을 기다린다(노크 stale 갈래가 칸을 비우고 구글에서 새로 받았다)
       }, function () {});
   } catch (e) {}
 }
-/* 🏫 정적 먼저 기기 스위치 — 주소 tout=1|0 이면 이 기기에 기억(onf_tout) · 없으면 기억값 · 기본 꺼짐(= 지금 길) · tout=1 은 그날 물러남 기억(onfTOutFail)도 지운다(학생 out=1 과 같이). */
-var TOUT_FAIL = 'onfTOutFail', TOUT = (function () {
+/* 🏫 정적 먼저 기기 스위치 — 주소 tout=1|2|0 이면 이 기기에 기억(onf_tout) · 없으면 기억값 · 기본 꺼짐(= 지금 길) · tout=1·2 는 그날 물러남 기억(onfTOutFail)도 지운다(학생 out=1 과 같이).
+   📱 2 = WebKit(아이패드·아이폰·사파리)·홈 화면 앱에서도(TOUTWK · 2026-10-30) — 1 은 종전대로 그 기기들을 뺀다. 판 쓰기는 익명 다리(ONF_TeacherBridge)로 가고,
+     익명 다리가 꺼져 있으면(빌드 execAnon 빈 값) 판이 그리기 전에 outFail('anon') → 지금 길(구글 홈) + 그날 기억(정적 판 teacher-boot.js). 크롬 등에선 2 = 1. */
+var TOUT_FAIL = 'onfTOutFail', TOUTV = (function () {
   var v = null;
-  try { v = new URLSearchParams(location.search).get('tout'); if (v === '1' || v === '0') { localStorage.setItem('onf_tout', v); if (v === '1') localStorage.removeItem(TOUT_FAIL); } else v = localStorage.getItem('onf_tout'); } catch (e) {}
-  return v === '1';
-})();
+  try { v = new URLSearchParams(location.search).get('tout'); if (v === '1' || v === '2' || v === '0') { localStorage.setItem('onf_tout', v); if (v !== '0') localStorage.removeItem(TOUT_FAIL); } else v = localStorage.getItem('onf_tout'); } catch (e) {}
+  return v;
+})(), TOUT = TOUTV === '1' || TOUTV === '2', TOUTWK = TOUTV === '2';
 
 /* ═══ 🔑 기기 열쇠를 못 쓰는 기기 (2026-10-12 Peter 아이폰 실측) ═══
    아이폰·아이패드·맥 사파리(WebKit)는 앱을 다시 열면 구글 창구를 거치기 **전엔** 끼운 구글 화면(exec)에 로그인 쿠키를
@@ -439,7 +447,9 @@ var frameWatch = null;
 /* ═══ 🏫 정적 먼저 — 선생님 홈을 구글 밖 정적 판(Pages /teacher/ · Worker 사본)으로 먼저 연다(밖으로 4-④-2c · 2026-10-30) ═══
    ⚠️ 쌍둥이: 학생 껍데기 assets/onf-frame.js mainHome(정본 주석) — 선생님은 /home/get 을 껍데기가 안 묻는다(판이 입장권으로 /t/home/get).
    묻는 때만(tOutQ): 기기 스위치(위 TOUT · 기본 꺼짐) · 홈(mode 없음 — 학생 한 명 창·과제 판은 지금 길) · 입장권 있음(tchGet) · 물러남 기억에 안 막힘(onfTOutFail · onf-frame.js fallBlocked 'thome' — 까닭별) ·
-     WebKit 아님(webkitOnly — 사파리·아이폰 크롬·아이패드 · 2026-10-30 판정) · 홈 화면 앱(standalone) 아님 — 판의 다리(exec?mode=bridge)가 아직 구글 쿠키를 요구한다(Peter 결정 대기 · 입장권 받기는 그 앱도 한다) · onf-frame.js 가 정적 판 주소를 낸다.
+     WebKit 아님(webkitOnly — 사파리·아이폰 크롬·아이패드 · 2026-10-30 판정) · 홈 화면 앱(standalone) 아님 — 선생님 배포 다리(exec?mode=bridge)는 구글 쿠키를 요구한다 · onf-frame.js 가 정적 판 주소를 낸다.
+     📱 tout=2(TOUTWK) 기기는 WebKit·홈 화면 앱도 탄다 — 판이 익명 다리(입장권만 받는 ONF_TeacherBridge)로 쓰고, 그 다리가 꺼진 빌드면 판이 outFail('anon')(위 TOUT 주석 · hard = 하루).
+       WebKit 은 그래도 늘 구글 창구(버튼) 뒤에 연다(reuse 안 함 · 물러난 지금 길이 쿠키 문을 거친 뒤여야 한다).
    판 말(그 액자 창 · 그 판 출처만): outHello → outBoot{tk}(hello 마다 — 다시 읽힌 판도 · ⛔ 주소엔 안 싣는다) · homeDrawn = 이 기기 정적 홈(그 뒤 outFail·시한 무시 · 로고 막 ok) ·
      그리기 전 outFail·hello 없음(TOUT_HELLO_MS)·outBoot 뒤 그리기 시한(TOUT_PAINT_MS) = 같은 액자에 지금 길(openHome) + 물러남 기억(ONF.frame.fallBack 'thome' — hello·paint·fail-time·fail-net 은 slow, 그 밖 hard) · homeDrawn = 연속 0 · 물러나면 죽은 정적 창을 노크 칸에서 비운다.
    그린 뒤 화면 노크(auth-please)는 위 onf-knock 이 받는다 — 정적 판 창(직접 자식 · 그 출처)이면 답이 구글 토큰이 아니라 입장권(answer · appTch).
@@ -455,7 +465,7 @@ function tPreTake(tk) {
 function tOutUrl() { try { return new URL('/teacher/', ONF.frame.OUT_BOOK).href; } catch (e) { return ''; } }   // 정적 판 주소 = 교재 정적 판과 같은 출처(onf-frame.js 상수)
 function tOutQ() {
   try {   // ⛔ 무엇이 던져도 지금 길(mount 안에서 불린다 — 여기서 던지면 로그인이 멈춘다)
-    if (!TOUT || new URLSearchParams(location.search).get('mode') || homeApp() || webkitOnly() || !tchGet() || !(window.ONF && ONF.frame && ONF.frame.OUT_BOOK) || !bookAppOrigin(new URL(tOutUrl()).origin)) return false;
+    if (!TOUT || new URLSearchParams(location.search).get('mode') || (!TOUTWK && (homeApp() || webkitOnly())) || !tchGet() || !(window.ONF && ONF.frame && ONF.frame.OUT_BOOK) || !bookAppOrigin(new URL(tOutUrl()).origin)) return false;
     return !ONF.frame.fallBlocked('thome');
   } catch (e) { return false; }
 }
@@ -616,7 +626,8 @@ window.addEventListener('message', function (ev) {
    입장권(onf_tch)은 구글 로그인(onCredential → tchLogin → Worker /t/login)에서만 생겼다 — 기기 열쇠(odk1.)로 다시 여는 선생님은 그 로그인을 안 거친다.
    이제 구글 선생님 홈(doGet · 서버 _onfTchMint)이 Worker 와 같은 꼴·같은 비밀로 지어 안쪽이 { onf:'tch', tk } 로 준다 → tchLogin 과 같은 규칙으로 칸에.
    ⛔ 받는 말 = 우리가 정한 그 안쪽 구글 창·출처뿐(appWin·appOrigin · 기기 열쇠와 같은 자물쇠 · fromOurFrame 을 지나 정해진 창) · 정적 판 창(appTch)은 아니다.
-   ⛔ 다른 계정이면 버린다(입장권 e ≠ 지금 쓰는 구글 토큰·기기 열쇠의 email · 없으면 버림) · 같은 계정 것이 7일 넘게 남았으면 안 바꾼다 · 열쇠 못 쓰는 기기(devkeyOff)는 메모리만.
+   ⛔ 다른 계정이면 버린다(입장권 e ≠ 지금 쓰는 구글 토큰·기기 열쇠의 email · 없으면 버림) · 같은 계정 것이 7일 넘게 남았으면 안 바꾼다 · 열쇠 못 쓰는 기기(devkeyOff)는 메모리만(tout=2 WebKit 은 저장 · tchKeep).
+   📱 WebKit 첫 길: 구글 버튼(팝업 · 홈 화면 앱은 리디렉트) → 지금 길(구글 홈) → 여기서 입장권 → 다음 로그인부터 정적 먼저(/t/login 이 켜져 있으면 그 답도 같은 칸).
    ⚠️ 만료는 입장권 본문 x 에서(따로 온 값을 안 믿는다) · 진짜 검사(서명·끊기)는 Worker·구글 — 여기 꼴 검사는 죽은 값 받아 두기 막이. */
 /* onf-tchgas:begin */
 window.addEventListener('message', function (ev) {
@@ -628,8 +639,7 @@ window.addEventListener('message', function (ev) {
   if (!me || String(b.e || '').toLowerCase() !== me || !(Number(b.x) > now)) return;
   v = tchGet();
   if (v && String(jwtBody(v.tk).e || '').toLowerCase() === me && v.x - now > TCH_RENEW) return;   // 같은 계정 것이 아직 넉넉하다(tchLogin 의 7일 규칙)
-  var c = { tk: d.tk, x: Number(b.x) };
-  if (devkeyOff()) tchMem = c; else { try { localStorage.setItem(TCHKEY, JSON.stringify(c)); } catch (e) {} }
+  tchPut({ tk: d.tk, x: Number(b.x) });
 });
 /* onf-tchgas:end */
 

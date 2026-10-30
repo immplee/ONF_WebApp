@@ -465,7 +465,12 @@ const PRE_CASES = [[eligible({}), {}], [{ onf_tch: tchCell(20) }, { search: '?to
   [eligible({ onf_tch: tchCell(-1) }), {}], [eligible({ onf_tch: '{bad' }), {}], [{ onf_tout: '1' }, {}], [eligible({ onfTOutFail: (Date.now() + 3600000) + ',3' }), {}],
   [eligible({ onfTOutFail: (Date.now() + 3600000) + ',3' }), { search: '?tout=1' }], [eligible({ onfTOutFail: String(Date.now() - 2 * 86400000) }), {}], [eligible({ onfTOutFail: '0,1' }), {}], [eligible({ onfTOutFail: (Date.now() - 1) + ',2' }), {}], [eligible({ onf_devkey_off: String(Date.now()) }), {}],
   [eligible({}), { search: '?mode=student&t=Tok_1' }], [eligible({}), { search: '?mode=hwbook&t=Tok_1' }], [eligible({}), { nav: { standalone: true } }],
-  [eligible({}), { nav: MACSAFARI }], [eligible({}), { nav: IPHONE }], [eligible({}), { nav: IPAD }]];
+  [eligible({}), { nav: MACSAFARI }], [eligible({}), { nav: IPHONE }], [eligible({}), { nav: IPAD }],
+  //   📱 tout=2(WebKit·홈 화면 앱도) — 기억값 · 주소 · 그날 물러남 · 열쇠 꺼짐 기기도 · mode 는 여전히 안 함
+  [eligible({ onf_tout: '2' }), { nav: MACSAFARI }], [eligible({ onf_tout: '2' }), { nav: IPHONE }], [eligible({ onf_tout: '2' }), { nav: IPAD }], [eligible({ onf_tout: '2' }), { nav: Object.assign({ standalone: true }, IPAD) }],
+  [{ onf_tch: tchCell(20) }, { search: '?tout=2', nav: IPAD }], [eligible({ onf_tout: '2' }), {}], [eligible({ onf_tout: '2', onf_devkey_off: String(Date.now()) }), {}],
+  [eligible({ onf_tout: '2', onfTOutFail: String(Date.now()) }), { nav: IPAD }], [eligible({ onf_tout: '2', onfTOutFail: String(Date.now()) }), { search: '?tout=2', nav: IPAD }],
+  [eligible({ onf_tout: '2' }), { search: '?mode=student&t=Tok_1', nav: IPAD }], [eligible({ onf_tout: '2' }), { search: '?tout=1', nav: IPAD }], [eligible({ onf_tout: '2' }), { search: '?tout=0', nav: IPAD }]];
 
 t('P1 머리 미리 받기 — 묻는 때 = tOutQ 와 같다(스위치·주소·입장권·그날 물러남·열쇠 꺼짐·mode·홈 화면 앱·WebKit 전부) · POST <Worker>/t/home/get {tk} 머리말 없음 · 저장소에 안 쓴다', () => {
   assert.ok(HEAD, '⛔ 머리 미리 받기 스크립트가 없다');
@@ -487,6 +492,64 @@ t('P1 머리 미리 받기 — 묻는 때 = tOutQ 와 같다(스위치·주소·
   }
   assert.ok(fired >= 3, '전제: 묻는 경우가 셋 넘게 있었다 — ' + fired);
   assert.strictEqual(head(eligible({}), { framed: true }).fetches.length, 0, '⛔ 남의 액자 안에서 물었다');
+});
+
+/* ── 📱 tout=2 — WebKit(아이패드·아이폰·맥 사파리)·홈 화면 앱도 정적 먼저(2026-10-30 · 익명 다리 ONF_TeacherBridge) ── */
+t('W1 tout=2 · WebKit·홈 화면 앱 + 입장권 → 구글 버튼 로그인 뒤 정적 판 먼저 → outBoot{tk} · 화면 노크엔 auth{tch} · 열 때 구글 창구는 그대로(받아 둔 토큰으로 안 연다)', async () => {
+  for (const nav of [MACSAFARI, IPHONE, IPAD, Object.assign({ standalone: true }, IPAD)]) {
+    const cell = tchCell(20), tk = JSON.parse(cell).tk;
+    const R = boot({ onf_tch: cell, onf_id_tok: gtok() }, { search: '?tout=2', nav });
+    assert.strictEqual(R.ls.onf_tout, '2');
+    assert.deepStrictEqual(R.nav, [], '⛔ WebKit 이 구글 창구 없이(받아 둔 토큰으로) 열었다: ' + nav.platform);
+    login(R); await tick(); await tick();
+    assert.deepStrictEqual(R.nav, [TURL], '⛔ tout=2 WebKit 이 정적 판을 먼저 안 열었다: ' + nav.platform + ' ' + JSON.stringify(R.nav));
+    assert.strictEqual(R.fetches.filter((f) => /\/t\/login$/.test(f.url)).length, 0, '전제: 남은 20일 = 안 묻는다');
+    R.fromApp({ onf: 'outHello' });
+    assert.deepStrictEqual(R.sentTo(APP), [{ onf: 'outBoot', tk }]);
+    R.fromApp({ onf: 'homeDrawn' }); R.sent.length = 0;
+    R.fromApp({ onf: 'auth-please', stale: false });
+    assert.deepStrictEqual(R.sent.map((x) => [x.m, x.o]), [[{ onf: 'auth', token: tk, hist: 1 }, APP]], '⛔ 정적 화면에 입장권 대신 다른 것을 줬다');
+  }
+  //   tout=1 은 종전대로 WebKit 을 뺀다 · 크롬에선 2 = 1
+  const O = boot({ onf_tch: tchCell(20), onf_tout: '1' }, { nav: IPAD }); login(O);
+  assert.ok(!O.staticOpen() && O.execOpen(), '⛔ tout=1 이 WebKit 에서 정적 먼저를 했다');
+  const C = boot({ onf_tch: tchCell(20), onf_tout: '2' }); login(C);
+  assert.ok(C.staticOpen(), '⛔ 크롬에서 tout=2 가 정적 먼저를 안 했다');
+  const Z = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { search: '?tout=0', nav: IPAD }); login(Z);
+  assert.ok(Z.ls.onf_tout === '0' && !Z.staticOpen());
+});
+
+t('W2 tout=2 WebKit 입장권은 저장소에 남는다(다음 열기) — /t/login 답 · 구글 홈이 준 입장권(BOOT.tch) 둘 다 · tout 없으면 종전대로 메모리만 · 저장 실패 = 메모리', async () => {
+  for (const nav of [IPHONE, IPAD, Object.assign({ standalone: true }, IPAD)]) {
+    const R = boot({ onf_tout: '2' }, { nav });
+    login(R); await tick(); await tick();
+    assert.ok(R.execOpen() && !R.staticOpen(), '전제: 입장권 없는 첫 열기 = 지금 길');
+    assert.ok(/^tch\./.test(JSON.parse(R.ls.onf_tch || 'null').tk), '⛔ tout=2 WebKit 이 /t/login 입장권을 저장 안 했다: ' + nav.platform);
+    //   /t/login 꺼짐(TLOGIN 0)이면 구글 홈(#122)이 준 입장권으로
+    const G = boot({ onf_tout: '2' }, { nav, fetch: () => ({ status: 503, body: { ok: false, reason: 'off' } }) }), gt = gtok();
+    login(G, gt); await tick(); await tick();
+    assert.ok(!('onf_tch' in G.ls), '전제: /t/login 꺼짐');
+    G.knockG(); const nt = tch('g'); G.fire({ onf: 'tch', tk: nt }, G.lastSrc, KORIGIN);
+    assert.strictEqual(JSON.parse(G.ls.onf_tch).tk, nt, '⛔ tout=2 WebKit 이 구글 홈 입장권을 저장 안 했다');
+    //   다음 열기(새 껍데기 · 구글 버튼 로그인) = 정적 먼저
+    const N = boot({ onf_tout: '2', onf_tch: G.ls.onf_tch }, { nav }); login(N);
+    assert.deepStrictEqual(N.nav, [TURL], '⛔ 받아 둔 입장권으로 다음 열기가 정적 먼저를 안 탔다');
+  }
+  const M = boot({}, { nav: IPAD }); login(M); await tick(); await tick();
+  assert.ok(!('onf_tch' in M.ls) && M.g.tchGet(), '⛔ tout 없는 WebKit 이 입장권을 저장소에 남겼다(또는 메모리에도 없다)');
+  const F = boot({ onf_tout: '2' }, { nav: IPAD }); F.g.localStorage.setItem = () => { throw new Error('QuotaExceeded'); };
+  login(F); await tick(); await tick();
+  assert.ok(F.g.tchGet() && /^tch\./.test(F.g.tchGet().tk), '⛔ 저장 못 한 기기가 이 페이지에서도 입장권을 잃었다');
+});
+
+t('W3 tout=2 WebKit 판이 outFail(anon — 익명 다리 꺼진 빌드) → 지금 길 + 그날 기억(clog reopen:tout-fail-anon) → 그날 다음 열기는 바로 지금 길', async () => {
+  const beacons = [], nav = Object.assign({ sendBeacon: (u, b) => { beacons.push(JSON.parse(b)[0].c); return true; } }, IPAD), store = { onf_tch: tchCell(20), onf_tout: '2' };
+  const R = boot(store, { nav }); login(R);
+  R.fromApp({ onf: 'outFail', why: 'anon' });
+  assert.ok(R.nav[0] === TURL && /AKfycb/.test(R.nav[R.nav.length - 1]), '⛔ 익명 다리 꺼짐에 지금 길로 안 갔다: ' + JSON.stringify(R.nav));
+  assert.ok(Number(String(store.onfTOutFail).split(',')[0]) > Date.now() + 3600000 && beacons.indexOf('reopen:tout-fail-anon') >= 0 && beacons.indexOf('fallback:thome:fail-anon:1') >= 0, '⛔ 익명 다리 꺼짐 물러남이 하루(hard) 기억·기록이 아니다: ' + store.onfTOutFail + ' ' + beacons);
+  const N = boot(store, { nav: IPAD }); login(N);
+  assert.ok(!N.staticOpen() && N.execOpen());
 });
 
 t('P2 머리의 Worker 주소 = onf-frame.js 상수(ONF.frame.WORKER) 쌍둥이 · 머리 말고 본 스크립트엔 여전히 안 적는다', () => {
