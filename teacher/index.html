@@ -892,6 +892,7 @@ window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
   if (!d || !hwBk || !bookFrom(ev, hwBk.el)) return;
   if (d.onf === 'bookHi') { hwBk.win = ev.source; hwBk.origin = ev.origin; hwPenSync(); return; }
+  if (d.onf === 'penAct') { if (hwView === 'side' && hwWin) { try { hwWin.postMessage({ onf: 'bookPenAct' }, hwOrigin); } catch (e) {} } return; }   // ↩️ 옆 교재에 되돌릴 일이 생겼다 → 과제 판 펜 줄 차례 장부(2026-10-30 4차)
   if (d.onf === 'themeAsk') { themeAsk(ev); return; }
   if (d.onf === 'printTitle') { if (window.ONF && ONF.frame && ONF.frame.printTitle) ONF.frame.printTitle(d.t); return; }
   if (d.onf === 'bookClose') { hwViewSet('photo'); hwTellView(); }
@@ -918,7 +919,7 @@ window.addEventListener('popstate', function () {
 });
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
-  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwPen' && d.onf !== 'hwLeaveKeep' && d.onf !== 'hwRec' && d.onf !== 'hwBand')) return;
+  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwPen' && d.onf !== 'hwLeaveKeep' && d.onf !== 'hwRec' && d.onf !== 'hwBand' && d.onf !== 'hwPenOp')) return;
   if (hwFr && hwFrom(ev.source)) {   // 과제 판 액자에서 온 말
     try { if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return; } catch (e) { return; }
     if (hwWin && ev.source !== hwWin) return;   // 한 번 정하면 그 창만(노크 자물쇠와 같다)
@@ -942,7 +943,8 @@ window.addEventListener('message', function (ev) {
     if (d.onf === 'hwLeaveKeep') { var sk = history.state; hwAsking = false; if (hwBox && sk && sk.onfHw && !sk.lg) { try { history.pushState({ onfHw: 1, n: sk.n || 0, lg: 1 }, ''); } catch (e) {} } }   // ③ 「홈으로 나갈까요?」 취소 — 물음 칸 다시
     if (d.onf === 'hwbookView') hwViewSet(String(d.v || ''), d.href);
     if (d.onf === 'hwRec') hwRecSet(d.rs);   // 🎧 녹음 플레이어 자리(교재만에서도 보이게)
-    if (d.onf === 'hwBand') hwBandSet(d.h);   // 📖 옆에 = 위 줄·펜 줄 띠 높이(0 = 종전 배치)
+    if (d.onf === 'hwBand') hwBandSet(d.h);
+    if (d.onf === 'hwPenOp' && (d.op === 'undo' || d.op === 'redo') && hwBk && hwBk.win) { try { hwBk.win.postMessage({ onf: 'penRelay', op: d.op }, hwBk.origin); } catch (e) {} }   // ↩️ 펜 줄 ↩︎·↪︎ 가 옆 교재 차례 — 교재가 되돌린다(Peter 2026-10-30 4차 「교재에 필기하고 나면 되돌리기가 안 돼」)   // 📖 옆에 = 위 줄·펜 줄 띠 높이(0 = 종전 배치)
     if (d.onf === 'hwPen') hwPenRelay(d);   // 📖 펜 줄 하나 — 과제 판 도구를 옆 교재로(⑬)   // 📖 교재 옆에 · 교재만 · 사진만(과제 첨삭 5단계)
     return;
   }
