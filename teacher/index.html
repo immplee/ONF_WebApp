@@ -1483,18 +1483,18 @@ function bookOpen(href, left, m, r, home, cf, out) {   // cf = 📖 ☁️ 홈�
   var fl = !outWant(src, out);   // 🧺 지금 길로 여는 교재 — 남은 쓰기를 숨긴 정적 판으로 한 번 넘겨준다(위 bookFlushSoon · 보이는 판이 뜬 뒤)
   p = bookFind(src);
   if (p && !outSame(p, src, out)) { bookRetire(p); p = null; }   // 🌤 길이 다른 판 — 자격 내리고 그 길 새 판(학생 껍데기와 같다)
-  if (!p && home && (b = bookBoardFor(src, out))) { bookSwapTo(b, src, left, m, r, cf); if (fl) bookFlushSoon(b, src); rsMark(bookShown(), href, out); return; }
+  if (!p && home && (b = bookBoardFor(src, out))) { bookSwapTo(b, src, left, m, r, cf); if (fl) bookFlushSoon(b, src); rsMark(bookShown(), href, out, cf); return; }
   bookShow(p || bookMake(src, false, out, cf), left, m, r);
   if (fl) bookFlushSoon(bookShown(), src);
-  rsMark(bookShown(), href, out);
+  rsMark(bookShown(), href, out, cf);
 }
 /* 🔄 새로고침 = 열린 창 그대로(Peter 2026-10-24 · ⚠️ 쌍둥이: 학생 assets/onf-frame.js rsSave·rsBoot) — 보이는 판의 연 주소·자리·교재가 알린 상태(bookState)를 이 탭에만(sessionStorage) ·
    다시 읽히면 홈이 처음 노크할 때(bookHello — 로그인이 끝나 홈이 뜬 뒤) 그 주소로 다시 열고 교재 노크 때 bookRestore · 닫으면 지운다 · 12시간 넘은 기억은 버린다 */
 var RS_KEY = 'onfThOpenBook', RS_MS = 12 * 3600 * 1000, rsBooted = false;
 /* 홈 탭도(학생 껍데기 TAB0 와 같다) — 돌려줄 값은 읽힐 때 한 번 잡는다(홈이 처음 그린 오늘 탭이 먼저 와서 덮지 않게) */
 var TAB_KEY = 'onfThHomeTab', TAB0 = (function () { try { return sessionStorage.getItem(TAB_KEY) || ''; } catch (e) { return ''; } })();
-function rsMark(p, href, out) { if (!p) return; p.href = href; p.hout = out ? 1 : 0; rsSave(p); }   // 🌤 hout = 홈이 out:1 로 연 판(되살릴 때 같은 길 · 학생 껍데기 rsMark 쌍둥이 · 2026-10-28)
-function rsSave(p) { if (!p || !p.href) return; try { sessionStorage.setItem(RS_KEY, JSON.stringify({ h: p.href, l: p.left, m: p.m, r: p.r, o: p.hout || 0, st: p.st || null, at: Date.now() })); } catch (e) {} }
+function rsMark(p, href, out, cf) { if (!p) return; p.href = href; p.hout = out ? 1 : 0; p.hcf = bookCfOk(cf); rsSave(p); }   // 📖 hcf = 홈이 실은 사본 힌트(밖으로 7 · 2026-11-01) — 되살린 정적 판도 Worker /book/boot(없으면 다리 3.5초 · 5단계에 남긴 틈)   // 🌤 hout = 홈이 out:1 로 연 판(되살릴 때 같은 길 · 학생 껍데기 rsMark 쌍둥이 · 2026-10-28)
+function rsSave(p) { if (!p || !p.href) return; try { sessionStorage.setItem(RS_KEY, JSON.stringify({ h: p.href, l: p.left, m: p.m, r: p.r, o: p.hout || 0, c: p.hcf || null, st: p.st || null, at: Date.now() })); } catch (e) {} }
 function rsDrop() { try { sessionStorage.removeItem(RS_KEY); } catch (e) {} }
 function rsTell(p) { if (!p || !p.rs || !p.win) return; var st = p.rs; p.rs = null; try { p.win.postMessage({ onf: 'bookRestore', st: st }, p.origin); } catch (e) {} }
 function rsBoot() {
@@ -1502,7 +1502,7 @@ function rsBoot() {
   var v = null;
   try { v = JSON.parse(sessionStorage.getItem(RS_KEY) || 'null'); } catch (e) { v = null; }
   if (!v || typeof v.h !== 'string' || !(Date.now() - Number(v.at) < RS_MS)) return;
-  bookOpen(v.h, typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, null, v.o === 1);
+  bookOpen(v.h, typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, bookCfOk(v.c), v.o === 1);   // 입장권(12시간)이 낡았으면 Worker 가 403 → 판이 다리로(종전과 같다)
   var p = bookShown(); if (!p) return;
   p.st = v.st && typeof v.st === 'object' ? v.st : null; p.rs = p.st; rsTell(p);
 }
