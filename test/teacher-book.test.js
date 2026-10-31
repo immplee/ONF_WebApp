@@ -1212,14 +1212,24 @@ t('O1 홈 openBook{out:1} → 판 액자 = 정적 판(주소에 토큰 없음) �
   assert.strictEqual(bootOf(w2).length, 0, '⛔ 남의 출처 hello 에 outBoot 을 보냈다');
 });
 
-t('O2 out 없음 → 종전 구글 판(openExec) · ⭐ 내 문장(mode=mine)+out:1 → 지금 길(Review Focus 3) · onf-frame.js 가 openApp 을 모르면 지금 길', () => {
+t('O2 out 없음 → 종전 구글 판(openExec) · ⭐ 내 문장(mode=mine)+out:1 → 정적 /mine/(2026-10-31 넓히기 ③ · outBoot src 에 ttok·tas 그대로) · 내 문장 out 없음 = 지금 길 · onf-frame.js 가 outOpen 을 모르면 지금 길', () => {
   let s = phoneRun({ wide: true, frame: true });
   s.send({ onf: 'openBook', href: E1 }, s.home);
   assert.ok(!isStatic(s.panel()) && s.panel().kids[0].src === srcOf(s, E1), '⛔ out 없는데 정적 판');
   assert.ok(!('onfOutUsed' in s.g.localStorage.s), '⛔ 지금 길인데 onfOutUsed 를 적었다');
   s = phoneRun({ wide: true, frame: true });
   s.send({ onf: 'openBook', href: MYS, out: 1 }, s.home);
-  assert.ok(!isStatic(s.panel()), '⛔ 내 문장을 정적 판으로 열었다');
+  assert.strictEqual(s.panel().kids[0].src, OUT_O + '/mine/', '⛔ 내 문장 out:1 을 정적 /mine/ 으로 안 열었다: ' + s.panel().kids[0].src);
+  const wm = outUp(s, s.panel());
+  assert.deepStrictEqual(bootOf(wm), [[{ onf: 'outBoot', tok: '', src: srcOf(s, MYS), cf: null }, OUT_O]], '⛔ 내 문장 outBoot 꼴(선생님 보기 값 그대로): ' + JSON.stringify(bootOf(wm)));
+  assert.ok(/[?&]ttok=M(&|$)/.test(srcOf(s, MYS)) && /[?&]mode=mine(&|$)/.test(srcOf(s, MYS)), '준비: 선생님 보기 주소');
+  s = phoneRun({ wide: true, frame: true });
+  s.send({ onf: 'openBook', href: MYS }, s.home);
+  assert.ok(s.panel().kids[0].src === srcOf(s, MYS), '⛔ out 없는 내 문장이 지금 길이 아니다');
+  s = phoneRun({ wide: true, frame: true, pre(g) { g.__noOutOpen = 1; } });
+  if (s.g.ONF && s.g.ONF.frame) delete s.g.ONF.frame.outOpen;   // 옛 onf-frame.js(outOpen 모름)
+  s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
+  assert.ok(!isStatic(s.panel()) && s.panel().kids[0].src === srcOf(s, E1), '⛔ outOpen 을 모르는 옛 onf-frame.js 인데 정적 판');
   s = phoneRun({ wide: true });   // ONF.frame 없음(못 받은 onf-frame.js)
   s.send({ onf: 'openBook', href: E1, out: 1 }, s.home);
   assert.ok(s.panel() && s.panel().kids[0].src === srcOf(s, E1), '⛔ openApp 이 없는데 지금 길로 안 열었다');
@@ -1317,11 +1327,25 @@ t('O8 고침 1 — 홈 목록이 bookWarm{out:1, panel:1} 여섯(다른 교재)�
   const st = s.panels().filter((x) => isStatic(x) && x.classList.contains('park'));
   assert.strictEqual(st.length, 1, '⛔ 숨긴 정적 판이 ' + st.length + '개 — 다리(GAS)가 한꺼번에 뜬다');
   assert.strictEqual(s.panels().length, 1, '⛔ 정적 미리가 구글 판으로 새어 나갔다');
-  //   노크 뒤(후보가 아님)에도 숨긴 정적 판이 있으면 더 안 띄운다
+  //   노크 뒤 숨긴 정적 판은 새 미리 받기에 자리를 비킨다(2026-10-31 넓히기 — 30분 막힘 고침) · 숨긴 정적 판은 여전히 하나 · 같은 주소는 그대로
   outUp(s, st[0]); s.send({ onf: 'bookHi', swap: 1 }, st[0].kids[0].contentWindow, OUT_O);
   s.g.books[0].born -= 2 * 60 * 1000;
+  const was = s.g.books[0].src;
+  s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e1'), panel: 1, out: 1 }, s.home);
+  assert.ok(s.panels().length === 1 && s.g.books[0].src === was, '⛔ 같은 주소 미리 받기가 숨긴 정적 판을 갈았다');
   s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e7'), panel: 1, out: 1 }, s.home);
-  assert.strictEqual(s.panels().length, 1, '⛔ 노크한 숨긴 정적 판이 있는데 또 띄웠다');
+  const st2 = s.panels().filter((x) => isStatic(x) && x.classList.contains('park'));
+  assert.ok(st2.length === 1 && s.panels().length === 1, '⛔ 숨긴 정적 판이 하나가 아니다: ' + s.panels().length);
+  assert.ok(s.g.books.length === 1 && /e7/.test(s.g.books[0].src), '⛔ 노크한 숨긴 정적 판이 새 미리 받기(e7)를 막았다 — 30분 막힘: ' + s.g.books.map((q) => q.src.slice(-60)));
+  //   새 판(e7)이 아직 노크 전이면 그 뒤 미리 받기는 버린다(다리 몰림 방지 그대로)
+  s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e8'), panel: 1, out: 1 }, s.home);
+  assert.ok(s.g.books.length === 1 && /e7/.test(s.g.books[0].src), '⛔ 뜨는 중 정적 판이 있는데 또 띄웠다(다리 몰림)');
+  //   보이는 정적 판은 비키지 않는다
+  s.send({ onf: 'openBook', href: TURL.replace('e1', 'e9'), left: 270, out: 1 }, s.home);
+  const vis = s.g.books.find((q) => !q.parked); outUp(s, vis.box, 9); s.send({ onf: 'bookHi', swap: 1 }, vis.box.kids[0].contentWindow, OUT_O);
+  outUp(s, s.g.books.find((q) => /e7/.test(q.src)).box, 7); s.send({ onf: 'bookHi', swap: 1 }, s.g.books.find((q) => /e7/.test(q.src)).box.kids[0].contentWindow, OUT_O);
+  s.send({ onf: 'bookWarm', href: TURL.replace('e1', 'e5'), panel: 1, out: 1 }, s.home);
+  assert.ok(s.g.books.some((q) => q === vis), '⛔ 보이는 정적 판을 비켰다');
   //   구글 미리 — 종전(판 한 장 끔: 셋까지 숨긴 판)
   s = phoneRun({ wide: true, frame: true });
   HS.forEach((h) => s.send({ onf: 'bookWarm', href: h, panel: 1, left: 270 }, s.home));

@@ -471,6 +471,38 @@ t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼�
   R.g.hwClose();   // 과제 판 닫기(뒤로·‹ 모두 여기로) = 그 교재 액자도 지움
   assert.strictEqual(panels().length, 0, '⛔ 과제 판을 닫았는데 교재 액자가 남았다');
 });
+t('🌤 과제 판 「교재 옆에」 정적 판(2026-10-31 넓히기 ②) — 말 out:1 이면 홈 옆 판과 같은 함수(ONF.frame.outOpen) · out 없으면 종전 구글 판 · 안 뜨면 같은 액자에 지금 길 · 보기만 바꿈은 길 그대로 · 정적 판 출처 노크 받음', () => {
+  const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
+  R.knockAs(me); R.postAs({ onf: 'hwbook', t: 'Tok_1' }, me);
+  const fr = R.created.filter((e) => e.tag === 'iframe')[0], inner = { parent: { parent: fr.contentWindow }, postMessage() {} };
+  R.postAs({ onf: 'auth-please' }, inner);
+  const ce = R.g.document.createElement; R.g.document.createElement = (tag) => { const e = ce(tag); e.style.setProperty = (k, v) => { e.style[k] = v; }; e.style.removeProperty = (k) => { delete e.style[k]; }; e.blur = () => {}; return e; };
+  const opened = [], execs = [];
+  R.g.ONF = { api: { EXEC: R.g.EXEC }, frame: { OUT_BOOK: 'https://app.ownify.co.kr/book/', fallBlocked: () => false, isAppOrigin: (o) => o === 'https://app.ownify.co.kr' || /googleusercontent\.com$/.test(o),
+    outOpen: (el, u, cf, tok, back) => { opened.push({ el, u, cf, back }); return { stop() {}, stuck: () => false }; },
+    openExec: (el, u) => { execs.push(u); el.src = u; return { stop() {}, stuck: () => false }; } } };
+  const HREF = 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILEaaaaaaaa01&sheetName=E3';
+  const CF = { f: 'FILEaaaaaaaa01', s: 'E3', k: 'v1.eyJmIjoiRjEifQ.sig-test-not-live' };
+  R.postAs({ onf: 'hwbookView', v: 'side', href: HREF, out: 1, cf: Object.assign({ evil: 1 }, CF) }, inner);
+  assert.strictEqual(opened.length, 1, '⛔ out:1 인데 같은 함수(outOpen)로 정적 판을 안 열었다');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(opened[0].cf)), CF, '⛔ 사본 힌트를 거름(bookCfOk) 없이 넘기거나 안 넘겼다');
+  assert.ok(opened[0].u.indexOf(R.g.EXEC + '?') === 0 && /[?&]embed=1(&|$)/.test(opened[0].u) && /[?&]t=Tok_1(&|$)/.test(opened[0].u), '⛔ 정적 판 주소가 교재 판 거름(teacherBookSrc)을 안 지났다: ' + opened[0].u);
+  assert.strictEqual(execs.length, 0, '⛔ 정적 판인데 구글 판도 열었다');
+  //   보기만 바꿈(교재만) — 같은 액자 그대로
+  R.postAs({ onf: 'hwbookView', v: 'book' }, inner);
+  assert.ok(opened.length === 1 && execs.length === 0, '⛔ 보기만 바꿨는데 다시 열었다');
+  //   정적 판 출처의 노크(bookHi)를 받는다(펜 줄 중계)
+  const got = [], bkWin = { parent: opened[0].el.contentWindow, postMessage: (m) => got.push(m) };
+  R.postAs({ onf: 'bookHi' }, bkWin, 'https://app.ownify.co.kr');
+  R.postAs({ onf: 'hwbookView', v: 'side' }, inner);
+  assert.ok(got.some((m) => m && m.onf === 'penRelay'), '⛔ 정적 판 노크를 안 받았다(펜 줄 중계 0)');
+  //   안 뜸 → 같은 액자에 지금 길
+  opened[0].back('hello');
+  assert.ok(execs.length === 1 && execs[0] === opened[0].u, '⛔ 정적 판이 안 떴는데 같은 주소로 지금 길을 안 열었다');
+  //   out 없는 다른 교재 → 종전 구글 판
+  R.postAs({ onf: 'hwbookView', v: 'side', href: HREF.replace('E3', 'E4') }, inner);
+  assert.ok(opened.length === 1 && execs.length === 2 && /sheetName=E4/.test(execs[1]), '⛔ out 없는데 정적 판');
+});
 t('📝 과제 판 액자 — 노크엔 지금 토큰 + 고른 사진·입장권(한 번만) · 그 액자 후손·googleusercontent 만 · 홈 노크 자물쇠(appWin)는 안 건드림 · ‹ 와 뒤로 = 닫기(홈엔 뒤로 안 보냄)', () => {
   const L = '402d6a62-96ae-817f-86ec-ecaf4f919ab9', HWT = { p: '{"s":"Tok_1"}', sig: 'A'.repeat(43) };
   const R = boot({ onf_id_tok: odk() }), homeGot = [], me = { parent: R.els.app.contentWindow, postMessage: (m) => homeGot.push(m) };
