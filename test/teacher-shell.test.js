@@ -479,11 +479,13 @@ t('🌤 과제 판 「교재 옆에」 정적 판(2026-10-31 넓히기 ②) — 
   const ce = R.g.document.createElement; R.g.document.createElement = (tag) => { const e = ce(tag); e.style.setProperty = (k, v) => { e.style[k] = v; }; e.style.removeProperty = (k) => { delete e.style[k]; }; e.blur = () => {}; return e; };
   const opened = [], execs = [];
   R.g.ONF = { api: { EXEC: R.g.EXEC }, frame: { OUT_BOOK: 'https://app.ownify.co.kr/book/', fallBlocked: () => false, isAppOrigin: (o) => o === 'https://app.ownify.co.kr' || /googleusercontent\.com$/.test(o),
-    outOpen: (el, u, cf, tok, back) => { opened.push({ el, u, back }); return { stop() {}, stuck: () => false }; },
+    outOpen: (el, u, cf, tok, back) => { opened.push({ el, u, cf, back }); return { stop() {}, stuck: () => false }; },
     openExec: (el, u) => { execs.push(u); el.src = u; return { stop() {}, stuck: () => false }; } } };
   const HREF = 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILEaaaaaaaa01&sheetName=E3';
-  R.postAs({ onf: 'hwbookView', v: 'side', href: HREF, out: 1 }, inner);
+  const CF = { f: 'FILEaaaaaaaa01', s: 'E3', k: 'v1.eyJmIjoiRjEifQ.sig-test-not-live' };
+  R.postAs({ onf: 'hwbookView', v: 'side', href: HREF, out: 1, cf: Object.assign({ evil: 1 }, CF) }, inner);
   assert.strictEqual(opened.length, 1, '⛔ out:1 인데 같은 함수(outOpen)로 정적 판을 안 열었다');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(opened[0].cf)), CF, '⛔ 사본 힌트를 거름(bookCfOk) 없이 넘기거나 안 넘겼다');
   assert.ok(opened[0].u.indexOf(R.g.EXEC + '?') === 0 && /[?&]embed=1(&|$)/.test(opened[0].u) && /[?&]t=Tok_1(&|$)/.test(opened[0].u), '⛔ 정적 판 주소가 교재 판 거름(teacherBookSrc)을 안 지났다: ' + opened[0].u);
   assert.strictEqual(execs.length, 0, '⛔ 정적 판인데 구글 판도 열었다');
   //   보기만 바꿈(교재만) — 같은 액자 그대로
