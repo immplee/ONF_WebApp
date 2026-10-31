@@ -275,6 +275,7 @@ function phoneRun(o) {
     Object.assign(g.localStorage.s, o.lg ? {} : { onfThLg: '0' }, o.ls || {});   // 📱 물음 칸(BOOK_LG · 2026-10-24)은 켠 검사(o.lg)만 — 나머지는 판 칸 구조를 그대로 잰다
     g.appWin = home; g.appOrigin = ORIGIN;                    // 로그인 노크(onf-knock)가 정해 두는 홈 창 — 홈 기록 다리가 그 창 말만 받는다
     if (o.vv) g.visualViewport = Object.assign({ addEventListener() {} }, o.vv);
+    if (o.late) g.hwHistLate = () => o.late.on;   // 👆 손짓 밖 흉내(진짜는 onf-hwbook 블록 navigator.userActivation)
   } });
   s.H = H; s.mq = mq; s.root = s.g.document.documentElement;
   s.pop = () => { if (H.to.length) H.i = H.to.shift(); (s.L.popstate || []).forEach((f) => f({})); };
@@ -332,6 +333,24 @@ t('📱 스위치 — 기본 켬(caps phone:1) · 주소 phonepanel=0 이면 끄
   assert.strictEqual(caps(s).phone, 0, '⛔ 기억한 끔을 안 따랐다');
   s = phoneRun({ ls: { onfThPhonePanel: '0' }, search: '?mode=student&phonepanel=1' });
   assert.ok(caps(s).phone === 1 && s.g.localStorage.s.onfThPhonePanel === '1', '⛔ phonepanel=1 이 기억된 끔을 못 이겼다');
+});
+
+t('👆 손짓 밖 판 칸(새로 고침 되살리기·느린 답 뒤 판 열기)은 줄(histQ)에 — 판은 보이고 칸은 미룬다 · 홈을 만지고 떼면(hwTap) 쌓는다 · 판을 만지고 떼도 · 판 ✕ 는 줄 칸부터 걷는다(진짜 뒤로 0) (Peter 2026-10-31 「새로 고침 뒤 뒤로」)', () => {
+  const late = { on: true }, s = phoneRun({ late });
+  s.send({ onf: 'openBook', href: E1, left: 0 }, s.home);
+  const p = s.panel();
+  assert.ok(p && !p.classList.contains('park'), '판은 보여야 한다');
+  assert.strictEqual(s.H.st.length, 1, '⛔ 손짓 밖인데 판 칸을 쌓았다(WebKit 이 찍어 뒤로가 사이트 밖)');
+  late.on = false; s.send({ onf: 'hwTap' }, s.home);
+  assert.deepStrictEqual(s.H.state, { onfBook: 1, n: 0, bd: 1 }, '⛔ 홈 손짓(hwTap)에 미룬 판 칸을 안 쌓았다');
+  //   판을 만지고 떼도
+  const t2 = phoneRun({ late: { on: true } }); t2.send({ onf: 'openBook', href: E1, left: 0 }, t2.home);
+  const bi = t2.hi(t2.panel()); t2.g.hwHistLate = () => false; t2.send({ onf: 'hwTap' }, bi);
+  assert.strictEqual(t2.H.state && t2.H.state.onfBook, 1, '⛔ 판 손짓(hwTap)에 미룬 판 칸을 안 쌓았다');
+  //   줄에 남은 채 판 ✕ — 줄 칸부터(진짜 go 0)
+  const t3 = phoneRun({ late: { on: true } }); t3.send({ onf: 'openBook', href: E1, left: 0 }, t3.home);
+  t3.g.bookClose();
+  assert.ok(t3.H.goes.length === 0 && t3.H.backs === 0 && t3.g.histQ.length === 0, '⛔ 줄에 있는 판 칸을 걷으려 진짜 뒤로를 했다(아래 홈 칸·사이트 밖)');
 });
 
 t('📱 폰 — 홈 openBook → 판 하나(화면 전체 <html onf-ph> · left 가 와도 메뉴 옆 모양은 CSS 가 안 먹인다) · 최상위 기록에 판 칸 {onfBook, n, bd} · 같은 판을 또 열면 칸 안 늘림 · PC 는 판 칸 없음(종전)', () => {
