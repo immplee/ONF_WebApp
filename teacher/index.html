@@ -844,7 +844,7 @@ function hwTell() { if (hwWant && hwWin && pending && tokAlive(pending)) { hwWan
    교재 주소는 teacherBookSrc 거르개(남의 주소·모르는 mode 거절) · 못 받은 주소면 판에 지금 보기를 다시 알린다. 교재 판은 제 펜 줄을 그대로 쓴다(도구 한 줄 = 다음). */
 var hwView = 'photo', hwBk = null;
 function hwTellView() { if (hwWin) { try { hwWin.postMessage({ onf: 'hwbookView', v: hwView }, hwOrigin); } catch (e) {} } }
-function hwBookFrame(src, out, cf) {   // out = 과제 판이 실은 out:1(🌤 정적 교재 판 · 2026-10-31 넓히기 ②) · cf = 사본 힌트(홈 옆 판과 같은 bookCfOk 거름)
+function hwBookFrame(src, out, cf, park) {   // park = 미리 띄우기(hwBookWarm) — 교재를 「대기」로(park=1 · 학생 화면에 「선생님 접속 중」 안 뜸) · 보일 때 hwBkUnpark   // out = 과제 판이 실은 out:1(🌤 정적 교재 판 · 2026-10-31 넓히기 ②) · cf = 사본 힌트(홈 옆 판과 같은 bookCfOk 거름)
   if (!hwBk) {
     var box = document.createElement('div'), el = document.createElement('iframe'), wt = document.createElement('div');
     box.className = 'onf-hwbk'; box.style.cssText = 'position:fixed;top:0;bottom:0;right:0;z-index:50;padding:8px;box-sizing:border-box;background:var(--onf-dock-bg,var(--bg,#1d1712))';
@@ -856,16 +856,17 @@ function hwBookFrame(src, out, cf) {   // out = 과제 판이 실은 out:1(🌤 
   }
   var o = typeof outWant === 'function' && outWant(src, out);   // 판 블록(onf-book)의 거름 — 같은 페이지 · 검사 하네스가 이 블록만 돌리면 지금 길
   if (hwBk.src !== src || hwBk.out !== o) {
-    hwBk.src = src; hwBk.win = null; hwBk.out = o;   // 새 교재 = 새 노크를 기다린다
+    hwBk.src = src; hwBk.win = null; hwBk.out = o; hwBk.parked = !!park; hwBk.unpark = false;   // 새 교재 = 새 노크를 기다린다 · ⛔ src 엔 park 를 안 붙인다(누를 때 같은 주소 = 다시 안 받음)
+    var u = park ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src;
     if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} hwBk.oe = null; }
     var exec = function () {
       /* ⛔ 로그인 문을 두지 마라 — 교재 exec(ONF.api.EXEC = 래퍼)는 익명 배포(ANYONE_ANONYMOUS)라 구글 쿠키가 필요 없다(학생 아이폰도 로그인 없이 연다 · 홈 옆 판 bookMake 도 그대로). 2026-10-31 한 번 넣었다가 걷음(전수 검수 🟠3). */
       hwBk.out = false; hwBk.win = null;
-      if (window.ONF && ONF.frame && ONF.frame.openExec) hwBk.oe = ONF.frame.openExec(hwBk.el, src, hwBk.wt, function () { hwViewSet('photo'); hwTellView(); });   // 🔐 여러 계정 우회(교재 판과 같은 길)
-      else hwBk.el.src = src;
+      if (window.ONF && ONF.frame && ONF.frame.openExec) hwBk.oe = ONF.frame.openExec(hwBk.el, u, hwBk.wt, function () { hwViewSet('photo'); hwTellView(); });   // 🔐 여러 계정 우회(교재 판과 같은 길)
+      else hwBk.el.src = u;
     };
     /* 🌤 정적 교재 판(2026-10-31 넓히기 ②) — 홈 옆 판(bookMake)과 **같은 함수** ONF.frame.outOpen · 같은 거름(outWant — 기기 스위치·물러남 기억) · 안 뜨면 같은 액자에 지금 길(위 exec) */
-    if (o) { flushStop(); var bk = hwBk; hwBk.oe = ONF.frame.outOpen(hwBk.el, src, bookCfOk(cf), '', function () { if (hwBk === bk && hwBk.src === src) exec(); }); }
+    if (o) { flushStop(); var bk = hwBk; hwBk.oe = ONF.frame.outOpen(hwBk.el, u, bookCfOk(cf), '', function () { if (hwBk === bk && hwBk.src === src) exec(); }); }
     else exec();
   }
   return hwBk;
@@ -876,8 +877,14 @@ function hwBookFrame(src, out, cf) {   // out = 과제 판이 실은 out:1(🌤 
 function hwBookWarm(href, out, cf) {
   if (!hwBox || hwWarmOn || hwView !== 'photo' || typeof href !== 'string' || !href) return;
   var src = teacherBookSrc(href); if (!src) return;
-  hwBookFrame(src, out, cf);
+  hwBookFrame(src, out, cf, true);
   if (hwBk) hwBk.box.style.display = 'none';
+}
+/** 미리 띄운(대기) 교재를 보인다 — 노크(bookHi) 전이면 노크 때 보낸다 */
+function hwBkUnpark() {
+  if (!hwBk || !hwBk.parked) return;
+  hwBk.parked = false;
+  if (hwBk.win) { try { hwBk.win.postMessage({ onf: 'bookPark', on: false }, hwBk.origin); } catch (e) {} } else hwBk.unpark = true;
 }
 /* 🖥️ 과제 판 확장 창(mode=hwext · 2026-10-29) — 「교재 옆에」 수업에서 공유가 교재로 넘어가면 안쪽(ONF_HwExt_Html)이 그 교재 주소를 보낸다(extBook) →
    시트만 보는 교재 칸(ext=1)을 위에 겹친다 · 과제 판으로 돌아오면 숨긴다(한 번 띄운 칸은 숨겨 두고 다시 써서 오갈 때 다시 안 읽는다).
@@ -918,6 +925,7 @@ function hwViewSet(v, href, fromPop, out, cf) {   // fromPop — 뒤로가 보�
     src = given ? teacherBookSrc(href) : (hwBk ? hwBk.src : null);
     if (!src) { hwTellView(); return; }   // 못 받은 주소 — 판이 눌린 단추를 지금 보기로 되돌린다
     hwBookFrame(src, given ? out : (hwBk && hwBk.out), given ? cf : null);   // 주소 없이 보기만 바꿈(옆에↔교재만) = 지금 길 그대로
+    hwBkUnpark();   // 📖 미리 띄운 교재면 「대기」를 푼다
   }
   hwView = v; hwLay(); hwPenSync();
   if (!fromPop) hwViewHist(was, v);
@@ -1006,7 +1014,7 @@ function hwPenSync() {
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
   if (!d || !hwBk || !bookFrom(ev, hwBk.el, true)) return;   // 🌤 판 출처(구글 또는 정적 판 · 2026-10-31 넓히기 ②)
-  if (d.onf === 'bookHi') { hwBk.win = ev.source; hwBk.origin = ev.origin; hwPenSync(); return; }
+  if (d.onf === 'bookHi') { hwBk.win = ev.source; hwBk.origin = ev.origin; if (hwBk.unpark) { hwBk.unpark = false; try { hwBk.win.postMessage({ onf: 'bookPark', on: false }, hwBk.origin); } catch (e) {} } hwPenSync(); return; }
   if (d.onf === 'hwTap') { histTap(); return; }   // 👆 옆·교재만에서 교재만 만져도(반박 🟠2)
   if (d.onf === 'penAct') { if (hwView === 'side' && hwWin) { try { hwWin.postMessage({ onf: 'bookPenAct' }, hwOrigin); } catch (e) {} } return; }   // ↩️ 옆 교재에 되돌릴 일이 생겼다 → 과제 판 펜 줄 차례 장부(2026-10-30 4차)
   if (d.onf === 'themeAsk') { themeAsk(ev); return; }

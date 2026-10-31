@@ -413,8 +413,12 @@ t('📖 교재 미리 띄우기(2026-10-31 「과제 사진 열어 놓은 데서
   R.postAs({ onf: 'hwbookBookWarm', href: HREF }, inner);
   assert.strictEqual(panels().length, 1, '⛔ 미리 띄우기를 안 했다');
   assert.strictEqual(panels()[0].style.display, 'none', '⛔ 미리 띄운 교재가 사진 위에 보인다');
+  const bk0 = R.created.filter((e) => e.tag === 'iframe').slice(-1)[0];
+  assert.ok(/[?&]park=1/.test(bk0.src || '') && !/park=1/.test(R.g.hwBk.src), '⛔ 미리 띄운 교재가 「대기」가 아니다(학생 화면에 선생님 접속 중이 뜬다) · 또는 판 열쇠에 park 가 붙었다: ' + bk0.src);
   const ifr = () => R.created.filter((e) => e.tag === 'iframe').length, n0 = ifr();
   R.postAs({ onf: 'hwbookView', v: 'side', href: HREF }, inner);
+  const got = []; R.postAs({ onf: 'bookHi' }, { parent: bk0.contentWindow, postMessage: (m) => got.push(m) });
+  assert.ok(got.some((m) => m.onf === 'bookPark' && m.on === false), '⛔ 보였는데 교재 「대기」를 안 풀었다: ' + JSON.stringify(got));
   assert.strictEqual(ifr(), n0, '⛔ 누를 때 교재 액자를 새로 만들었다');
   assert.notStrictEqual(panels()[0].style.display, 'none', '⛔ 누른 뒤에도 교재가 숨어 있다');
   R.postAs({ onf: 'hwbookBookWarm', href: HREF.replace('E3', 'E4') }, inner);
