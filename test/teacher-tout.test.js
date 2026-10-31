@@ -499,20 +499,28 @@ t('P1 머리 미리 받기 — 묻는 때 = tOutQ 와 같다(스위치·주소·
 });
 
 /* ── 📱 tout=2 — WebKit(아이패드·아이폰·맥 사파리)·홈 화면 앱도 정적 먼저(2026-10-30 · 익명 다리 ONF_TeacherBridge) ── */
-t('W1 tout=2 · WebKit·홈 화면 앱 + 입장권 → 구글 버튼 로그인 뒤 정적 판 먼저 → outBoot{tk} · 화면 노크엔 auth{tch} · 열 때 구글 창구는 그대로(받아 둔 토큰으로 안 연다)', async () => {
+t('W1 tout=2 · WebKit·홈 화면 앱 + 입장권 → 구글 버튼 없이 곧장 정적 판 먼저(2026-10-31 아이패드 7초 = 사람 손) → outBoot{tk} · 화면 노크엔 auth{tch} · 받아 둔 구글 토큰은 안 쓴다 · One Tap 도 안 띄운다', async () => {
   for (const nav of [MACSAFARI, IPHONE, IPAD, Object.assign({ standalone: true }, IPAD)]) {
     const cell = tchCell(20), tk = JSON.parse(cell).tk;
     const R = boot({ onf_tch: cell, onf_id_tok: gtok() }, { search: '?tout=2', nav });
     assert.strictEqual(R.ls.onf_tout, '2');
-    assert.deepStrictEqual(R.nav, [], '⛔ WebKit 이 구글 창구 없이(받아 둔 토큰으로) 열었다: ' + nav.platform);
-    login(R); await tick(); await tick();
-    assert.deepStrictEqual(R.nav, [TURL], '⛔ tout=2 WebKit 이 정적 판을 먼저 안 열었다: ' + nav.platform + ' ' + JSON.stringify(R.nav));
+    assert.deepStrictEqual(R.nav, [TURL], '⛔ tout=2 WebKit 이 로그인 전에 정적 판을 안 열었다(구글 버튼을 기다린다 = 7초): ' + nav.platform + ' ' + JSON.stringify(R.nav));
+    assert.ok(R.g.tchOnly === true && R.g.pending === '' && !R.execOpen(), '⛔ WebKit 이 받아 둔 구글 토큰으로 구글 exec 를 열 수 있게 됐다(구글 창구 전엔 쿠키가 없다)');
+    assert.ok(R.els.lock.hidden === true && R.els.app.hidden === false, '⛔ 로그인 화면이 정적 홈을 가린다');
+    assert.ok(R.calls.indexOf('prompt') < 0, '⛔ 입장권으로 연 홈 위에 One Tap 을 띄웠다');
     assert.strictEqual(R.fetches.filter((f) => /\/t\/login$/.test(f.url)).length, 0, '전제: 남은 20일 = 안 묻는다');
     R.fromApp({ onf: 'outHello' });
     assert.deepStrictEqual(R.sentTo(APP), [{ onf: 'outBoot', tk }]);
     R.fromApp({ onf: 'homeDrawn' }); R.sent.length = 0;
     R.fromApp({ onf: 'auth-please', stale: false });
     assert.deepStrictEqual(R.sent.map((x) => [x.m, x.o]), [[{ onf: 'auth', token: tk, hist: 1 }, APP]], '⛔ 정적 화면에 입장권 대신 다른 것을 줬다');
+    login(R); await tick(); await tick();   // 나중에 구글 로그인(다른 길에서 prompt)이 와도 다시 열지 않는다
+    assert.deepStrictEqual(R.nav, [TURL], '⛔ 로그인이 다시 열기를 불렀다');
+  }
+  //   입장권 없음 · 그날 물러남 기억 · 학생 한 명 창 = 종전대로 로그인 화면(구글 버튼)
+  for (const [st, sr] of [[{ onf_tout: '2' }, ''], [{ onf_tout: '2', onf_tch: tchCell(20), onfTOutFail: (Date.now() + 3600000) + ',2' }, ''], [{ onf_tout: '2', onf_tch: tchCell(20) }, '?mode=student&t=abc']]) {
+    const L = boot(st, { nav: IPAD, search: sr });
+    assert.ok(L.nav.length === 0 && !L.g.tchOnly && L.g.document.getElementById('lock').hidden !== true, '⛔ 정적 먼저를 못 탈 때 로그인 화면이 아니다: ' + JSON.stringify(st) + sr);
   }
   //   tout=1 은 종전대로 WebKit 을 뺀다 · 크롬에선 2 = 1
   const O = boot({ onf_tch: tchCell(20), onf_tout: '1' }, { nav: IPAD }); login(O);
@@ -572,6 +580,53 @@ t('W3 tout=2 WebKit 판이 outFail(anon — 익명 다리 꺼진 빌드) → 지
   assert.ok(Number(String(store.onfTOutFail).split(',')[0]) > Date.now() + 3600000 && beacons.indexOf('reopen:tout-fail-anon') >= 0 && beacons.indexOf('fallback:thome:fail-anon:1') >= 0, '⛔ 익명 다리 꺼짐 물러남이 하루(hard) 기억·기록이 아니다: ' + store.onfTOutFail + ' ' + beacons);
   const N = boot(store, { nav: IPAD }); login(N);
   assert.ok(!N.staticOpen() && N.execOpen());
+});
+
+t('W4 입장권만으로 연 정적 홈(tchOnly)이 그리기 전에 물러나면 → 구글 exec 를 바로 열지 않고 로그인 화면(구글 창구) → 누르면 지금 길 · 로그인 뒤 물러남은 종전대로 곧장 지금 길', async () => {
+  for (const kick of [(R) => R.fromApp({ onf: 'outFail', why: 'copy' }), (R) => R.advance(3000), (R) => { R.fromApp({ onf: 'outHello' }); R.advance(8000); }]) {
+    const R = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD });
+    assert.deepStrictEqual(R.nav, [TURL]);
+    kick(R);
+    assert.deepStrictEqual(R.nav, [TURL], '⛔ 구글 창구 전에 구글 exec 를 열었다(WebKit 「화면이 안 열렸어요」): ' + JSON.stringify(R.nav));
+    assert.ok(R.els.lock.hidden === false && R.els.app.hidden === true && R.els.wait.hidden === true, '⛔ 물러난 뒤 로그인 화면이 안 보인다(빈 화면·도는 원에 갇힘)');
+    assert.ok(!R.els.gateBack || R.els.gateBack.hidden !== false, '⛔ 돌아갈 홈이 없는데 「홈으로 돌아가기」를 보였다');
+    login(R); await tick(); await tick();
+    assert.ok(R.execOpen() && R.els.lock.hidden === true && R.els.app.hidden === false && R.els.wait.hidden === false, '⛔ 로그인 뒤 지금 길이 안 열렸다: ' + JSON.stringify(R.nav));
+    R.knockG(); assert.ok(R.sent.some((x) => x.g && x.m.onf === 'auth' && /^x\./.test(x.m.token)), '⛔ 물러난 지금 길 노크에 구글 토큰을 안 줬다');
+  }
+  //   로그인 뒤(구글 토큰 있음) 물러남 = 종전 그대로 곧장 지금 길
+  const Q = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD }); login(Q); await tick();
+  Q.fromApp({ onf: 'outFail', why: 'copy' });
+  assert.ok(Q.execOpen() && Q.els.lock.hidden === true, '⛔ 구글 토큰이 있는데 로그인 화면을 또 보였다');
+});
+
+t('W5 입장권만으로 연 홈(tchOnly)의 과제 판 — 미리 띄우기(hwbookWarm)는 안 하고 · 열기(hwbook)는 로그인 화면(+「홈으로 돌아가기」) → 누르면 과제 판 + hwOpened · 돌아가기 = 정적 홈 그대로 · 로그인 뒤엔 바로', async () => {
+  const R = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD });
+  R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'homeDrawn' }); R.fromApp({ onf: 'auth-please', stale: false }); R.sent.length = 0;
+  R.fromApp({ onf: 'hwbookWarm', t: 'tokA' });
+  assert.ok(!R.g.hwBox, '⛔ 구글 창구 전에 과제 판(구글 exec)을 미리 띄웠다 — 쿠키 없는 액자');
+  R.fromApp({ onf: 'hwbook', t: 'tokA', l: '' });
+  assert.ok(!R.g.hwBox && R.els.lock.hidden === false && R.els.app.hidden === true && R.els.gateBack.hidden === false, '⛔ 과제 판 열기가 로그인 화면(+돌아가기)을 안 거쳤다');
+  assert.ok(/과제 판/.test(R.els.why.textContent), '⛔ 왜 로그인하는지 말하지 않는다');
+  assert.ok(R.calls.indexOf('prompt') < 0, '⛔ One Tap(닫으면 몇 시간 안 뜸)을 썼다 — 버튼으로');
+  R.els.gateBack.onclick();
+  assert.ok(R.els.lock.hidden === true && R.els.app.hidden === false && !R.g.hwBox && R.g.gateGo === null, '⛔ 「홈으로 돌아가기」가 정적 홈으로 안 돌아갔다');
+  login(R); await tick();
+  assert.ok(!R.g.hwBox, '⛔ 그만둔 과제 판이 로그인 뒤 열렸다');
+  //   다시 누르고 로그인 = 과제 판
+  const S = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD });
+  S.fromApp({ onf: 'outHello' }); S.fromApp({ onf: 'homeDrawn' }); S.fromApp({ onf: 'auth-please', stale: false }); S.sent.length = 0;
+  S.fromApp({ onf: 'hwbook', t: 'tokA', l: '' });
+  assert.ok(!S.g.hwBox && S.sentTo(APP).every((m) => m.onf !== 'hwOpened'));
+  login(S); await tick();
+  assert.ok(S.g.hwBox && S.els.lock.hidden === true && S.els.app.hidden === false, '⛔ 로그인 뒤 과제 판이 안 열렸다');
+  assert.ok(S.sentTo(APP).some((m) => m.onf === 'hwOpened'), '⛔ 홈에 hwOpened 를 안 알렸다(모아 보기 창이 남는다)');
+  //   로그인 뒤엔 문 없이 바로 · 미리 띄우기도
+  S.fromApp({ onf: 'hwbookBack' });
+  const T = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD }); login(T); await tick();
+  T.fromApp({ onf: 'outHello' }); T.fromApp({ onf: 'homeDrawn' }); T.fromApp({ onf: 'auth-please', stale: false });
+  T.fromApp({ onf: 'hwbookWarm', t: 'tokB' });
+  assert.ok(T.g.hwBox && T.g.hwWarmOn, '⛔ 로그인 뒤 미리 띄우기가 안 됐다');
 });
 
 t('P2 머리의 Worker 주소(W·FB) = onf-frame.js 상수(ONF_W_EDGE·ONF_W_FB) 쌍둥이 · ONF.frame.WORKER 와도 같다 · 머리 말고 본 스크립트엔 여전히 안 적는다', () => {
