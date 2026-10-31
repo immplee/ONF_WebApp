@@ -361,11 +361,16 @@ t('ask 에 edge-on(그 출처로만) · back = 맨 위가 우리 칸(홈 칸·�
   assert.deepStrictEqual(R.inner.sent, [{ m: { onf: 'edge-on' }, o: ORIGIN }], '⛔ 안쪽 노크에 edge-on 으로 답하지 않았다: ' + JSON.stringify(R.inner.sent));
   R.msg({ onf: 'edge', op: 'ask' }, { origin: 'https://evil.example' });
   assert.strictEqual(R.inner.sent.length, 1, '⛔ 남의 출처 노크에 답했다');
+  const pop = R.win('popup');   // 같은 출처라도 우리 액자 밖 창
+  R.msg({ onf: 'edge', op: 'ask' }, { source: pop });
+  assert.strictEqual(pop.sent.length, 0, '⛔ 우리 액자 밖 창의 노크에 답했다(2026-10-31 전수 검수)');
   R.msg({ onf: 'edge', op: 'back' });
   assert.strictEqual(R.H.backs, 0, '⛔ 바닥에서 쓸었는데 뒤로 갔다(앱 밖으로 나간다)');
   R.hi(); R.push('h1', { onfPeek: 'p1' });
   R.msg({ onf: 'edge', op: 'back' }, { origin: 'https://evil.example' });
   assert.strictEqual(R.H.backs, 0, '⛔ 남의 출처 쓸기에 뒤로 갔다');
+  R.msg({ onf: 'edge', op: 'back' }, { source: pop });
+  assert.strictEqual(R.H.backs, 0, '⛔ 우리 액자 밖 창의 쓸기에 뒤로 갔다');
   R.msg({ onf: 'edge', op: 'back' });
   assert.strictEqual(R.H.backs, 1, '⛔ 홈 칸이 맨 위인데 쓸기가 뒤로를 안 했다');
 });

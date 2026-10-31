@@ -451,9 +451,10 @@ t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼�
   assert.strictEqual(box.style.visibility, 'hidden', '⛔ 과제 판 액자가 아닌 창의 플레이어 자리를 받았다');
   R.postAs({ onf: 'hwRec', rs: [[1500, 820, 500, 240, 16]] }, inner);
   assert.ok(box.style.visibility === '' && box.style.pointerEvents === '' && box.style.zIndex === '52', '⛔ 교재만 + 플레이어 — 과제 판(플레이어)이 교재 위에 안 보인다');
-  assert.strictEqual(box.style.clipPath, 'path("M1516 820h468a16 16 0 0 1 16 16v208a16 16 0 0 1 -16 16h-468a16 16 0 0 1 -16 -16v-208a16 16 0 0 1 16 -16z")', '⛔ 플레이어 모양(둥근 귀)으로만 오리지 않았다 — 오린 밖이 교재를 가리거나 누름을 먹는다');
+  assert.strictEqual(box.style.clipPath, 'path("M16 0h468a16 16 0 0 1 16 16v208a16 16 0 0 1 -16 16h-468a16 16 0 0 1 -16 -16v-208a16 16 0 0 1 16 -16z")', '⛔ 플레이어 모양(둥근 귀)으로만 오리지 않았다 — 오린 밖이 교재를 가리거나 누름을 먹는다');
+  assert.deepStrictEqual([box.style.left, box.style.top, box.style.overflow], ['1500px', '820px', 'hidden'], '⛔ 판 상자가 화면 전체 — 아이패드는 clip-path 를 안 보고 교재 굴리기를 먹는다(2026-10-31 · 상자를 플레이어 묶음 크기로 · 오림은 상자 안 좌표)');
   R.postAs({ onf: 'hwRec', rs: [[1500, 820, 500, 240, 16], [1700, 700, 220, 110, 0]] }, inner);
-  assert.ok(/^path\("M1516 820.*zM1700 700h220/.test(box.style.clipPath), '⛔ 속도 창이 열렸는데 그 자리를 안 오렸다');
+  assert.ok(/^path\("M16 120.*zM200 0h220/.test(box.style.clipPath) && box.style.top === '700px', '⛔ 속도 창이 열렸는데 그 자리를 안 오렸다(상자 = 두 창 묶음 · 오림은 상자 안 좌표)');
   R.postAs({ onf: 'hwRec', rs: [['x', 1, 2, 3, 4]] }, inner);
   assert.ok(box.style.visibility === 'hidden' && box.style.clipPath === '' && box.style.zIndex === '50', '⛔ 꼴이 틀린 자리를 받았다(또는 숨길 때 z-index:50 이 지워졌다)');
   R.postAs({ onf: 'hwRec', rs: [[1500, 820, 500, 240, 16]] }, inner);
@@ -688,7 +689,9 @@ t('👆 기록 칸 줄 — 진짜 뒤로(브라우저)가 오면 줄에 남은 �
   assert.ok(R.g.history.state && R.g.history.state.onfHw && !R.g.hwHistWait, '⛔ 줄을 쌓은 뒤 과제 판 칸을 안 쌓았다');
 });
 t('📱 왼쪽 끝 쓸기 = 앱 뒤로(Peter 2026-10-25 ④⑦ · onf-edge) — 안쪽 노크(ask)에 edge-on · back 은 맨 위가 우리 칸일 때만 코드로 뒤로 · 바닥·남의 출처는 아무것도 안 함', () => {
-  const R = boot({ onf_id_tok: odk() }), got = [], src = { postMessage: (m, o) => got.push([m, o]) };
+  const R = boot({ onf_id_tok: odk() }), got = [], src = { parent: vm.runInContext('window', R.g), postMessage: (m, o) => got.push([m, o]) };   // 우리 껍데기 바로 아래 액자
+  R.postAs({ onf: 'edge', op: 'ask' }, { parent: null, postMessage: (m, o) => got.push([m, o]) });
+  assert.strictEqual(got.length, 0, '⛔ 우리 액자 밖 창(같은 출처 팝업)의 노크에 답했다(2026-10-31 전수 검수)');
   R.postAs({ onf: 'edge', op: 'ask' }, src);
   assert.deepStrictEqual(JSON.parse(JSON.stringify(got)), [[{ onf: 'edge-on' }, KORIGIN]], '⛔ 안쪽 노크에 edge-on 으로 답하지 않았다');
   R.postAs({ onf: 'edge', op: 'ask' }, src, 'https://evil.example');
