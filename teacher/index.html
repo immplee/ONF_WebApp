@@ -110,6 +110,8 @@ var tPre = (function () {
        서버가 막는데, 종전엔 그 자리에서 할 수 있는 일이 아무것도 없었다("안 될 때가 있다").
        ⚠️ 평소엔 숨어 있다 — 잘 되는 사람에게 「다른 계정」을 권할 이유가 없다. -->
   <p class="why"><button type="button" id="other" hidden>다른 계정으로 로그인</button></p>
+  <!-- 📱 구글 창구 문(아래 gate) — 과제 판처럼 뒤에 살아 있는 정적 홈이 있을 때만 보인다(로그인 안 하고 돌아가기) -->
+  <p class="why"><button type="button" id="gateBack" hidden>홈으로 돌아가기</button></p>
 </div>
 <!-- 접속 중 표시. ⛔ 새로 만들지 않는다 — 학생 액자(../index.html)가 쓰는 그 조각 그대로다
      (../assets/onf-ui.css 의 .onf-wait/.onf-spin). 이미 링크된 CSS 라 파일도 안 늘었다.
@@ -165,6 +167,24 @@ var EXEC = 'https://script.google.com/a/macros/ownify.co.kr/s/AKfycbx4taL78DPmHm
 
 var frame = document.getElementById('app');
 var mounted = false, pending = '';
+/* 📱 tchOnly = 구글 창구 없이 입장권(tch.)만으로 정적 먼저를 열었다(아래 reuse · 2026-10-31 아이패드 7초) — pending(구글 토큰)이 없다.
+   구글 exec 를 띄워야 할 때(정적 판 물러남 · 과제 판)만 gate 가 로그인 화면을 다시 보인다. */
+var tchOnly = false, gateGo = null;
+/* 📱 구글 창구 문 — 로그인 화면을 다시 보이고, 누르면(onCredential → gateRun) go 를 한다.
+   ⛔ WebKit 은 구글 창구(버튼 팝업)를 거쳐야 끼운 exec 에 로그인 쿠키를 싣는다(webkitOnly · 2026-10-12 실측) — 그 전에 exec 액자를 열면 「화면이 안 열렸어요」.
+   ⛔ One Tap(prompt)을 쓰지 않는다 — 닫으면 구글이 몇 시간 안 띄운다(쿨다운) · 버튼은 늘 눌린다.
+   back = 「홈으로 돌아가기」(살아 있는 정적 홈으로 — 과제 판 문만 · 물러남엔 돌아갈 홈이 없다). */
+function gate(go, msg, back) {
+  gateGo = go;
+  frame.hidden = true;
+  document.getElementById('wait').hidden = true;
+  document.getElementById('lock').hidden = false;
+  say(msg || '');
+  var b = document.getElementById('gateBack');
+  if (b) { b.hidden = !back; b.onclick = function () { gateGo = null; gateShut(); }; }
+}
+function gateShut() { document.getElementById('lock').hidden = true; frame.hidden = false; say(''); var b = document.getElementById('gateBack'); if (b) b.hidden = true; }
+function gateRun() { var g = gateGo; if (!g) return false; gateGo = null; gateShut(); g(); return true; }
 
 /* ═══ 받아 둔 토큰을 **아껴 쓴다** (Peter 2026-09-23 「새로고침하면 항상 다시 로그인해야 해」)
    ⛔ 종전엔 토큰이 가는 곳이 전역 변수 하나였다. 새로고침 = 그 변수가 사라짐 = GIS 를 처음부터
@@ -315,7 +335,7 @@ function onCredential(res) {
   pending = tok;
   tokSave(tok);                      // 새로고침해도 다시 로그인하지 않게
   tchLogin(tok);                     // 🏫 덧붙여 Worker 입장권(위 tch · 기다리지 않는다)
-  if (!mounted) mount(); else answer();
+  if (!mounted) mount(); else if (!gateRun()) answer();   // 📱 구글 창구 문이 기다리던 일(gate)이면 그것 · 아니면 지금 화면에 토큰
   if (typeof hwTell === 'function') hwTell();   // 📝 과제 판이 새 토큰을 기다리면 그쪽에도(onf-hwbook)
 }
 
@@ -414,7 +434,9 @@ function mount() {
   /* 📱 replace 로 연다(2026-10-23 · 까닭은 학생 껍데기 onf-frame.js 「처음 열기도 replace」 주석) — mount 는 구글 로그인 뒤(onCredential)에도 불린다:
      다 뜬 페이지의 붙은 빈 액자에 src 를 넣으면 WebKit(아이폰·아이패드)은 기록 칸을 하나 쌓아, 홈에서 뒤로 = 이 액자만 빈 문서로 되감긴다(선생님 홈이 흰 화면). */
   /* 🏫 정적 먼저(아래 onf-tout · tOutQ) — 켠 기기는 정적 선생님 홈을 먼저 · 안 뜨면 이 openHome(지금 길)으로. 꺼짐이면 종전 그대로 바로 openHome. */
-  if (tOutQ()) tOutOpen(openHome, LD); else { tPreTake(''); openHome(); }   // 정적 먼저를 안 타면 미리 받은 사본도 버린다
+  /* 📱 입장권만으로 연 정적 먼저(tchOnly)가 물러나면 지금 길은 구글 창구 뒤 — 로그인 화면을 다시 보이고 누르면 연다(위 gate · 로고 막은 걷는다) */
+  if (tOutQ()) tOutOpen(function () { if (!tchOnly || pending) return openHome(); if (LD) LD.stuck(); gate(function () { document.getElementById('wait').hidden = false; openHome(); }); }, LD);
+  else { tPreTake(''); openHome(); }   // 정적 먼저를 안 타면 미리 받은 사본도 버린다
   function openHome() {
   try { frame.contentWindow.location.replace(appSrc); } catch (e) { frame.src = appSrc; }
   /* ⛔ 프레임이 **막혔는지**를 화면이 말해야 한다. 안쪽이 살아 있으면 몇백 ms 안에 노크가 온다.
@@ -472,7 +494,7 @@ var frameWatch = null;
    묻는 때만(tOutQ): 기기 스위치(위 TOUT · 기본 꺼짐) · 홈(mode 없음 — 학생 한 명 창·과제 판은 지금 길) · 입장권 있음(tchGet) · 물러남 기억에 안 막힘(onfTOutFail · onf-frame.js fallBlocked 'thome' — 까닭별) ·
      WebKit 아님(webkitOnly — 사파리·아이폰 크롬·아이패드 · 2026-10-30 판정) · 홈 화면 앱(standalone) 아님 — 선생님 배포 다리(exec?mode=bridge)는 구글 쿠키를 요구한다 · onf-frame.js 가 정적 판 주소를 낸다.
      📱 tout=2(TOUTWK) 기기는 WebKit·홈 화면 앱도 탄다 — 판이 익명 다리(입장권만 받는 ONF_TeacherBridge)로 쓰고, 그 다리가 꺼진 빌드면 판이 outFail('anon')(위 TOUT 주석 · hard = 하루).
-       WebKit 은 그래도 늘 구글 창구(버튼) 뒤에 연다(reuse 안 함 · 물러난 지금 길이 쿠키 문을 거친 뒤여야 한다).
+       WebKit 은 구글 창구 없이 입장권만으로 연다(reuse tchOnly · 2026-10-31) — 물러나면 로그인 화면(gate)을 거쳐 지금 길(쿠키 문을 거친 뒤여야 한다).
    판 말(그 액자 창 · 그 판 출처만): outHello → outBoot{tk}(hello 마다 — 다시 읽힌 판도 · ⛔ 주소엔 안 싣는다) · homeDrawn = 이 기기 정적 홈(그 뒤 outFail·시한 무시 · 로고 막 ok) ·
      그리기 전 outFail·hello 없음(TOUT_HELLO_MS)·outBoot 뒤 그리기 시한(TOUT_PAINT_MS) = 같은 액자에 지금 길(openHome) + 물러남 기억(ONF.frame.fallBack 'thome' — hello·paint·fail-time·fail-net 은 slow, 그 밖 hard) · homeDrawn = 연속 0 · 물러나면 죽은 정적 창을 노크 칸에서 비운다.
    그린 뒤 화면 노크(auth-please)는 위 onf-knock 이 받는다 — 정적 판 창(직접 자식 · 그 출처)이면 답이 구글 토큰이 아니라 입장권(answer · appTch).
@@ -1001,13 +1023,17 @@ window.addEventListener('message', function (ev) {
   }
   if (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm') return;
   if (!appWin || ev.source !== appWin || ev.origin !== appOrigin) return;   // 홈(우리가 정한 안쪽 창)에서 온 말만
-  if (d.onf === 'hwbookWarm') { if (/^[A-Za-z0-9_-]{1,40}$/.test(String(d.t || ''))) hwWarm(String(d.t)); return; }
+  if (d.onf === 'hwbookWarm') { if (!(tchOnly && !pending) && /^[A-Za-z0-9_-]{1,40}$/.test(String(d.t || ''))) hwWarm(String(d.t)); return; }   // 📱 구글 창구 전(tchOnly)엔 미리 안 띄운다 — 쿠키 없는 exec 액자
   if (d.onf === 'hwbookBack') { location.href = location.pathname; return; }   // 주소로 연 과제 판(mode=hwbook) 의 ‹ = 홈으로
   var t = String(d.t || ''), l = String(d.l || '');
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(t)) return;
   if (!/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(l)) l = '';
-  hwOpen(t, l, d.f, d.hwt, d.a);
-  try { appWin.postMessage({ onf: 'hwOpened' }, appOrigin); } catch (e) {}   // 홈 창은 이 말을 받고 모아 보기 창을 닫는다
+  var hf = d.f, hk = d.hwt, ha = d.a, hw = appWin, ho = appOrigin, go = function () {
+    hwOpen(t, l, hf, hk, ha);
+    try { hw.postMessage({ onf: 'hwOpened' }, ho); } catch (e) {}   // 홈 창은 이 말을 받고 모아 보기 창을 닫는다
+  };
+  /* 📱 입장권만으로 연 홈(tchOnly)은 구글 창구 전이다 — 과제 판(구글 exec)은 로그인 화면(gate)을 한 번 거쳐 연다 · 「홈으로 돌아가기」로 그만둘 수 있다 */
+  if (tchOnly && !pending) gate(go, '과제 판은 구글 로그인 뒤에 열려요.', true); else go();
 });
 /* ═══ 📝 정적 과제 판(2026-10-31 · Peter 「과제 판도 같은 방식으로」 · 정적 선생님 홈 onf-tout 과 같은 꼴) ═══
    과제 판 액자를 구글 doGet(1.7~2.2초) 대신 Pages /hwbook/(같은 템플릿 · Ownify tools/outside/hwbook-boot.js)로 먼저 연다 — 미리 띄우기(hwWarm)·열기(hwOpen) 둘 다 이 한 곳(hwSrc).
@@ -1715,11 +1741,15 @@ function homeApp() { try { return navigator.standalone === true || matchMedia('(
 })();
 (function reuse() {
   if (mounted) return;   // 리디렉트로 막 받은 토큰으로 이미 열었다
+  if (devkeyOff() && tOutQ()) { tchOnly = true; mount(); return; }   // 📱 입장권만으로 정적 먼저(아래 주석)
   var t = tokLoad();
   if (!t || devkeyOff()) return;
   pending = t;
   reused = true;
   mount();
+  /* 📱 [2026-10-31 아이패드 ?tout=2 실측 「t.hello 6.96초」] WebKit 정적 먼저는 구글 창구(버튼 → 팝업 → 계정 고르기)를 거쳐야 열렸다 — 그 7초는 사람 손이었다.
+     정적 판은 구글 쿠키가 필요 없다(입장권 + 익명 다리) → 열쇠를 못 쓰는 기기(devkeyOff)라도 입장권이 있고 정적 먼저를 탈 기기면(tOutQ · WebKit 은 tout=2 일 때만) 버튼 없이 바로 연다.
+     ⛔ 받아 둔 구글 토큰은 그때도 안 쓴다(pending 빈 채) — 구글 exec 는 구글 창구 뒤에만(gate — 물러남 · 과제 판). 열쇠를 쓰는 기기(크롬 등)는 종전 그대로(위 tokLoad 길). */
 })();
 
 /* GIS 가 늦게 도착할 수 있다 — 있을 때 시작한다. */
@@ -1751,7 +1781,7 @@ function homeApp() { try { return navigator.standalone === true || matchMedia('(
        ⛔ 버튼 팝업으로도 그 문이 열리는지는 **라이브에서 Peter 와 확인**(가짜로는 못 잰다) — 안쪽이 안 열리면 이 줄을 `if (!reused)` 로 되돌린다.
      ⚠️ login_hint 로 고르기 창을 건너뛰지 않는다 — 고르기 창에서 누르는 손이 WebKit 쿠키 문을 여는 것일 수 있다(못 잼).
      ⚠️ 만료·[다른 계정으로]의 prompt()(메시지 핸들러)는 그대로다 — 그땐 누를 버튼이 화면에 없다. */
-  if (!reused && !webkitOnly()) google.accounts.id.prompt();
+  if (!reused && !tchOnly && !webkitOnly()) google.accounts.id.prompt();   // 📱 입장권만으로 연 정적 홈 위에도 안 띄운다(위 09-23 같은 까닭)
 })();
 </script>
 </body>
