@@ -363,9 +363,9 @@ t('C1 출처 자물쇠 — 정적 먼저 동안 노크·판 말(bookFrom 홈)은
   assert.ok(!R.sent.some((x) => x.m.onf === 'auth'), '⛔ 정한 창 말고 다른 창에 토큰을 줬다');
 });
 
-t('C2 과제 판(hwbook) 노크 자물쇠는 그대로 googleusercontent 만', () => {
+t('C2 과제 판(hwbook) 노크 자물쇠 — 구글 판이면 그대로 googleusercontent 만 · 정적 과제 판(hwOut)이면 그 액자 직접 자식 + 그 판 출처만(아래 H*)', () => {
   const blk = main.slice(main.indexOf('/* onf-hwbook:begin */'));
-  assert.ok(/if \(hwFr && hwFrom\(ev\.source\)\) \{[^\n]*\n\s*try \{ if \(!\/\(\^\|\\\.\)googleusercontent\\\.com\$\/\.test\(new URL\(ev\.origin\)\.hostname\)\) return; \}/.test(blk), '⛔ 과제 판 노크 자물쇠가 바뀌었다');
+  assert.ok(/if \(hwFr && hwFrom\(ev\.source\)\) \{[^\n]*\n[^\n]*\n\s*if \(hwOut\) \{ if \(ev\.source !== hwFr\.contentWindow \|\| ev\.origin !== hwOut\.org\) return; \}\n\s*else \{ if \(d\.onf === 'outHello' \|\| d\.onf === 'outFail'\) return; try \{ if \(!\/\(\^\|\\\.\)googleusercontent\\\.com\$\/\.test\(new URL\(ev\.origin\)\.hostname\)\) return; \}/.test(blk), '⛔ 과제 판 노크 자물쇠가 바뀌었다');
 });
 
 t('E1 정적 화면이 노크한 뒤 그리기 전 outFail → 노크 칸을 비워 지금 길 구글 노크를 받는다(구글 토큰으로 답)', async () => {
@@ -681,6 +681,111 @@ t('G3 스스로 다시 연 자리 = clog 한 줄(reopen:<까닭> · 기기 꼴 �
   //   sendBeacon 없는 브라우저 = 조용히 안 보낸다(화면 일은 그대로)
   const Q = boot({ onf_id_tok: odk() }); Q.load(); Q.advance(8000);
   assert.strictEqual(Q.calls.filter((c) => c === 'reload').length, 1);
+});
+
+/* ═══ 📝 정적 과제 판(onf-hwout · 2026-10-31) ═══ — 홈(구글 창)이 hwbook/hwbookWarm 을 보내면 과제 판 액자를 연다 · 정적 먼저면 Pages /hwbook/ */
+const HWB = APP + '/hwbook/', LSN = '3d4d6a62-96ae-81aa-a000-000000000009';
+const HDEF = /^var HWOUT_DEF = '([01])'/m.exec(main)[1], HOFF = HDEF === '0' ? {} : { onf_hwout: '0' };
+/** 로그인 + 홈 구글 창 노크(appWin) 뒤 홈이 과제 판을 연다 · 과제 판 액자 창(hf)을 달아 둔다 */
+function hwHome(R) {   // 홈 창 노크 — 정적 선생님 홈이 살아 있으면 그 판(직접 자식 · 정적 출처) · 아니면 구글 창
+  if (R.g.tOutLive()) { R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'homeDrawn' }); R.fromApp({ onf: 'auth-please' }); R.home = [R.win, APP]; }
+  else { R.knockG(); R.home = [R.lastSrc, KORIGIN]; }
+  R.sent.length = 0;
+}
+function hwOpenR(store, opt, msg) {
+  const R = boot(Object.assign({ onf_tout: '0' }, store), opt), tok = gtok();
+  login(R, tok); hwHome(R);
+  R.fire(Object.assign({ onf: 'hwbook', t: 'tokHwA01', l: LSN }, msg || {}), R.home[0], R.home[1]);
+  const hf = { nav: [], sent: [], location: { replace(u) { hf.nav.push(String(u)); } }, postMessage(m, o) { hf.sent.push({ m: JSON.parse(JSON.stringify(m)), o }); } };
+  hf.parent = hf;
+  if (R.g.hwFr) R.g.hwFr.contentWindow = hf;
+  R.hf = hf; R.tok = tok;
+  R.hw = (data, origin, src) => R.fire(data, src || hf, origin || APP);
+  return R;
+}
+const fallN = (R) => Number(String(R.ls.onfHwOutFail || '0,0').split(',')[1]);
+
+t('H1 스위치 꺼짐(기본 HWOUT_DEF · ?hwout=0) · 입장권 없음 · WebKit(tout=2 아님) = 종전 구글 판(exec?mode=hwbook) — 정적 판 주소 0', () => {
+  for (const [store, opt] of [[{ onf_tch: tchCell(20), ...HOFF }, {}], [{ onf_tch: tchCell(20) }, { search: '?hwout=0' }], [{}, { search: '?hwout=1' }], [{ onf_tch: tchCell(20) }, { search: '?hwout=1', nav: MACSAFARI }]]) {
+    const R = hwOpenR(store, opt);
+    assert.ok(/AKfycb[\w-]+\/exec\?mode=hwbook&t=tokHwA01&l=/.test(String(R.g.hwFr.src)), '⛔ 구글 판이 아니다: ' + R.g.hwFr.src + ' · ' + JSON.stringify(opt));
+    assert.strictEqual(R.g.hwOut, null);
+  }
+});
+
+t('H2 ?hwout=1 + 입장권 = 정적 판 /hwbook/?t&l(열기) · &warm=1(미리 띄우기) — 주소에 입장권·토큰 0 · 기기에 기억(onf_hwout)', () => {
+  const R = hwOpenR({ onf_tch: tchCell(20) }, { search: '?hwout=1' });
+  assert.strictEqual(String(R.g.hwFr.src), HWB + '?t=tokHwA01&l=' + LSN);
+  assert.strictEqual(R.ls.onf_hwout, '1');
+  const W = boot({ onf_tch: tchCell(20), onf_hwout: '1', onf_tout: '0' }); login(W); hwHome(W);
+  W.fire({ onf: 'hwbookWarm', t: 'tokHwA01' }, W.home[0], W.home[1]);
+  assert.strictEqual(String(W.g.hwFr.src), HWB + '?t=tokHwA01&warm=1');
+  for (const u of [R.g.hwFr.src, W.g.hwFr.src]) assert.ok(!/tch\.|x\.ey|odk1/.test(u), '⛔ 주소에 입장권·토큰');
+  //   tout=2 WebKit 기기는 정적 판(익명 다리)
+  const K = hwOpenR({ onf_tch: tchCell(20), onf_tout: '2', onf_hwout: '1' }, { nav: IPAD });
+  assert.strictEqual(String(K.g.hwFr.src), HWB + '?t=tokHwA01&l=' + LSN);
+});
+
+t('H3 정적 판 outHello → 노크 → 답 = 입장권(tch.)만(구글 토큰 아님) + 고른 사진·입장권(hw) 한 번 · 물러남 기억 비움 · 그 판 출처·그 창 말고는(구글 출처·pages.dev·다른 창) 안 받는다', () => {
+  const R = hwOpenR({ onf_tch: tchCell(20), onf_hwout: '1', onfHwOutFail: '0,2' }, {}, { f: [{ id: 'F1abcdefghij', ymd: '2026-10-30' }] });
+  const tk = JSON.parse(R.ls.onf_tch).tk;
+  R.hw({ onf: 'auth-please' }, KORIGIN); R.hw({ onf: 'auth-please' }, 'https://onf-app.pages.dev'); R.hw({ onf: 'auth-please' }, APP, { parent: R.hf, postMessage() {} });
+  assert.strictEqual(R.hf.sent.length, 0, '⛔ 다른 출처·창의 노크에 답했다');
+  R.hw({ onf: 'outHello' }); R.hw({ onf: 'auth-please' });
+  const a = R.hf.sent.filter((x) => x.m.onf === 'auth');
+  assert.strictEqual(a.length, 1); assert.strictEqual(a[0].o, APP);
+  assert.strictEqual(a[0].m.token, tk, '⛔ 정적 과제 판에 입장권이 아닌 것을 줬다');
+  assert.deepStrictEqual(a[0].m.hw.f, [{ id: 'F1abcdefghij', ymd: '2026-10-30' }]);
+  assert.ok(!('onfHwOutFail' in R.ls), '⛔ 판이 섰는데 물러남 기억을 안 비웠다');
+  R.advance(60000);
+  assert.strictEqual(R.hf.nav.length, 0, '⛔ 선 판을 시계가 구글 판으로 바꿨다');
+});
+
+t('H4 시한 — outHello 4초 안 없음 = hello · outHello 뒤 노크 10초 안 없음 = paint → 같은 액자에 구글 판(replace · 같은 t·l·warm) + 물러남 기억 · 그 뒤 구글 노크는 구글 토큰 + 고른 사진 그대로', () => {
+  const R = hwOpenR({ onf_tch: tchCell(20), onf_hwout: '1' }, {}, { f: [{ id: 'F1abcdefghij', ymd: '2026-10-30' }] });
+  R.advance(3999); assert.strictEqual(R.hf.nav.length, 0);
+  R.advance(2);
+  assert.ok(R.hf.nav.length === 1 && /AKfycb[\w-]+\/exec\?mode=hwbook&t=tokHwA01&l=/.test(R.hf.nav[0]), '⛔ hello 시한 뒤 구글 판으로 안 갔다: ' + R.hf.nav);
+  assert.strictEqual(fallN(R), 1); assert.strictEqual(R.g.hwOut, null);
+  const gsrc = { parent: R.hf, postMessage(m, o) { gsrc.sent.push(JSON.parse(JSON.stringify(m))); }, sent: [] };
+  R.hw({ onf: 'auth-please' }, KORIGIN, gsrc);
+  assert.strictEqual(gsrc.sent[0].token, R.tok, '⛔ 물러난 구글 판에 구글 토큰을 안 줬다');
+  assert.deepStrictEqual(gsrc.sent[0].hw.f, [{ id: 'F1abcdefghij', ymd: '2026-10-30' }]);
+  const P = hwOpenR({ onf_tch: tchCell(20), onf_hwout: '1' });
+  P.hw({ onf: 'outHello' }); P.advance(9999); assert.strictEqual(P.hf.nav.length, 0); P.advance(2);
+  assert.strictEqual(P.hf.nav.length, 1, '⛔ 노크 시한(paint) 뒤 구글 판으로 안 갔다');
+  const W = boot({ onf_tch: tchCell(20), onf_hwout: '1', onf_tout: '0' }); login(W); hwHome(W);
+  W.fire({ onf: 'hwbookWarm', t: 'tokHwA01' }, W.home[0], W.home[1]);
+  const wf = { nav: [], location: { replace(u) { wf.nav.push(u); } } }; W.g.hwFr.contentWindow = wf; W.advance(4001);
+  assert.ok(/mode=hwbook&t=tokHwA01&warm=1$/.test(wf.nav[0]), '⛔ 미리 띄운 판 물러남이 warm 을 잃었다: ' + wf.nav[0]);
+});
+
+t('H5 그리기 전 outFail(anon·bridge)·입장권 없음·거절(stale 같은 입장권) = 구글 판 + 기억(까닭별 · 다리·입장권 = 느림 · anon = 하루) · 물러난 뒤 다음 열기는 막힘이면 바로 구글', () => {
+  const R = hwOpenR({ onf_tch: tchCell(20), onf_hwout: '1' });
+  R.hw({ onf: 'outHello' }); R.hw({ onf: 'outFail', why: 'anon' });
+  assert.strictEqual(R.hf.nav.length, 1); assert.ok(Number(R.ls.onfHwOutFail.split(',')[0]) > Date.now() + 3600e3, '⛔ anon 이 하루 막힘이 아니다');
+  R.fire({ onf: 'hwbook', t: 'tokHwA02', l: '' }, R.home[0], R.home[1]);
+  assert.ok(/exec\?mode=hwbook&t=tokHwA02$/.test(String(R.g.hwFr.src)), '⛔ 막힌 기기가 또 정적 판을 열었다: ' + R.g.hwFr.src);
+  const B = hwOpenR({ onf_tch: tchCell(20), onf_hwout: '1' });
+  B.hw({ onf: 'outHello' }); B.hw({ onf: 'outFail', why: 'bridge' });
+  assert.strictEqual(B.hf.nav.length, 1); assert.strictEqual(Number(B.ls.onfHwOutFail.split(',')[0]), 0, '⛔ 다리 늦음 첫 번째가 막힘이 됐다(느림 갈래 = 이번 한 번)');
+  const S = hwOpenR({ onf_tch: tchCell(20), onf_hwout: '1' });
+  S.hw({ onf: 'outHello' }); S.hw({ onf: 'auth-please' }); S.hw({ onf: 'auth-please', stale: true });
+  assert.strictEqual(S.hf.nav.length, 1, '⛔ 거절당한 입장권에 구글 판으로 안 갔다'); assert.ok(!('onf_tch' in S.ls), '⛔ 거절당한 입장권을 남겼다');
+  const N = hwOpenR({ onf_tch: tchCell(20), onf_hwout: '1' });
+  N.g.tchDrop(); N.hw({ onf: 'outHello' }); N.hw({ onf: 'auth-please' });
+  assert.strictEqual(N.hf.nav.length, 1, '⛔ 입장권이 사라졌는데 판이 답을 기다린다(끝없는 불러오는 중)');
+  assert.ok(!N.hf.sent.some((x) => x.m.onf === 'auth'), '⛔ 정적 판에 구글 토큰을 줬다');
+  //   판 말 아닌 출처의 outFail 은 무시
+  const Z = hwOpenR({ onf_tch: tchCell(20), onf_hwout: '1' });
+  Z.hw({ onf: 'outFail', why: 'anon' }, KORIGIN); Z.hw({ onf: 'outFail', why: 'anon' }, 'https://onf-app.pages.dev');
+  assert.strictEqual(Z.hf.nav.length, 0, '⛔ 남의 출처 outFail 로 물러났다');
+});
+
+t('H6 닫으면(hwClose) 정적 판 시계도 걷힌다 · 다시 열면 새 판', () => {
+  const R = hwOpenR({ onf_tch: tchCell(20), onf_hwout: '1' });
+  R.g.hwClose(); R.advance(30000);
+  assert.strictEqual(R.hf.nav.length, 0, '⛔ 닫은 판의 시계가 돌았다'); assert.strictEqual(R.g.hwOut, null);
 });
 
 (async () => {

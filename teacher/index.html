@@ -718,9 +718,10 @@ function hwOpen(t, l, f, hwt, au) {
   x.style.cssText = 'position:absolute;top:12px;left:12px;z-index:2;width:40px;height:40px;border-radius:12px;border:0;font-size:18px;cursor:pointer;background:rgba(0,0,0,.35);color:#fff';
   x.onclick = function () { hwBack(); };
   hwLateX(x, wait);
-  hwFr.src = EXEC + '?mode=hwbook&t=' + encodeURIComponent(t) + (l ? '&l=' + encodeURIComponent(l) : '');   // ⛔ 붙이기 전에(위 주석)
+  hwFr.src = hwSrc(t, l, false);   // ⛔ 붙이기 전에(위 주석) · 📝 정적 먼저면 Pages /hwbook/(아래 onf-hwout)
   hwBox.appendChild(wait); hwBox.appendChild(hwFr); hwBox.appendChild(x);
   document.body.appendChild(hwBox);
+  hwOutArm();
   try { hwFr.focus(); } catch (eF) {}   // 키보드(Esc·화살표)가 가려진 홈으로 안 가게
   hwHistPush();
 }
@@ -759,13 +760,14 @@ function hwWarm(t) {
   hwBox.style.cssText = 'position:fixed;inset:0;z-index:50;background:var(--bg,#1d1712);visibility:hidden;pointer-events:none';   // 안 보이지만 크기는 진짜(맞춤 계산이 틀리지 않게)
   hwFr = document.createElement('iframe'); hwFr.setAttribute('allow', 'clipboard-write; microphone'); hwFr.setAttribute('title', '과제');
   hwFr.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent';
-  hwFr.src = EXEC + '?mode=hwbook&t=' + encodeURIComponent(t) + '&warm=1';   // ⛔ 붙이기 전에(WebKit 뒤로 칸)
+  hwFr.src = hwSrc(t, '', true);   // ⛔ 붙이기 전에(WebKit 뒤로 칸) · 📝 정적 먼저면 Pages /hwbook/(미리 띄우기도 같은 판)
   var wt = document.createElement('div'); wt.className = 'onf-wait'; wt.innerHTML = '<div class="onf-spin"></div><span>불러오는 중</span>';
   var xb = document.createElement('button'); xb.type = 'button'; xb.className = 'onf-hwx'; xb.setAttribute('aria-label', '닫기'); xb.textContent = '✕';   // 보인 뒤 노크가 안 오면(구글 오류 화면 등) 닫을 단추 — 노크가 오면 숨긴다(반박 🟠2)
   xb.style.cssText = 'position:absolute;top:12px;left:12px;z-index:2;width:40px;height:40px;border-radius:12px;border:0;font-size:18px;cursor:pointer;background:rgba(0,0,0,.35);color:#fff';
   xb.onclick = function () { hwBack(); };
   hwLateX(xb, wt);
   hwBox.appendChild(wt); hwBox.appendChild(hwFr); hwBox.appendChild(xb); document.body.appendChild(hwBox);
+  hwOutArm();
   hwT = t; hwWarmOn = true; clearTimeout(hwWarmTm); hwWarmTm = setTimeout(function () { if (hwWarmOn) hwClose(); }, 600000);
 }
 /* ✕ 는 15초 넘게 「불러오는 중」 일 때만(Peter 2026-10-24 ⑧ 「불러오는 중 창 왼쪽 위 ✕ 없애줘」) — 평소엔 뒤로가 닫는다 ·
@@ -774,11 +776,12 @@ var hwSeen = false;   // 과제 판이 노크했다(= 떴다)
 function hwLateX(x, wait) { var box = hwBox; hwSeen = false; x.hidden = true; setTimeout(function () { if (hwBox && hwBox === box && !hwSeen && wait && !wait.hidden) x.hidden = false; }, 15000); }
 function hwBack() { var k = hwHistUp(); hwAsking = false; if (k) history.go(-k); else hwClose(); }   // 위 물음·보기 칸까지 한 번에(③ · 뒤따르는 popstate 가 닫는다)
 function hwAuth() {   // 판에 지금 토큰(+ 고른 사진·입장권 한 번)
-  if (!hwWin || !pending) return;
-  var m = { onf: 'auth', token: pending, hist: 0, side: 1 };   // side = 이 껍데기는 「교재 옆에」를 한다(과제 판 액자만 · 주소로 연 판엔 없다)
+  var c = hwOut ? tchGet() : null, tok = hwOut ? (c ? c.tk : '') : pending;   // 📝 정적 과제 판 = 입장권(tch.)만 — 구글 토큰·기기 열쇠는 구글 판에만(정적 선생님 홈 answer 와 같은 규칙)
+  if (!hwWin || !tok) return;
+  var m = { onf: 'auth', token: tok, hist: 0, side: 1 };   // side = 이 껍데기는 「교재 옆에」를 한다(과제 판 액자만 · 주소로 연 판엔 없다)
   try { if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) m.sa = 1; } catch (e) {}   // 홈 화면 앱엔 브라우저 뒤로가 없다 — 판이 ‹ 를 보이게(반박 🔴1)
-  if (hwGo) { m.hw = hwGo; hwGo = null; }
-  hwGave = pending;
+  if (hwGo) { m.hw = hwGo; if (hwOut) hwOut.go = hwGo; hwGo = null; }   // 📝 정적 판이 물러나면 구글 판에 다시 준다(hwOutBack)
+  hwGave = tok;
   try { hwWin.postMessage(m, hwOrigin); } catch (e) {}
   if (hwGoMsg) { try { hwWin.postMessage(hwGoMsg, hwOrigin); } catch (e) {} hwGoMsg = null; }   // 미리 띄운 판 「열어」 — 토큰 바로 뒤(새로 받은 토큰 길 hwTell 로 와도 · 반박 🔴1)
 }
@@ -940,6 +943,7 @@ function hwClose() {
   hwView = 'photo'; hwRecR = null; hwBand = 0; hwCutTold = -1; if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;
   if (hwBox && hwBox.parentNode) hwBox.parentNode.removeChild(hwBox);
   hwBox = null; hwFr = null; hwWin = null; hwOrigin = ''; hwGo = null; hwGave = ''; hwWant = false; hwT = ''; hwWarmOn = false; hwGoMsg = null; clearTimeout(hwWarmTm);
+  if (hwOut) { clearTimeout(hwOut.tm); hwOut = null; }
 }
 /* onf-hist 블록 popstate 가 묻는다 — 과제 판 칸이 맨 위거나 방금 그 칸을 걷었으면 홈에 「뒤로」를 안 보낸다(홈은 안 바뀌었다) */
 function hwSkipPop() { var k = hwSkip || !!(history.state && history.state.onfHw); hwSkip = false; return k; }
@@ -956,15 +960,25 @@ window.addEventListener('popstate', function () {
 });
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
-  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwPen' && d.onf !== 'hwLeaveKeep' && d.onf !== 'hwRec' && d.onf !== 'hwBand' && d.onf !== 'hwPenOp')) return;
+  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwPen' && d.onf !== 'hwLeaveKeep' && d.onf !== 'hwRec' && d.onf !== 'hwBand' && d.onf !== 'hwPenOp' && d.onf !== 'outHello' && d.onf !== 'outFail')) return;
   if (hwFr && hwFrom(ev.source)) {   // 과제 판 액자에서 온 말
-    try { if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return; } catch (e) { return; }
+    /* 📝 정적 과제 판이 살아 있으면(hwOut) 그 판 창(액자 직접 자식 — 정적 판은 겹이 없다) + 그 판 출처만 · 판 안 구글 액자(다리)는 안 받는다 · 그 밖(구글 판)은 종전 그대로 googleusercontent 만 */
+    if (hwOut) { if (ev.source !== hwFr.contentWindow || ev.origin !== hwOut.org) return; }
+    else { if (d.onf === 'outHello' || d.onf === 'outFail') return; try { if (!/(^|\.)googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return; } catch (e) { return; } }
+    if (d.onf === 'outHello') { hwOutHello(hwOut); return; }
+    if (d.onf === 'outFail') { hwOutBack(hwOut, 'fail-' + (/^[a-z]{1,10}$/.test(String(d.why)) ? d.why : 'x')); return; }
     if (hwWin && ev.source !== hwWin) return;   // 한 번 정하면 그 창만(노크 자물쇠와 같다)
     hwWin = ev.source; hwOrigin = ev.origin;
     if (d.onf === 'auth-please') {
       hwSeen = true;
       var w = hwBox && hwBox.querySelector('.onf-wait'); if (w) w.hidden = true;
       var xb = hwBox && hwBox.querySelector('.onf-hwx'); if (xb) xb.hidden = true;
+      if (hwOut) {   // 📝 정적 과제 판 — 노크 = 판이 섰다(물러남 기억 비움) · 답 = 입장권 · 거절당한 입장권(stale)·입장권 없음 = 구글 판으로(이번 한 번 · 아래 hwOutBack)
+        clearTimeout(hwOut.tm); if (!hwOut.ok) { hwOut.ok = true; ONF.frame.fallOk('hwbook'); }
+        var tc = tchGet();
+        if (!tc || (d.stale && tc.tk === hwGave)) { if (d.stale && tc) tchDrop(); hwOutBack(hwOut, d.stale ? 'stale' : 'notch'); return; }
+        hwAuth(); return;
+      }
       if (d.stale && pending && pending !== hwGave && tokAlive(pending)) { hwAuth(); return; }   // 홈이 그새 새 토큰을 받았다
       if (d.stale || !pending || !tokAlive(pending)) {   // 죽은 토큰 — 홈 노크 길과 같이 새로 받는다(기기 열쇠면 칸에서 지움)
         if (String(pending).indexOf('odk1.') === 0) { pending = ''; try { localStorage.removeItem(TOKKEY); } catch (e0) {} }
@@ -995,6 +1009,48 @@ window.addEventListener('message', function (ev) {
   hwOpen(t, l, d.f, d.hwt, d.a);
   try { appWin.postMessage({ onf: 'hwOpened' }, appOrigin); } catch (e) {}   // 홈 창은 이 말을 받고 모아 보기 창을 닫는다
 });
+/* ═══ 📝 정적 과제 판(2026-10-31 · Peter 「과제 판도 같은 방식으로」 · 정적 선생님 홈 onf-tout 과 같은 꼴) ═══
+   과제 판 액자를 구글 doGet(1.7~2.2초) 대신 Pages /hwbook/(같은 템플릿 · Ownify tools/outside/hwbook-boot.js)로 먼저 연다 — 미리 띄우기(hwWarm)·열기(hwOpen) 둘 다 이 한 곳(hwSrc).
+   묻는 때만(hwOutQ): 기기 스위치(HWOUTV — 주소 hwout=1|0 > 이 기기 기억 onf_hwout > 기본 HWOUT_DEF) · 입장권 있음(tchGet — 판은 입장권으로 선생님 다리를 부른다) ·
+     WebKit·홈 화면 앱은 tout=2(TOUTWK) 기기만(입장권을 그 기기에 둔다 · 판이 익명 다리로 쓴다) · 물러남 기억에 안 막힘(onf-frame.js fallBlocked 'hwbook' — 까닭별).
+   판 말(그 액자 직접 자식 · 그 판 출처만 — 위 받는 손): outHello(머리 · HWOUT_HELLO_MS 안) → 노크 auth-please(HWOUT_KNOCK_MS 안) = 섰다 → 답은 입장권(hwAuth) ·
+     그리기 전 outFail(anon · bridge) · 시한 넘김 · 입장권 없음·거절(stale) = 같은 액자에 구글 판(지금 길 · 같은 t·l·warm) + 물러남 기억(ONF.frame.fallBack 'hwbook').
+   ⛔ 「불러오는 중」 끝없음 0 — 어느 갈래든 시한 안에 판이 서거나 구글 판으로 넘어가고, 구글 판도 안 뜨면 종전 15초 ✕(hwLateX).
+   켜기: 이 기기 ?hwout=1(Peter 기기 시험) → 넓히면 HWOUT_DEF '1'(켜기 커밋 하나) · 끄기 = ?hwout=0 또는 HWOUT_DEF '0'. */
+var HWOUT_DEF = '0', HWOUT_HELLO_MS = 4000, HWOUT_KNOCK_MS = 10000, hwOut = null;
+var HWOUTV = (function () {
+  var sw = null, kept = null;
+  try { sw = new URLSearchParams(location.search).get('hwout'); if (sw === '1' || sw === '0') { localStorage.setItem('onf_hwout', sw); if (sw === '1') localStorage.removeItem('onfHwOutFail'); } kept = localStorage.getItem('onf_hwout'); } catch (e) {}
+  return sw === '1' || sw === '0' ? sw : kept === '1' || kept === '0' ? kept : HWOUT_DEF;
+})();
+function hwOutUrl() { try { return new URL('/hwbook/', ONF.frame.OUT_BOOK).href; } catch (e) { return ''; } }   // 정적 판 출처 = 교재·선생님 홈 정적 판과 같은 곳(onf-frame.js 상수)
+function hwOutQ() {
+  try {   // ⛔ 무엇이 던져도 구글 판(지금 길)
+    if (HWOUTV !== '1' || !tchGet() || (!TOUTWK && (homeApp() || webkitOnly())) || !(window.ONF && ONF.frame && ONF.frame.OUT_BOOK) || !bookAppOrigin(new URL(hwOutUrl()).origin)) return false;
+    return !ONF.frame.fallBlocked('hwbook');
+  } catch (e) { return false; }
+}
+/** 과제 판 주소 한 곳 — 정적 먼저면 Pages /hwbook/?t&l&warm(이 판 상태 hwOut) · 아니면 구글 exec?mode=hwbook(종전) */
+function hwSrc(t, l, warm) {
+  var q = 't=' + encodeURIComponent(t) + (l ? '&l=' + encodeURIComponent(l) : '') + (warm ? '&warm=1' : '');
+  if (hwOut) { clearTimeout(hwOut.tm); hwOut = null; }
+  if (hwOutQ()) { var u = hwOutUrl(); hwOut = { org: new URL(u).origin, q: q, tm: 0, hi: false, ok: false }; return u + '?' + q; }
+  return EXEC + '?mode=hwbook&' + q;
+}
+/** 붙인 뒤 시계 — 머리 outHello 가 안 오면 구글 판 */
+function hwOutArm() { var me = hwOut; if (me) me.tm = setTimeout(function () { hwOutBack(me, 'hello'); }, HWOUT_HELLO_MS); }
+/** 머리가 섰다 — 노크(auth-please)까지 시계 하나 더(큰 판 · 느린 기기) */
+function hwOutHello(me) { if (!me || me !== hwOut || me.hi || me.ok) return; me.hi = true; clearTimeout(me.tm); me.tm = setTimeout(function () { hwOutBack(me, 'paint'); }, HWOUT_KNOCK_MS); }
+/** 정적 판을 버리고 같은 액자에 구글 판 — 같은 t·l·warm · 노크 자물쇠(hwWin)를 비워 구글 판 노크를 받는다 */
+function hwOutBack(me, why) {
+  if (!me || me !== hwOut) return;
+  clearTimeout(me.tm); hwOut = null; hwWin = null; hwOrigin = ''; hwGave = ''; if (me.go && !hwGo) hwGo = me.go;
+  if (typeof reopenLog === 'function') reopenLog('hwout-' + why);
+  try { ONF.frame.fallBack('hwbook', why); } catch (e) {}
+  console.info('[onf] 정적 과제 판이 안 떴다 — 구글 판으로');
+  var u = EXEC + '?mode=hwbook&' + me.q;
+  if (hwFr) { try { hwFr.contentWindow.location.replace(u); } catch (e) { hwFr.src = u; } }   // 📱 replace — 뒤로 칸을 안 쌓는다(정적 선생님 홈 tOutOpen 과 같다)
+}
 /* onf-hwbook:end */
 
 /* onf-edge:begin */
