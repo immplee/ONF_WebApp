@@ -468,8 +468,12 @@ t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼�
   assert.ok(box.style.visibility === '' && box.style.right === '0px', '⛔ 사진만 — 과제 판이 전체로 안 돌아왔다(right 를 비우면 inset:0 의 오른쪽이 지워져 폭 0 — 2026-10-24 라이브)');
   assert.strictEqual(panels()[0].style.display, 'none', '⛔ 사진만 — 교재 액자가 안 숨었다');
   assert.ok(!R.created.some((e) => e.className && /onf-bookpanel/.test(e.className)), '⛔ 홈 옆 교재 판(books)을 건드렸다');
+  R.postAs({ onf: 'hwbookView', v: 'side', href: HREF }, inner);   // 옆에 그대로 닫기 — 경계선이 판과 같이 가야 한다
+  const divs = () => R.created.filter((e) => e.className === 'onf-hwdiv' && e.parentNode && !e.removed);
+  assert.strictEqual(divs().length, 1, '⛔ 옆에 — 경계선이 없다(이 검사의 전제)');
   R.g.hwClose();   // 과제 판 닫기(뒤로·‹ 모두 여기로) = 그 교재 액자도 지움
   assert.strictEqual(panels().length, 0, '⛔ 과제 판을 닫았는데 교재 액자가 남았다');
+  assert.strictEqual(divs().length, 0, '⛔ 옆에서 닫았는데 경계선(14px · z 55)이 홈 위에 남았다 — 그 줄을 누르면 홈이 안 눌린다(29190d8 에서 지우는 줄이 주석 안으로 들어감 · 2026-10-31)');
 });
 t('🌤 과제 판 「교재 옆에」 정적 판(2026-10-31 넓히기 ②) — 말 out:1 이면 홈 옆 판과 같은 함수(ONF.frame.outOpen) · out 없으면 종전 구글 판 · 안 뜨면 같은 액자에 지금 길 · 보기만 바꿈은 길 그대로 · 정적 판 출처 노크 받음', () => {
   const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };

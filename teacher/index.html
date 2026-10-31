@@ -997,7 +997,8 @@ function hwClose() {
   if (hwBox && !hwWarmOn && appWin) { try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (e) {} }   // 홈이 카드 상태(완료 등)를 다시 받게
   if (hwBk) { if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} } if (hwBk.box.parentNode) hwBk.box.parentNode.removeChild(hwBk.box); hwBk = null; }   // 과제 판을 닫으면 그 교재 액자도 지운다
   hwView = 'photo'; hwRecR = null; hwBand = 0; hwCutTold = -1; hwHistWait = false;
-  if (hwBox && gateGo && gateBackOn) { gateGo = null; gateShut(); }   // 판(과제 판·옆 교재)이 띄운 로그인 화면은 판과 같이 닫는다(반박 🟡7 · 돌아가기 단추가 있는 문 = 과제 판 문뿐) if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;
+  if (hwBox && gateGo && gateBackOn) { gateGo = null; gateShut(); }   // 판(과제 판·옆 교재)이 띄운 로그인 화면은 판과 같이 닫는다(반박 🟡7 · 돌아가기 단추가 있는 문 = 과제 판 문뿐)
+  if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;   // ⛔ 위 줄 주석 끝에 붙으면 안 돈다(29190d8 · 옆에서 닫으면 경계선이 홈 위에 남았다)
   if (hwBox && hwBox.parentNode) hwBox.parentNode.removeChild(hwBox);
   hwBox = null; hwFr = null; hwWin = null; hwOrigin = ''; hwGo = null; hwGave = ''; hwWant = false; hwT = ''; hwWarmOn = false; hwGoMsg = null; clearTimeout(hwWarmTm);
   if (hwOut) { clearTimeout(hwOut.tm); hwOut = null; }
