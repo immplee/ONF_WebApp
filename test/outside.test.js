@@ -889,15 +889,19 @@ ta('S4e slug 링크 → 몸통 {t, slug}(f·s 칸 없음) · cf 면 정적 판',
   assert.deepStrictEqual(Object.keys(JSON.parse(f.calls[0].init.body)), ['t', 'f'], '⛔ 없는 칸을 실었다(빈 값은 Worker 가 400 bad)');
 });
 
-ta('S4f 안 묻는 때 — 기기 out=0 · 토큰 없음 · 14일 안에 정적 판 안 씀(없음·15일 전) · 그날 물러남 · ⭐ 내 문장 · 🗂️ 카드 덱 · ttok → /who 0회 · 바로 지금 길', async () => {
+ta('S4f 안 묻는 때 — 기기 out=0 · 토큰 없음 · 그날 물러남 · ⭐ 내 문장 · 🗂️ 카드 덱 · ttok → /who 0회 · 바로 지금 길', async () => {
   const D = 86400000;
-  const cases = [['out=0', { out: false }], ['토큰 없음', { tok: '' }], ['정적 판 안 씀', { ls: LSf() }], ['15일 전', { ls: UL({ onfOutUsed: String(1.7e12 - 15 * D) }) }],
+  const cases = [['out=0', { out: false }], ['토큰 없음', { tok: '' }],   // ☁️ 정적 판 안 쓴 기기(없음·15일 전)는 이제 묻는다(2026-11-01 밖으로 5단계 ④ · 아래 N6 · 첫 판 시한만 길게)
     ['그날 물러남', { ls: UL({ onfOutFail: BLK }) }],
     ['내 문장', { src: DSRC.replace('mode=share', 'mode=mine') }], ['카드 덱', { src: DSRC + '&view=cards' }], ['ttok', { src: DSRC + '&ttok=X' }]];
   for (const [nm, o] of cases) {
     const s = wsetup(o);
     assert.strictEqual(s.calls.length, 0, '⛔ ' + nm + ' — /who 를 물었다');
     assert.strictEqual(s.frameEl.src, o.src || DSRC, '⛔ ' + nm + ' — 바로 지금 길로 안 열었다');
+  }
+  for (const [nm, ls] of [['정적 판 안 씀', LSf()], ['15일 전', UL({ onfOutUsed: String(1.7e12 - 15 * D) })]]) {
+    const s = wsetup({ ls });
+    assert.strictEqual(s.calls.length, 1, '⛔ ' + nm + ' — 차가운 기기라고 링크 직행을 구글 교재로 보냈다(2026-11-01 밖으로 5단계 ④)');
   }
 });
 
@@ -1230,11 +1234,13 @@ ta('N5 새 기기의 다른 실패(error · 그리기 전 notice·stale · 스�
   assert.strictEqual(t.frameEl.src, HSRC);
   assert.ok(!(held(t.g.localStorage.m, 'onfOutFailHome')));
 });
-ta('N6 flushWorth·whoQ 의 onfOutUsed 판정은 그대로(새 기기 홈 시도가 교재 넘겨주기·링크 직행을 안 연다)', async () => {
+ta('N6 flushWorth 의 onfOutUsed 판정은 그대로 · 링크 직행(whoQ)은 차가운 기기도 묻고 첫 판 시한만 HOME_PAINT_MS_COLD(2026-11-01 밖으로 5단계 ④ — 종전엔 그 기기를 늘 구글 교재로)', async () => {
   const src = fs.readFileSync(path.join(ROOT, 'assets', 'onf-frame.js'), 'utf8');
   const at = (k, n) => src.slice(src.indexOf(k), src.indexOf(k) + n);
   assert.ok(/OUT_USED/.test(at('function flushWorth(b)', 500)), '⛔ flushWorth 의 onfOutUsed 판정이 사라졌다');
-  assert.ok(/OUT_USED/.test(at('function whoQ(s)', 700)), '⛔ whoQ 의 onfOutUsed 판정이 사라졌다');
+  assert.ok(!/OUT_USED/.test(at('function whoQ(s)', 400)), '⛔ whoQ 가 아직 차가운 기기를 뺀다');
+  assert.ok(/var mk = mainBook\(src\), cold = homeCold\(\);/.test(src) && /opts\.hooks \|\| null, cold \? HOME_PAINT_MS_COLD : 0\);/.test(src), '⛔ 차가운 기기 첫 판 시한(쓴 표시 적기 전에 잰다)');
+  assert.ok(/tm = setTimeout\(function \(\) \{ if \(!booted\) bad\('hello'\); \}, ms \|\| OUT_MS\);/.test(src), '⛔ openApp 이 받은 시한을 안 쓴다');
 });
 
 ta('N7 시한 실패 사다리(종전 Ruling 6 「새 기기 첫 번째만 면제」를 대신 · 쓴 기기도 같다) — 연속 1 = 0 · 2 = 10분(그 동안 정적 0) · hello·그리기 섞여도 셈 · mismatch 는 셈에 안 들어감 · 그리면 셈 지움', async () => {
