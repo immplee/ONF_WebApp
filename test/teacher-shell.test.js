@@ -398,6 +398,28 @@ t('⑧ 과제 여는 동안 ✕ 는 숨김 · 15초 넘게 「불러오는 중�
   R2.advance(16000);
   assert.strictEqual(x2.hidden, true, '⛔ 다 떴는데 15초 뒤 ✕ 가 나왔다');
 });
+t('📖 교재 미리 띄우기(2026-10-31 「과제 사진 열어 놓은 데서 교재 불러오는 게 너무 느려」) — 판이 주소를 보내면(hwbookBookWarm) 사진 보기 동안 교재 액자를 숨긴 채 만든다 · 누르면 같은 액자 보이기만(다시 안 받음) · 남의 주소·남의 창·교재 보는 중은 안 함', () => {
+  const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
+  R.knockAs(me); R.postAs({ onf: 'hwbook', t: 'Tok_1' }, me);
+  const fr = R.created.filter((e) => e.tag === 'iframe')[0], inner = { parent: { parent: fr.contentWindow }, postMessage() {} };
+  R.postAs({ onf: 'auth-please' }, inner);
+  const panels = () => R.created.filter((e) => e.className === 'onf-hwbk' && e.parentNode && !e.removed);
+  const HREF = 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILEaaaaaaaa01&sheetName=E3';
+  const ce = R.g.document.createElement; R.g.document.createElement = (tag) => { const e = ce(tag); e.style.setProperty = (k, v) => { e.style[k] = v; }; e.style.removeProperty = (k) => { delete e.style[k]; }; e.blur = () => {}; return e; };
+  R.g.ONF = Object.assign({}, R.g.ONF || {}, { api: { EXEC: R.g.EXEC } }); if (R.g.window && R.g.window !== R.g) R.g.window.ONF = R.g.ONF;
+  R.postAs({ onf: 'hwbookBookWarm', href: 'https://evil.example/?mode=share&t=Tok_1' }, inner);
+  R.postAs({ onf: 'hwbookBookWarm', href: HREF }, { parent: {}, postMessage() {} });
+  assert.strictEqual(panels().length, 0, '⛔ 남의 주소·남의 창으로 교재를 띄웠다');
+  R.postAs({ onf: 'hwbookBookWarm', href: HREF }, inner);
+  assert.strictEqual(panels().length, 1, '⛔ 미리 띄우기를 안 했다');
+  assert.strictEqual(panels()[0].style.display, 'none', '⛔ 미리 띄운 교재가 사진 위에 보인다');
+  const ifr = () => R.created.filter((e) => e.tag === 'iframe').length, n0 = ifr();
+  R.postAs({ onf: 'hwbookView', v: 'side', href: HREF }, inner);
+  assert.strictEqual(ifr(), n0, '⛔ 누를 때 교재 액자를 새로 만들었다');
+  assert.notStrictEqual(panels()[0].style.display, 'none', '⛔ 누른 뒤에도 교재가 숨어 있다');
+  R.postAs({ onf: 'hwbookBookWarm', href: HREF.replace('E3', 'E4') }, inner);
+  assert.ok(R.g.hwBk && /sheetName=E3/.test(R.g.hwBk.src) && !/E4/.test(R.g.hwBk.src), '⛔ 교재를 보는 중인데 미리 띄우기가 교재를 바꿨다: ' + (R.g.hwBk && R.g.hwBk.src));
+});
 t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼쪽 반 · 과제 판 전용 교재 액자 오른쪽 반(홈 옆 교재 판 기계 안 씀) · 교재만 = 과제 판 숨김 + 「과제로」 칩 · 사진만 = 교재 숨김 · 남의 주소 거절 · 과제 판 액자에서 온 말만', () => {
   const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
   R.knockAs(me);

@@ -870,6 +870,15 @@ function hwBookFrame(src, out, cf) {   // out = 과제 판이 실은 out:1(🌤 
   }
   return hwBk;
 }
+/* 📖 교재 미리 띄우기(2026-10-31 Peter 「과제 사진 열어 놓은 데서 교재 불러오는 게 너무 느려」) — 판이 교재 주소를 알면(목록·처음 회차) 보내 온다(hwbookBookWarm) →
+   사진만 보는 동안 교재 액자를 **숨긴 채** 만들어 둔다(hwBookFrame — 같은 주소는 다시 안 띄움 · 같은 거름 teacherBookSrc·outWant) → [교재]·[사진·교재]를 누르면 보이기만.
+   ⛔ 미리 띄운 판(hwWarmOn · 안 보이는 판)·교재를 보고 있을 때는 안 한다(보이는 교재를 바꾸지 않는다) · 상자는 hwLay 가 사진 보기면 숨긴다(만든 직후 한 번 더 숨김). */
+function hwBookWarm(href, out, cf) {
+  if (!hwBox || hwWarmOn || hwView !== 'photo' || typeof href !== 'string' || !href) return;
+  var src = teacherBookSrc(href); if (!src) return;
+  hwBookFrame(src, out, cf);
+  if (hwBk) hwBk.box.style.display = 'none';
+}
 /* 🖥️ 과제 판 확장 창(mode=hwext · 2026-10-29) — 「교재 옆에」 수업에서 공유가 교재로 넘어가면 안쪽(ONF_HwExt_Html)이 그 교재 주소를 보낸다(extBook) →
    시트만 보는 교재 칸(ext=1)을 위에 겹친다 · 과제 판으로 돌아오면 숨긴다(한 번 띄운 칸은 숨겨 두고 다시 써서 오갈 때 다시 안 읽는다).
    ⛔ 안쪽 창(appWin)이 보낸 것만 · 주소는 학생 판과 같은 거름(teacherBookSrc) */
@@ -1031,7 +1040,7 @@ window.addEventListener('popstate', function () {
 });
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
-  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwTap' && d.onf !== 'hwPen' && d.onf !== 'hwLeaveKeep' && d.onf !== 'hwRec' && d.onf !== 'hwBand' && d.onf !== 'hwPenOp' && d.onf !== 'outHello' && d.onf !== 'outFail')) return;
+  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwbookBookWarm' && d.onf !== 'hwTap' && d.onf !== 'hwPen' && d.onf !== 'hwLeaveKeep' && d.onf !== 'hwRec' && d.onf !== 'hwBand' && d.onf !== 'hwPenOp' && d.onf !== 'outHello' && d.onf !== 'outFail')) return;
   if (hwFr && hwFrom(ev.source)) {   // 과제 판 액자에서 온 말
     /* 📝 정적 과제 판이 살아 있으면(hwOut) 그 판 창(액자 직접 자식 — 정적 판은 겹이 없다) + 그 판 출처만 · 판 안 구글 액자(다리)는 안 받는다 · 그 밖(구글 판)은 종전 그대로 googleusercontent 만 */
     if (hwOut) { if (ev.source !== hwFr.contentWindow || ev.origin !== hwOut.org) return; }
@@ -1067,6 +1076,7 @@ window.addEventListener('message', function (ev) {
     if (d.onf === 'hwbookBack') hwBack();
     if (d.onf === 'hwLeaveKeep') { var sk = history.state; hwAsking = false; if (hwBox && sk && sk.onfHw && !sk.lg) { try { history.pushState({ onfHw: 1, n: sk.n || 0, lg: 1 }, ''); } catch (e) {} } }   // ③ 「홈으로 나갈까요?」 취소 — 물음 칸 다시
     if (d.onf === 'hwbookView') hwViewSet(String(d.v || ''), d.href, false, d.out === 1, d.cf);
+    if (d.onf === 'hwbookBookWarm') hwBookWarm(d.href, d.out === 1, d.cf);   // 📖 교재 미리 띄우기(숨긴 채)
     if (d.onf === 'hwRec') hwRecSet(d.rs);   // 🎧 녹음 플레이어 자리(교재만에서도 보이게)
     if (d.onf === 'hwBand') hwBandSet(d.h);
     if (d.onf === 'hwPenOp' && (d.op === 'undo' || d.op === 'redo') && hwBk && hwBk.win) { try { hwBk.win.postMessage({ onf: 'penRelay', op: d.op }, hwBk.origin); } catch (e) {} }   // ↩️ 펜 줄 ↩︎·↪︎ 가 옆 교재 차례 — 교재가 되돌린다(Peter 2026-10-30 4차 「교재에 필기하고 나면 되돌리기가 안 돼」)   // 📖 옆에 = 위 줄·펜 줄 띠 높이(0 = 종전 배치)
