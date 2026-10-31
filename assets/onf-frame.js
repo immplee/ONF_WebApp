@@ -300,7 +300,7 @@
   var OUT_MINE_URL = 'https://app.ownify.co.kr/mine/';   // 🌤 밖으로 4-②(2026-10-29) ⭐ 내 문장 정적 판 — Lib 스위치 ONF_OUT_MINE 과 다른 이름
   var OUT_MS = 2500;
   function isAppOrigin(o) { o = String(o); return ONF_OUT_ORIGINS.indexOf(o) >= 0 || /^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(o); }
-  function openApp(el, url, src, cf, onFail, tok, hooks) {   // hooks = 첫 판만(밖으로 2 · 로고 막 onf-load.js) — 첫 hello 에 ok
+  function openApp(el, url, src, cf, onFail, tok, hooks, ms) {   // hooks = 첫 판만(밖으로 2 · 로고 막 onf-load.js) — 첫 hello 에 ok · ms = hello 시한(없으면 OUT_MS · 차가운 기기 첫 판 = HOME_PAINT_MS_COLD)
     var org = new URL(url).origin, done = false, booted = false, tm;
     function end() { done = true; clearTimeout(tm); global.removeEventListener('message', onMsg); }
     function bad(why) { if (done) return; end(); onFail(why); }   // why = 위 fallBack 까닭('hello' | 'fail-<판 why>')
@@ -314,7 +314,7 @@
       if (cf && typeof cf.then === 'function') cf.then(say, function () { say(null); }); else say(cf);   // 📖 cf 가 묻는 중(bookCfFor · /who)이면 답 뒤에 — 판은 outBoot 을 4초 기다린다(WHO_MS 800 안)
     }
     global.addEventListener('message', onMsg);
-    tm = setTimeout(function () { if (!booted) bad('hello'); }, OUT_MS);
+    tm = setTimeout(function () { if (!booted) bad('hello'); }, ms || OUT_MS);
     try { if (el.isConnected && el.contentWindow) el.contentWindow.location.replace(url); else el.src = url; } catch (e) { el.src = url; }   // 📱 replace — openExec 끝 주석(WebKit 기록 칸)
     return { stop: end, stuck: function () { return false; } };
   }
@@ -1195,15 +1195,15 @@
       preP = bookFind(opts.bookSrc(v.h));   // 🚀 미리 띄운 판(위 preSave 가 오늘 주소와 견준다)
     }
     /* 🌤 밖으로 2(2026-10-24 · 판정 2·5) — 링크 직행 교재(fileId·slug)면 /who 를 WHO_MS 안 묻고 cf 가 오면 첫 판을 정적 판(openApp)으로.
-       묻는 때만(아래 whoQ): 토큰 · 기기 out · 물러남 기억에 안 막힘 · ⭐ 내 문장(mode)·🗂️ 카드 덱(view) 아님 · ttok 아님 · 14일 안에 정적 판을 쓴 기기(onfOutUsed) — 아니면 종전 그대로(요청·기다림 0).
+       묻는 때만(아래 whoQ): 토큰 · 기기 out · 물러남 기억에 안 막힘 · ⭐ 내 문장(mode)·🗂️ 카드 덱(view) 아님 · ttok 아님 — 아니면 종전 그대로(요청·기다림 0).
+       차가운 기기(onfOutUsed 없음·14일 넘음)도 묻는다 — 첫 판 hello 시한만 HOME_PAINT_MS_COLD(2026-11-01 · 종전엔 그 기기를 뺐다).
        안 뜨면(outFail·hello 없음) 같은 액자에 종전 openExec(여러 계정 우회·로고 신호 그대로) · 물러남 기억(위 fallBack 'book'). 정적 판은 src 의 embed 를 따른다(링크 직행 = 판 단추 없음 · boot.js). */
     function mainExec(navStart) { openExec(frameEl, src, opts.wait || null, null, true, opts.hooks || null, navStart === true); }
     function whoQ(s) {   // 🗂️ 덱 링크 직행은 지금 길 그대로(4-② — 덱은 홈 out:1 만 · outOk 가 덱을 안 거른다 · whoAsk 가 거른다)
       try {
         var a = whoAsk(s);
         if (!a || !outOk(s)) return null;
-        if (!(Date.now() - Number(global.localStorage.getItem(OUT_USED) || 0) < OUT_USED_MS)) return null;
-        return a;
+        return a;   // ☁️ 차가운 기기(14일 안 정적 판을 안 쓴 기기 · 카톡 인앱 브라우저처럼 저장소가 따로인 곳)도 묻는다 — 첫 판 hello 시한만 HOME_PAINT_MS_COLD(홈 ③-3 과 같다 · 밖으로 5단계 ④ 2026-11-01). 종전엔 그 기기는 늘 구글 교재(4~6초).
       } catch (e) { return null; }
     }
     /* 🧺 첫 판 교재의 남은 쓰기 표시 열쇠 — 판과 같은 교재 주소(bookSrc 꼴 · bookBase)라야 다음에 지금 길 판으로 열 때 넘겨주기(flushWorth)가 찾는다(검토 고침 1).
@@ -1276,7 +1276,7 @@
     if (homeQ()) mainHome();   // 홈 표시면 교재 주소가 없어 whoQ 는 늘 null
     else if (wq) (bookCfFor(src, null, wq) || Promise.resolve(null)).then(function (cf) {   // 📖 판 사본 힌트와 한 지붕(bookCfFor)
       if (!cf) return mainExec();
-      var mk = mainBook(src);
+      var mk = mainBook(src), cold = homeCold();   // ⛔ 아래에서 onfOutUsed 를 지금으로 적기 **전에** 잰다
       function onQ(ev) { if (mainOut && ev && ev.data && ev.data.onf === 'outQueue' && ev.source === frameEl.contentWindow && ev.origin === OUT_ORG) outPend(mk, ev.data.n); }   // 🧺 그 액자 창 · 정적 판 출처만
       try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}
       mainOut = true; flushStop(); global.addEventListener('message', onQ);
@@ -1286,7 +1286,7 @@
         mainOut = false; global.removeEventListener('message', onQ);
         appWin = null; histWin = null; histOrigin = '';   // 죽은 정적 창을 가리키지 않게(판 물러남과 같게 · 지금 길 노크가 다시 정한다)
         mainExec();
-      }, opts.tok, opts.hooks || null);
+      }, opts.tok, opts.hooks || null, cold ? HOME_PAINT_MS_COLD : 0);
     });
     else mainExec();   // 🟠 hooks = 첫 화면 로고 로딩(index.html · onf-load.js) · 🔐 여러 계정 우회(위) — 못 열면 index.html 의 「불러오는 중」 자리에 안내 · 기억은 홈 액자만 정한다
     preEarly();   // 🚀 홈 요청이 먼저 나간 **뒤** — 홈이 더 중요하다(둘이 같이 받는다)
