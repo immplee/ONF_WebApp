@@ -92,6 +92,8 @@ var tPre = (function () {
           font:15px/1.65 -apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
           color:var(--onf-ink); }
   .lock .em { font-size:34px; margin-bottom:12px; }
+  /* 🔐 로그인 화면(gate)을 띄운 동안 과제 판·옆 교재·경계 손잡이 층(z 50~55)을 숨긴다 — 인라인 visibility 를 hwLay 가 되돌려도(회전 등) 이긴다(2026-10-31 반박 🟡6) */
+  html.onf-gating .onf-hwbox, html.onf-gating .onf-hwbk, html.onf-gating .onf-hwdiv { visibility:hidden !important; pointer-events:none !important; }
   .lock h2 { margin:0 0 9px; font-size:20px; font-weight:800; }
   .lock p { margin:0 0 18px; color:var(--onf-brown); }
   .lock .why { font-size:12.5px; color:var(--onf-mute); margin-top:14px; }
@@ -169,13 +171,14 @@ var frame = document.getElementById('app');
 var mounted = false, pending = '';
 /* 📱 tchOnly = 구글 창구 없이 입장권(tch.)만으로 정적 먼저를 열었다(아래 reuse · 2026-10-31 아이패드 7초) — pending(구글 토큰)이 없다.
    구글 exec 를 띄워야 할 때(정적 판 물러남 · 과제 판)만 gate 가 로그인 화면을 다시 보인다. */
-var tchOnly = false, gateGo = null;
+var tchOnly = false, gateGo = null, gateBackOn = false;
 /* 📱 구글 창구 문 — 로그인 화면을 다시 보이고, 누르면(onCredential → gateRun) go 를 한다.
    ⛔ WebKit 은 구글 창구(버튼 팝업)를 거쳐야 끼운 exec 에 로그인 쿠키를 싣는다(webkitOnly · 2026-10-12 실측) — 그 전에 exec 액자를 열면 「화면이 안 열렸어요」.
    ⛔ One Tap(prompt)을 쓰지 않는다 — 닫으면 구글이 몇 시간 안 띄운다(쿨다운) · 버튼은 늘 눌린다.
    back = 「홈으로 돌아가기」(살아 있는 정적 홈으로 — 과제 판 문만 · 물러남엔 돌아갈 홈이 없다). */
 function gate(go, msg, back, onBack) {   // onBack = 「홈으로 돌아가기」 때 더 할 일(과제 판 닫기 — hwOutBack)
-  gateGo = go;
+  gateGo = go; gateBackOn = !!back;
+  gating(true);   // 과제 판 층이 로그인 화면을 덮지 않게(위 CSS)
   frame.hidden = true;
   document.getElementById('wait').hidden = true;
   document.getElementById('lock').hidden = false;
@@ -183,7 +186,8 @@ function gate(go, msg, back, onBack) {   // onBack = 「홈으로 돌아가기�
   var b = document.getElementById('gateBack');
   if (b) { b.hidden = !back; b.onclick = function () { gateGo = null; gateShut(); if (onBack) onBack(); }; }
 }
-function gateShut() { document.getElementById('lock').hidden = true; frame.hidden = false; say(''); var b = document.getElementById('gateBack'); if (b) b.hidden = true; }
+function gating(on) { try { document.documentElement.classList.toggle('onf-gating', !!on); } catch (e) {} }
+function gateShut() { gateBackOn = false; gating(false); document.getElementById('lock').hidden = true; frame.hidden = false; say(''); var b = document.getElementById('gateBack'); if (b) b.hidden = true; }
 function gateRun() { var g = gateGo; if (!g) return false; gateGo = null; gateShut(); g(); return true; }
 
 /* ═══ 받아 둔 토큰을 **아껴 쓴다** (Peter 2026-09-23 「새로고침하면 항상 다시 로그인해야 해」)
@@ -769,9 +773,20 @@ function hwHistPush() {
   } catch (e) {}
   hwAsking = false;
 }
+/** 👆 미뤄 둔 칸 맞추기(손짓 안에서만) — 판 칸·물음 칸이 없으면 쌓고 · 교재를 보이는 중인데 보기 칸이 없으면 그것도(보기 칸도 손짓 밖이면 미뤘다 · 반박 🟠2·🟡5) */
+function hwHistSync() {
+  if (!hwHistWait || !hwBox || hwWarmOn) return;
+  if (hwHistLate()) { if (!hwTapLog) { hwTapLog = true; if (typeof reopenLog === 'function') reopenLog('hwtap-inactive'); } return; }   // 🔭 손짓이 부모 창에 안 닿는다(실기기에서 가른다 · 반박 🟠3)
+  var s = history.state;
+  if (!(s && s.onfHw)) hwHistPush();
+  hwHistWait = false; s = history.state;
+  if (hwView !== 'photo' && s && s.onfHw && !s.hv) { try { history.pushState({ onfHw: 1, n: s.n || 0, lg: 1, hv: 1 }, ''); } catch (e) {} }
+}
+var hwTapLog = false;
 function hwHistUp() { var s = history.state; return s && s.onfHw ? 1 + (s.lg ? 1 : 0) + (s.hv ? 1 : 0) : 0; }   // 맨 위에서 이어진 과제 판 칸 수
 function hwViewHist(was, v) {   // 사진만 ↔ 교재 — 보기 칸을 넣고 뺀다(뒤로 = 사진만)
   var s = history.state;
+  if (was === 'photo' && v !== 'photo' && hwHistLate()) { hwHistWait = true; return; }   // 👆 손짓 밖(판이 저절로 켠 옆에 등) — 다음 손짓(hwTap)에 맞춘다(hwHistSync)
   if (was === 'photo' && v !== 'photo' && s && s.onfHw && !s.hv) { try { history.pushState({ onfHw: 1, n: s.n || 0, lg: 1, hv: 1 }, ''); } catch (e) {} }
   else if (was !== 'photo' && v === 'photo' && s && s.onfHw && s.hv) history.back();   // 뒤따르는 popstate 는 이미 사진만이라 할 일이 없다
 }
@@ -838,6 +853,8 @@ function hwBookFrame(src, out, cf) {   // out = 과제 판이 실은 out:1(🌤 
     hwBk.src = src; hwBk.win = null; hwBk.out = o;   // 새 교재 = 새 노크를 기다린다
     if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} hwBk.oe = null; }
     var exec = function () {
+      /* 🔐 입장권만으로 연 홈(tchOnly · 구글 창구 전)이면 구글 교재 액자는 쿠키가 없다(WebKit) — 로그인을 거쳐 연다 · 돌아가기 = 사진으로(2026-10-31 반박 🟠1) */
+      if (tchOnly && !pending) { var bk0 = hwBk; gate(function () { if (hwBk === bk0 && hwBk.src === src) exec(); }, '교재는 구글 로그인 뒤에 열려요.', true, function () { if (hwBk === bk0) hwBk.src = ''; hwViewSet('photo'); hwTellView(); }); return; }   // 돌아가기 = 주소 기억을 비운다(다시 누르면 또 묻는다 · 안 비우면 빈 교재 칸)
       hwBk.out = false; hwBk.win = null;
       if (window.ONF && ONF.frame && ONF.frame.openExec) hwBk.oe = ONF.frame.openExec(hwBk.el, src, hwBk.wt, function () { hwViewSet('photo'); hwTellView(); });   // 🔐 여러 계정 우회(교재 판과 같은 길)
       else hwBk.el.src = src;
@@ -970,6 +987,7 @@ window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
   if (!d || !hwBk || !bookFrom(ev, hwBk.el, true)) return;   // 🌤 판 출처(구글 또는 정적 판 · 2026-10-31 넓히기 ②)
   if (d.onf === 'bookHi') { hwBk.win = ev.source; hwBk.origin = ev.origin; hwPenSync(); return; }
+  if (d.onf === 'hwTap') { hwHistSync(); return; }   // 👆 옆·교재만에서 교재만 만져도(반박 🟠2)
   if (d.onf === 'penAct') { if (hwView === 'side' && hwWin) { try { hwWin.postMessage({ onf: 'bookPenAct' }, hwOrigin); } catch (e) {} } return; }   // ↩️ 옆 교재에 되돌릴 일이 생겼다 → 과제 판 펜 줄 차례 장부(2026-10-30 4차)
   if (d.onf === 'themeAsk') { themeAsk(ev); return; }
   if (d.onf === 'printTitle') { if (window.ONF && ONF.frame && ONF.frame.printTitle) ONF.frame.printTitle(d.t); return; }
@@ -978,7 +996,8 @@ window.addEventListener('message', function (ev) {
 function hwClose() {
   if (hwBox && !hwWarmOn && appWin) { try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (e) {} }   // 홈이 카드 상태(완료 등)를 다시 받게
   if (hwBk) { if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} } if (hwBk.box.parentNode) hwBk.box.parentNode.removeChild(hwBk.box); hwBk = null; }   // 과제 판을 닫으면 그 교재 액자도 지운다
-  hwView = 'photo'; hwRecR = null; hwBand = 0; hwCutTold = -1; hwHistWait = false; if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;
+  hwView = 'photo'; hwRecR = null; hwBand = 0; hwCutTold = -1; hwHistWait = false;
+  if (hwBox && gateGo && gateBackOn) { gateGo = null; gateShut(); }   // 판(과제 판·옆 교재)이 띄운 로그인 화면은 판과 같이 닫는다(반박 🟡7 · 돌아가기 단추가 있는 문 = 과제 판 문뿐) if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;
   if (hwBox && hwBox.parentNode) hwBox.parentNode.removeChild(hwBox);
   hwBox = null; hwFr = null; hwWin = null; hwOrigin = ''; hwGo = null; hwGave = ''; hwWant = false; hwT = ''; hwWarmOn = false; hwGoMsg = null; clearTimeout(hwWarmTm);
   if (hwOut) { clearTimeout(hwOut.tm); hwOut = null; }
@@ -1028,7 +1047,7 @@ window.addEventListener('message', function (ev) {
       return;
     }
     if (d.onf === 'themeAsk') { themeAsk(ev); return; }
-    if (d.onf === 'hwTap') { if (hwHistWait && hwBox && !hwWarmOn) hwHistPush(); return; }   // 👆 미뤄 둔 뒤로 칸 — 판을 만진 손짓 안에서(위 hwHistLate)
+    if (d.onf === 'hwTap') { hwHistSync(); return; }   // 👆 미뤄 둔 뒤로 칸 — 판을 만진 손짓 안에서(위 hwHistLate)
     if (d.onf === 'hwbookBack') hwBack();
     if (d.onf === 'hwLeaveKeep') { var sk = history.state; hwAsking = false; if (hwBox && sk && sk.onfHw && !sk.lg) { try { history.pushState({ onfHw: 1, n: sk.n || 0, lg: 1 }, ''); } catch (e) {} } }   // ③ 「홈으로 나갈까요?」 취소 — 물음 칸 다시
     if (d.onf === 'hwbookView') hwViewSet(String(d.v || ''), d.href, false, d.out === 1, d.cf);
@@ -1052,7 +1071,7 @@ window.addEventListener('message', function (ev) {
   /* 📱 입장권만으로 연 홈(tchOnly)은 구글 창구 전이다 — 구글 판(exec)이면 로그인 화면(gate)을 한 번 거쳐 연다 · 「홈으로 돌아가기」로 그만둘 수 있다.
      정적 과제 판(hwOutQ · 입장권으로 연다)이면 묻지 않는다 — 구글을 안 지나는데 로그인부터 묻던 순서였다(Peter 2026-10-31 아이패드 ?tout=2 「순서가 이상해」).
      정적 판이 안 뜨면 그때 묻는다(hwOutBack). */
-  if (tchOnly && !pending && !hwOutQ()) gate(go, '과제 판은 구글 로그인 뒤에 열려요.', true); else go();
+  if (tchOnly && !pending && !hwOutQ() && !(hwBox && hwWarmOn && hwT === t && hwOut)) gate(go, '과제 판은 구글 로그인 뒤에 열려요.', true); else go();   // 미리 띄운 정적 판이 살아 있으면 그것을 쓴다(반박 🟡8)
 });
 /* ═══ 📝 정적 과제 판(2026-10-31 · Peter 「과제 판도 같은 방식으로」 · 정적 선생님 홈 onf-tout 과 같은 꼴) ═══
    과제 판 액자를 구글 doGet(1.7~2.2초) 대신 Pages /hwbook/(같은 템플릿 · Ownify tools/outside/hwbook-boot.js)로 먼저 연다 — 미리 띄우기(hwWarm)·열기(hwOpen) 둘 다 이 한 곳(hwSrc).
@@ -1098,8 +1117,7 @@ function hwOutBack(me, why) {
   /* 📱 입장권만으로 연 홈(tchOnly · 구글 창구 전)이면 구글 판은 쿠키가 없다 — 미리 띄운 판은 걷고(열 때 다시) · 보이는 판은 로그인 화면을 거쳐 바꾼다 · 「홈으로 돌아가기」 = 판 닫기 */
   if (tchOnly && !pending) {
     if (hwWarmOn) { hwClose(); return; }
-    var bx = hwBox; if (bx) bx.style.visibility = 'hidden';   // 판 층(z 50)이 로그인 화면을 덮지 않게 — 로그인 뒤 다시 보인다
-    gate(function () { if (bx && bx === hwBox) bx.style.visibility = ''; swap(); }, '과제 판은 구글 로그인 뒤에 열려요.', true, function () { hwBack(); });
+    gate(swap, '과제 판은 구글 로그인 뒤에 열려요.', true, function () { hwBack(); });   // 판 층은 gate 가 숨긴다(onf-gating)
     return;
   }
   swap();

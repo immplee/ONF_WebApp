@@ -640,7 +640,8 @@ t('W5b 입장권만으로 연 홈(tchOnly)의 정적 과제 판(기본) — 로�
   assert.ok(R.sentTo(APP).some((m) => m.onf === 'hwOpened'), '⛔ 홈에 hwOpened 를 안 알렸다');
   //   보이는 정적 판이 안 떴다 → 로그인 화면(판 층 숨김) · 돌아가기 = 판 닫기
   R.g.hwOutBack(R.g.hwOut, 'paint');
-  assert.ok(R.els.lock.hidden === false && R.els.gateBack.hidden === false && R.g.hwBox && R.g.hwBox.style.visibility === 'hidden', '⛔ 구글 판으로 물러날 때 로그인 화면을 안 거쳤다(쿠키 없는 액자) 또는 판 층이 로그인 화면을 덮는다');
+  assert.ok(R.els.lock.hidden === false && R.els.gateBack.hidden === false && R.g.hwBox && R.g.gateBackOn === true, '⛔ 구글 판으로 물러날 때 로그인 화면을 안 거쳤다(쿠키 없는 액자)');
+  assert.ok(/html\.onf-gating \.onf-hwbox, html\.onf-gating \.onf-hwbk, html\.onf-gating \.onf-hwdiv \{ visibility:hidden !important/.test(html) && /function gate\([^)]*\) \{[^\n]*\n  gateGo = go; gateBackOn = !!back;\n  gating\(true\);/.test(html), '⛔ 로그인 화면 동안 판 층(과제 판·옆 교재·손잡이)을 숨기지 않는다 — 판이 로그인 화면을 덮는다');
   R.els.gateBack.onclick();
   assert.ok(R.els.lock.hidden === true && !R.g.hwBox, '⛔ 「홈으로 돌아가기」가 물러난 과제 판을 안 닫았다');
   //   미리 띄운 정적 판이 안 떴다 → 조용히 걷는다(로그인 화면 없음)
@@ -649,6 +650,32 @@ t('W5b 입장권만으로 연 홈(tchOnly)의 정적 과제 판(기본) — 로�
   S.fromApp({ onf: 'hwbookWarm', t: 'tokB' }); assert.ok(S.g.hwWarmOn && S.g.hwOut);
   S.g.hwOutBack(S.g.hwOut, 'hello');
   assert.ok(!S.g.hwBox && S.els.lock.hidden !== false, '⛔ 미리 띄운 판이 물러나며 로그인 화면을 띄웠거나 쿠키 없는 구글 판을 남겼다');
+});
+
+t('W5c 입장권만으로 연 홈의 정적 과제 판 반박(2026-10-31) — 🟠1 옆 교재가 구글 액자면 로그인을 거친다(쿠키 없는 exec 금지 · 돌아가기 = 사진) · 🟡7 판을 닫으면 판이 띄운 로그인도 닫힌다 · 🟡8 미리 띄운 정적 판이 살아 있으면 입장권이 사라져도 로그인 안 묻고 그 판', () => {
+  const R = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD });
+  R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'homeDrawn' }); R.fromApp({ onf: 'auth-please', stale: false });
+  R.fromApp({ onf: 'hwbook', t: 'tokA', l: '' });
+  const bw = { name: 'hwwin', postMessage() {} }; R.g.hwFr.contentWindow = bw;
+  let execs = 0; R.g.ONF.frame.openExec = () => { execs++; return { stop() {} }; }; R.g.ONF.api = { EXEC: R.g.EXEC };   // 교재 주소 거름(teacherBookSrc)이 EXEC 를 쓴다 — teacher-shell 검사와 같은 대역
+  R.fire({ onf: 'auth-please' }, bw, R.g.hwOut.org);
+  R.fire({ onf: 'hwbookView', v: 'side', href: 'https://class.ownify.co.kr/?mode=share&t=tokA&fileId=FILEaaaaaaaa01&sheetName=E3' }, bw, R.g.hwOrigin);
+  assert.strictEqual(execs, 0, '⛔ 구글 창구 전에 옆 교재를 구글 exec 로 열었다(WebKit 쿠키 없음 · 「화면이 안 열렸어요」)');
+  assert.ok(R.els.lock.hidden === false && /교재/.test(R.els.why.textContent) && R.g.gateBackOn, '⛔ 옆 교재 — 로그인 화면(+돌아가기)을 안 띄웠다');
+  R.els.gateBack.onclick();
+  assert.ok(R.g.hwView === 'photo' && R.els.lock.hidden === true && R.g.hwBox, '⛔ 돌아가기 = 사진(판은 그대로)이 아니다');
+  //   🟡7 — 로그인 화면이 떠 있는 채 판을 닫으면 로그인도 닫힌다
+  R.fire({ onf: 'hwbookView', v: 'side', href: 'https://class.ownify.co.kr/?mode=share&t=tokA&fileId=FILEaaaaaaaa01&sheetName=E3' }, bw, R.g.hwOrigin);
+  assert.ok(R.els.lock.hidden === false);
+  R.g.hwClose();
+  assert.ok(R.els.lock.hidden === true && R.g.gateGo === null && R.els.app.hidden === false, '⛔ 판을 닫았는데 판이 띄운 로그인 화면이 남았다(홈이 가려진 채)');
+  //   🟡8 — 미리 띄운 정적 판이 살아 있으면 그것(입장권이 그새 사라져 hwOutQ 거짓이어도)
+  const S = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD });
+  S.fromApp({ onf: 'outHello' }); S.fromApp({ onf: 'homeDrawn' }); S.fromApp({ onf: 'auth-please', stale: false });
+  S.fromApp({ onf: 'hwbookWarm', t: 'tokB' }); const warm = S.g.hwBox; assert.ok(warm && S.g.hwWarmOn);
+  delete S.ls.onf_tch;
+  S.fromApp({ onf: 'hwbook', t: 'tokB', l: '' });
+  assert.ok(S.els.lock.hidden !== false && S.g.hwBox === warm && !S.g.hwWarmOn, '⛔ 미리 띄운 정적 판이 있는데 로그인부터 물었다');
 });
 
 t('P2 머리의 Worker 주소(W·FB) = onf-frame.js 상수(ONF_W_EDGE·ONF_W_FB) 쌍둥이 · ONF.frame.WORKER 와도 같다 · 머리 말고 본 스크립트엔 여전히 안 적는다', () => {
