@@ -615,6 +615,7 @@
     global.addEventListener('message', function (ev) {
       var d = ev && ev.data, s;
       if (!d || d.onf !== 'edge' || !isAppOrigin(ev.origin)) return;
+      if (!(_fromOurFrame(ev.source, frameEl) || books.some(function (b) { return b && _fromOurFrame(ev.source, b.el); }))) return;   // 우리 액자(홈·판) 안에서 온 것만(같은 출처 팝업이 뒤로를 못 누르게 · teacher/index.html edgeOurs 와 같은 뜻 · 2026-10-31 전수 검수)
       if (d.op === 'ask') { try { ev.source.postMessage({ onf: 'edge-on' }, ev.origin); } catch (e) {} return; }
       s = history.state;
       if (d.op === 'back' && s && (s.onfHist || s.onfBook)) history.back();

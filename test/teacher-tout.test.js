@@ -875,6 +875,45 @@ t('H4 시한 — outHello 4초 안 없음 = hello · outHello 뒤 노크 10초 �
   assert.ok(/mode=hwbook&t=tokHwA01&warm=1$/.test(wf.nav[0]), '⛔ 미리 띄운 판 물러남이 warm 을 잃었다: ' + wf.nav[0]);
 });
 
+t('H4b 미리 띄운 정적 판을 연(hwbookGo) 뒤 물러나면 — 구글 판은 warm 이 아니라 그 수업(l)으로 · 노크 답에 고른 사진(hw) · 옛 보기 띠·플레이어 비움 · 「불러오는 중」 다시(2026-10-31 전수 검수 C2·C3)', () => {
+  const W = boot({ onf_tch: tchCell(20), onf_hwout: '1', onf_tout: '0' }); login(W); hwHome(W);
+  W.fire({ onf: 'hwbookWarm', t: 'tokHwA01' }, W.home[0], W.home[1]);
+  const wf = { nav: [], sent: [], location: { replace(u) { wf.nav.push(String(u)); } }, postMessage(m, o) { wf.sent.push(JSON.parse(JSON.stringify(m))); } }; wf.parent = wf;
+  W.g.hwFr.contentWindow = wf;
+  W.fire({ onf: 'outHello' }, wf, APP); W.fire({ onf: 'auth-please' }, wf, APP);
+  W.fire({ onf: 'hwbook', t: 'tokHwA01', l: LSN, f: [{ id: 'F1abcdefghij', ymd: '2026-10-30' }] }, W.home[0], W.home[1]);
+  assert.ok(wf.sent.some((m) => m.onf === 'hwbookGo' && m.l === LSN), '정적 판에 열기');
+  W.g.hwBand = 112; W.g.hwCutTold = 590; W.g.hwRecR = [[1, 2, 3, 4, 0]];
+  W.fire({ onf: 'auth-please', stale: true }, wf, APP);   // 정적 판 입장권 거절 → 구글 판
+  assert.ok(wf.nav.length === 1 && /mode=hwbook&t=tokHwA01&l=/.test(wf.nav[0]) && !/warm=1/.test(wf.nav[0]), '⛔ 연 판이 warm=1 로 물러나 hwbookGo 를 영영 기다린다: ' + wf.nav[0]);
+  assert.deepStrictEqual([W.g.hwBand, W.g.hwCutTold, W.g.hwRecR], [0, -1, null], '⛔ 물러난 판에 옛 띠·자른 폭·플레이어 자리가 남았다');
+  const gsrc = { parent: wf, postMessage(m) { gsrc.sent.push(JSON.parse(JSON.stringify(m))); }, sent: [] };
+  W.fire({ onf: 'auth-please' }, gsrc, KORIGIN);
+  assert.deepStrictEqual(gsrc.sent[0] && gsrc.sent[0].hw && gsrc.sent[0].hw.f, [{ id: 'F1abcdefghij', ymd: '2026-10-30' }], '⛔ 물러난 구글 판에 고른 사진을 안 줬다');
+});
+t('H4c 미리 띄운 판이 걷혀도(10분) 홈에 hwClosed — 홈이 다시 띄운다(2026-10-31 전수 검수)', () => {
+  const W = boot({ onf_tch: tchCell(20), onf_hwout: '1', onf_tout: '0' }); login(W); hwHome(W);
+  W.fire({ onf: 'hwbookWarm', t: 'tokHwA01' }, W.home[0], W.home[1]);
+  W.sent.length = 0; W.g.hwClose();
+  const sent = W.sent.map((x) => x.m.onf);
+  assert.ok(sent.includes('hwClosed'), '⛔ 미리 띄운 판을 걷고 홈에 안 알렸다: ' + JSON.stringify(sent));
+});
+t('H4d 교재만 + 녹음 플레이어 — 판 상자 = 플레이어 묶음 크기(아이패드 손가락 굴리기가 clip-path 를 안 봐 교재를 먹던 것) · 판 액자는 화면 크기 그대로 거꾸로 밀어 자리 맞춤 · 사진만으로 돌아오면 원래대로(2026-10-31 전수 검수)', () => {
+  const R = hwOpenR({ onf_tch: tchCell(20), onf_hwout: '1' });
+  const g = R.g; g.innerWidth = 1180; g.innerHeight = 820; const W = 1180, H = 820;
+  g.hwView = 'book'; g.hwRecR = [[100, 600, 300, 80, 10], [120, 500, 200, 60, 8]]; g.hwLay();
+  const b = g.hwBox.style, f = g.hwFr.style;
+  assert.deepStrictEqual([b.left, b.top, b.right, b.bottom, b.overflow], ['100px', '500px', (W - 400) + 'px', (H - 680) + 'px', 'hidden'], '⛔ 판 상자가 화면 전체다(아이패드 교재 굴리기를 먹는다)');
+  assert.deepStrictEqual([f.left, f.top, f.width, f.height], ['-100px', '-500px', W + 'px', H + 'px'], '⛔ 판 액자 자리가 플레이어와 어긋난다');
+  assert.ok(/^path\("M ?20/.test(String(b.clipPath)) || /M\s*0\s*100|M20/.test(String(b.clipPath)) || String(b.clipPath).indexOf('path("') === 0, 'clip-path 는 상자 안 좌표');
+  g.hwView = 'photo'; g.hwRecR = null; g.hwLay();
+  assert.deepStrictEqual([b.left, b.top, b.bottom, b.overflow, f.left, f.top, f.width, f.height], ['0px', '0px', '0px', '', '0px', '0px', '100%', '100%'], '⛔ 사진만으로 돌아왔는데 판 상자가 작은 채');
+});
+t('H4e 죽은 토큰 노크 — One Tap 이 4초 안에 토큰을 못 주면 로그인 버튼 화면(gate) · 홈 교재 판은 과제 판 칸 뒤로에 안 숨는다(2026-10-31 전수 검수)', () => {
+  const H = require('fs').readFileSync(require('path').join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
+  assert.ok(/var hb0 = hwBox; setTimeout\(function \(\) \{ if \(hwWant && hwBox && hwBox === hb0 && !gateGo\) gate\(function \(\) \{ hwTell\(\); \}/.test(H), '⛔ One Tap 이 막히면(쿨다운) 과제 판이 20초 뒤 「로그인을 확인하지 못했어요」에 갇힌다');
+  assert.ok(/window\.addEventListener\('popstate', function \(\) \{ var s0 = histTop\(\); if \(s0 && s0\.onfHw\) return; bookPop\(s0\); \}\);/.test(H), '⛔ 과제 판 칸 뒤로가 홈 교재 판을 숨기고 복원 기억을 지운다');
+});
 t('H5 그리기 전 outFail(anon·bridge)·입장권 없음·거절(stale 같은 입장권) = 구글 판 + 기억(까닭별 · 다리·입장권 = 느림 · anon = 하루) · 물러난 뒤 다음 열기는 막힘이면 바로 구글', () => {
   const R = hwOpenR({ onf_tch: tchCell(20), onf_hwout: '1' });
   R.hw({ onf: 'outHello' }); R.hw({ onf: 'outFail', why: 'anon' });

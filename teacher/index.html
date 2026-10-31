@@ -724,6 +724,7 @@ function hwOpen(t, l, f, hwt, au) {
     try { hwFr.focus(); } catch (eF) {}
     hwHistPush();
     hwGoMsg = { onf: 'hwbookGo', l: l, hw: hwShape(files0, tk0, au) };
+    if (hwOut) { hwOut.go = hwGoMsg.hw; hwOut.q = 't=' + encodeURIComponent(t) + (l ? '&l=' + encodeURIComponent(l) : ''); }   // 정적 판이 물러나면 구글 판은 warm 이 아닌 「이 수업 열기」로(종전엔 warm=1 로 다시 떠 hwbookGo 를 영영 기다렸다 · 2026-10-31 전수 검수 C2)
     if (hwWin) { try { hwWin.postMessage(hwGoMsg, hwOrigin); } catch (e) {} hwGoMsg = null; }
     return;
   }
@@ -945,7 +946,13 @@ function hwLay() {
   hwBox.style.right = side && !band ? (W - cut) + 'px' : '0px';   // ⛔ 빈 값이면 inset:0 의 right 가 지워져 판 폭이 0 이 된다(사진만으로 돌아오면 「불러오는 중」만 보였다 · 2026-10-24 라이브)
   var rec = hwView === 'book' && hwRecR && hwRecR.length;   // 🎧 교재만이어도 녹음 플레이어는 그 자리에(Peter 2026-10-28) — 과제 판을 플레이어 모양으로만 오려 교재 위에
   hwBox.style.visibility = hwView === 'book' && !rec ? 'hidden' : ''; hwBox.style.pointerEvents = hwView === 'book' && !rec ? 'none' : '';
-  var clip = band ? hwRecPath([[0, 0, W, band, 0], [0, band, cut, Math.max(1, H - band), 0]].concat(hwRecR || [])) : rec ? hwRecPath(hwRecR) : '';
+  /* 📱 교재만 + 플레이어 = 판 상자를 플레이어 묶음 크기로 줄인다(판 액자는 화면 크기 그대로 · 거꾸로 밀어 자리를 맞춘다) — 아이패드는 손가락 굴리기 판정이 clip-path 를 안 봐
+     화면 전체 판 상자가 교재 굴리기를 먹었다(2026-10-31 전수 검수 · 옆에 한 줄은 위 over 가 따로 푼다). 상자 밖(overflow)은 누름 판정도 잘린다. */
+  var bb = rec && !band ? hwRecR.reduce(function (a, q) { return [Math.min(a[0], q[0]), Math.min(a[1], q[1]), Math.max(a[2], q[0] + q[2]), Math.max(a[3], q[1] + q[3])]; }, [Infinity, Infinity, 0, 0]) : null;
+  if (bb) { hwBox.style.left = bb[0] + 'px'; hwBox.style.top = bb[1] + 'px'; hwBox.style.right = Math.max(0, W - bb[2]) + 'px'; hwBox.style.bottom = Math.max(0, H - bb[3]) + 'px'; hwBox.style.overflow = 'hidden'; }
+  else { hwBox.style.left = hwBox.style.top = hwBox.style.bottom = '0px'; hwBox.style.overflow = ''; }
+  if (hwFr) { hwFr.style.left = bb ? -bb[0] + 'px' : '0px'; hwFr.style.top = bb ? -bb[1] + 'px' : '0px'; hwFr.style.width = bb ? W + 'px' : '100%'; hwFr.style.height = bb ? H + 'px' : '100%'; }
+  var clip = band ? hwRecPath([[0, 0, W, band, 0], [0, band, cut, Math.max(1, H - band), 0]].concat(hwRecR || [])) : rec ? hwRecPath(bb ? hwRecR.map(function (q) { return [q[0] - bb[0], q[1] - bb[1], q[2], q[3], q[4]]; }) : hwRecR) : '';
   /* 📖 옆에 한 줄이면 교재 칸이 **판 위** — 판 떠 있는 것(플레이어·창)이 교재 칸에 걸칠 때만 판이 위(Peter 2026-10-30 「확대·축소는 되는데 위아래좌우 스크롤이 안 돼」).
      아이패드(WebKit iOS)는 손가락 굴리기를 UI 쪽에서 판정하는데, 화면 전체 판 액자의 clip-path 를 그 판정이 안 본다 → 교재 굴리기를 위 판이 먹었다
      (핀치는 페이지 JS 라 clip-path 를 지켜 됐다 · 크롬은 굴리기도 됨 = 실측 0 → 301px). 교재 칸은 띠 아래 오른쪽만이라 띠·사진 칸을 안 가린다. */
@@ -998,7 +1005,7 @@ window.addEventListener('message', function (ev) {
   if (d.onf === 'bookClose') { hwViewSet('photo'); hwTellView(); }
 });
 function hwClose() {
-  if (hwBox && !hwWarmOn && appWin) { try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (e) {} }   // 홈이 카드 상태(완료 등)를 다시 받게
+  if (hwBox && appWin) { try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (e) {} }   // 홈이 카드 상태(완료 등)를 다시 받게 · 미리 띄운 판이 걷혀도(10분·물러남) — 홈이 HWWARM 을 풀고 다음에 다시 띄운다(2026-10-31 전수 검수)
   if (hwBk) { if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} } if (hwBk.box.parentNode) hwBk.box.parentNode.removeChild(hwBk.box); hwBk = null; }   // 과제 판을 닫으면 그 교재 액자도 지운다
   hwView = 'photo'; hwRecR = null; hwBand = 0; hwCutTold = -1; hwHistWait = false; hwHvWait = false;
   if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;   // ⛔ 위 줄 주석 끝에 붙으면 실행이 안 된다(2026-10-31 회귀 · 판을 닫아도 경계 손잡이가 홈 위에 남았다)
@@ -1048,6 +1055,8 @@ window.addEventListener('message', function (ev) {
         if (String(pending).indexOf('odk1.') === 0) { pending = ''; try { localStorage.removeItem(TOKKEY); } catch (e0) {} }
         hwWant = true;
         try { google.accounts.id.cancel(); google.accounts.id.prompt(); } catch (e3) {}
+        /* One Tap 은 닫으면 몇 시간 안 뜬다(쿨다운 · 위 gate 머리말) — 4초 안에 토큰이 안 오면 로그인 버튼 화면(gate)으로(종전엔 20초 뒤 판이 「로그인을 확인하지 못했어요」 · 2026-10-31 전수 검수) */
+        var hb0 = hwBox; setTimeout(function () { if (hwWant && hwBox && hwBox === hb0 && !gateGo) gate(function () { hwTell(); }, '로그인이 끝났어요 — 다시 로그인하면 과제 판이 이어서 열려요.', true, function () { hwBack(); }); }, 4000);
         return;
       }
       hwAuth();
@@ -1119,7 +1128,9 @@ function hwOutBack(me, why) {
   if (typeof reopenLog === 'function') reopenLog('hwout-' + why);
   try { ONF.frame.fallBack('hwbook', why); } catch (e) {}
   console.info('[onf] 정적 과제 판이 안 떴다 — 구글 판으로');
-  if (hwView !== 'photo' && !hwWarmOn) { hwViewSet('photo'); }   // 구글 판은 사진으로 새로 뜬다 — 옛 보기(옆 교재·교재만)를 남기면 판과 껍데기 보기가 어긋난다(2026-10-31 다른 세션 지적)
+  hwCutTold = -1; hwRecR = null; hwBand = 0;   // 새 판은 띠·플레이어·자른 폭을 모른다 — 다시 알린다(옛 값이면 같은 폭이라 hwbookCut 을 안 보냈다 · 2026-10-31 전수 검수 C3)
+  if (hwView !== 'photo' && !hwWarmOn) { hwViewSet('photo'); } else hwLay();
+  var wt0 = hwBox && hwBox.querySelector('.onf-wait'), xb0 = hwBox && hwBox.querySelector('.onf-hwx'); if (wt0 && xb0 && !hwWarmOn) { wt0.hidden = false; hwLateX(xb0, wt0); }   // 「불러오는 중」·늦은 ✕ 다시(앞 판 노크로 숨겼다 — 구글 판도 못 뜨면 갇혔다)   // 구글 판은 사진으로 새로 뜬다 — 옛 보기(옆 교재·교재만)를 남기면 판과 껍데기 보기가 어긋난다(2026-10-31 다른 세션 지적)
   var u = EXEC + '?mode=hwbook&' + me.q, fr = hwFr;
   var swap = function () { if (fr && fr === hwFr) { try { fr.contentWindow.location.replace(u); } catch (e) { fr.src = u; } } };   // 📱 replace — 뒤로 칸을 안 쌓는다(정적 선생님 홈 tOutOpen 과 같다)
   /* 📱 입장권만으로 연 홈(tchOnly · 구글 창구 전)이면 구글 판은 쿠키가 없다 — 미리 띄운 판은 걷고(열 때 다시) · 보이는 판은 로그인 화면을 거쳐 바꾼다 · 「홈으로 돌아가기」 = 판 닫기 */
@@ -1139,10 +1150,12 @@ function hwOutBack(me, why) {
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data, o = String(ev && ev.origin), s;
   if (!d || d.onf !== 'edge' || !(/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(o) || o === 'https://app.ownify.co.kr' || o === 'https://onf-app.pages.dev')) return;
+  if (!edgeOurs(ev.source)) return;   // 우리 액자 안에서 온 것만(같은 출처의 딴 창 · 팝업이 뒤로를 못 누르게 · 2026-10-31 전수 검수)
   if (d.op === 'ask') { try { ev.source.postMessage({ onf: 'edge-on' }, o); } catch (e) {} return; }
   s = histTop();
   if (d.op === 'back' && s && (s.onfHist || s.onfBook || s.onfHw)) { if (s.onfHw) history.back(); else histGo(1, true); }   // 👆 줄에 남은 칸이면 줄에서
 });
+function edgeOurs(w) { for (var i = 0; i < 8 && w; i++) { try { if (w.parent === window) return true; w = w.parent !== w ? w.parent : null; } catch (e) { return false; } } return false; }
 /* onf-edge:end */
 
 /* ═══ 📖 선생님 홈 옆 판(2026-10-12 Peter 「선생님 홈에서 교재를 열면 왜 새 창으로? 학생 홈처럼 창으로 열리고 전체 화면으로」) ═══
@@ -1702,7 +1715,7 @@ window.addEventListener('message', function (ev) {
   }
 });
 window.addEventListener('keydown', function (e) { if (e.key === 'Escape') bookClose(false); });   // 보이는 판만(숨긴 판은 Esc 를 안 먹는다)
-window.addEventListener('popstate', function () { bookPop(histTop()); });   // 📱 홈 칸 깊이·홈 알림은 onf-hist 블록(판 칸이 맨 위면 홈은 안 바뀌었다)
+window.addEventListener('popstate', function () { var s0 = histTop(); if (s0 && s0.onfHw) return; bookPop(s0); });   // 과제 판 칸(보기·물음)이 오가는 뒤로는 홈 교재 판과 무관 — 종전엔 홈 교재 판을 숨기고 새로고침 복원 기억을 지웠다(2026-10-31 전수 검수)   // 📱 홈 칸 깊이·홈 알림은 onf-hist 블록(판 칸이 맨 위면 홈은 안 바뀌었다)
 /* 📱 폰 ↔ PC(폭이 바뀜) — 모양(<html class="onf-ph">)·자리 수를 맞추고, 폰이 되면 보이는 판에 판 칸(뒤로 = 숨김) · 폰→PC 면 남은 판 칸은 ✕ 가 걷는다. 옛 사파리는 addListener 뿐. */
 function bookMode() {
   try { document.documentElement.classList.toggle('onf-ph', phone()); } catch (e) {}
