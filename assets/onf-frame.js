@@ -272,9 +272,9 @@
        hard  = 그 밖(판이 스스로 못 그린다고 말함 · 스위치 off …) → 하루(종전 그대로) · 연속은 +1
      · 물러날 때마다 clog 한 줄 {k:'err', c:'fallback:<판>:<까닭>:<연속 n>', d:기기 꼴} — 값(토큰·주소) 없음 · sendBeacon 만.
      ⚠️ 선생님 껍데기 머리 tPre 는 이 파일이 뜨기 전이라 칸 앞 숫자만 직접 읽는다(같은 꼴 · 검사 teacher-tout P1). 저장소가 막힌 창 = 막힘(열 때마다 시한을 안 낸다 · 종전 그대로). */
-  var FALL_KEY = { book: 'onfOutFail', home: 'onfOutFailHome', thome: 'onfTOutFail' };
+  var FALL_KEY = { book: 'onfOutFail', home: 'onfOutFailHome', thome: 'onfTOutFail', hwbook: 'onfHwOutFail' };   // 📝 hwbook = 정적 과제 판(2026-10-31 · teacher/index.html onf-hwout)
   var FALL_STEP = [0, 600000, 3600000, 86400000], FALL_DAY = 86400000, FALL_API = 3600000;
-  var FALL_SLOW_PAN = { thome: ['fail-none', 'fail-stale'] };   // 🏫 선생님 홈 사본 없음·낡음 = 5분 틱이 곧 고쳐 놓는 상태 → 느림 갈래(2026-10-31 · 사본은 3시간·날짜마다 다시 짓는다 #155)
+  var FALL_SLOW_PAN = { thome: ['fail-none', 'fail-stale'], hwbook: ['fail-bridge', 'notch', 'stale'] };   // 📝 과제 판 다리가 늦음(구글 바닥)·입장권 없음/거절 = 곧 풀리는 것 → 느림 갈래   // 🏫 선생님 홈 사본 없음·낡음 = 5분 틱이 곧 고쳐 놓는 상태 → 느림 갈래(2026-10-31 · 사본은 3시간·날짜마다 다시 짓는다 #155)
   var FALL_SLOW = ['hello', 'paint', 'fail-time', 'fail-net'], FALL_SKIP = ['fail-mismatch', 'late-notice', 'late-stale', 'nodata'];
   function fallGet(k) { var v = String(global.localStorage.getItem(k) || '').split(','); return { at: Number(v[0]) || 0, n: Number(v[1]) || 0 }; }
   function fallBlocked(pan) { try { return Date.now() < fallGet(FALL_KEY[pan]).at; } catch (e) { return true; } }
