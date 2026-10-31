@@ -600,8 +600,8 @@ t('W4 입장권만으로 연 정적 홈(tchOnly)이 그리기 전에 물러나�
   assert.ok(Q.execOpen() && Q.els.lock.hidden === true, '⛔ 구글 토큰이 있는데 로그인 화면을 또 보였다');
 });
 
-t('W5 입장권만으로 연 홈(tchOnly)의 과제 판 — 미리 띄우기(hwbookWarm)는 안 하고 · 열기(hwbook)는 로그인 화면(+「홈으로 돌아가기」) → 누르면 과제 판 + hwOpened · 돌아가기 = 정적 홈 그대로 · 로그인 뒤엔 바로', async () => {
-  const R = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD });
+t('W5 입장권만으로 연 홈(tchOnly)의 구글 과제 판(정적 판 끔 ?hwout=0) — 미리 띄우기(hwbookWarm)는 안 하고 · 열기(hwbook)는 로그인 화면(+「홈으로 돌아가기」) → 누르면 과제 판 + hwOpened · 돌아가기 = 정적 홈 그대로 · 로그인 뒤엔 바로', async () => {
+  const R = boot({ onf_tch: tchCell(20), onf_tout: '2', onf_hwout: '0' }, { nav: IPAD });
   R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'homeDrawn' }); R.fromApp({ onf: 'auth-please', stale: false }); R.sent.length = 0;
   R.fromApp({ onf: 'hwbookWarm', t: 'tokA' });
   assert.ok(!R.g.hwBox, '⛔ 구글 창구 전에 과제 판(구글 exec)을 미리 띄웠다 — 쿠키 없는 액자');
@@ -614,7 +614,7 @@ t('W5 입장권만으로 연 홈(tchOnly)의 과제 판 — 미리 띄우기(hwb
   login(R); await tick();
   assert.ok(!R.g.hwBox, '⛔ 그만둔 과제 판이 로그인 뒤 열렸다');
   //   다시 누르고 로그인 = 과제 판
-  const S = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD });
+  const S = boot({ onf_tch: tchCell(20), onf_tout: '2', onf_hwout: '0' }, { nav: IPAD });
   S.fromApp({ onf: 'outHello' }); S.fromApp({ onf: 'homeDrawn' }); S.fromApp({ onf: 'auth-please', stale: false }); S.sent.length = 0;
   S.fromApp({ onf: 'hwbook', t: 'tokA', l: '' });
   assert.ok(!S.g.hwBox && S.sentTo(APP).every((m) => m.onf !== 'hwOpened'));
@@ -623,10 +623,32 @@ t('W5 입장권만으로 연 홈(tchOnly)의 과제 판 — 미리 띄우기(hwb
   assert.ok(S.sentTo(APP).some((m) => m.onf === 'hwOpened'), '⛔ 홈에 hwOpened 를 안 알렸다(모아 보기 창이 남는다)');
   //   로그인 뒤엔 문 없이 바로 · 미리 띄우기도
   S.fromApp({ onf: 'hwbookBack' });
-  const T = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD }); login(T); await tick();
+  const T = boot({ onf_tch: tchCell(20), onf_tout: '2', onf_hwout: '0' }, { nav: IPAD }); login(T); await tick();
   T.fromApp({ onf: 'outHello' }); T.fromApp({ onf: 'homeDrawn' }); T.fromApp({ onf: 'auth-please', stale: false });
   T.fromApp({ onf: 'hwbookWarm', t: 'tokB' });
   assert.ok(T.g.hwBox && T.g.hwWarmOn, '⛔ 로그인 뒤 미리 띄우기가 안 됐다');
+});
+
+t('W5b 입장권만으로 연 홈(tchOnly)의 정적 과제 판(기본) — 로그인 화면 없이 바로 연다 · 미리 띄우기도 한다(Peter 2026-10-31 「구글 확인 없이 열리는데 이어 쓰기에서 계정 확인 — 순서가 이상해」 · 「Luna 이어 쓰기 로딩 오래」) · 정적 판이 안 뜨면 그때 로그인(판 층 숨김 · 돌아가기 = 판 닫기) · 미리 띄운 판이 안 뜨면 조용히 걷는다', async () => {
+  const R = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD });
+  R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'homeDrawn' }); R.fromApp({ onf: 'auth-please', stale: false }); R.sent.length = 0;
+  R.fromApp({ onf: 'hwbookWarm', t: 'tokA' });
+  assert.ok(R.g.hwBox && R.g.hwWarmOn && R.g.hwOut, '⛔ 정적 과제 판인데 미리 띄우지 않았다');
+  assert.ok(R.els.lock.hidden !== false, '⛔ 미리 띄우기가 로그인 화면을 띄웠다');
+  R.fromApp({ onf: 'hwbook', t: 'tokA', l: '' });
+  assert.ok(R.g.hwBox && !R.g.hwWarmOn && R.els.lock.hidden !== false && R.g.gateGo == null, '⛔ 정적 과제 판인데 로그인 화면을 거쳤다');
+  assert.ok(R.sentTo(APP).some((m) => m.onf === 'hwOpened'), '⛔ 홈에 hwOpened 를 안 알렸다');
+  //   보이는 정적 판이 안 떴다 → 로그인 화면(판 층 숨김) · 돌아가기 = 판 닫기
+  R.g.hwOutBack(R.g.hwOut, 'paint');
+  assert.ok(R.els.lock.hidden === false && R.els.gateBack.hidden === false && R.g.hwBox && R.g.hwBox.style.visibility === 'hidden', '⛔ 구글 판으로 물러날 때 로그인 화면을 안 거쳤다(쿠키 없는 액자) 또는 판 층이 로그인 화면을 덮는다');
+  R.els.gateBack.onclick();
+  assert.ok(R.els.lock.hidden === true && !R.g.hwBox, '⛔ 「홈으로 돌아가기」가 물러난 과제 판을 안 닫았다');
+  //   미리 띄운 정적 판이 안 떴다 → 조용히 걷는다(로그인 화면 없음)
+  const S = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD });
+  S.fromApp({ onf: 'outHello' }); S.fromApp({ onf: 'homeDrawn' }); S.fromApp({ onf: 'auth-please', stale: false });
+  S.fromApp({ onf: 'hwbookWarm', t: 'tokB' }); assert.ok(S.g.hwWarmOn && S.g.hwOut);
+  S.g.hwOutBack(S.g.hwOut, 'hello');
+  assert.ok(!S.g.hwBox && S.els.lock.hidden !== false, '⛔ 미리 띄운 판이 물러나며 로그인 화면을 띄웠거나 쿠키 없는 구글 판을 남겼다');
 });
 
 t('P2 머리의 Worker 주소(W·FB) = onf-frame.js 상수(ONF_W_EDGE·ONF_W_FB) 쌍둥이 · ONF.frame.WORKER 와도 같다 · 머리 말고 본 스크립트엔 여전히 안 적는다', () => {

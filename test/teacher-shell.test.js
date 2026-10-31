@@ -622,6 +622,25 @@ t('📱 과제 판 뒤로 한 칸씩(Peter 2026-10-25 ③) — 교재만/옆에 
   R2.postAs({ onf: 'hwbookView', v: 'photo' }, in2);
   assert.strictEqual(R2.calls.filter((c) => c === 'back').length, n0 + 1, '⛔ 사진만으로 돌아가면서 보기 칸을 안 걷었다(뒤로가 한 번 헛돈다)');
 });
+t('👆 손짓 밖이면 과제 판 뒤로 칸을 미룬다(Peter 2026-10-31 아이패드 「뒤로 = 홈페이지가 통째로 닫혀 크롬 첫 화면」 · WebKit 은 손짓 없이 쌓은 칸 + 앞 칸 하나를 건너뛴다) — isActive 거짓이면 안 쌓고 · 판 hwTap(손 뗌) 때 쌓는다 · 그때도 손짓 밖이면 또 기다린다 · 손짓 안이면 종전대로 바로 · userActivation 없는 브라우저도 바로 · 기다리는 채 뒤로 = 판 닫기 + 홈도 한 칸', () => {
+  const mk = (ua) => { const R = boot({ onf_id_tok: odk() }), homeGot = []; if (ua !== undefined) R.g.navigator = Object.assign({}, R.g.navigator, { userActivation: ua }); const me = { parent: R.els.app.contentWindow, postMessage: (m) => homeGot.push(m) }; R.knockAs(me); R.postAs({ onf: 'hwbook', t: 'Tok_1' }, me);
+    const fr = R.created.filter((e) => e.tag === 'iframe')[0], inner = { parent: { parent: fr.contentWindow }, postMessage() {} }; R.postAs({ onf: 'auth-please' }, inner); return { R, inner, homeGot }; };
+  const ua = { isActive: false }, { R, inner } = mk(ua), st = () => JSON.parse(JSON.stringify(R.g.history.state));
+  assert.ok(!(R.g.history.state && R.g.history.state.onfHw) && R.g.hwHistWait === true, '⛔ 손짓 밖인데 칸을 쌓았다(뒤로에서 건너뛰어져 사이트 밖으로 나간다)');
+  R.postAs({ onf: 'hwTap' }, inner);
+  assert.ok(!(R.g.history.state && R.g.history.state.onfHw), '⛔ hwTap 이 왔지만 아직 손짓 밖인데 쌓았다');
+  ua.isActive = true; R.postAs({ onf: 'hwTap' }, inner);
+  assert.deepStrictEqual(st(), { onfHw: 1, n: 0, lg: 1 }, '⛔ 판을 만진 손짓 안에서 칸을 안 쌓았다');
+  assert.strictEqual(R.g.hwHistWait, false);
+  const n1 = R.calls.filter((c) => /push/.test(c)).length; R.postAs({ onf: 'hwTap' }, inner);
+  assert.strictEqual(R.calls.filter((c) => /push/.test(c)).length, n1, '⛔ 이미 쌓았는데 hwTap 마다 또 쌓았다');
+  //   손짓 안 = 바로 · userActivation 없음 = 바로
+  [{ isActive: true }, null].forEach((u) => { const { R: Q } = mk(u === null ? undefined : u); assert.ok(Q.g.history.state && Q.g.history.state.onfHw && Q.g.hwHistWait === false, '⛔ 손짓 안(또는 옛 브라우저)인데 칸을 미뤘다 ' + JSON.stringify(u)); });
+  //   기다리는 채 뒤로 = 판 닫기 · 홈에 뒤로를 넘긴다(hwSkip 거짓)
+  const { R: W, homeGot: wg } = mk({ isActive: false }); W.g.history.state = null; W.pop();
+  assert.ok(W.created.find((e) => e.className === 'onf-hwbox').removed && W.g.hwHistWait === false, '⛔ 미룬 채 뒤로 — 판이 안 닫혔다');
+  assert.ok(wg.some((m) => m.onf === 'hist-pop'), '⛔ 미룬 채 뒤로는 홈 칸을 뺐는데 홈에 「뒤로」 를 안 넘겼다(홈 칸 수가 어긋난다)');
+});
 t('📱 왼쪽 끝 쓸기 = 앱 뒤로(Peter 2026-10-25 ④⑦ · onf-edge) — 안쪽 노크(ask)에 edge-on · back 은 맨 위가 우리 칸일 때만 코드로 뒤로 · 바닥·남의 출처는 아무것도 안 함', () => {
   const R = boot({ onf_id_tok: odk() }), got = [], src = { postMessage: (m, o) => got.push([m, o]) };
   R.postAs({ onf: 'edge', op: 'ask' }, src);
