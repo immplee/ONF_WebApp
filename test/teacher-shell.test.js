@@ -520,6 +520,10 @@ t('📝 과제 미리 띄우기 — hwbookWarm = 안 보이는 액자(&warm=1 ·
   R.postAs({ onf: 'hwbookWarm', t: 'Tok_1' }, me); assert.equal(frames().length, 1, '같은 학생이면 다시 안 띄운다');
   R.g.history.state = null; R.pop(); assert.ok(!box.removed, '⛔ 안 보이는 미리 띄운 판을 뒤로가 닫았다');
   const got = [], inner = { parent: { parent: frames()[0].contentWindow }, postMessage: (m) => got.push(m) };
+  // ⛔ 미리 띄운 판이 자리 알림(hwRec·hwBand)을 보내도 드러나면 안 된다 — 드러나면 「불러오는 중」이 화면을 덮고, 뒤로 칸이 없어 뒤로 가기가 사이트 밖으로 나갔다(Peter 2026-10-31)
+  const vis0 = box.style.visibility, pe0 = box.style.pointerEvents;
+  R.postAs({ onf: 'hwRec', rs: [] }, inner); R.postAs({ onf: 'hwBand', h: 112 }, inner);
+  assert.deepStrictEqual([box.style.visibility, box.style.pointerEvents], [vis0, pe0], '⛔ 미리 띄운 판이 자리 알림에 드러났다(hwLay)');
   R.postAs({ onf: 'auth-please' }, inner);   // 미리 띄운 판이 먼저 노크(토큰만)
   assert.equal(got.length, 1); assert.equal(got[0].hw, undefined);
   R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L, f: [{ id: 'PHOTOaaaaaaaa1', ymd: '2026-10-20' }], hwt: HWT }, me);

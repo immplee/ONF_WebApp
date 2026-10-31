@@ -877,7 +877,7 @@ function hwDivider() {
 var hwBand = 0, hwCutTold = -1;
 function hwCutTell(w) { if (w === hwCutTold || !hwWin) return; hwCutTold = w; try { hwWin.postMessage({ onf: 'hwbookCut', w: w }, hwOrigin); } catch (e) {} }
 function hwLay() {
-  if (!hwBox) return;
+  if (!hwBox || hwWarmOn) return;   // ⛔ 미리 띄운 판(안 보임 · 뒤로 칸 없음)은 건드리지 않는다 — 판이 보낸 자리 알림(hwRec)에 드러나 「불러오는 중」이 화면을 덮고 뒤로가 사이트 밖으로 나갔다(Peter 2026-10-31) · 열 때 hwOpen 이 보인다
   var W = window.innerWidth || 0, H = window.innerHeight || 0, cut = Math.round(W * hwSplit), side = hwView === 'side', band = side && hwBand > 0 ? hwBand : 0;
   hwCutTell(side ? cut : 0);
   hwBox.style.right = side && !band ? (W - cut) + 'px' : '0px';   // ⛔ 빈 값이면 inset:0 의 right 가 지워져 판 폭이 0 이 된다(사진만으로 돌아오면 「불러오는 중」만 보였다 · 2026-10-24 라이브)
