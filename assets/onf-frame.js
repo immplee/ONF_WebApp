@@ -318,6 +318,18 @@
     try { if (el.isConnected && el.contentWindow) el.contentWindow.location.replace(url); else el.src = url; } catch (e) { el.src = url; }   // 📱 replace — openExec 끝 주석(WebKit 기록 칸)
     return { stop: end, stuck: function () { return false; } };
   }
+  /** 🌤 교재 판을 정적 판으로 여는 한 함수(2026-10-31 넓히기 · 학생 bookMake · 선생님 bookMake · 선생님 「교재 옆에」 hwBookFrame 이 같이 부른다).
+      ⭐ 내 문장 주소(mode=mine)는 /mine/ · 그 밖은 /book/ · 이 기기 정적 판 저장소에 쓰기가 남을 수 있다는 표시(onfOutUsed · 넘겨주기 14일) ·
+      안 뜨면(OUT_MS 안 hello 없음 · outFail) 물러남 기억(fallBack 'book' · 까닭별) 뒤 onBack(why) — 부른 쪽이 같은 액자에 지금 길을 연다.
+      u = 액자가 열 주소(숨긴 판이면 park=1 까지) · 답 = openApp 과 같은 {stop, stuck}. */
+  function outOpen(el, u, cf, tok, onBack) {
+    try { global.localStorage.setItem('onfOutUsed', String(Date.now())); } catch (eU) {}
+    return openApp(el, /[?&]mode=mine(&|$)/.test(u) ? OUT_MINE_URL : ONF_OUT_BOOK, u, cf, function (why) {
+      try { console.info('[onf] 정적 판이 안 떴다 — 지금 길로 다시'); } catch (eC) {}
+      fallBack('book', why);
+      onBack(why);
+    }, tok);
+  }
   /* 🌤 밖으로 2(2026-10-24) — 링크 직행 교재(fileId·slug)를 Worker 에 묻는다: q = {f, s?} | {slug} (없는 칸은 안 싣는다 — 빈 글자는 400 bad).
      POST · text/plain 몸통(사전 요청 없음) · 토큰은 몸통에만. WHO_MS 안 답이 없거나 실패·ok:false·api≠2(약속 어긋남) 면 null(지금 길) — 늦은 답은 이미 정해진 Promise 라 버려진다.
      ponytail: 800ms = 짐작 시한 — 실측으로 고친다. */
@@ -861,16 +873,14 @@
       if (out && outOk(src)) {
         p.out = true;
         flushStop();   // 🧺 한 출처에 정적 판 둘 금지(위 넘겨주기) — 넘겨주던 판의 못 보낸 것은 기기에 남고 이 판이 다시 열 때 보낸다
-        try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}   // 🧺 아래 bookFlush — 이 기기 정적 판 저장소에 쓰기가 남을 수 있다
-        p.oe = openApp(p.el, bookMine(src) ? OUT_MINE_URL : ONF_OUT_BOOK, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, bookCfOk(cf) || bookCfFor(src, null), function (why) {   // 📖 홈이 힌트를 안 실은 판(미리 띄우기 preEarly · 옛 홈)도 /who 로 — 링크 직행과 같은 손
-          console.info('[onf] 정적 판이 안 떴다 — 지금 길로 다시');
-          fallBack('book', why);   // 🔁 위 물러남 기억(까닭별)
+        //   🧺 아래 bookFlush — onfOutUsed(이 기기 정적 판 저장소에 쓰기가 남을 수 있다) · /mine/·/book/ 고르기 · 물러남 기억은 위 outOpen 한 곳(선생님 껍데기와 같은 함수)
+        p.oe = outOpen(p.el, parked ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src, bookCfOk(cf) || bookCfFor(src, null), opts.tok, function () {   // 📖 홈이 힌트를 안 실은 판(미리 띄우기 preEarly · 옛 홈)도 /who 로 — 링크 직행과 같은 손
           /* 검토 고침 3 — hello·노크 뒤 outFail 이면 판 창·출처·views·swap·기록 다리·키보드 창이 정적 판을 가리킨다 → 새 판처럼 비운다(죽은 창을 판으로 쳐 갈아 끼우기가 14초 기다렸다).
              기다리던 갈아 끼우기(sw)는 지금 길 노크(bookHi)가 종전대로 끝낸다. */
           p.win = null; p.origin = ''; p.views = []; p.swap = false; p.hw = null; p.ho = ''; p.kb = null;
           p.real = p.src = p.load; p.key = bookKey(p.load);
           exec();
-        }, opts.tok);
+        });
       } else exec();
       books.push(p);
       return p;
@@ -1365,6 +1375,7 @@
     tokenFromPath: tokenFromPath,
     openExec: openExec,   // 🔐 선생님 껍데기 판도 쓴다(teacher/index.html bookMake)
     openApp: openApp, OUT_BOOK: ONF_OUT_BOOK,   // 🌤 선생님 껍데기 정적 판도 같은 손·같은 주소(밖으로 4-① 2026-10-28 · teacher/index.html bookMake)
+    outOpen: outOpen,   // 🌤 교재 판을 정적 판으로 여는 한 함수(학생·선생님 bookMake · 선생님 「교재 옆에」 · 2026-10-31 넓히기)
     fallBack: fallBack, fallBlocked: fallBlocked, fallOk: fallOk,   // 🔁 물러남 기억 한 곳(위 FALL_KEY) — 선생님 껍데기 정적 홈·정적 교재도 이 셋만
     get WORKER() { return wBase(); },   // 🏫 Worker 바탕 주소(밖으로 4-④-2c 2026-10-30 · 선생님 껍데기 /t/login·/clog) — 위 wBase() 한 곳에서(서울 길 · 물러나면 workers.dev)
     printTitle: printTitle,   // 📄 선생님 껍데기(teacher/index.html) 판도 같은 함수

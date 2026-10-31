@@ -1534,7 +1534,11 @@ ta('FB3 한 함수 — 물러남 칸(onfOutFail·onfOutFailHome·onfTOutFail)을
   assert.deepStrictEqual(bad, [], '⛔ 물러남 칸을 공용 함수 밖에서 만진다');
   const bare = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert.ok(!/OUT_FAIL_MS|coldMissKill|OUT_COLD_MISS|86400000\)/.test(bare(CODE) + bare(T)), '⛔ 옛 하루 규칙(OUT_FAIL_MS·coldMissKill)이 남았다');
-  assert.ok(/ONF\.frame\.fallBack\('thome'/.test(T) && /ONF\.frame\.fallBack\('book'/.test(T) && /ONF\.frame\.fallOk\('thome'\)/.test(T) && /ONF\.frame\.fallBlocked\('thome'\)/.test(T) && /ONF\.frame\.fallBlocked\('book'\)/.test(T), '⛔ 선생님 껍데기가 공용 함수를 안 쓴다');
+  assert.ok(/ONF\.frame\.fallBack\('thome'/.test(T) && /ONF\.frame\.outOpen\(/.test(T) && /ONF\.frame\.fallOk\('thome'\)/.test(T) && /ONF\.frame\.fallBlocked\('thome'\)/.test(T) && /ONF\.frame\.fallBlocked\('book'\)/.test(T), '⛔ 선생님 껍데기가 공용 함수를 안 쓴다');
+  //   🌤 정적 교재 판 열기 = 한 함수 outOpen(2026-10-31 넓히기) — 물러남 기억 'book' 은 그 안 한 곳 · 껍데기 둘은 openApp 으로 교재 판을 직접 열지 않는다(넘겨주기 판만)
+  const oo = bare(CODE).slice(bare(CODE).indexOf('function outOpen('));
+  assert.ok(/fallBack\('book', why\)/.test(oo.slice(0, oo.indexOf('\n  }\n'))), '⛔ outOpen 이 물러남 기억을 안 적는다');
+  assert.ok(!/fallBack\('book'/.test(bare(T)), '⛔ 선생님 껍데기가 교재 물러남을 따로 적는다(outOpen 밖)');
 });
 
 (async () => {
