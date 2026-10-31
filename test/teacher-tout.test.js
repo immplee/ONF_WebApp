@@ -662,6 +662,14 @@ t('W5c 입장권만으로 연 홈의 정적 과제 판(2026-10-31 전수 검수)
   R.fire({ onf: 'hwbookView', v: 'side', href: 'https://class.ownify.co.kr/?mode=share&t=tokA&fileId=FILEaaaaaaaa01&sheetName=E3' }, bw, R.g.hwOrigin);
   assert.ok(R.els.lock.hidden !== false && R.g.gateGo == null, '⛔ 옆 교재에 로그인을 물었다 — 교재 exec 는 익명 배포라 쿠키가 필요 없다');
   assert.strictEqual(execs, 1, '⛔ 옆 교재를 안 열었다');
+  //   정적 판이 구글 판으로 물러나면 보기를 사진으로(구글 판은 사진으로 새로 뜬다 — 옛 옆 교재가 남으면 판과 어긋난다 · 다른 세션 지적)
+  { const Q = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD }); Q.fromApp({ onf: 'outHello' }); Q.fromApp({ onf: 'homeDrawn' }); Q.fromApp({ onf: 'auth-please', stale: false });
+    Q.fromApp({ onf: 'hwbook', t: 'tokQ', l: '' }); const qw = { postMessage() {} }; Q.g.hwFr.contentWindow = qw; Q.g.ONF.frame.openExec = () => ({ stop() {} }); Q.g.ONF.api = { EXEC: Q.g.EXEC };
+    Q.fire({ onf: 'auth-please' }, qw, Q.g.hwOut.org);
+    Q.fire({ onf: 'hwbookView', v: 'side', href: 'https://class.ownify.co.kr/?mode=share&t=tokQ&fileId=FILEaaaaaaaa01&sheetName=E3' }, qw, Q.g.hwOrigin);
+    assert.strictEqual(Q.g.hwView, 'side');
+    Q.g.hwOutBack(Q.g.hwOut, 'stale');
+    assert.strictEqual(Q.g.hwView, 'photo', '⛔ 구글 판으로 물러났는데 옛 보기(옆 교재)가 남았다'); }
   const div = R.g.hwDiv; assert.ok(div && div.parentNode, '손잡이가 있어야 한다(옆에)'); let gone = false; div.parentNode.removeChild = () => { gone = true; };
   R.g.hwClose();
   assert.ok(gone && R.g.hwDiv === null, '⛔ 판을 닫았는데 경계 손잡이가 홈 위에 남았다(누름을 먹는 회색 막대)');

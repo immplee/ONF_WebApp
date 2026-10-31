@@ -321,7 +321,7 @@ t('⛔ 선생님 껍데기(teacher/index.html onf-hist 블록)에 op:hi 를 보�
   const c = { window: { addEventListener(tp, f) { L[tp].push(f); } }, history: H, appWin, appOrigin: ORIGIN };
   //   📱 onf-hist 블록은 onf-book 블록의 판 칸 도우미(histTop·bookOwner·histRun)를 부른다 — 진짜 줄을 떼어 같이 돌린다(teacher-hist.test.js 와 같은 길)
   const BK = tsrc.slice(tsrc.indexOf('/* onf-book:begin */'), tsrc.indexOf('/* onf-book:end */'));
-  const help = ['histTop', 'bookOwner', 'histRun'].map((n) => (new RegExp('^function ' + n + '\\(.*$', 'm').exec(BK) || [''])[0]).join('\n');
+  const help = ['^var histQ = .*$'].concat(['histTop', 'bookOwner', 'histRun', 'histPush', 'histFlush', 'histGo', 'histVirtPop', 'histTap'].map((n) => '^function ' + n + '\\(.*$')).map((re) => (new RegExp(re, 'm').exec(BK) || [''])[0]).join('\n');   // 👆 기록 칸 줄(histQ · 2026-10-31)도
   vm.createContext(c); vm.runInContext(help + '\n' + tsrc.slice(A, B), c);
   const msg = (d) => L.message.forEach((f) => f({ data: d, source: appWin, origin: ORIGIN }));
   msg({ onf: 'hist', op: 'hi' });

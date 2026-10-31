@@ -13,7 +13,7 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'teacher', 'index.html'),
 const A = src.indexOf('/* onf-hist:begin */'), B = src.indexOf('/* onf-hist:end */');
 /* 📱 이 블록은 onf-book 블록의 판 칸 도우미 셋(histTop·bookOwner·histRun — 2026-10-14 폰 판)을 부른다 — 그 진짜 줄(한 줄짜리)을 떼어 같이 돌린다. */
 const BK = src.slice(src.indexOf('/* onf-book:begin */'), src.indexOf('/* onf-book:end */'));
-const HELP = ['histTop', 'bookOwner', 'histRun'].map((n) => (new RegExp('^function ' + n + '\\(.*$', 'm').exec(BK) || [''])[0]).join('\n');
+const HELP = ['^var histQ = .*$'].concat(['histTop', 'bookOwner', 'histRun', 'histPush', 'histFlush', 'histGo', 'histVirtPop', 'histTap'].map((n) => '^function ' + n + '\\(.*$')).map((re) => (new RegExp(re, 'm').exec(BK) || [''])[0]).join('\n');   // 👆 기록 칸 줄(histQ · 2026-10-31)도 한 줄짜리라 같이
 let pass = 0, fail = 0;
 function t(label, fn) {
   try { fn(); console.log('  ✅ ' + label); pass++; }
@@ -46,7 +46,9 @@ function run(opt) {
     go(n) { this.goes.push(n); this.to.push(Math.max(0, Math.min(this.st.length - 1, this.i + n))); } };
   const L = { message: [], popstate: [] }, sent = [];
   const appWin = opt.noApp ? null : { postMessage(m, o) { sent.push({ m: JSON.parse(JSON.stringify(m)), o }); } };
-  const c = { window: { addEventListener(tp, f) { L[tp].push(f); } }, history: H, appWin, appOrigin: ORIGIN };
+  const c = { window: { addEventListener(tp, f) { L[tp].push(f); }, dispatchEvent(e) { L.popstate.forEach((f) => f(e)); } }, history: H, appWin, appOrigin: ORIGIN,
+    PopStateEvent: function (tp, o) { this.type = tp; this.state = o && o.state; } };
+  if (opt.late) c.hwHistLate = () => opt.late.on;   // 👆 손짓 밖 흉내(진짜는 onf-hwbook 블록 navigator.userActivation)
   vm.createContext(c);
   vm.runInContext(HELP + '\n' + src.slice(A, B), c, { filename: 'onf-hist-block' });
   const R = { H, sent, appWin, c,
@@ -70,6 +72,33 @@ t('push = 주소 칸을 비운 채 {onfHist,s,n} 한 칸 · 깊이 증가', () =
   assert.strictEqual(R.depth(), 1);
   R.push('abc2', { onfHwv: 'v1' });
   assert.strictEqual(R.depth(), 2); assert.strictEqual(R.H.state.n, 2);
+});
+
+t('👆 손짓 밖이면 홈 칸을 줄(histQ)에 — 쌓지 않고 깊이는 센다 · 손짓(histTap)에 차례대로 쌓는다 · 줄에 있는 칸 back = 줄에서 빼고 popstate 흉내(홈에 hist-pop · 진짜 뒤로 0) · hello 도 줄부터 · 줄이 있으면 손짓 안이어도 뒤 칸은 줄 뒤로(차례) (Peter 2026-10-31 「새로 고침 뒤 뒤로」 — WebKit 은 손짓 밖 칸 + 앞 칸 하나를 건너뛴다)', () => {
+  const late = { on: true }, R = run({ late });
+  R.push('abc1', { onfPeek: 'p1' });
+  assert.strictEqual(R.H.st.length, 1, '⛔ 손짓 밖인데 칸을 쌓았다(뒤로에서 건너뛰어져 사이트 밖)');
+  assert.strictEqual(R.depth(), 1, '⛔ 줄에 넣은 칸을 깊이에 안 셌다(홈과 어긋남)');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(R.c.histTop())), { onfHist: 'abc1', s: { onfPeek: 'p1' }, n: 1 }, '⛔ 맨 위 읽기가 줄 끝을 안 본다');
+  R.sent.length = 0; R.back('abc1');
+  assert.strictEqual(R.H.backs + R.H.goes.length, 0, '⛔ 줄에 있는 칸을 걷으려 진짜 뒤로를 했다(아래 칸·사이트 밖으로)');
+  assert.ok(R.sent.some((x) => x.m.onf === 'hist-pop' && x.m.id === ''), '⛔ 줄 칸을 걷고 홈에 hist-pop 을 안 보냈다');
+  assert.strictEqual(R.depth(), 0);
+  //   줄에 둘 — 위 하나를 걷으면 홈엔 줄의 그다음 칸을 알린다(맨 위 읽기 = 줄 끝)
+  R.push('abcA', { a: 'A' }); R.push('abcB', { a: 'B' }); R.sent.length = 0; R.back('abcB');
+  assert.ok(R.sent.some((x) => x.m.onf === 'hist-pop' && x.m.id === 'abcA' && x.m.s && x.m.s.a === 'A'), '⛔ 줄 칸을 걷은 뒤 홈에 줄의 다음 칸(abcA)을 안 알렸다: ' + JSON.stringify(R.sent));
+  assert.strictEqual(R.depth(), 1);
+  R.back('abcA'); assert.strictEqual(R.depth(), 0);
+  R.push('abc2', { a: 1 }); R.push('abc3', { a: 2 }); assert.strictEqual(R.H.st.length, 1);
+  late.on = false; R.push('abc4', { a: 3 });   // 손짓 안 새 칸 — 줄을 먼저 비우고 그 뒤에(검토 🟡5 · 줄이 남은 채 쌓이면 차례가 뒤집힌다)
+  assert.deepStrictEqual(R.H.st.slice(1).map((x) => x.state.onfHist), ['abc2', 'abc3', 'abc4'], '⛔ 손짓 안 새 칸이 줄을 먼저 안 비웠거나 차례가 뒤집혔다');
+  R.c.histTap();
+  assert.strictEqual(R.H.st.length, 4, '⛔ 빈 줄에 손짓이 또 칸을 쌓았다');
+  assert.strictEqual(R.c.histQ.length, 0);
+  //   hello(홈 새로 읽기) — 줄에 남은 칸부터 걷고 나머지는 진짜 go
+  late.on = true; R.push('abc5', { a: 4 }); assert.strictEqual(R.depth(), 4);
+  R.hello();
+  assert.deepStrictEqual(R.H.goes, [-3], '⛔ hello 가 줄 칸까지 진짜 go 로 걷었다(쌓인 것은 셋)'); assert.strictEqual(R.c.histQ.length, 0);
 });
 
 t('⛔ back 은 맨 위가 그 id 일 때만 걷는다 (남의 칸 보호)', () => {

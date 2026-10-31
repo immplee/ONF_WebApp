@@ -674,6 +674,19 @@ t('👆 손짓 밖이면 과제 판 뒤로 칸을 미룬다(Peter 2026-10-31 아
   assert.ok(W.created.find((e) => e.className === 'onf-hwbox').removed && W.g.hwHistWait === false, '⛔ 미룬 채 뒤로 — 판이 안 닫혔다');
   assert.ok(wg.some((m) => m.onf === 'hist-pop'), '⛔ 미룬 채 뒤로는 홈 칸을 뺐는데 홈에 「뒤로」 를 안 넘겼다(홈 칸 수가 어긋난다)');
 });
+t('👆 기록 칸 줄 — 진짜 뒤로(브라우저)가 오면 줄에 남은 칸을 버린다(그 칸들은 아래 칸보다 위였다) · 줄이 남은 채 과제 판을 열면 과제 판 칸도 미룬다(차례) · 손짓에 줄 → 과제 판 칸 차례로', () => {
+  const R = boot({ onf_id_tok: odk() }), ua = { isActive: false }; R.g.navigator = Object.assign({}, R.g.navigator, { userActivation: ua });
+  const me = { parent: R.els.app.contentWindow, postMessage() {} }; R.knockAs(me);
+  R.postAs({ onf: 'hist', op: 'push', id: 'abc1', state: { a: 1 } }, me);
+  assert.strictEqual(R.g.histQ.length, 1, '전제: 손짓 밖 홈 칸은 줄로');
+  R.g.history.state = null; R.pop();
+  assert.strictEqual(R.g.histQ.length, 0, '⛔ 진짜 뒤로 뒤에도 줄 칸이 남았다(다음 손짓에 죽은 칸을 쌓는다)');
+  R.postAs({ onf: 'hist', op: 'push', id: 'abc2', state: { a: 2 } }, me);
+  ua.isActive = true;   // 손짓 안이지만 줄이 남았다 — 과제 판 칸이 줄을 앞지르면 안 된다 → hwHistPush 가 줄부터 쌓는다
+  R.postAs({ onf: 'hwbook', t: 'Tok_1' }, me);
+  assert.strictEqual(R.g.histQ.length, 0, '⛔ 과제 판 열기(손짓 안)가 줄을 먼저 안 쌓았다');
+  assert.ok(R.g.history.state && R.g.history.state.onfHw && !R.g.hwHistWait, '⛔ 줄을 쌓은 뒤 과제 판 칸을 안 쌓았다');
+});
 t('📱 왼쪽 끝 쓸기 = 앱 뒤로(Peter 2026-10-25 ④⑦ · onf-edge) — 안쪽 노크(ask)에 edge-on · back 은 맨 위가 우리 칸일 때만 코드로 뒤로 · 바닥·남의 출처는 아무것도 안 함', () => {
   const R = boot({ onf_id_tok: odk() }), got = [], src = { postMessage: (m, o) => got.push([m, o]) };
   R.postAs({ onf: 'edge', op: 'ask' }, src);

@@ -763,7 +763,8 @@ var hwAsking = false, hwHistWait = false, hwHvWait = false;   // hwHistWait = �
    userActivation 이 없는 옛 브라우저는 종전대로 바로. 기다리는 동안 뒤로 = 판 닫기(popstate 첫 줄 · 칸이 없으니 앞 칸으로 간다). */
 function hwHistLate() { try { var ua = navigator.userActivation; return !!ua && !ua.isActive; } catch (e) { return false; } }
 function hwHistPush() {
-  if (hwHistLate()) { hwHistWait = true; hwAsking = false; return; }
+  if (typeof histFlush === 'function') histFlush();   // 👆 판·홈 줄이 먼저(차례 보존) — 손짓 밖이면 줄도 과제 판 칸도 그대로 미룬다
+  if (hwHistLate() || (typeof histQ !== 'undefined' && histQ.length)) { hwHistWait = true; hwAsking = false; return; }
   hwHistWait = false;
   var n = typeof histDepth === 'number' ? histDepth : 0, s = history.state;
   try {
@@ -787,6 +788,7 @@ function hwHistSync() {
 var hwTapLog = false;
 function hwHistUp() { var s = history.state; return s && s.onfHw ? 1 + (s.lg ? 1 : 0) + (s.hv ? 1 : 0) : 0; }   // 맨 위에서 이어진 과제 판 칸 수
 function hwViewHist(was, v) {   // 사진만 ↔ 교재 — 보기 칸을 넣고 뺀다(뒤로 = 사진만)
+  if (typeof histFlush === 'function') histFlush();   // 👆 판·홈 줄이 먼저(손짓 안이면 · 보기 칸이 줄 칸 아래로 들어가 차례가 뒤집히지 않게 · 검토 🟡1)
   var s = history.state;
   if (v === 'photo') hwHvWait = false;
   if (was === 'photo' && v !== 'photo' && (hwHistLate() || hwHistWait)) { hwHvWait = true; hwHistSync(); return; }   // 판 칸을 아직 미룬 채면 손짓 안이어도 판 칸부터(hwHistSync 가 판 칸 → 보기 칸 차례로)   // 👆 손짓 밖(판이 저절로 켠 옆에 등) — 다음 손짓(hwTap)에 맞춘다(hwHistSync)
@@ -989,7 +991,7 @@ window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
   if (!d || !hwBk || !bookFrom(ev, hwBk.el, true)) return;   // 🌤 판 출처(구글 또는 정적 판 · 2026-10-31 넓히기 ②)
   if (d.onf === 'bookHi') { hwBk.win = ev.source; hwBk.origin = ev.origin; hwPenSync(); return; }
-  if (d.onf === 'hwTap') { hwHistSync(); return; }   // 👆 옆·교재만에서 교재만 만져도(반박 🟠2)
+  if (d.onf === 'hwTap') { histTap(); return; }   // 👆 옆·교재만에서 교재만 만져도(반박 🟠2)
   if (d.onf === 'penAct') { if (hwView === 'side' && hwWin) { try { hwWin.postMessage({ onf: 'bookPenAct' }, hwOrigin); } catch (e) {} } return; }   // ↩️ 옆 교재에 되돌릴 일이 생겼다 → 과제 판 펜 줄 차례 장부(2026-10-30 4차)
   if (d.onf === 'themeAsk') { themeAsk(ev); return; }
   if (d.onf === 'printTitle') { if (window.ONF && ONF.frame && ONF.frame.printTitle) ONF.frame.printTitle(d.t); return; }
@@ -1008,6 +1010,8 @@ function hwClose() {
 /* onf-hist 블록 popstate 가 묻는다 — 과제 판 칸이 맨 위거나 방금 그 칸을 걷었으면 홈에 「뒤로」를 안 보낸다(홈은 안 바뀌었다) */
 function hwSkipPop() { var k = hwSkip || !!(history.state && history.state.onfHw); hwSkip = false; return k; }
 window.addEventListener('popstate', function () {
+  if (typeof histQ !== 'undefined' && !histVirt) histQ.length = 0;   // 👆 진짜 뒤로(브라우저) — 줄에 남은 칸은 그 아래 칸보다 위였다 → 버린다(맨 먼저 도는 popstate 손 · onf-book histQ)
+  if (typeof histVirt !== 'undefined' && histVirt) return;   // 흉내 popstate(줄 칸 걷기)는 과제 판과 무관
   var s = history.state;
   if (hwBox && !hwWarmOn && !(s && s.onfHw)) { var waited = hwHistWait; hwClose(); hwSkip = !waited; return; }   // 뒤로·스와이프 = 과제 판 닫기(안 보이는 미리 띄운 판은 그대로) · 칸을 미뤄 둔 채였으면(👆) 이 뒤로는 홈 칸을 뺐다 — 홈도 한 칸 되돌린다(어긋남 방지)
   if (!hwBox || hwWarmOn || !s || !s.onfHw) return;
@@ -1050,7 +1054,7 @@ window.addEventListener('message', function (ev) {
       return;
     }
     if (d.onf === 'themeAsk') { themeAsk(ev); return; }
-    if (d.onf === 'hwTap') { hwHistSync(); return; }   // 👆 미뤄 둔 뒤로 칸 — 판을 만진 손짓 안에서(위 hwHistLate)
+    if (d.onf === 'hwTap') { histTap(); return; }   // 👆 미뤄 둔 뒤로 칸 — 판을 만진 손짓 안에서(위 hwHistLate · 판·홈 줄 먼저)
     if (d.onf === 'hwbookBack') hwBack();
     if (d.onf === 'hwLeaveKeep') { var sk = history.state; hwAsking = false; if (hwBox && sk && sk.onfHw && !sk.lg) { try { history.pushState({ onfHw: 1, n: sk.n || 0, lg: 1 }, ''); } catch (e) {} } }   // ③ 「홈으로 나갈까요?」 취소 — 물음 칸 다시
     if (d.onf === 'hwbookView') hwViewSet(String(d.v || ''), d.href, false, d.out === 1, d.cf);
@@ -1115,6 +1119,7 @@ function hwOutBack(me, why) {
   if (typeof reopenLog === 'function') reopenLog('hwout-' + why);
   try { ONF.frame.fallBack('hwbook', why); } catch (e) {}
   console.info('[onf] 정적 과제 판이 안 떴다 — 구글 판으로');
+  if (hwView !== 'photo' && !hwWarmOn) { hwViewSet('photo'); }   // 구글 판은 사진으로 새로 뜬다 — 옛 보기(옆 교재·교재만)를 남기면 판과 껍데기 보기가 어긋난다(2026-10-31 다른 세션 지적)
   var u = EXEC + '?mode=hwbook&' + me.q, fr = hwFr;
   var swap = function () { if (fr && fr === hwFr) { try { fr.contentWindow.location.replace(u); } catch (e) { fr.src = u; } } };   // 📱 replace — 뒤로 칸을 안 쌓는다(정적 선생님 홈 tOutOpen 과 같다)
   /* 📱 입장권만으로 연 홈(tchOnly · 구글 창구 전)이면 구글 판은 쿠키가 없다 — 미리 띄운 판은 걷고(열 때 다시) · 보이는 판은 로그인 화면을 거쳐 바꾼다 · 「홈으로 돌아가기」 = 판 닫기 */
@@ -1135,8 +1140,8 @@ window.addEventListener('message', function (ev) {
   var d = ev && ev.data, o = String(ev && ev.origin), s;
   if (!d || d.onf !== 'edge' || !(/^https:\/\/[^\/:]+\.googleusercontent\.com$/.test(o) || o === 'https://app.ownify.co.kr' || o === 'https://onf-app.pages.dev')) return;
   if (d.op === 'ask') { try { ev.source.postMessage({ onf: 'edge-on' }, o); } catch (e) {} return; }
-  s = history.state;
-  if (d.op === 'back' && s && (s.onfHist || s.onfBook || s.onfHw)) history.back();
+  s = histTop();
+  if (d.op === 'back' && s && (s.onfHist || s.onfBook || s.onfHw)) { if (s.onfHw) history.back(); else histGo(1, true); }   // 👆 줄에 남은 칸이면 줄에서
 });
 /* onf-edge:end */
 
@@ -1194,7 +1199,17 @@ var BOOK_SWAP_MS = 14000, bookSwapN = 0, BOOK_AGE_MS = 2 * 60 * 60 * 1000;   // 
 function phone() { return !!(BOOK_PH && wideMq && !wideMq.matches); }
 function bookMax() { return phone() ? BOOK_PHONE : BOOK_MAX; }
 function bookKey(src) { var i = bookSrcs.indexOf(src); if (i < 0) i = bookSrcs.push(src) - 1; return i + 1; }   // 판 번호 — 기록 칸엔 주소(토큰이 든다) 대신 이것
-function histTop() { try { return history.state; } catch (e) { return null; } }
+/* 👆 기록 칸 줄(2026-10-31 Peter 「새로 고침 뒤 뒤로도 고쳐줘」) — WebKit 은 손짓 밖(10초 · 로그인 팝업 뒤) pushState 칸 + 앞 칸 하나를 뒤로에서 건너뛴다
+   (정본 설명 = 과제 판 hwHistLate · 기억 webkit-skips-pushstate-without-gesture). 새로 고침 되살리기(rsBoot·학생 창 peekRestore)·느린 서버 답 뒤 판 열기가 그 길이었다.
+   판·홈 칸은 histPush 로만 — 손짓 밖이면 줄(histQ)에 넣고, 어느 액자든 손을 뗄 때 보내는 hwTap(histTap)에 차례대로 쌓는다(줄이 있으면 뒤 칸도 줄로 · 차례 보존).
+   맨 위 읽기는 histTop(줄 끝 먼저) · 뒤로는 histGo(줄에 남은 칸부터 걷고 popstate 를 흉내 · 나머지는 진짜 go) · 진짜 뒤로(브라우저)가 오면 줄은 버린다(그 칸들은 줄 아래 칸보다 위였다 — onf-hwbook 첫 popstate 손). */
+var histQ = [], histVirt = false;
+function histTop() { try { return typeof histQ !== 'undefined' && histQ.length ? histQ[histQ.length - 1] : history.state; } catch (e) { return null; } }
+function histPush(st) { histFlush(); if (histQ.length || (typeof hwHistLate === 'function' && hwHistLate())) { histQ.push(st); return true; } try { history.pushState(st, ''); return true; } catch (e) { return false; } }   // 참 = 쌓았거나 줄에 넣었다(못 넣은 칸은 깊이에 안 센다)
+function histFlush() { if (!histQ.length || (typeof hwHistLate === 'function' && hwHistLate())) return; var q = histQ; histQ = []; q.forEach(function (st) { try { history.pushState(st, ''); } catch (e) {} }); }
+function histGo(k, bk) { histFlush(); var v = Math.min(k, histQ.length); if (v) { histQ.length -= v; k -= v; } if (k > 0) { try { if (bk && k === 1) history.back(); else history.go(-k); } catch (e) {} } else if (v) histVirtPop(); }   // bk = 부르던 자리가 back() 이었다(같은 꼴 유지)
+function histVirtPop() { histVirt = true; try { var e; try { e = new PopStateEvent('popstate', { state: histTop() }); } catch (e1) { e = document.createEvent('Event'); e.initEvent('popstate', false, false); } window.dispatchEvent(e); } catch (e2) {} finally { histVirt = false; } }
+function histTap() { histFlush(); if (typeof hwHistSync === 'function') hwHistSync(); }   // 👆 손짓 안 — 줄 먼저, 그 위 과제 판 칸
 function bookOwner(s) { return (s && (s.onfBook || s.b)) || 0; }           // 판 칸·판 안쪽 칸이면 그 판 번호
 function histRun() { var t = histTop(); return bookOwner(t) ? Math.max(0, Number(t.bd) || 0) : 0; }   // 맨 위에서 이어진 판 칸 수
 function homeN() { return (typeof histDepth === 'number' && histDepth) || 0; }   // 그 아래 홈 칸 수 = 아래 onf-hist 블록의 histDepth(남의 액자 안이면 그 블록이 안 돈다 — 0)
@@ -1202,7 +1217,7 @@ function homeN() { return (typeof histDepth === 'number' && histDepth) || 0; }  
 function histBook(p) {
   if (bookOwner(histTop()) === p.key) return;
   p.hb = histRun();   // 🖥 이 판 칸 밑에 이어진 판 칸 수 — PC ✕ 가 제 칸만 걷는다(아래 bookClose 앞 판 규칙 · 2026-10-24)
-  try { history.pushState({ onfBook: p.key, n: homeN(), bd: histRun() + 1 }, ''); } catch (e) {}   // 주소 칸은 비운다
+  histPush({ onfBook: p.key, n: homeN(), bd: histRun() + 1 });   // 주소 칸은 비운다 · 👆 손짓 밖이면 줄로(위 histQ)
 }
 /* 「홈으로 나갈까요?」 칸 {onfBook, lg:1} — 판 칸 바로 위 · 판을 보이기 **전에**(아이폰 스와이프 밑그림 = 그 칸을 떠날 때 화면 → 홈) · 빠지면 교재에 bookLeaveAsk ·
    취소 = bookLeaveKeep(되묻기가 떠 있는 채 다시 민다) · 옛 교재(노크에 lg:1 없음)엔 안 민다 · ⚠️ 쌍둥이: 학생 assets/onf-frame.js histGuard */
@@ -1212,7 +1227,7 @@ function histGuard(p) {
   var t = histTop();
   if (t && t.lg && bookOwner(t) === p.key) return;
   if (bookOwner(t) !== p.key) return;
-  try { history.pushState({ onfBook: p.key, n: homeN(), bd: histRun() + 1, lg: 1 }, ''); p.lgOn = true; } catch (e) {}
+  histPush({ onfBook: p.key, n: homeN(), bd: histRun() + 1, lg: 1 }); p.lgOn = true;
 }
 /* 판 안쪽 기록 다리(폰) — 홈 다리(onf-hist)와 같은 약속·같은 검증(op · id · 2KB · JSON 사본). hello 는 안 받는다(학생 껍데기 한계 주석). 숨긴 판은 칸을 못 민다. */
 function bookHist(p, ev) {
@@ -1226,8 +1241,8 @@ function bookHist(p, ev) {
   if (!p.hw || ev.source !== p.hw || ev.origin !== p.ho || typeof d.id !== 'string' || !/^[A-Za-z0-9]{1,40}$/.test(d.id)) return;
   t = histTop();
   if (d.op === 'push' && !p.parked && d.state && Object.prototype.toString.call(d.state) === '[object Object]') {
-    try { flat = JSON.parse(JSON.stringify(d.state)); if (unescape(encodeURIComponent(JSON.stringify(flat))).length <= 2048) history.pushState({ onfHist: d.id, s: flat, n: homeN(), b: p.key, bd: histRun() + 1 }, ''); } catch (e) {}
-  } else if (d.op === 'back' && t && t.onfHist === d.id && t.b === p.key) history.back();   // 맨 위가 이 판의 그 칸일 때만(남의 칸 보호)
+    try { flat = JSON.parse(JSON.stringify(d.state)); if (unescape(encodeURIComponent(JSON.stringify(flat))).length <= 2048) histPush({ onfHist: d.id, s: flat, n: homeN(), b: p.key, bd: histRun() + 1 }); } catch (e) {}
+  } else if (d.op === 'back' && t && t.onfHist === d.id && t.b === p.key) histGo(1, true);   // 맨 위가 이 판의 그 칸일 때만(남의 칸 보호 · 👆 줄에 남은 칸이면 줄에서)
 }
 /* 기록 칸이 빠졌다 — 폰이면 맨 위 칸 주인 판을 보이고(지워졌으면 그 주소로 다시 받음) · 홈 칸·바닥이면 보이는 판을 숨긴다. 판 안쪽엔 그 판 맨 위 칸을 알린다. 🖥 PC 도 같다(2026-10-24). */
 function bookPop(s) {
@@ -1624,12 +1639,12 @@ function bookClose(all) {
   var cur = bookShown(), b = cur && cur.back;
   if (all !== true && !phone() && b && books.indexOf(b) >= 0) {   // left·m·r 없이 부르면 보이던 판 칸 값 그대로(위 bookShow)
     var own = bookOwner(histTop()) === cur.key ? histRun() - (cur.hb || 0) : 0;   // 🖥 이 판 칸만 걷는다 → popstate 의 bookPop 이 밑의 앞 판을 보인다(기록과 화면이 같은 차례 · 2026-10-24)
-    if (own > 0) { try { history.go(-own); return; } catch (e) {} }
+    if (own > 0) { histGo(own); return; }
     bookShow(b); return;
   }
   if (!bookHide()) return;
   var r = histRun();
-  if (r > 0) { try { history.go(-r); } catch (e) {} }
+  if (r > 0) histGo(r);
 }
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data, p = null, i;
@@ -1643,6 +1658,7 @@ window.addEventListener('message', function (ev) {
       if (!rsBooted) { bookHome = ev.source; bookHomeOrigin = ev.origin; rsBoot(); }   // 🔄 새로고침 전에 열려 있던 판(위 rsBoot) — 홈이 뜬 뒤 한 번
       return;
     }
+    if (d.onf === 'hwTap') { histTap(); return; }   // 👆 홈을 만지고 뗐다 — 줄에 미뤄 둔 칸을 이 손짓 안에서
     if (d.onf === 'reload') { var rp = bookShown(); if (rp) rsSave(rp); reopenLog('pull'); location.reload(); return; }
     if (d.onf === 'homeTab') { if (/^[a-z]{1,8}$/.test(String(d.v))) { try { sessionStorage.setItem(TAB_KEY, d.v); } catch (eS) {} } return; }   // 🔄 홈이 고른 탭 — 이 탭에 적는다   // 🔄 홈의 당겨서 새로고침(Ownify ONF_Shell_Js)
     if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left, d.m, d.r, true, d.cf, d.out === 1); var hq = bookShown(); if (hq) hq.back = null; return; }   // 홈에서 연 판은 앞 판 기억 없음(종전 · 4.4) · 📖 판이 있으면 갈아 끼움
@@ -1655,6 +1671,7 @@ window.addEventListener('message', function (ev) {
   }
   for (i = 0; i < books.length && !p; i++) if (bookFrom(ev, books[i].el, true)) p = books[i];   // 🌤 판 액자 = 정적 판 출처도(위 bookAppOrigin)
   if (!p) return;                                              // 판 액자(교재·내 문장)
+  if (d.onf === 'hwTap') { histTap(); return; }               // 👆 판(교재·내 문장)을 만지고 뗐다
   if (d.onf === 'bookHi') {
     if (!bookAppOrigin(ev.origin)) return;
     p.win = ev.source; p.origin = ev.origin; p.swap = d.swap === 1; p.lg = d.lg === 1;
@@ -1726,7 +1743,7 @@ window.addEventListener('message', function (ev) {
      안쪽이 주소를 바꿔 문서 이동을 얹으면 go(-n) 이 엉뚱한 칸에 닿는다(검수 2026-10-01 · 실제 GAS 「다시 불러오기」는 같은 주소라 해당 없다고 보지만 실기기는 못 쟀다). */
   if (d.op === 'hello') {                 // 안쪽이 새로 떴다 — 옛 안쪽이 남긴 죽은 칸을 치운다(같은 문서 안 칸이라 조용히 빠진다)
     //   📱 판 칸이 맨 위면 안 치운다 — go(-n) 이 판 칸부터 걷는다(「맨 위 n 칸이 전부 홈 칸」 전제가 깨진다 · 죽은 홈 칸은 남는 한계 · onf-book 블록)
-    if (histDepth > 0 && !histRun()) { n = histDepth; histDepth = 0; try { history.go(-n); } catch (e) {} }
+    if (histDepth > 0 && !histRun()) { n = histDepth; histDepth = 0; histGo(n); }
     return;
   }
   if ((d.op !== 'push' && d.op !== 'back') || typeof d.id !== 'string' || !HIST_ID.test(d.id)) return;
@@ -1736,14 +1753,14 @@ window.addEventListener('message', function (ev) {
        pushState 의 구조화 복제가 덩어리째 기록 칸에 저장되고 popstate 마다 안쪽으로 되돌려 보낸다(검수 2026-10-01). 평범한 JSON 값만 남긴다. */
     var flat = null;
     try { flat = JSON.parse(JSON.stringify(d.state)); } catch (e) { return; }
-    try { history.pushState({ onfHist: d.id, s: flat, n: histDepth + 1 }, ''); histDepth++; } catch (e) {}   // 주소 칸은 비운다
+    if (histPush({ onfHist: d.id, s: flat, n: histDepth + 1 })) histDepth++;   // 주소 칸은 비운다 · 👆 손짓 밖이면 줄로(onf-book histQ)
     return;
   }
-  s = history.state;                      // back — 맨 위가 그 id 일 때만(남의 칸 보호 · 📱 판 칸·판 안쪽 칸은 홈 것이 아니다)
-  if (s && s.onfHist === d.id && !bookOwner(s)) history.back();
+  s = histTop();                          // back — 맨 위가 그 id 일 때만(남의 칸 보호 · 📱 판 칸·판 안쪽 칸은 홈 것이 아니다 · 👆 줄 끝 먼저)
+  if (s && s.onfHist === d.id && !bookOwner(s)) histGo(1, true);
 });
 window.addEventListener('popstate', function () {
-  var s = history.state, h = (s && s.onfHist) ? s : null;
+  var s = histTop(), h = (s && s.onfHist) ? s : null;
   histDepth = (h || bookOwner(s)) ? Math.max(0, Number(s.n) || 0) : 0;   // 📱 판 칸의 n = 그 아래 홈 칸 수
   if (typeof hwSkipPop === 'function' && hwSkipPop()) { histDepth = s && s.onfHw ? Math.max(0, Number(s.n) || 0) : histDepth; return; }   // 📝 과제 판 칸(onf-hwbook) — 홈은 안 바뀌었다
   if (!appWin || bookOwner(s)) return;    // 📱 판 칸이 맨 위면 홈은 안 바뀌었다(판 칸은 늘 홈 칸 위에 쌓인다 · 판 숨김·보임은 onf-book 블록 bookPop)
