@@ -755,7 +755,7 @@ function hwOpen(t, l, f, hwt, au) {
    교재(옆에·교재만)를 보이면 그 위 보기 칸 {onfHw, lg:1, hv:1}. 뒤로 = 보기 칸 빠짐 → 사진만 · 물음 칸 빠짐 → 판에 「홈으로 나갈까요?」(hwLeaveAsk · 판의 onfAskHome)
    → 확인 = hwbookBack(hwBack · 남은 판 칸 걷고 닫음) · 취소 = hwLeaveKeep(물음 칸 다시). ‹·✕ 는 위 칸까지 한 번에 걷는다(hwBack · history.go).
    이미 과제 판 칸이면 칸을 또 쌓지 않는다(쌓이면 뒤로를 여러 번) — 맨 위가 판 칸이면 물음 칸만 · 물음 칸이면 그대로 · 보기 칸이면 물음 칸으로 덮어쓴다(새로 연 판은 사진만). */
-var hwAsking = false, hwHistWait = false;
+var hwAsking = false, hwHistWait = false, hwHvWait = false;   // hwHistWait = 판 칸·물음 칸 전체를 미룸 · hwHvWait = 보기 칸만 미룸(뜻이 둘이라 칸 수가 어긋났다 · 전수 검수 🟠2)
 /* 👆 손짓 밖이면 칸을 미룬다(Peter 2026-10-31 아이패드 「과제 판에서 뒤로 = 홈페이지가 통째로 닫혀 크롬 첫 화면」) —
    WebKit 은 손짓 뒤 10초 밖(또는 로그인 팝업이 손짓을 써 버린 뒤)의 pushState 칸을 「손짓 없이 JS 가 만든 칸」으로 찍고, 뒤로에서 그 칸 전부 + 앞 칸 하나를 건너뛴다
    (WebKit HistoryController::pushState · WebBackForwardList::itemStartingAtIndexSkippingItemsAddedByJSWithoutUserGesture · 한 번 찍히면 안 지워진다).
@@ -775,18 +775,21 @@ function hwHistPush() {
 }
 /** 👆 미뤄 둔 칸 맞추기(손짓 안에서만) — 판 칸·물음 칸이 없으면 쌓고 · 교재를 보이는 중인데 보기 칸이 없으면 그것도(보기 칸도 손짓 밖이면 미뤘다 · 반박 🟠2·🟡5) */
 function hwHistSync() {
-  if (!hwHistWait || !hwBox || hwWarmOn) return;
+  if ((!hwHistWait && !hwHvWait) || !hwBox || hwWarmOn) return;
   if (hwHistLate()) { if (!hwTapLog) { hwTapLog = true; if (typeof reopenLog === 'function') reopenLog('hwtap-inactive'); } return; }   // 🔭 손짓이 부모 창에 안 닿는다(실기기에서 가른다 · 반박 🟠3)
   var s = history.state;
-  if (!(s && s.onfHw)) hwHistPush();
+  if (hwHistWait && !(s && s.onfHw)) hwHistPush();
   hwHistWait = false; s = history.state;
-  if (hwView !== 'photo' && s && s.onfHw && !s.hv) { try { history.pushState({ onfHw: 1, n: s.n || 0, lg: 1, hv: 1 }, ''); } catch (e) {} }
+  /* 보기 칸은 물음 칸(lg) 위에만 — 물음 칸이 빠진 채(「나갈까요?」 중)면 안 쌓는다(쌓으면 hwHistUp 이 3칸으로 세어 go(-3) 이 학생 창 칸까지 걷었다) */
+  if (hwHvWait && hwView !== 'photo' && s && s.onfHw && s.lg && !s.hv) { try { history.pushState({ onfHw: 1, n: s.n || 0, lg: 1, hv: 1 }, ''); } catch (e) {} }
+  hwHvWait = false;
 }
 var hwTapLog = false;
 function hwHistUp() { var s = history.state; return s && s.onfHw ? 1 + (s.lg ? 1 : 0) + (s.hv ? 1 : 0) : 0; }   // 맨 위에서 이어진 과제 판 칸 수
 function hwViewHist(was, v) {   // 사진만 ↔ 교재 — 보기 칸을 넣고 뺀다(뒤로 = 사진만)
   var s = history.state;
-  if (was === 'photo' && v !== 'photo' && hwHistLate()) { hwHistWait = true; return; }   // 👆 손짓 밖(판이 저절로 켠 옆에 등) — 다음 손짓(hwTap)에 맞춘다(hwHistSync)
+  if (v === 'photo') hwHvWait = false;
+  if (was === 'photo' && v !== 'photo' && (hwHistLate() || hwHistWait)) { hwHvWait = true; hwHistSync(); return; }   // 판 칸을 아직 미룬 채면 손짓 안이어도 판 칸부터(hwHistSync 가 판 칸 → 보기 칸 차례로)   // 👆 손짓 밖(판이 저절로 켠 옆에 등) — 다음 손짓(hwTap)에 맞춘다(hwHistSync)
   if (was === 'photo' && v !== 'photo' && s && s.onfHw && !s.hv) { try { history.pushState({ onfHw: 1, n: s.n || 0, lg: 1, hv: 1 }, ''); } catch (e) {} }
   else if (was !== 'photo' && v === 'photo' && s && s.onfHw && s.hv) history.back();   // 뒤따르는 popstate 는 이미 사진만이라 할 일이 없다
 }
@@ -853,8 +856,7 @@ function hwBookFrame(src, out, cf) {   // out = 과제 판이 실은 out:1(🌤 
     hwBk.src = src; hwBk.win = null; hwBk.out = o;   // 새 교재 = 새 노크를 기다린다
     if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} hwBk.oe = null; }
     var exec = function () {
-      /* 🔐 입장권만으로 연 홈(tchOnly · 구글 창구 전)이면 구글 교재 액자는 쿠키가 없다(WebKit) — 로그인을 거쳐 연다 · 돌아가기 = 사진으로(2026-10-31 반박 🟠1) */
-      if (tchOnly && !pending) { var bk0 = hwBk; gate(function () { if (hwBk === bk0 && hwBk.src === src) exec(); }, '교재는 구글 로그인 뒤에 열려요.', true, function () { if (hwBk === bk0) hwBk.src = ''; hwViewSet('photo'); hwTellView(); }); return; }   // 돌아가기 = 주소 기억을 비운다(다시 누르면 또 묻는다 · 안 비우면 빈 교재 칸)
+      /* ⛔ 로그인 문을 두지 마라 — 교재 exec(ONF.api.EXEC = 래퍼)는 익명 배포(ANYONE_ANONYMOUS)라 구글 쿠키가 필요 없다(학생 아이폰도 로그인 없이 연다 · 홈 옆 판 bookMake 도 그대로). 2026-10-31 한 번 넣었다가 걷음(전수 검수 🟠3). */
       hwBk.out = false; hwBk.win = null;
       if (window.ONF && ONF.frame && ONF.frame.openExec) hwBk.oe = ONF.frame.openExec(hwBk.el, src, hwBk.wt, function () { hwViewSet('photo'); hwTellView(); });   // 🔐 여러 계정 우회(교재 판과 같은 길)
       else hwBk.el.src = src;
@@ -996,8 +998,9 @@ window.addEventListener('message', function (ev) {
 function hwClose() {
   if (hwBox && !hwWarmOn && appWin) { try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (e) {} }   // 홈이 카드 상태(완료 등)를 다시 받게
   if (hwBk) { if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} } if (hwBk.box.parentNode) hwBk.box.parentNode.removeChild(hwBk.box); hwBk = null; }   // 과제 판을 닫으면 그 교재 액자도 지운다
-  hwView = 'photo'; hwRecR = null; hwBand = 0; hwCutTold = -1; hwHistWait = false;
-  if (hwBox && gateGo && gateBackOn) { gateGo = null; gateShut(); }   // 판(과제 판·옆 교재)이 띄운 로그인 화면은 판과 같이 닫는다(반박 🟡7 · 돌아가기 단추가 있는 문 = 과제 판 문뿐) if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;
+  hwView = 'photo'; hwRecR = null; hwBand = 0; hwCutTold = -1; hwHistWait = false; hwHvWait = false;
+  if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;   // ⛔ 위 줄 주석 끝에 붙으면 실행이 안 된다(2026-10-31 회귀 · 판을 닫아도 경계 손잡이가 홈 위에 남았다)
+  if (hwBox && gateGo && gateBackOn) { gateGo = null; gateShut(); }   // 판(과제 판·옆 교재)이 띄운 로그인 화면은 판과 같이 닫는다(반박 🟡7 · 돌아가기 단추가 있는 문 = 과제 판 문뿐)
   if (hwBox && hwBox.parentNode) hwBox.parentNode.removeChild(hwBox);
   hwBox = null; hwFr = null; hwWin = null; hwOrigin = ''; hwGo = null; hwGave = ''; hwWant = false; hwT = ''; hwWarmOn = false; hwGoMsg = null; clearTimeout(hwWarmTm);
   if (hwOut) { clearTimeout(hwOut.tm); hwOut = null; }

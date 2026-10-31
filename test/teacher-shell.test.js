@@ -655,6 +655,21 @@ t('👆 손짓 밖이면 과제 판 뒤로 칸을 미룬다(Peter 2026-10-31 아
     assert.deepStrictEqual(JSON.parse(JSON.stringify(Y.g.history.state)), { onfHw: 1, n: 0, lg: 1 }, '⛔ 손짓 밖에 보기 칸을 쌓았다(WebKit 이 찍어 뒤로에서 건너뛴다)');
     u3.isActive = true; Y.postAs({ onf: 'hwTap' }, yi);
     assert.deepStrictEqual(JSON.parse(JSON.stringify(Y.g.history.state)), { onfHw: 1, n: 0, lg: 1, hv: 1 }, '⛔ 다음 손짓에 미룬 보기 칸을 안 쌓았다'); }
+  //   보기 칸만 미룬 채 「나갈까요?」(물음 칸 빠짐) 중 손짓 — 물음 칸 없는 판 칸 위에 보기 칸을 쌓지 않는다(쌓으면 hwHistUp 3칸 → go(-3) 이 학생 창 칸까지 · 전수 검수 🟠2)
+  { const u4 = { isActive: true }, { R: Z, inner: zi } = mk(u4);
+    const ce = Z.g.document.createElement; Z.g.document.createElement = (tag) => { const e = ce(tag); e.style.setProperty = (k, v) => { e.style[k] = v; }; e.blur = () => {}; e.focus = () => {}; return e; };
+    Z.g.ONF = Object.assign({}, Z.g.ONF || {}, { api: { EXEC: Z.g.EXEC } });
+    u4.isActive = false; Z.postAs({ onf: 'hwbookView', v: 'side', href: 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILEaaaaaaaa01&sheetName=E3' }, zi);
+    Z.g.history.state = { onfHw: 1, n: 0 }; Z.pop();   // 스와이프 뒤로 — 물음 칸 빠짐(「나갈까요?」)
+    u4.isActive = true; Z.postAs({ onf: 'hwTap' }, zi);
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(Z.g.history.state)), { onfHw: 1, n: 0 }, '⛔ 물음 칸 없는 판 칸 위에 보기 칸을 쌓았다(칸 수 어긋남)');
+    assert.strictEqual(Z.g.hwHvWait, false); assert.strictEqual(Z.g.hwHistWait, false, '⛔ 판 칸은 쌓여 있는데 「판 칸 미룸」 으로 남았다(뒤로가 홈에 엉뚱한 hist-pop)'); }
+  //   판 칸을 미룬 채 손짓 안에서 바로 보기를 바꾸면(hwTap 보다 보기 말이 먼저) — 판 칸 → 보기 칸 차례로
+  { const u5 = { isActive: false }, { R: X, inner: xi } = mk(u5);
+    const ce = X.g.document.createElement; X.g.document.createElement = (tag) => { const e = ce(tag); e.style.setProperty = (k, v) => { e.style[k] = v; }; e.blur = () => {}; e.focus = () => {}; return e; };
+    X.g.ONF = Object.assign({}, X.g.ONF || {}, { api: { EXEC: X.g.EXEC } });
+    u5.isActive = true; X.postAs({ onf: 'hwbookView', v: 'book', href: 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILEaaaaaaaa01&sheetName=E3' }, xi);
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(X.g.history.state)), { onfHw: 1, n: 0, lg: 1, hv: 1 }, '⛔ 판 칸을 미룬 채 손짓 안 보기 바꿈 — 칸을 차례로 안 쌓았다'); }
   const { R: W, homeGot: wg } = mk({ isActive: false }); W.g.history.state = null; W.pop();
   assert.ok(W.created.find((e) => e.className === 'onf-hwbox').removed && W.g.hwHistWait === false, '⛔ 미룬 채 뒤로 — 판이 안 닫혔다');
   assert.ok(wg.some((m) => m.onf === 'hist-pop'), '⛔ 미룬 채 뒤로는 홈 칸을 뺐는데 홈에 「뒤로」 를 안 넘겼다(홈 칸 수가 어긋난다)');
