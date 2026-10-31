@@ -1051,7 +1051,7 @@ window.addEventListener('message', function (ev) {
      그리기 전 outFail(anon · bridge) · 시한 넘김 · 입장권 없음·거절(stale) = 같은 액자에 구글 판(지금 길 · 같은 t·l·warm) + 물러남 기억(ONF.frame.fallBack 'hwbook').
    ⛔ 「불러오는 중」 끝없음 0 — 어느 갈래든 시한 안에 판이 서거나 구글 판으로 넘어가고, 구글 판도 안 뜨면 종전 15초 ✕(hwLateX).
    켜기: 이 기기 ?hwout=1(Peter 기기 시험) → 넓히면 HWOUT_DEF '1'(켜기 커밋 하나) · 끄기 = ?hwout=0 또는 HWOUT_DEF '0'. */
-var HWOUT_DEF = '0', HWOUT_HELLO_MS = 4000, HWOUT_KNOCK_MS = 10000, hwOut = null;
+var HWOUT_DEF = '1', HWOUT_HELLO_MS = 4000, HWOUT_KNOCK_MS = 10000, hwOut = null;
 var HWOUTV = (function () {
   var sw = null, kept = null;
   try { sw = new URLSearchParams(location.search).get('hwout'); if (sw === '1' || sw === '0') { localStorage.setItem('onf_hwout', sw); if (sw === '1') localStorage.removeItem('onfHwOutFail'); } kept = localStorage.getItem('onf_hwout'); } catch (e) {}
