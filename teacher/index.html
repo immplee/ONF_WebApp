@@ -512,20 +512,30 @@ function tPreTake(tk) {
   return x.tk === tk && x.p && typeof x.p.then === 'function' ? x.p : null;
 }
 function tOutUrl() { try { return new URL('/teacher/', ONF.frame.OUT_BOOK).href; } catch (e) { return ''; } }   // 정적 판 주소 = 교재 정적 판과 같은 출처(onf-frame.js 상수)
+/* 🖥️ 과제 판 화면 확장 창(mode=hwext · 2026-11-01 밖으로 설계 ⑬ · Peter 「매 수업 쓴다」) — 같은 정적 먼저 손으로 Pages /hwext/?t&s(Ownify tools/outside/hwext-boot.js · 보기 = Worker /t/stu hwv).
+   판 말: outHello(머리) → 노크 auth-please = 섰다(답은 입장권 — 아래 노크 손 appTch) · outFail·시한·입장권 없음 = 같은 액자에 구글 판(appSrc = exec?mode=hwext&t&s&ext=1 · 종전) + 물러남 기억 'hwext'.
+   ⛔ 주소 값은 노크 손 앞 pass 와 같은 거름(학생 토큰 꼴 · 세트 h+20 hex) — 꼴이 틀리면 정적 판도 안 탄다(구글 판이 종전대로 말한다). */
+function tOutExt() {
+  var q = new URLSearchParams(location.search), t = q.get('t') || '', st = q.get('s') || '';
+  return q.get('mode') === 'hwext' && /^[A-Za-z0-9_-]{1,40}$/.test(t) && /^h[0-9a-f]{20}$/.test(st) ? { t: t, s: st } : null;
+}
 function tOutQ() {
   try {   // ⛔ 무엇이 던져도 지금 길(mount 안에서 불린다 — 여기서 던지면 로그인이 멈춘다)
-    if (!TOUT || new URLSearchParams(location.search).get('mode') || (!TOUTWK && (homeApp() || webkitOnly())) || !tchGet() || !(window.ONF && ONF.frame && ONF.frame.OUT_BOOK) || !bookAppOrigin(new URL(tOutUrl()).origin)) return false;
-    return !ONF.frame.fallBlocked('thome');
+    var mode = new URLSearchParams(location.search).get('mode'), ext = tOutExt();
+    if (!TOUT || (mode && !ext) || (!TOUTWK && (homeApp() || webkitOnly())) || !tchGet() || !(window.ONF && ONF.frame && ONF.frame.OUT_BOOK) || !bookAppOrigin(new URL(tOutUrl()).origin)) return false;
+    return !ONF.frame.fallBlocked(ext ? 'hwext' : 'thome');
   } catch (e) { return false; }
 }
 function tOutOpen(fallback, LD) {
-  var url = tOutUrl(), me = { org: new URL(url).origin, gone: false, drawn: false }, tm = 0;
+  var ext = tOutExt(), key = ext ? 'hwext' : 'thome';
+  var url = ext ? new URL('/hwext/', ONF.frame.OUT_BOOK).href + '?t=' + encodeURIComponent(ext.t) + '&s=' + encodeURIComponent(ext.s) : tOutUrl();
+  var me = { org: new URL(url).origin, gone: false, drawn: false }, tm = 0;
   tOut = me;
   function back(why) {
     if (me.gone || me.drawn) return;
     me.gone = true; clearTimeout(tm); window.removeEventListener('message', onMsg);
-    if (typeof reopenLog === 'function') reopenLog('tout-' + why);
-    ONF.frame.fallBack('thome', why);   // 🔁 물러남 기억 한 곳(onf-frame.js · 까닭별 · clog fallback:thome:<까닭>:<연속>)
+    if (typeof reopenLog === 'function') reopenLog((ext ? 'hwext-' : 'tout-') + why);
+    ONF.frame.fallBack(key, why);   // 🔁 물러남 기억 한 곳(onf-frame.js · 까닭별 · clog fallback:thome:<까닭>:<연속>)
     console.info('[onf] 정적 선생님 홈이 안 떴다 — 지금 길로 다시');
     if (appTch) { appWin = null; appOrigin = ''; appTch = false; }
     fallback();
@@ -534,6 +544,12 @@ function tOutOpen(fallback, LD) {
     var d = ev && ev.data, c;
     if (me.gone || !d || ev.source !== frame.contentWindow || ev.origin !== me.org) return;
     if (d.onf === 'outFail') return back('fail-' + (/^[a-z]{1,10}$/.test(d.why) ? d.why : 'x'));
+    if (ext && d.onf === 'outHello') {   // 🖥️ 확장 판은 노크(auth-please)로 입장권을 받는다 — outBoot 없음 · 노크까지 시계
+      if (!tchGet()) return back('notch');
+      if (!me.drawn) { clearTimeout(tm); tm = setTimeout(function () { back('paint'); }, TOUT_PAINT_MS); }
+      return;
+    }
+    if (ext && d.onf === 'auth-please' && !me.drawn) { me.drawn = true; clearTimeout(tm); ONF.frame.fallOk(key); if (LD) LD.ok(); return; }   // 섰다 — 답(입장권)은 아래 노크 손이 준다
     if (d.onf === 'outHello') {
       if (!(c = tchGet())) return back('notch');
       /* 🏫 머리에서 미리 받은 사본(위 tPre)이 있으면 그 답을 기다려 outBoot{d} 로 싣는다(판은 묻지 않는다) · 없음·못 받음 = 종전 outBoot{tk}(판이 묻는다).
@@ -550,7 +566,7 @@ function tOutOpen(fallback, LD) {
       if (!me.drawn) { clearTimeout(tm); tm = setTimeout(function () { back('paint'); }, TOUT_PAINT_MS); }
       return;
     }
-    if (d.onf === 'homeDrawn' && !me.drawn) { me.drawn = true; clearTimeout(tm); ONF.frame.fallOk('thome'); if (LD) LD.ok(); }
+    if (d.onf === 'homeDrawn' && !me.drawn) { me.drawn = true; clearTimeout(tm); ONF.frame.fallOk(key); if (LD) LD.ok(); }
   }
   window.addEventListener('message', onMsg);
   tm = setTimeout(function () { back('hello'); }, TOUT_HELLO_MS);
