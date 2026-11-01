@@ -1387,6 +1387,22 @@ t('O9 고침 2 — 새로고침 되살리기가 길(out)을 기억한다: 정적
   assert.ok(s.panel() && !isStatic(s.panel()), '⛔ 구글 판을 정적 판으로 되살렸다');
 });
 
+t('O9b 되살린 정적 판도 사본 힌트(cf)를 싣는다(밖으로 7 · 2026-11-01 — 5단계 틈: 새로고침 뒤 판은 cf 없이 다리 3.5초) · 꼴 틀린 힌트는 안 싣는다', () => {
+  const mk = (ss) => run({ frame: true, pre(g) { g.sessionStorage = ss; } });
+  const store = () => ({ s: {}, getItem(k) { return k in this.s ? this.s[k] : null; }, setItem(k, v) { this.s[k] = String(v); }, removeItem(k) { delete this.s[k]; } });
+  const ss = store();
+  let s = mk(ss);
+  s.send({ onf: 'openBook', href: E1, left: 270, out: 1, cf: CFT }, s.home);
+  assert.deepStrictEqual(JSON.parse(ss.s.onfThOpenBook).c, CFT, '⛔ 기억에 사본 힌트가 없다');
+  s = mk(ss); s.send({ onf: 'bookHello' }, s.home);
+  const w = outUp(s, s.panel()), b = bootOf(w);
+  assert.ok(b.length === 1 && JSON.stringify(b[0][0].cf) === JSON.stringify(CFT), '⛔ 되살린 판 outBoot 에 cf 가 없다(다리 3.5초): ' + JSON.stringify(b));
+  const bad = store(); s = mk(bad); s.send({ onf: 'openBook', href: E1, left: 270, out: 1, cf: { f: '../x', s: 'E1', k: 'zz' } }, s.home);
+  assert.strictEqual(JSON.parse(bad.s.onfThOpenBook).c, null, '⛔ 꼴 틀린 힌트를 기억했다');
+  s = mk(bad); s.send({ onf: 'bookHello' }, s.home);
+  assert.ok(!bootOf(outUp(s, s.panel()))[0][0].cf, '⛔ 꼴 틀린 힌트로 되살렸다');
+});
+
 /* ═══ 🧺 남은 쓰기 넘겨주기(밖으로 4-① Task 5 · 2026-10-28) — ⚠️ 쌍둥이: 학생 test/outside.test.js S6a·F1·F2 ═══
    정적 판에서 못 보낸 쓰기 → 같은 교재를 지금 길로 열면 숨긴 정적 판(park=1)으로 한 번 넘겨준다. 저장 열쇠엔 자격(t·ttok·tas)이 없다. */
 console.log('[🧺 밖으로 4-① — 선생님 남은 쓰기 넘겨주기]');
