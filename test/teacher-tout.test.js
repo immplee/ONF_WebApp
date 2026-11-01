@@ -307,6 +307,42 @@ t('B3 물러난 지금 길도 종전처럼 돈다 — 구글 노크에 구글 �
   assert.ok(/AKfycb/.test(Q.nav[Q.nav.length - 1]));
 });
 
+t('HX 🖥️ 화면 확장 창(mode=hwext · 2026-11-01) — 입장권·켬이면 Pages /hwext/?t&s 먼저(outBoot 없음 · 노크에 입장권) · 섰으면 물러남 기억 0 · outFail·시한 = 같은 액자 구글 확장 창(mode=hwext&t&s&ext=1) + 기억 onfHwExtOutFail · 꼴 틀린 세트·입장권 없음 = 구글', async () => {
+  const cell = tchCell(20), tk = JSON.parse(cell).tk, SET = 'h' + 'a'.repeat(20), XURL = APP + '/hwext/?t=Tok_1&s=' + SET;
+  const R = boot({ onf_tch: cell, onf_tout: '1' }, { search: '?mode=hwext&t=Tok_1&s=' + SET + '&ext=1' });
+  login(R, gtok());
+  assert.deepStrictEqual(R.opened()[0], XURL, '⛔ 확장 창이 정적 판을 먼저 안 열었다: ' + JSON.stringify(R.opened()));
+  R.fromApp({ onf: 'outHello' });
+  assert.deepStrictEqual(R.sentTo(APP), [], '⛔ 확장 판에 outBoot 을 보냈다(노크로 입장권을 받는다)');
+  R.sent.length = 0;
+  R.fromApp({ onf: 'auth-please', stale: false });
+  assert.deepStrictEqual(R.sent.map((x) => [x.m, x.o]), [[{ onf: 'auth', token: tk, hist: 1 }, APP]], '⛔ 확장 판 노크에 입장권을 안 줬다(또는 구글 토큰)');
+  //   노크는 「섰다」가 아니다 — 노크 뒤라도 첫 보기 전 outFail 이면 물러난다(반박 검토 🔴)
+  const K = boot({ onf_tch: cell, onf_tout: '1' }, { search: '?mode=hwext&t=Tok_1&s=' + SET + '&ext=1' }); login(K, gtok());
+  K.fromApp({ onf: 'outHello' }); K.fromApp({ onf: 'auth-please', stale: false }); K.fromApp({ onf: 'outFail', why: 'bridge' });
+  assert.ok(K.opened().some((u) => /AKfycb/.test(u) && /mode=hwext/.test(u)), '⛔ 노크 뒤 열리기 전 outFail 을 버렸다(멈춤)');
+  R.fromApp({ onf: 'outDrawn' });
+  R.advance(60000); R.fromApp({ onf: 'outFail', why: 'bridge' });
+  assert.ok(!R.execOpen() && !('onfHwExtOutFail' in R.ls), '⛔ 선(outDrawn) 확장 판을 구글로 바꿨거나 실패로 적었다');
+  for (const [why, go] of [['fail-bridge', (Q) => { Q.fromApp({ onf: 'outHello' }); Q.fromApp({ onf: 'outFail', why: 'bridge' }); }], ['hello', (Q) => Q.advance(60000)], ['paint', (Q) => { Q.fromApp({ onf: 'outHello' }); Q.advance(60000); }]]) {
+    const store = { onf_tch: cell, onf_tout: '1' }, Q = boot(store, { search: '?mode=hwext&t=Tok_1&s=' + SET + '&ext=1' });
+    login(Q, gtok()); go(Q);
+    const g = Q.opened().filter((u) => /AKfycb/.test(u));
+    assert.ok(g.length && /mode=hwext/.test(g[0]) && /t=Tok_1/.test(g[0]) && /s=h[a]{20}/.test(g[0]) && /ext=1/.test(g[0]), '⛔ ' + why + ' — 구글 확장 창(같은 t·s·ext)으로 안 물러났다: ' + JSON.stringify(Q.opened()));
+    assert.ok(/,1$/.test(String(store.onfHwExtOutFail)), '⛔ ' + why + ' — 물러남 기억(hwext)이 없다: ' + store.onfHwExtOutFail);
+    assert.ok(!('onfTOutFail' in store), '⛔ 확장 창 물러남을 선생님 홈 기억에 적었다');
+  }
+  //   물러남 기억(hwext)이 막는 동안은 곧장 구글 · 선생님 홈 기억(thome)은 확장 창을 안 막는다
+  const blk = { onf_tch: cell, onf_tout: '1', onfHwExtOutFail: (Date.now() + 3600e3) + ',1' }, B = boot(blk, { search: '?mode=hwext&t=Tok_1&s=' + SET + '&ext=1' }); login(B, gtok());
+  assert.ok(!B.opened().some((u) => /\/hwext\//.test(u)) && B.execOpen(), '⛔ 확장 창 물러남 기억이 막는 동안 또 정적 판');
+  const blk2 = { onf_tch: cell, onf_tout: '1', onfTOutFail: (Date.now() + 3600e3) + ',1' }, B2 = boot(blk2, { search: '?mode=hwext&t=Tok_1&s=' + SET + '&ext=1' }); login(B2, gtok());
+  assert.deepStrictEqual(B2.opened()[0], XURL, '⛔ 선생님 홈 물러남 기억이 확장 창을 막았다');
+  for (const [store, search] of [[{ onf_tch: cell, onf_tout: '1' }, '?mode=hwext&t=Tok_1&s=hBAD&ext=1'], [{ onf_tout: '1' }, '?mode=hwext&t=Tok_1&s=' + SET], [{ onf_tch: cell }, '?mode=hwext&t=Tok_1&s=' + SET + '&tout=0']]) {
+    const Q = boot(store, { search }); login(Q, gtok());
+    assert.ok(!Q.opened().some((u) => /\/hwext\//.test(u)) && Q.execOpen(), '⛔ 정적 확장 판을 열면 안 되는데 열었다: ' + search);
+  }
+});
+
 t('B4 입장권 없음·만료 · 학생 한 명 창(mode=student)·과제 판(hwbook) · 홈 화면 앱(standalone) · WebKit(맥 사파리·아이폰 크롬·아이패드) → 정적 먼저 안 함', async () => {
   const st = (o) => Object.assign({ onf_tout: '1' }, o);
   for (const [store, opt] of [[st({}), {}], [st({ onf_tch: tchCell(-1) }), {}], [st({ onf_tch: tchCell(20) }), { search: '?mode=student&t=Tok_1' }],
