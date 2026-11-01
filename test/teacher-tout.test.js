@@ -317,8 +317,13 @@ t('HX 🖥️ 화면 확장 창(mode=hwext · 2026-11-01) — 입장권·켬이�
   R.sent.length = 0;
   R.fromApp({ onf: 'auth-please', stale: false });
   assert.deepStrictEqual(R.sent.map((x) => [x.m, x.o]), [[{ onf: 'auth', token: tk, hist: 1 }, APP]], '⛔ 확장 판 노크에 입장권을 안 줬다(또는 구글 토큰)');
-  R.advance(60000);
-  assert.ok(!R.execOpen() && !('onfHwExtOutFail' in R.ls), '⛔ 선 확장 판을 구글로 바꿨거나 실패로 적었다');
+  //   노크는 「섰다」가 아니다 — 노크 뒤라도 첫 보기 전 outFail 이면 물러난다(반박 검토 🔴)
+  const K = boot({ onf_tch: cell, onf_tout: '1' }, { search: '?mode=hwext&t=Tok_1&s=' + SET + '&ext=1' }); login(K, gtok());
+  K.fromApp({ onf: 'outHello' }); K.fromApp({ onf: 'auth-please', stale: false }); K.fromApp({ onf: 'outFail', why: 'bridge' });
+  assert.ok(K.opened().some((u) => /AKfycb/.test(u) && /mode=hwext/.test(u)), '⛔ 노크 뒤 열리기 전 outFail 을 버렸다(멈춤)');
+  R.fromApp({ onf: 'outDrawn' });
+  R.advance(60000); R.fromApp({ onf: 'outFail', why: 'bridge' });
+  assert.ok(!R.execOpen() && !('onfHwExtOutFail' in R.ls), '⛔ 선(outDrawn) 확장 판을 구글로 바꿨거나 실패로 적었다');
   for (const [why, go] of [['fail-bridge', (Q) => { Q.fromApp({ onf: 'outHello' }); Q.fromApp({ onf: 'outFail', why: 'bridge' }); }], ['hello', (Q) => Q.advance(60000)], ['paint', (Q) => { Q.fromApp({ onf: 'outHello' }); Q.advance(60000); }]]) {
     const store = { onf_tch: cell, onf_tout: '1' }, Q = boot(store, { search: '?mode=hwext&t=Tok_1&s=' + SET + '&ext=1' });
     login(Q, gtok()); go(Q);

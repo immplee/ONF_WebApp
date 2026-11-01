@@ -503,7 +503,7 @@ var frameWatch = null;
      그리기 전 outFail·hello 없음(TOUT_HELLO_MS)·outBoot 뒤 그리기 시한(TOUT_PAINT_MS) = 같은 액자에 지금 길(openHome) + 물러남 기억(ONF.frame.fallBack 'thome' — hello·paint·fail-time·fail-net 은 slow, 그 밖 hard) · homeDrawn = 연속 0 · 물러나면 죽은 정적 창을 노크 칸에서 비운다.
    그린 뒤 화면 노크(auth-please)는 위 onf-knock 이 받는다 — 정적 판 창(직접 자식 · 그 출처)이면 답이 구글 토큰이 아니라 입장권(answer · appTch).
    ponytail: 시한 둘은 짐작(판 boot 4초 · /t/home/get 4초에 맞춤)·첫 실패 면제(학생 cold) 없음 — 라이브 재기로 고친다. */
-var tOut = null, TOUT_HELLO_MS = 3000, TOUT_PAINT_MS = 8000;
+var tOut = null, TOUT_HELLO_MS = 3000, TOUT_PAINT_MS = 8000, TOUT_EXT_MS = 15000;   // 🖥️ 확장 판 첫 보기 시한(Worker 4초 → 다리 8초)
 function tOutLive() { return tOut && !tOut.gone ? tOut.org : ''; }   // 살아 있는 정적 먼저의 판 출처 · 없으면 ''
 /** 미리 받은 사본(머리 tPre) 약속 — 한 번만 · 같은 입장권일 때만 · 없으면 null. 꺼낸 뒤 잡고 있지 않는다(학생 열쇠가 든 답) */
 function tPreTake(tk) {
@@ -544,12 +544,14 @@ function tOutOpen(fallback, LD) {
     var d = ev && ev.data, c;
     if (me.gone || !d || ev.source !== frame.contentWindow || ev.origin !== me.org) return;
     if (d.onf === 'outFail') return back('fail-' + (/^[a-z]{1,10}$/.test(d.why) ? d.why : 'x'));
-    if (ext && d.onf === 'outHello') {   // 🖥️ 확장 판은 노크(auth-please)로 입장권을 받는다 — outBoot 없음 · 노크까지 시계
+    if (ext && d.onf === 'outHello') {   // 🖥️ 확장 판은 노크(auth-please)로 입장권을 받는다(답은 아래 노크 손) — outBoot 없음 · 첫 보기까지 시계(Worker 4초 + 다리 8초 + 여유)
       if (!tchGet()) return back('notch');
-      if (!me.drawn) { clearTimeout(tm); tm = setTimeout(function () { back('paint'); }, TOUT_PAINT_MS); }
+      if (!me.drawn) { clearTimeout(tm); tm = setTimeout(function () { back('paint'); }, TOUT_EXT_MS); }
       return;
     }
-    if (ext && d.onf === 'auth-please' && !me.drawn) { me.drawn = true; clearTimeout(tm); ONF.frame.fallOk(key); if (LD) LD.ok(); return; }   // 섰다 — 답(입장권)은 아래 노크 손이 준다
+    /* 🖥️ 섰다 = 판이 첫 보기 답(live)을 받았다(outDrawn) — ⛔ 노크가 아니다: 노크는 첫 부름 전에 오므로 그걸 「섰다」로 보면 열리기 전 outFail(bridge·anon)을 버려
+         「과제를 읽지 못했어요」에서 멈췄다(반박 검토 🔴 · 2026-11-01). */
+    if (ext && d.onf === 'outDrawn' && !me.drawn) { me.drawn = true; clearTimeout(tm); ONF.frame.fallOk(key); if (LD) LD.ok(); return; }
     if (d.onf === 'outHello') {
       if (!(c = tchGet())) return back('notch');
       /* 🏫 머리에서 미리 받은 사본(위 tPre)이 있으면 그 답을 기다려 outBoot{d} 로 싣는다(판은 묻지 않는다) · 없음·못 받음 = 종전 outBoot{tk}(판이 묻는다).
