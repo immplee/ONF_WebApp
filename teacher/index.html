@@ -1022,6 +1022,14 @@ function hwPenRelay(d) {
   hwPenLast = { onf: 'penRelay', tool: tool, pick: pick, stampK: d.stampK === 1 ? 1 : 0 };
   hwPenSync();
 }
+/* ◎ 옆 교재 고리 → 과제 판(bookPenRing) — 꼴만 거른다(도구 이름 · 색 16자 · 굵기 수) · 옆에일 때만(교재만이면 교재가 제 줄을 쓴다) */
+function hwPenRing(d) {
+  var tool = String(d.tool || '');
+  if (hwView !== 'side' || !hwWin || !/^[a-z]{2,8}$/.test(tool)) return;
+  var pick = {};
+  ['pen', 'marker'].forEach(function (k) { var x = d.pick && d.pick[k]; if (x && typeof x.color === 'string' && x.color.length <= 16 && typeof x.w === 'number') pick[k] = { color: x.color, w: x.w }; });
+  try { hwWin.postMessage({ onf: 'bookPenRing', tool: tool, pick: pick, stampK: d.stampK === 1 ? 1 : 0 }, hwOrigin); } catch (e) {}
+}
 /* 옆에 = 과제 판 줄이 정본(교재 줄 숨김 · 마지막 도구) · 교재만 = 과제 판이 숨으니 교재가 제 줄을 쓴다(off · 반박 🔴1) */
 function hwPenSync() {
   if (!hwBk || !hwBk.win) return;
@@ -1034,7 +1042,8 @@ window.addEventListener('message', function (ev) {
   if (!d || !hwBk || !bookFrom(ev, hwBk.el, true)) return;   // 🌤 판 출처(구글 또는 정적 판 · 2026-10-31 넓히기 ②)
   if (d.onf === 'bookHi') { hwBk.win = ev.source; hwBk.origin = ev.origin; if (hwBk.unpark) { hwBk.unpark = false; try { hwBk.win.postMessage({ onf: 'bookPark', on: false }, hwBk.origin); } catch (e) {} } hwPenSync(); return; }
   if (d.onf === 'hwTap') { histTap(); return; }   // 👆 옆·교재만에서 교재만 만져도(반박 🟠2)
-  if (d.onf === 'penAct') { if (hwView === 'side' && hwWin) { try { hwWin.postMessage({ onf: 'bookPenAct' }, hwOrigin); } catch (e) {} } return; }   // ↩️ 옆 교재에 되돌릴 일이 생겼다 → 과제 판 펜 줄 차례 장부(2026-10-30 4차)
+  if (d.onf === 'penAct') { if (hwView === 'side' && hwWin) { try { hwWin.postMessage({ onf: 'bookPenAct' }, hwOrigin); } catch (e) {} } return; }
+  if (d.onf === 'penRing') { hwPenRing(d); return; }   // ◎ 옆 교재 두 손가락 고리에서 고른 도구·색 → 과제 판 펜 줄(그 줄이 다시 penRelay 로 교재에 · Ownify 2026-11-02)   // ↩️ 옆 교재에 되돌릴 일이 생겼다 → 과제 판 펜 줄 차례 장부(2026-10-30 4차)
   if (d.onf === 'themeAsk') { themeAsk(ev); return; }
   if (d.onf === 'printTitle') { if (window.ONF && ONF.frame && ONF.frame.printTitle) ONF.frame.printTitle(d.t); return; }
   if (d.onf === 'bookClose') { hwViewSet('photo'); hwTellView(); }
