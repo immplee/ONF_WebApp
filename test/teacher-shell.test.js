@@ -428,7 +428,7 @@ t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼�
   const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
   R.knockAs(me);
   R.postAs({ onf: 'hwbook', t: 'Tok_1' }, me);
-  const fr = R.created.filter((e) => e.tag === 'iframe')[0], inner = { parent: { parent: fr.contentWindow }, postMessage() {} };
+  const fr = R.created.filter((e) => e.tag === 'iframe')[0], boardGot = [], inner = { parent: { parent: fr.contentWindow }, postMessage: (m) => boardGot.push(m) };
   R.postAs({ onf: 'auth-please' }, inner);
   const box = R.created.filter((e) => e.className === 'onf-hwbox')[0], panels = () => R.created.filter((e) => e.className === 'onf-hwbk' && e.parentNode && !e.removed);
   const HREF = 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILEaaaaaaaa01&sheetName=E3';
@@ -467,6 +467,11 @@ t('📖 과제 판 + 교재(5단계 · 2026-10-24) — 옆에 = 과제 판 왼�
   assert.deepStrictEqual(JSON.parse(JSON.stringify(bookGot[2] || {})), { onf: 'penRelay', off: 1 }, '⛔ 교재만인데 교재 펜 줄을 안 되살렸다(과제 판이 숨어 펜 줄이 하나도 없다)');
   R.postAs({ onf: 'hwbookView', v: 'side' }, inner);
   assert.strictEqual(bookGot[3] && bookGot[3].tool, 'pen', '⛔ 옆에로 돌아왔는데 과제 판 도구를 다시 안 보냈다');
+  // ◎ 옆 교재 두 손가락 고리 → 과제 판 펜 줄(Ownify 2026-11-02) — 꼴 거름 · 옆에일 때만
+  R.postAs({ onf: 'penRing', tool: 'marker', pick: { marker: { color: '#FFC2DA', w: 18 }, pen: { color: 'x'.repeat(40), w: 3 } } }, bookWin);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(boardGot.filter((m) => m && m.onf === 'bookPenRing'))), [{ onf: 'bookPenRing', tool: 'marker', pick: { marker: { color: '#FFC2DA', w: 18 } }, stampK: 0 }], '⛔ 교재 고리에서 고른 도구가 과제 판에 안 갔다(또는 꼴 틀린 색을 넘겼다)');
+  R.postAs({ onf: 'penRing', tool: 'x"><b' }, bookWin);
+  assert.strictEqual(boardGot.filter((m) => m && m.onf === 'bookPenRing').length, 1, '⛔ 꼴이 틀린 도구를 넘겼다');
   R.postAs({ onf: 'hwbookView', v: 'book' }, inner);
   R.postAs({ onf: 'hwbookView', v: 'book' }, inner);
   assert.strictEqual(box.style.visibility, 'hidden', '⛔ 교재만 — 과제 판이 안 숨었다');
