@@ -1326,9 +1326,12 @@
     /* 🖥️ 모니터 연결 알림 · 확장 창 열기(2026-10-29 · ONF_Archive 웹-앱/2026-10-29-목요일_교재-시스템_화면확장-미러링-구현계획.md 3단계)
        ▸ {onf:'monitorHello'} = 선생님 교재가 「모니터가 붙으면 알려 줘」 — 지금 상태를 바로 답하고, 바뀔 때마다 {onf:'monitor', on}(크롬 screen.isExtended · change).
          screen.isExtended 를 모르는 브라우저(사파리)는 can:false — 교재는 알림 없이 ☰ 줄만.
+       ▸ {onf:'extPend', url} = 📱 아이패드(2026-11-02 Peter 「꾹 메뉴 맨 위 링크가 지저분 — https://class.ownify.co.kr/ 만」) — 교재 「화면 확장」 링크는 맨 주소(/)만 단다.
+         꾹 누를 때 긴 확장 주소를 여기 맡기면(30초) 「새 윈도우에서 열기」로 뜬 새 창의 index.html 머리가 한 번 꺼내 그 주소로 간다 · 지운다.
        ▸ {onf:'extOpen', url} = 확장 창을 이 맨 위 창이 연다 — 모니터가 붙어 있으면 그 모니터 자리·크기로(getScreenDetails · 처음 한 번 크롬이 「창 관리」 허락을 묻는다).
          주소는 우리 책 껍데기(script·class.ownify.co.kr)의 ext=1 주소만. 열림·닫힘(1초마다 봄)은 {onf:'extState', on, why} · {onf:'extClose'} = 닫기.
          ⚠️ 허락을 묻는 사이 누른 손길이 식으면 창이 막힐 수 있다 → why:'blocked' — 교재가 「한 번 더 눌러 주세요」(허락은 남아 다음엔 바로). */
+    var EXT_PEND = 'onfExtPend';   // ⛔ 이름을 바꾸면 index.html 머리 꺼내기도 같이
     var mon = [], scr = global.screen, xw = null, xOwner = null, xIv = 0, xLone = 0, LONE_MS = 10 * 60 * 1000;   // xLone = 주인 없는 확장 창 닫기 시계(10분)
     function canMon() { return !!scr && typeof scr.isExtended === 'boolean'; }
     function xOrphan() { return !!(xw && !xw.closed && !xOwner); }   // 🖥️ 교재를 닫거나 다른 교재로 갔다 — 창은 남겨 다음 판이 이어 쓴다(Peter 2026-10-29)
@@ -1345,7 +1348,11 @@
     }
     function onMon(ev) {
       var d = ev && ev.data;
-      if (!d || (d.onf !== 'monitorHello' && d.onf !== 'extOpen' && d.onf !== 'extClose' && d.onf !== 'extRelease') || !ev.source || !isAppOrigin(ev.origin) || !inside(ev.source)) return;
+      if (!d || (d.onf !== 'monitorHello' && d.onf !== 'extOpen' && d.onf !== 'extClose' && d.onf !== 'extRelease' && d.onf !== 'extPend') || !ev.source || !isAppOrigin(ev.origin) || !inside(ev.source)) return;
+      if (d.onf === 'extPend') {   // 📱 아이패드 꾹 = 「새 윈도우에서 열기」 링크가 이 껍데기 맨 주소(/)다 — 긴 확장 주소는 30초 맡겨 두고 새 창 index.html 머리가 꺼내 간다(EXT_PEND) · 빈 url = 짧게 눌렀다(지움)
+        try { if (d.url === '') global.localStorage.removeItem(EXT_PEND); else if (extOk(d.url)) global.localStorage.setItem(EXT_PEND, JSON.stringify({ u: String(d.url), t: Date.now() })); } catch (e) {}
+        return;
+      }
       var a = { win: ev.source, origin: ev.origin };
       if (d.onf === 'monitorHello') { if (!mon.some(function (x) { return x.win === ev.source; })) mon.push(a); monTell(a); return; }
       if (d.onf === 'extClose') { if (xOwner && xOwner.win === ev.source) xEnd(); return; }
