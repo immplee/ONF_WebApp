@@ -124,6 +124,34 @@ t('🖥️ 판이 떠나도 창은 남는다(extRelease) — 다음 판 monitorH
   const lone = s.TO.filter((x) => x[1] === 600000).pop(); assert.ok(lone, '⛔ 주인 없는 창 10분 시계가 없다');
   lone[0](); assert.ok(s.opened[0].closed, '⛔ 10분 주인 없는 창을 안 닫았다');
 });
+console.log('[📱 아이패드 확장 창 = 맨 주소 링크 + 맡긴 긴 주소(2026-11-02 Peter 「https://class.ownify.co.kr/ 만」)]');
+function store(init) { const m = Object.assign({}, init || {}); return { m, getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } }; }
+t('extPend — 우리 ext 주소만 30초 맡김 · 빈 url = 지움 · ⛔ 남의 출처·바깥 창·남의 주소는 안 맡김', () => {
+  const ls = store(), s = mon(false); s.g.localStorage = ls; const book = s.frame(s.g);
+  s.send({ onf: 'extPend', url: EXT }, book, GAS);
+  const p = JSON.parse(ls.m.onfExtPend || 'null'); assert.ok(p && p.u === EXT && Math.abs(Date.now() - p.t) < 2000, '⛔ 긴 확장 주소를 안 맡겼다(새 창이 홈으로 뜬다)');
+  assert.strictEqual(s.opened.length, 0, '⛔ 맡기기만 해야 하는데 창을 열었다');
+  s.send({ onf: 'extPend', url: '' }, book, GAS); assert.ok(!('onfExtPend' in ls.m), '⛔ 짧게 눌렀는데 맡긴 주소가 남았다');
+  for (const bad of ['https://evil.example/?ext=1', 'https://script.ownify.co.kr/?fileId=F', 'javascript:alert(1)']) s.send({ onf: 'extPend', url: bad }, book, GAS);
+  s.send({ onf: 'extPend', url: EXT }, s.frame(s.g), 'https://evil.example');
+  const other = { postMessage() {} }; other.parent = other; s.send({ onf: 'extPend', url: EXT }, other, GAS);
+  assert.ok(!('onfExtPend' in ls.m), '⛔ 남의 주소·출처·창의 말로 맡겼다(새 창이 거기로 간다)');
+});
+t('index.html 머리 — 맨 주소로 뜬 새 창은 30초 안 맡긴 주소로 간다(한 번 · 지움) · 낡음·맨 주소 아님·남의 주소면 그냥 홈', () => {
+  const H = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const js = (H.match(/<script>\/\* 📱 아이패드 「화면 확장」 새 창[\s\S]*?\*\/([\s\S]*?)<\/script>/) || [])[1];
+  assert.ok(js, '⛔ index.html 머리에 맡긴 주소 꺼내기가 없다');
+  assert.ok(H.indexOf(js) < H.indexOf('/assets/onf-load.js'), '⛔ 꺼내기가 로고 로딩 뒤다(홈이 먼저 그려진다)');
+  const run = (loc, ls) => { const went = []; vm.runInNewContext(js, { location: Object.assign({ pathname: '/', search: '', hash: '', replace: (u) => went.push(u) }, loc), localStorage: ls, JSON, Date }); return went; };
+  const T = 'https://class.ownify.co.kr/teacher/?mode=hwext&t=S&s=1&ext=1', pend = (u, ago) => store({ onfExtPend: JSON.stringify({ u, t: Date.now() - ago }) });
+  let ls = pend(T, 5000); assert.deepStrictEqual(run({}, ls), [T], '⛔ 맡긴 확장 주소로 안 갔다'); assert.ok(!('onfExtPend' in ls.m), '⛔ 쓴 뒤 안 지웠다(다음 홈도 확장으로 간다)');
+  assert.deepStrictEqual(run({}, pend(EXT, 1000)), [EXT]);
+  ls = pend(T, 31000); assert.deepStrictEqual(run({}, ls), [], '⛔ 낡은(30초 넘은) 주소로 갔다'); assert.ok(!('onfExtPend' in ls.m));
+  assert.deepStrictEqual(run({ search: '?t=abc' }, pend(T, 1000)), [], '⛔ 학생 링크(맨 주소 아님)까지 끌고 갔다');
+  assert.deepStrictEqual(run({ pathname: '/i/abcdef' }, pend(T, 1000)), []);
+  for (const bad of ['https://evil.example/?ext=1', 'https://class.ownify.co.kr/?fileId=F', 'javascript:alert(1)//?ext=1']) assert.deepStrictEqual(run({}, pend(bad, 1000)), [], '⛔ 남의 주소로 갔다: ' + bad);
+  assert.deepStrictEqual(run({}, store()), []);
+});
 console.log(`${pass}개 통과, ${fail}개 실패`);
 if (fail) process.exit(1);
 })();

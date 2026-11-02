@@ -31,6 +31,8 @@
        「불러오는 중이에요」 글자만 남는다(2026-09-03 실제로 그렇게 배포됐다 — 그려 봐서 잡았다).
        ⚠️ 새 `<link>`·`<script>` 를 넣을 때도 `/` 로 시작해라. test/onf-frame.test.js 가 검사한다. -->
 <script>/* 🌙 다크 모드 — 안쪽 액자가 알려 준 색(onfTheme · onf-frame.js)을 **그리기 전에** 단다 · 없으면 어둡게(Peter 2026-10-14 「홈페이지 기본은 다크모드로」 — 종전 기기 설정 · 홈에서 「기기 설정 따라」를 고르면 안쪽이 그 색을 알려 남는다) */(function(){try{var v=localStorage.getItem("onfTheme"),d=v!=="light";document.documentElement.setAttribute("data-theme",d?"dark":"light");}catch(e){}})();</script>
+<script>/* 📱 아이패드 「화면 확장」 새 창(2026-11-02 Peter) — 링크는 맨 주소(/)만이라 꾹 메뉴엔 https://class.ownify.co.kr/ 만 보인다 ·
+   긴 확장 주소는 꾹 누를 때 껍데기가 맡겨 뒀다(onf-frame.js extPend · 30초 · 한 번 쓰면 지움) → 그리기 전에 그리로 간다. 맨 주소가 아니거나 낡았으면 그냥 홈. */(function(){try{if(location.pathname!=="/"||location.search||location.hash)return;var p=JSON.parse(localStorage.getItem("onfExtPend")||"null");if(!p)return;localStorage.removeItem("onfExtPend");if(Date.now()-p.t<30000&&/^https:\/\/(script|class)\.ownify\.co\.kr\/[^#]*[?&]ext=1(&|$)/.test(p.u))location.replace(p.u);}catch(e){}})();</script>
 <link rel="stylesheet" href="/assets/onf-ui.css">
 </head>
 <body class="onf-full">
