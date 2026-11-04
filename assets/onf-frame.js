@@ -861,7 +861,7 @@
         swap: false, load: src, real: src, sw: null, ask: {}, born: Date.now(), gone: false, home: false };   // 📖 아래 「교재 판 한 장」 — swap = 노크 swap:1 · load = 액자가 처음 연 주소 · real = 판이 실제로 든 교재 · sw = 기다리는 갈아 끼우기 · ask = 보낸 번호 → 주소 · born = 만든 때 · gone = 주소로 못 찾음 · home = 홈에서 연 판(bookBoard)
       p.box.className = 'onf-bookpanel';
       if (parked) p.box.classList.add('park');
-      p.el.setAttribute('allow', 'clipboard-write; microphone');
+      p.el.setAttribute('allow', 'clipboard-write; microphone; autoplay');
       p.el.setAttribute('title', '교재');
       p.box.appendChild(p.el);
       /* 액자 뒤에 「불러오는 중」(2026-10-12 · 홈 첫 화면 .onf-wait 와 같은 것) — 구글이 화면을 그리면 액자가 덮는다.
