@@ -152,6 +152,47 @@ t('index.html 머리 — 맨 주소로 뜬 새 창은 30초 안 맡긴 주소로
   for (const bad of ['https://evil.example/?ext=1', 'https://class.ownify.co.kr/?fileId=F', 'javascript:alert(1)//?ext=1']) assert.deepStrictEqual(run({}, pend(bad, 1000)), [], '⛔ 남의 주소로 갔다: ' + bad);
   assert.deepStrictEqual(run({}, store()), []);
 });
+console.log('[🖥️ 모니터 창 이어 쓰기(2026-11-05 Peter 「하루 한 번 띄워 두고 어떤 교재·과제 판을 열든 따라오게」)]');
+function bus() { const chs = []; return function BC(name) { const me = { name, onmessage: null, postMessage(m) { chs.filter((c) => c !== me && c.name === name && c.onmessage).forEach((c) => c.onmessage({ data: JSON.parse(JSON.stringify(m)) })); } }; chs.push(me); return me; }; }
+function monPair() {
+  const BC = bus(), TO = [], app = [], rep = [];
+  const tm = { setTimeout: (f, ms) => { TO.push([f, ms]); return TO.length; }, clearTimeout: (i) => { if (TO[i - 1]) TO[i - 1][0] = () => {}; }, setInterval: () => 0, BroadcastChannel: BC, URL };
+  const MU = 'https://class.ownify.co.kr/?t=T1&mode=share&fileId=A&sheetName=E1&ttok=x&ext=1';
+  const m = env(Object.assign({}, tm, { location: { search: MU.slice(MU.indexOf('?')), pathname: '/', href: MU, replace: (u) => rep.push(u) } }));
+  m.doc.body = { appendChild: (x) => app.push(x) };
+  const t = env(Object.assign({}, tm));
+  return { m, t, TO, app, rep };
+}
+t('창 소리(beat)를 들은 선생님 껍데기 = monHello 한 판에 monState(key) · monGo(다른 화면) = 창이 그 주소로 갈아탐 · 같은 화면이면 그대로 · ⛔ 남의 주소는 안 나름', () => {
+  const p = monPair(), book = p.t.frame(p.t.g);
+  p.t.send({ onf: 'monitorHello' }, book, OUT);
+  assert.deepStrictEqual(last(book), [{ onf: 'monState', key: 'share|A|T1' }, OUT], '⛔ 창이 있는데 판에 안 알렸다(monitorHello 로 듣기 등록)');
+  p.t.send({ onf: 'monGo', url: 'https://script.ownify.co.kr/?t=T1&mode=share&fileId=A&sheetName=E3&ttok=x&ext=1' }, book, OUT);
+  assert.strictEqual(p.rep.length, 0, '⛔ 같은 교재인데 창을 다시 불렀다(회차는 방이 따라간다)');
+  const HW = 'https://class.ownify.co.kr/teacher/?mode=hwext&t=T2&s=h0123456789abcdef0123&ext=1';
+  p.t.send({ onf: 'monGo', url: HW }, book, OUT);
+  assert.deepStrictEqual(p.rep, [HW], '⛔ 모니터 창이 새 화면(과제 판)으로 안 갈아탔다');
+  for (const bad of ['https://evil.example/?ext=1', 'https://class.ownify.co.kr/?fileId=B', 'javascript:alert(1)']) p.t.send({ onf: 'monGo', url: bad }, book, OUT);
+  p.t.send({ onf: 'monGo', url: HW.replace('T2', 'T9') }, p.t.frame(p.t.g), 'https://evil.example');
+  assert.strictEqual(p.rep.length, 1, '⛔ 남의 주소·출처로 창을 옮겼다');
+});
+t('monIdle = 창이 그 화면을 보이고 있을 때만 1.5초 뒤 로고 · 그 사이 monGo 면 안 덮음 · 다른 화면의 idle 은 무시', () => {
+  const p = monPair(), book = p.t.frame(p.t.g), A = 'https://script.ownify.co.kr/?t=T1&mode=share&fileId=A&ext=1';
+  p.t.send({ onf: 'monIdle', url: 'https://class.ownify.co.kr/teacher/?mode=hwext&t=T2&s=h0123456789abcdef0123&ext=1' }, book, OUT);
+  assert.ok(!p.TO.some((x) => x[1] === 1500), '⛔ 다른 화면이 떠났는데 로고로 덮으려 했다');
+  p.t.send({ onf: 'monIdle', url: A }, book, OUT);
+  const c = p.TO.filter((x) => x[1] === 1500).pop(); assert.ok(c, '⛔ 보이던 화면이 떠났는데 로고 시계가 없다');
+  p.t.send({ onf: 'monGo', url: A }, book, OUT); c[0]();
+  assert.strictEqual(p.app.length, 0, '⛔ 다시 불렀는데 로고로 덮었다');
+  p.t.send({ onf: 'monIdle', url: A }, book, OUT); p.TO.filter((x) => x[1] === 1500).pop()[0]();
+  assert.strictEqual(p.app.length, 1, '⛔ 로고를 안 덮었다(쉬는 시간에 학생 교재가 모니터에 남는다)');
+  assert.ok(/onf-512\.png/.test(p.app[0].innerHTML) && /pointer-events:none/.test(p.app[0].style.cssText), '⛔ 로고 덮개 모양이 다르다');
+});
+t('창 소리가 없으면(모니터 창 없음) monState 없음 — 판이 갈아타기를 안 부른다', () => {
+  const s = env(), book = s.frame(s.g);
+  s.send({ onf: 'monitorHello' }, book, OUT);
+  assert.ok(!book.got.some((x) => x[0].onf === 'monState'));
+});
 console.log(`${pass}개 통과, ${fail}개 실패`);
 if (fail) process.exit(1);
 })();

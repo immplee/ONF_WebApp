@@ -1353,13 +1353,14 @@
     }
     function onMon(ev) {
       var d = ev && ev.data;
-      if (!d || (d.onf !== 'monitorHello' && d.onf !== 'extOpen' && d.onf !== 'extClose' && d.onf !== 'extRelease' && d.onf !== 'extPend') || !ev.source || !isAppOrigin(ev.origin) || !inside(ev.source)) return;
+      if (!d || (d.onf !== 'monitorHello' && d.onf !== 'extOpen' && d.onf !== 'extClose' && d.onf !== 'extRelease' && d.onf !== 'extPend' && d.onf !== 'monHello' && d.onf !== 'monGo' && d.onf !== 'monIdle') || !ev.source || !isAppOrigin(ev.origin) || !inside(ev.source)) return;
+      if (d.onf === 'monHello' || d.onf === 'monGo' || d.onf === 'monIdle') { monMsg(d, ev); return; }   // 🖥️ 모니터 창 이어 쓰기(아래 MON)
       if (d.onf === 'extPend') {   // 📱 아이패드 꾹 = 「새 윈도우에서 열기」 링크가 이 껍데기 맨 주소(/)다 — 긴 확장 주소는 30초 맡겨 두고 새 창 index.html 머리가 꺼내 간다(EXT_PEND) · 빈 url = 짧게 눌렀다(지움)
         try { if (d.url === '') global.localStorage.removeItem(EXT_PEND); else if (extOk(d.url)) global.localStorage.setItem(EXT_PEND, JSON.stringify({ u: String(d.url), t: Date.now() })); } catch (e) {}
         return;
       }
       var a = { win: ev.source, origin: ev.origin };
-      if (d.onf === 'monitorHello') { if (!mon.some(function (x) { return x.win === ev.source; })) mon.push(a); monTell(a); return; }
+      if (d.onf === 'monitorHello') { if (!mon.some(function (x) { return x.win === ev.source; })) mon.push(a); monTell(a); monMsg({ onf: 'monHello' }, ev); return; }   // 🖥️ 같은 말로 모니터 창 소리(monState)도 받는다(아래 MON)
       if (d.onf === 'extClose') { if (xOwner && xOwner.win === ev.source) xEnd(); return; }
       if (d.onf === 'extRelease') {   // 주인 판이 떠난다(pagehide) — 창은 두고 주인만 비운다 · 다음 판이 monitor.ext 를 보고 이어 쓴다 · 10분 안 쓰면 닫는다
         if (!xOwner || xOwner.win !== ev.source) return;
@@ -1375,6 +1376,44 @@
         var cur = sd.currentScreen, other = (sd.screens || []).filter(function (s) { return s !== cur; })[0];
         xOpen(d.url, other ? 'left=' + other.availLeft + ',top=' + other.availTop + ',width=' + other.availWidth + ',height=' + other.availHeight : plain);
       }, function () { xOpen(d.url, plain); });   // 허락 안 함 — 이 화면에 연다(옮기는 건 사람이)
+    }
+    /* 🖥️ 모니터 창 이어 쓰기(2026-11-05 Peter 「확장 창을 매번 꾹·새 윈도우·모니터로 — 하루에 한 번만 띄워 두고 계속」 · 📱 아이패드 몫)
+       아이패드는 링크로 연 창을 판이 못 잡는다(opener 없음 · iOS 는 다른 창 조종 불가) → 같은 출처 맨 위 창끼리 BroadcastChannel 'onf-mon' 으로 말한다
+       (선생님 껍데기 class.ownify.co.kr/teacher · 확장 창 class.ownify.co.kr/?…ext=1 — script.ownify.co.kr 주소도 class 로 307 이라 같은 출처).
+       ▸ 확장 창(맨 위 주소 ext=1): 2초마다 {k:'beat', key}(key = 무엇을 보이나 · mode|fileId 또는 s|t) · {k:'go', url} = 다른 화면이면 그 주소로 갈아탄다(창은 그 모니터 그대로) ·
+         {k:'idle', key} = 지금 보이는 화면의 선생님 판이 떠났다 → 1.5초 뒤 로고만(쉬는 시간에 학생 교재가 모니터에 남지 않게 · 그 사이 go 가 오면 안 덮음).
+       ▸ 선생님 껍데기: beat 를 들으면 monHello 한 판들에 {onf:'monState', key} · 판의 monGo/monIdle 을 채널로 옮긴다(주소 검사 extOk).
+         어느 판이 언제 갈아타기를 부를지는 판(Ownify ONF_Present_Html _monTick)이 정한다 — 여기는 나르기만. */
+    var MCH = null, monIs = !!(global.location && /[?&]ext=1(&|$)/.test(global.location.search)), monFr = [], monAt = 0, monK = '';
+    function monKey(u) { try { var p = new URL(String(u), global.location ? global.location.href : 'https://class.ownify.co.kr/').searchParams; return [p.get('mode') || 'book', p.get('fileId') || p.get('s') || '', p.get('t') || ''].join('|'); } catch (e) { return ''; } }
+    function monPost(o) { try { if (MCH) MCH.postMessage(o); } catch (e) {} }
+    function monTellFr(a) { if (!monAt || Date.now() - monAt > 6000) return; (a ? [a] : monFr).forEach(function (x) { try { x.win.postMessage({ onf: 'monState', key: monK }, x.origin); } catch (e) {} }); }
+    function monMsg(d, ev) {
+      if (d.onf === 'monHello') { var a = { win: ev.source, origin: ev.origin }; if (!monFr.some(function (x) { return x.win === ev.source; })) monFr.push(a); monTellFr(a); return; }
+      if (!extOk(d.url)) return;
+      if (d.onf === 'monGo') monPost({ k: 'go', url: String(d.url) });
+      else monPost({ k: 'idle', key: monKey(d.url) });
+    }
+    try { if (typeof BroadcastChannel === 'function') MCH = new BroadcastChannel('onf-mon'); } catch (e) {}
+    if (MCH && monIs) {
+      var myKey = monKey(global.location.href), cov = null, covT = 0;
+      var beat = function () { monPost({ k: 'beat', key: myKey }); };
+      var uncover = function () { clearTimeout(covT); covT = 0; if (cov) { cov.remove(); cov = null; } };
+      MCH.onmessage = function (e) {
+        var o = e && e.data; if (!o || typeof o !== 'object') return;
+        if (o.k === 'who') { beat(); return; }
+        if (o.k === 'go' && extOk(o.url)) { uncover(); if (monKey(o.url) === myKey) beat(); else try { global.location.replace(String(o.url)); } catch (x) {} return; }
+        if (o.k === 'idle' && o.key === myKey && !cov && !covT) covT = setTimeout(function () {
+          covT = 0; cov = doc.createElement('div'); cov.id = 'onfMonIdle';
+          cov.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#1d1916;display:flex;align-items:center;justify-content:center;pointer-events:none';
+          cov.innerHTML = '<img src="/assets/icon/onf-512.png" alt="" style="width:128px;height:128px;border-radius:28px;opacity:.9">';
+          (doc.body || doc.documentElement).appendChild(cov);
+        }, 1500);
+      };
+      beat(); global.setInterval(beat, 2000);
+    } else if (MCH) {
+      MCH.onmessage = function (e) { var o = e && e.data; if (!o || o.k !== 'beat') return; monAt = Date.now(); monK = String(o.key || ''); monTellFr(); };
+      monPost({ k: 'who' });
     }
     onMon._onfFs = true;   // 늘 듣는 귀(위 onFs 와 같다)
     global.addEventListener('message', onMon);
