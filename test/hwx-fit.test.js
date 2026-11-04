@@ -12,7 +12,8 @@ function run(o) {
   const vv = o.vv === null ? undefined : Object.assign({ width: o.W, height: o.H, offsetTop: 0, offsetLeft: 0, scale: 1, addEventListener: (k, f) => { VL[k] = f; } }, o.vv || {});
   const sb = { URLSearchParams, JSON, Math, parseFloat, String, setTimeout: (f) => { timers.push(f); return timers.length; }, clearTimeout() {},
     location: { search: o.search == null ? '?mode=hwext&t=tokA&s=h0123456789abcdef0123' : o.search }, innerWidth: o.W, innerHeight: o.H, visualViewport: vv,
-    navigator: { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15', maxTouchPoints: 5, sendBeacon: (u, b) => beacons.push([u, JSON.parse(b)]) },
+    screen: o.screen || { width: 1366, height: 1024 }, screenY: 0,
+    navigator: { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15', maxTouchPoints: o.mac ? 0 : 5, sendBeacon: (u, b) => beacons.push([u, JSON.parse(b)]) },
     ONF: { frame: { WORKER: 'https://w.example' } },
     getComputedStyle: () => ({ paddingTop: safe[0] + 'px', paddingRight: safe[1] + 'px', paddingBottom: safe[2] + 'px', paddingLeft: safe[3] + 'px' }),
     addEventListener: (k, f) => { L[k] = f; },
@@ -49,9 +50,23 @@ t('크기·보이는 칸·전체 화면이 바뀌면 다시 맞춘다', () => {
 t('숫자 기록 — 바뀔 때만 · 0.8초 모아서 · perf hwvp:… · 값만(토큰·주소 0) · 한 창 8줄까지', () => {
   const r = run({ W: 1920, H: 1080, vv: { height: 1010, offsetTop: 30 }, safe: [24, 0, 0, 0], fs: true });
   r.timers.forEach((f) => f());
-  assert.deepStrictEqual(r.beacons, [['https://w.example/clog', [{ k: 'perf', c: 'hwvp:1920,1080,1920,1010,30,24,0,0,0,1', d: 'ipad' }]]]);
+  assert.deepStrictEqual(r.beacons, [['https://w.example/clog', [{ k: 'perf', c: 'hwvp:1920,1080,1920,1010,30,24,0,0,0,1,1366,1024,0,0', d: 'ipad' }]]]);
+  assert.ok(r.beacons[0][1][0].c.length <= 60, '⛔ clog c 는 60자에서 잘린다');
   for (let i = 0; i < 20; i++) { r.sb.innerHeight = 1000 + i; r.L.resize(); r.timers.splice(0).forEach((f) => f()); }
   assert.ok(r.beacons.length <= 8, '⛔ 기록이 끝없이 간다: ' + r.beacons.length);
+});
+t('📺 TV 위 띠(실기기 기록 3008×1560 · 안전 위 32·아래 28 · 전체 화면) — 16:9 로 셈한 띠 132px 만큼 아래를 비워 TV 기준 가운데', () => {
+  const r = run({ W: 3008, H: 1560, safe: [32, 0, 28, 0], fs: true });
+  assert.deepStrictEqual([r.props['--hwx-t'], r.props['--hwx-h']], ['32px', (1560 - 32 - 28 - 132) + 'px'], '⛔ 창 안 가운데 = TV 로는 아래로 쏠린다');
+  //   TV 기준: 위 = 띠 132 + 32 + 안쪽 여백 · 아래 = 28 + 132 + 안쪽 여백 → 같다(차 4px = 안전 영역 차)
+  r.timers.forEach((f) => f()); assert.ok(/^hwvp:3008,1560,3008,1560,0,32,28,0,0,1,1366,1024,0,132$/.test(r.beacons[0][1][0].c), r.beacons[0][1][0].c);
+});
+t('📺 화면 크기를 알려 주면 그 차를 쓴다(screen.width = 창 폭) · ⛔ 전체 화면 아님·맥·4:3·21:9·띠가 15% 넘음 = 안 함', () => {
+  assert.strictEqual(run({ W: 1920, H: 1000, fs: true, screen: { width: 1920, height: 1080 } }).props['--hwx-h'], '1000px'.replace('1000', String(1000 - 80)), '⛔ 알려 준 화면 높이 차(80)를 안 썼다');
+  assert.strictEqual(run({ W: 3008, H: 1560 }).props['--hwx-h'], '1560px', '⛔ 전체 화면이 아닌데 띠를 뺐다(창 모드는 창 안 가운데)');
+  assert.strictEqual(run({ W: 3008, H: 1560, fs: true, mac: true }).props['--hwx-h'], '1560px', '⛔ 맥(전체 화면 = 화면 전체)인데 띠를 뺐다');
+  assert.strictEqual(run({ W: 1366, H: 1024, fs: true }).props['--hwx-h'], '1024px', '⛔ 아이패드 화면 자체(4:3)인데 띠를 뺐다');
+  assert.strictEqual(run({ W: 3440, H: 1440, fs: true }).props['--hwx-h'], '1440px', '⛔ 21:9 화면을 16:9 로 셈해 큰 띠를 뺐다');
 });
 t('확장 창이 아니면 아무것도 안 한다', () => {
   const r = run({ W: 1920, H: 1080, search: '?mode=hwbook' });
