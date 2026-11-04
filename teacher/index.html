@@ -921,11 +921,21 @@ if (new URLSearchParams(location.search).get('mode') === 'hwext') (function () {
     var W = window.innerWidth || 0, H = window.innerHeight || 0, vv = window.visualViewport, z1 = !vv || Math.abs((vv.scale || 1) - 1) < 0.01;
     var vw = vv && z1 ? Math.min(W, Math.round(vv.width)) : W, vh = vv && z1 ? Math.min(H, Math.round(vv.height)) : H, vt = vv && z1 ? Math.max(0, Math.round(vv.offsetTop)) : 0, vl = vv && z1 ? Math.max(0, Math.round(vv.offsetLeft)) : 0;
     de.style.setProperty('--hwx-l', (vl + sl) + 'px'); de.style.setProperty('--hwx-t', (vt + st) + 'px');
-    de.style.setProperty('--hwx-w', Math.max(0, vw - sl - sr) + 'px'); de.style.setProperty('--hwx-h', Math.max(0, vh - st - sb) + 'px');
-    var fs = document.fullscreenElement || document.webkitFullscreenElement ? 1 : 0, k = [W, H, vw, vh, vt, st, sb, sl, sr, fs].join(',');
+    var fs = document.fullscreenElement || document.webkitFullscreenElement ? 1 : 0, band = tvBand(W, H, fs);
+    de.style.setProperty('--hwx-w', Math.max(0, vw - sl - sr) + 'px'); de.style.setProperty('--hwx-h', Math.max(0, vh - st - sb - band) + 'px');
+    var sc = window.screen || {}, k = [W, H, vw, vh, vt, st, sb, sl, sr, fs, sc.width || 0, sc.height || 0, window.screenY || 0, band].join(',');
     if (k !== last && n < 8) { last = k; clearTimeout(tm); tm = setTimeout(function () { n++; hwvpLog(k); }, 800); }
     de.classList.add('onf-hwx');   // 값을 다 단 뒤에 켠다(반쯤 단 값으로 액자가 0 이 되지 않게)
   } catch (e) {} }
+  /* 📺 TV 위 띠(Peter 2026-11-04 두 번째 TV 사진 「아래 여백은 생겼는데 위가 아직 한참 넓어」) — 기록 hwvp:3008,1560,…,전체 화면 1:
+     아이패드 창을 모니터로 옮겨 전체 화면이어도 창 위쪽 ~130px 는 아이패드 상태 줄 자리라 창이 TV 보다 낮다(3008÷1560 = 1.93 > 16:9).
+     창 안 가운데 = TV 로 보면 그 띠만큼 아래로 쏠림 → 그 띠만큼 아래를 비워 TV 전체 기준 가운데로.
+     띠 = 화면 크기를 알려 주면(screen.width 가 창 폭과 같고 더 높으면) 그 차 · 모르면 16:9 화면으로 셈 · 아이패드·전체 화면만 · 창 높이의 15% 넘으면(21:9 등) 안 함 */
+  function tvBand(W, H, fs) {
+    if (!fs || devKind() !== 'ipad' || !(W > 0 && H > 0)) return 0;
+    var sc = window.screen || {}, sw = sc.width || 0, sh = sc.height || 0, b = Math.abs(sw - W) <= 2 && sh > H ? sh - H : W / H > 16 / 9 + 0.02 ? Math.round(W * 9 / 16 - H) : 0;
+    return b > 0 && b <= H * 0.15 ? Math.round(b) : 0;
+  }
   function hwvpLog(k) {
     try { var w = window.ONF && ONF.frame && ONF.frame.WORKER; if (w && navigator.sendBeacon) navigator.sendBeacon(w + '/clog', JSON.stringify([{ k: 'perf', c: 'hwvp:' + k, d: devKind() }])); } catch (e) {}
   }
