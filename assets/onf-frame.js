@@ -55,7 +55,11 @@
        ⛔ 찾았으면 **저장까지** 한다. 아이콘으로 처음 열린 앱은 저장소가 비어 있으므로,
          여기서 안 넣으면 앱 안에서 새로고침 한 번에 토큰이 사라진다. */
     var t = new URLSearchParams(location.search).get('t') || tokenFromPath();
-    if (t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} return t; }
+    if (t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} try { sessionStorage.setItem(TOKEN_KEY, t); } catch (e1) {} return t; }
+    /* 🗂️ [2026-11-04 Peter 「두 학생 홈을 탭 둘에 열고 먼저 연 탭을 새로고침하면 마지막에 연 학생 홈이 뜬다」]
+       localStorage 는 **탭끼리 같이 쓴다** — 주소의 토큰은 위에서 지워지니(hideToken) 새로고침한 탭이 마지막에 연 학생 것을 읽었다.
+       → 이 탭이 받은 토큰(sessionStorage · 탭마다 따로 · 새로고침엔 남는다)이 먼저 · 없으면(아이콘으로 다시 연 앱·새 탭) 종전 localStorage. */
+    try { var s = sessionStorage.getItem(TOKEN_KEY); if (s) return s; } catch (e2) {}
     try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; }
   }
 
@@ -77,9 +81,10 @@
       /* ⛔ **저장이 실제로 됐을 때만** 지운다. 시크릿 모드·저장소 차단이면 setItem 이 조용히
        *   실패하는데, 그 상태에서 주소까지 지우면 새로고침 한 번에 토큰이 증발한다
        *   (「링크로 열어 주세요」로 떨어진다 — 지금은 되던 것이 안 되게 된다). */
-      var kept = '';
+      var kept = '', tabKept = '';
       try { kept = localStorage.getItem(TOKEN_KEY) || ''; } catch (e2) { kept = ''; }
-      if (kept !== t) return;
+      try { tabKept = sessionStorage.getItem(TOKEN_KEY) || ''; } catch (e3) { tabKept = ''; }
+      if (kept !== t && tabKept !== t) return;   // 둘 중 하나라도 이 탭 토큰을 쥐고 있어야 지운다(새로고침이 그걸 읽는다)
       u.searchParams.delete('t');
       history.replaceState(null, '', u.pathname + (u.searchParams.toString() ? '?' + u.searchParams : '') + u.hash);
     } catch (e) {}
