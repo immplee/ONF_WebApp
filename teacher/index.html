@@ -1506,6 +1506,7 @@ function bookMake(src, parked, out, cf) {
     p.oe = ONF.frame.outOpen(p.el, u, bookCfOk(cf), '', function () {
       p.win = null; p.origin = ''; p.swap = false; p.hw = null; p.ho = ''; p.kb = null; p.ko = '';   // 정적 판을 가리키던 칸 — 새 판처럼(학생 검토 고침 3)
       p.real = p.src = p.load; p.key = bookKey(p.load);
+      p.oe0 = 1;   // 🔭 정적 판이 물러났다(tbkStart 길 back)
       exec();
     });
   } else exec();
@@ -1546,6 +1547,22 @@ function bookShow(p, left, m, r) {
   bookRoom(bookMax());
   bookKb();
 }
+/* 🔭 선생님 홈 교재 열기 시간(2026-11-05 Peter 「처음 교재 열 때 아직도 느려」 · 2차 검수 8번 재기 · 동작 그대로) — 홈에서 누른 열기 하나 = /clog 한 줄
+     {k:'perf', c:'tbook <길> n<이 페이지 몇 번째 열기>', f:'<판 상태>', d, ms: 누름 → 판이 뜸(노크 bookHi · 갈아 끼우기 답)}
+     길 = ready(숨긴 판이 이미 노크했다 — 0초) · wait(숨긴 판이 아직 뜨는 중) · swap(판 갈아 끼우기 · f = 답 from) · out(새 정적 판) · gas(새 구글 판) · back(정적 판 → 구글로 물러남)
+     ⛔ 값(주소·토큰) 없음 · sendBeacon · 30초 넘게 안 뜨면 ms 600000(Worker 상한)으로 한 줄(그 뒤 오는 노크는 버린다). */
+var TBK_N = 0;
+function tbkDev() { var v = navigator, u = v.userAgent || ''; return /iPad/.test(u) || (/Macintosh/.test(u) && v.maxTouchPoints > 1) ? 'ipad' : /iPhone|iPod/.test(u) ? 'ios' : /Macintosh/.test(u) ? 'mac' : /Windows/.test(u) ? 'win' : /Android/.test(u) ? 'and' : 'other'; }   // = hwvp devKind(그 함수 안에 있어 여기선 못 부른다)
+function tbkStart(p, way) {
+  var w = window.ONF && ONF.frame && ONF.frame.WORKER, t0 = Date.now(), n = ++TBK_N, done = false, tm;
+  function say(way2, f, ms) {
+    if (done) return; done = true; clearTimeout(tm);
+    try { if (w && navigator.sendBeacon) navigator.sendBeacon(w + '/clog', JSON.stringify([{ k: 'perf', c: 'tbook ' + way2 + ' n' + n, f: String(f || '').slice(0, 40), d: tbkDev(), ms: ms }])); } catch (e) {}
+  }
+  if (way === 'ready') { say('ready', '', 0); return null; }
+  tm = setTimeout(function () { say(way, 'late', 600000); }, 30000);
+  return function (way2, f) { say(way2 || way, f, Date.now() - t0); };
+}
 /* home === true = 홈에서 온 openBook — 판(bookBoard)이 있으면 새 판 대신 갈아 끼운다. ⛔ 판 안에서 온 openBook(⭐ → 「교재에서 보기」 · 판 안 링크)은 종전 새 판(창 B안 앞 판 0초). */
 function bookOpen(href, left, m, r, home, cf, out) {   // cf = 📖 ☁️ 홈이 실은 사본 힌트(홈 openBook 만 · 아래 bookCfOk) · out = 🌤 홈이 out:1 로 연 교재(위 outWant)
   var src = teacherBookSrc(href), p, b;
@@ -1553,8 +1570,10 @@ function bookOpen(href, left, m, r, home, cf, out) {   // cf = 📖 ☁️ 홈�
   var fl = !outWant(src, out);   // 🧺 지금 길로 여는 교재 — 남은 쓰기를 숨긴 정적 판으로 한 번 넘겨준다(위 bookFlushSoon · 보이는 판이 뜬 뒤)
   p = bookFind(src);
   if (p && !outSame(p, src, out)) { bookRetire(p); p = null; }   // 🌤 길이 다른 판 — 자격 내리고 그 길 새 판(학생 껍데기와 같다)
-  if (!p && home && (b = bookBoardFor(src, out))) { bookSwapTo(b, src, left, m, r, cf); if (fl) bookFlushSoon(b, src); rsMark(bookShown(), href, out, cf); return; }
-  bookShow(p || bookMake(src, false, out, cf), left, m, r);
+  if (!p && home && (b = bookBoardFor(src, out))) { bookSwapTo(b, src, left, m, r, cf); if (b.sw) b.sw.tb = tbkStart(b, 'swap'); if (fl) bookFlushSoon(b, src); rsMark(bookShown(), href, out, cf); return; }
+  if (home) { if (p && p.win) tbkStart(p, 'ready'); else if (p) p.tb = tbkStart(p, 'wait'); }
+  if (!p) { p = bookMake(src, false, out, cf); if (home) p.tb = tbkStart(p, p.out ? 'out' : 'gas'); }
+  bookShow(p, left, m, r);
   if (fl) bookFlushSoon(bookShown(), src);
   rsMark(bookShown(), href, out, cf);
 }
@@ -1658,6 +1677,7 @@ function bookSwapEnd(p, sw, ok, why, from) {
   var shown = !p.parked;
   clearTimeout(sw.tm); p.sw = null;   // 마지막 번호가 끝났다 — 앞 번호들은 판이 더는 답하지 않는다(ask 에 남아도 무해)
   bookPerf(sw, ok ? String(from || '') : 'new', ok ? '' : why);
+  if (sw.tb) sw.tb('swap', ok ? String(from || 'x').replace(/[^a-z]/g, '').slice(0, 8) : 'fail-' + String(why || '').replace(/[^a-z]/g, '').slice(0, 10));   // 🔭 위 tbkStart
   if (ok) return;
   p.src = p.real; p.key = bookKey(p.real);
   if (why === 'stale' || why === 'time') bookRetire(p);   // ⛔ 지우지 않는다 — 판은 stale 을 맺음(편집 확정·저장) 앞에서 곧장 답한다 · 지우면 beforeunload 도 안 돌아 안 보낸 글이 사라진다(반박 검토 🟠 2026-10-17)
@@ -1776,6 +1796,7 @@ window.addEventListener('message', function (ev) {
   if (d.onf === 'bookHi') {
     if (!bookAppOrigin(ev.origin)) return;
     p.win = ev.source; p.origin = ev.origin; p.swap = d.swap === 1; p.lg = d.lg === 1;
+    if (p.tb) { var tb = p.tb; p.tb = null; tb(p.out ? '' : p.oe0 ? 'back' : '', p.parked ? 'hid' : ''); }   // 🔭 위 tbkStart — 판이 떴다(정적 판이 물러났으면 back)
     if (p.rs && !p.parked) setTimeout(function () { rsTell(p); }, 0);   // 🔄 되살릴 상태 — 노크 답 뒤에   // lg = 「나갈까요?」 물음을 알아듣는 교재(위 histGuard)   // 📖 swap:1 은 둘째 노크에 온다 — 첫 노크(없음)가 다시 오면 판이 다시 읽힌 것
     if (p.flushGo) p.flushGo();   // 🧺 보이는 판이 떴다 — 기다리던 넘겨주기(위 bookFlushSoon)
     if (p.real !== p.load || p.sw) { p.real = p.load; if (p.sw) bookSwapEnd(p, p.sw, false, 'fail', ''); p.src = p.load; p.key = bookKey(p.load); }   // 다시 읽힌 판 = 처음 주소
