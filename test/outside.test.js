@@ -163,9 +163,9 @@ t('S5c outFail(그 창·그 출처) → 같은 판에 exec 로 다시 · 남의 
   s.send({ onf: 'outFail', why: 'api' }, w, 'https://evil.example.com');
   s.send({ onf: 'outFail', why: 'api' }, win('stranger', s.top), OUT_O);
   assert.strictEqual(box.kids[0].src, OUT_BOOK, '⛔ 남의 출처·남의 창 outFail 로 물러났다');
-  s.send({ onf: 'outFail', why: 'bridge' }, w, OUT_O);
+  s.send({ onf: 'outFail', why: 'boot' }, w, OUT_O);
   assert.ok(box.kids[0].src === SRC1 && ls.m.onfOutFail === String(1.7e12 + 86400000) + ',1', '⛔ outFail(hard) 로 물러나 하루를 안 적었다');
-  s.send({ onf: 'outFail', why: 'bridge' }, w, OUT_O);
+  s.send({ onf: 'outFail', why: 'boot' }, w, OUT_O);
   assert.strictEqual(box.kids[0].src, SRC1, '물러남은 한 번');
 });
 
@@ -826,9 +826,9 @@ ta('S4a 첫 판 정적 판이 outFail(또는 hello 없음) → 같은 액자에 
   const s = wsetup();
   s.calls[0].ok(200, ANS(CF)); await flush();
   s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
-  s.send({ onf: 'outFail', why: 'bridge' }, s.homeWin, OUT_O);
+  s.send({ onf: 'outFail', why: 'boot' }, s.homeWin, OUT_O);
   assert.strictEqual(s.frameEl.src, DSRC, '⛔ outFail 인데 지금 길로 안 다시 열었다');
-  assert.strictEqual(s.g.localStorage.m.onfOutFail, String(1.7e12 + 86400000) + ',1', '⛔ outFail(bridge · hard) — 하루를 안 적었다');
+  assert.strictEqual(s.g.localStorage.m.onfOutFail, String(1.7e12 + 86400000) + ',1', '⛔ outFail(boot · hard) — 하루를 안 적었다');
   const n = wsetup();
   n.calls[0].ok(200, ANS(CF)); await flush();
   n.fire(2500);
@@ -1483,6 +1483,9 @@ ta('FB1 까닭별 표 — slow(hello·paint·fail-time·fail-net) 연속 1 = 0 �
     assert.strictEqual(y.F.fallBack('home', why), D, '⛔ ' + why + ' 는 hard(하루)');
     assert.strictEqual(y.ls.m.onfOutFailHome, String(1.7e12 + D) + ',1');
   }
+  const fb = mk();   // 📖 교재 판 다리 늦음 = 느림 갈래(2026-11-05 · 2차 검수 8번) — 1번째 0 · 2번째 10분 · 3번째 1시간 · 홈 판은 위에서 그대로 하루
+  for (const [n, ms] of [[1, 0], [2, 600000], [3, 3600000]]) assert.strictEqual(fb.F.fallBack('book', 'fail-bridge'), ms, '⛔ 교재 fail-bridge 연속 ' + n);
+  assert.strictEqual(mk().F.fallBack('home', 'fail-bridge'), D, '⛔ 홈 판 fail-bridge 가 하루가 아니다');
   const api = mk({ onfOutFail: '0,2' });   // 계약 어긋남(api)은 1시간(배포 사이 몇 분 · Peter 2026-10-30) · 연속은 +1
   assert.strictEqual(api.F.fallBack('book', 'fail-api'), 3600000, '⛔ fail-api 는 1시간');
   assert.strictEqual(api.ls.m.onfOutFail, String(1.7e12 + 3600000) + ',3');

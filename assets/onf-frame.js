@@ -279,7 +279,9 @@
      ⚠️ 선생님 껍데기 머리 tPre 는 이 파일이 뜨기 전이라 칸 앞 숫자만 직접 읽는다(같은 꼴 · 검사 teacher-tout P1). 저장소가 막힌 창 = 막힘(열 때마다 시한을 안 낸다 · 종전 그대로). */
   var FALL_KEY = { book: 'onfOutFail', home: 'onfOutFailHome', thome: 'onfTOutFail', hwbook: 'onfHwOutFail', hwext: 'onfHwExtOutFail' };   // 🖥️ hwext = 정적 화면 확장 창(2026-11-01 · teacher/index.html tOutExt)   // 📝 hwbook = 정적 과제 판(2026-10-31 · teacher/index.html onf-hwout)
   var FALL_STEP = [0, 600000, 3600000, 86400000], FALL_DAY = 86400000, FALL_API = 3600000;
-  var FALL_SLOW_PAN = { thome: ['fail-none', 'fail-stale'], hwbook: ['fail-bridge', 'notch', 'stale'], hwext: ['fail-bridge', 'notch'] };   // 📝 과제 판 다리가 늦음(구글 바닥)·입장권 없음/거절 = 곧 풀리는 것 → 느림 갈래   // 🏫 선생님 홈 사본 없음·낡음 = 5분 틱이 곧 고쳐 놓는 상태 → 느림 갈래(2026-10-31 · 사본은 3시간·날짜마다 다시 짓는다 #155)
+  var FALL_SLOW_PAN = { book: ['fail-bridge'], thome: ['fail-none', 'fail-stale'], hwbook: ['fail-bridge', 'notch', 'stale'], hwext: ['fail-bridge', 'notch'] };   // 📝 과제 판 다리가 늦음(구글 바닥)·입장권 없음/거절 = 곧 풀리는 것 → 느림 갈래   // 🏫 선생님 홈 사본 없음·낡음 = 5분 틱이 곧 고쳐 놓는 상태 → 느림 갈래(2026-10-31 · 사본은 3시간·날짜마다 다시 짓는다 #155)
+  /* 📖 교재 판 다리 늦음(fail-bridge) = 느림(2026-11-05 Peter 「A로 고쳐」 · 2차 검수 8번) — 종전 hard(하루)라 다리가 한 번 늦으면(배포 사이·구글 붐빔)
+       그 기기 모든 교재가 하루 동안 구글 판(Peter 맥 실측 첫 열기 9.3초 → 정적 0.26초 · 11/05 01:56 한 번에 11/06 01:56 까지). 홈 판의 fail-bridge 는 그대로 하루. */
   var FALL_SLOW = ['hello', 'paint', 'fail-time', 'fail-net'], FALL_SKIP = ['fail-mismatch', 'late-notice', 'late-stale', 'nodata'];
   /* 🔭 누구 화면인가(2026-11-05 2차 검수 「물러남 줄에 누구·왜가 없다」) — fallback:*·sh:* 줄에 b = SHA-256 앞 8 hex · f = 'S'(학생)|'T'(선생님).
      학생 = mount 의 토큰 → 구글 _onfInkHash8(tok) · 홈 판 homeMismatch 줄의 b 와 같은 값 · 선생님 = 입장권(onf_tch)의 주소 소문자 → 구글 _onfTHomeH 'T:' 뒤 16 hex 의 앞 8.
