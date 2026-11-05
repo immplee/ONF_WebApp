@@ -155,6 +155,28 @@ t('홈의 bookDismiss(탭 바꿈) · Esc 로 닫는다', () => {
   assert.ok(!s.panel(), '⛔ Esc 로 안 닫힌다');
 });
 
+t('🔭 교재 열기 시간(2026-11-05 2차 검수 8번) — 홈에서 누른 열기 하나 = /clog 한 줄 perf tbook <길> n<몇 번째> · 새 구글 판은 노크 때 · 숨긴 판 다시 = ready 0 · 판 안 열기·남의 노크는 안 센다 · 값 없음', () => {
+  const bs = [];
+  const s = run({ pre: (g) => { g.ONF.frame = { WORKER: 'https://w.test' }; g.navigator = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', maxTouchPoints: 0, sendBeacon: (u, b) => { bs.push([u, JSON.parse(b)[0]]); return true; } }; } });
+  s.send({ onf: 'openBook', href: TURL, left: 184 }, s.home);
+  const p = s.panel(), bw = win('book-exec', s.top), bi = win('book-user', win('book-sbx', bw));
+  p.kids[0].contentWindow = bw;
+  assert.strictEqual(bs.length, 0, '⛔ 판이 뜨기 전에 한 줄이 나갔다');
+  s.send({ onf: 'bookHi' }, win('stranger', s.top));
+  assert.strictEqual(bs.length, 0, '⛔ 남의 노크로 셌다');
+  s.send({ onf: 'bookHi' }, bi);
+  s.send({ onf: 'bookHi', swap: 1 }, bi);   // 둘째 노크는 안 센다
+  assert.strictEqual(bs.length, 1, '⛔ 노크 한 번에 한 줄이 아니다: ' + JSON.stringify(bs));
+  const r = bs[0][1];
+  assert.ok(bs[0][0] === 'https://w.test/clog' && r.k === 'perf' && r.c === 'tbook gas n1' && r.d === 'mac' && r.ms >= 0 && r.ms < 5000, '⛔ 줄 꼴: ' + JSON.stringify(r));
+  assert.ok(JSON.stringify(bs).indexOf('STUTOK') < 0 && JSON.stringify(bs).indexOf('CRED') < 0, '⛔ 값이 실렸다');
+  s.send({ onf: 'bookClose' }, bi);
+  s.send({ onf: 'openBook', href: TURL, left: 184 }, s.home);
+  assert.deepStrictEqual([bs.length, bs[1][1].c, bs[1][1].ms], [2, 'tbook ready n2', 0], '⛔ 숨긴 판 다시 열기 줄: ' + JSON.stringify(bs[1]));
+  s.send({ onf: 'openBook', href: TURL.replace('e1', 'e2') }, bi);   // 판 안 링크 — 홈에서 누른 열기가 아니다
+  assert.strictEqual(bs.length, 2, '⛔ 판 안 열기를 셌다');
+});
+
 t('📖 숨긴 판(2026-10-13) — 닫으면 숨김(.park) · 교재에 bookPark(노크한 창·출처로만) · 같은 주소는 그 판 그대로 · 노크는 판 액자·https googleusercontent 만', () => {
   const s = run(), js = (x) => JSON.parse(JSON.stringify(x));
   s.send({ onf: 'openBook', href: TURL, left: 184 }, s.home);
