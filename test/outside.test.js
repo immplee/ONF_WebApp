@@ -1524,6 +1524,23 @@ ta('FB2 물러날 때마다 clog 한 줄 {k:err, c:fallback:<판>:<까닭>:<연�
   s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner); outWin(s, s.panels()[0]); s.fire(2500);
   assert.deepStrictEqual(bs, ['fallback:book:hello:1'], '⛔ 교재 판 물러남 기록이 없다');
 });
+ta('FB2b 누구 화면(2026-11-05 2차 검수) — 해시를 잴 수 있으면 fallback 줄에 b(SHA-256 앞 8 hex)·f(S|T) · 선생님 = 입장권 주소 소문자 · 막힌 동안 구글 = sh:<판>:blocked 한 화면 한 번 · ⛔ 토큰·주소 없음', async () => {
+  const nc = require('crypto'), h8 = (x) => nc.createHash('sha256').update(x).digest('hex').slice(0, 8);
+  const mail = 'Peter@Ownify.co.kr', tk = 'tch.' + Buffer.from(JSON.stringify({ e: mail, n: 'Peter', o: 1, iat: 1, x: 9e9 })).toString('base64url') + '.' + 'x'.repeat(43);
+  const ls = LSf(), beacons = [], g = { T: 1.7e12, localStorage: ls, setTimeout, clearTimeout, URL, crypto: nc.webcrypto, TextEncoder, atob, console: { info() {}, log() {}, warn() {} },
+    navigator: { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', sendBeacon: (u, b) => { beacons.push(JSON.parse(b)[0]); return true; } },
+    document: { addEventListener() {} }, addEventListener() {} };
+  ls.setItem('onf_tch', JSON.stringify({ tk, x: 9e9 }));
+  g.window = g; g.Date = { now: () => g.T }; vm.createContext(g); vm.runInContext(CODE, g, { filename: 'onf-frame.js' });
+  const F = g.ONF.frame;
+  F.fallBack('thome', 'fail-anon'); F.fallBlocked('thome'); F.fallBlocked('thome'); F.fallBlocked('book');
+  for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+  const want = h8(mail.toLowerCase());
+  assert.deepStrictEqual(beacons, [{ k: 'err', c: 'fallback:thome:fail-anon:1', b: want, f: 'T', d: 'mac' }, { k: 'gp', c: 'sh:thome:blocked', b: want, f: 'T', d: 'mac' }], '⛔ 누구·통째 구글 줄 꼴: ' + JSON.stringify(beacons));
+  assert.ok(JSON.stringify(beacons).toLowerCase().indexOf('peter') < 0 && JSON.stringify(beacons).indexOf('tch.') < 0, '⛔ 주소·입장권이 실렸다');
+  //   학생 껍데기 mount 토큰이 이긴다(그 학생 해시) · 첫 판 사본 힌트 없음은 setup 경로 검사가 따로 본다
+  assert.strictEqual(want.length, 8);
+});
 ta('FB3 한 함수 — 물러남 칸(onfOutFail·onfOutFailHome·onfTOutFail)을 적고 읽는 곳은 onf-frame.js fallBack/fallBlocked/fallOk 뿐 · 껍데기들엔 지우기(out=1·tout=1)와 선생님 머리 tPre 읽기만 · 86400000 「하루」 직접 비교 0', async () => {
   const T = fs.readFileSync(path.join(ROOT, 'teacher', 'index.html'), 'utf8'), I = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   const keys = /onfOutFail(?!Home)|onfOutFailHome|onfTOutFail|OUT_FAIL|TOUT_FAIL/;

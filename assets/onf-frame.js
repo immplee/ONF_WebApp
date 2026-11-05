@@ -281,8 +281,60 @@
   var FALL_STEP = [0, 600000, 3600000, 86400000], FALL_DAY = 86400000, FALL_API = 3600000;
   var FALL_SLOW_PAN = { thome: ['fail-none', 'fail-stale'], hwbook: ['fail-bridge', 'notch', 'stale'], hwext: ['fail-bridge', 'notch'] };   // 📝 과제 판 다리가 늦음(구글 바닥)·입장권 없음/거절 = 곧 풀리는 것 → 느림 갈래   // 🏫 선생님 홈 사본 없음·낡음 = 5분 틱이 곧 고쳐 놓는 상태 → 느림 갈래(2026-10-31 · 사본은 3시간·날짜마다 다시 짓는다 #155)
   var FALL_SLOW = ['hello', 'paint', 'fail-time', 'fail-net'], FALL_SKIP = ['fail-mismatch', 'late-notice', 'late-stale', 'nodata'];
+  /* 🔭 누구 화면인가(2026-11-05 2차 검수 「물러남 줄에 누구·왜가 없다」) — fallback:*·sh:* 줄에 b = SHA-256 앞 8 hex · f = 'S'(학생)|'T'(선생님).
+     학생 = mount 의 토큰 → 구글 _onfInkHash8(tok) · 홈 판 homeMismatch 줄의 b 와 같은 값 · 선생님 = 입장권(onf_tch)의 주소 소문자 → 구글 _onfTHomeH 'T:' 뒤 16 hex 의 앞 8.
+     ⛔ 토큰·주소·이름은 안 싣는다 · 못 재면(옛 브라우저·저장소 막힘·입장권 없음) '' · 줄은 해시를 기다렸다 나간다(껍데기 문서는 안 떠나니 sendBeacon 이 늦어도 간다). */
+  var who = { b: '', r: '', p: null };
+  function whoHex(x) {
+    try {
+      return global.crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(x))).then(function (ab) {
+        return Array.prototype.map.call(new Uint8Array(ab).subarray(0, 4), function (n) { return ('0' + n.toString(16)).slice(-2); }).join('');
+      }, function () { return ''; });
+    } catch (e) { return Promise.resolve(''); }
+  }
+  function whoSet(x, r) {   // 학생(mount) 이 이긴다 — 선생님 기기에서 학생 화면을 열면 그 학생
+    if (r !== 'S' && who.r === 'S') return;
+    who.r = r; who.b = '';
+    var c = global.crypto;
+    if (!c || !c.subtle || typeof TextEncoder !== 'function') { who.p = null; return; }   // 못 잼 = 기다리지 않고 칸 없이(옛 꼴 그대로)
+    var p = who.p = whoHex(x).then(function (h) { if (who.p === p) { who.b = h; who.p = null; } });
+  }
+  (function whoTeacher() {   // 선생님 껍데기 — 입장권 몸통(base64url JSON {e,…})의 주소만 · 학생 껍데기엔 대개 없다
+    try {
+      var c = JSON.parse(global.localStorage.getItem('onf_tch') || 'null'), m = c && /^tch\.([A-Za-z0-9_-]{10,600})\./.exec(String(c.tk || ''));
+      var e = m && /"e":"([^"]{3,200})"/.exec(global.atob(m[1].replace(/-/g, '+').replace(/_/g, '/')));
+      if (e) whoSet(e[1].trim().toLowerCase(), 'T');
+    } catch (eW) {}
+  })();
+  function devOf() {   // ONF_Run_Js onfLogDev 와 같은 갈래
+    var v = global.navigator, u = (v && v.userAgent) || '';
+    return /iPad/.test(u) || (/Macintosh/.test(u) && v.maxTouchPoints > 1) ? 'ipad' : /iPhone|iPod/.test(u) ? 'ios' : /Macintosh/.test(u) ? 'mac' : /Windows/.test(u) ? 'win' : /Android/.test(u) ? 'and' : 'other';
+  }
+  function whoBeacon(row) {   // row 에 b·f·d 를 붙여 /clog 한 줄
+    var send = function () {
+      try {
+        var v = global.navigator;
+        if (who.b) { row.b = who.b; row.f = who.r; } row.d = devOf();   // 모르면 칸을 안 싣는다(옛 꼴 그대로)
+        if (v && typeof v.sendBeacon === 'function') v.sendBeacon(wBase() + '/clog', JSON.stringify([row]));
+      } catch (e) {}
+    };
+    if (who.p) who.p.then(send, send); else send();
+  }
+  /* 🔭 통째 구글 화면 세기(2026-11-05 2차 검수 ②) — 물러남 기억에 막혀(fallBlocked) 정적 판을 아예 안 묻고 구글 화면을 연 것 · 첫 판 사본 힌트가 없어(/who 답 없음) 구글로 간 것.
+     그 화면엔 gp 갈고리가 없어 안 보였다(막힌 동안 하루 내내 조용히 구글). k:'gp' c:'sh:<판>:<까닭>' — 한 화면(껍데기 문서) 판·까닭마다 한 번(gpLog 처럼 횟수는 실제보다 적다). */
+  var shSeen = {};
+  function gpSh(pan, why) {
+    var key = pan + ':' + why;
+    if (shSeen[key]) return;
+    shSeen[key] = 1;
+    whoBeacon({ k: 'gp', c: 'sh:' + key });
+  }
   function fallGet(k) { var v = String(global.localStorage.getItem(k) || '').split(','); return { at: Number(v[0]) || 0, n: Number(v[1]) || 0 }; }
-  function fallBlocked(pan) { try { return Date.now() < fallGet(FALL_KEY[pan]).at; } catch (e) { return true; } }
+  function fallBlocked(pan) {
+    var b; try { b = Date.now() < fallGet(FALL_KEY[pan]).at; } catch (e) { gpSh(pan, 'nostore'); return true; }
+    if (b) gpSh(pan, 'blocked');   // 🔭 위 「통째 구글 화면 세기」
+    return b;
+  }
   function fallOk(pan) { try { global.localStorage.removeItem(FALL_KEY[pan]); } catch (e) {} }
   function fallBack(pan, why) {   // → 막는 ms(skip = -1)
     var k = FALL_KEY[pan], f = { at: 0, n: 0 }, ms = -1;
@@ -293,11 +345,7 @@
       ms = (FALL_SLOW.indexOf(why) >= 0 || (FALL_SLOW_PAN[pan] || []).indexOf(why) >= 0) ? FALL_STEP[Math.min(f.n, FALL_STEP.length) - 1] : why === 'fail-api' ? FALL_API : FALL_DAY;
       try { global.localStorage.setItem(k, (ms ? Date.now() + ms : 0) + ',' + f.n); } catch (e) {}   // 0 = 막지 않음(셈만)
     }
-    try {
-      var v = global.navigator, u = (v && v.userAgent) || '';
-      if (v && typeof v.sendBeacon === 'function') v.sendBeacon(wBase() + '/clog', JSON.stringify([{ k: 'err', c: 'fallback:' + pan + ':' + why + ':' + f.n,
-        d: /iPad/.test(u) || (/Macintosh/.test(u) && v.maxTouchPoints > 1) ? 'ipad' : /iPhone|iPod/.test(u) ? 'ios' : /Macintosh/.test(u) ? 'mac' : /Windows/.test(u) ? 'win' : /Android/.test(u) ? 'and' : 'other' }]));
-    } catch (e) {}
+    whoBeacon({ k: 'err', c: 'fallback:' + pan + ':' + why + ':' + f.n });   // 🔭 b·f = 누구 화면(위)
     return ms;
   }
   var ONF_OUT_ORIGINS = ['https://app.ownify.co.kr', 'https://onf-app.pages.dev'];
@@ -405,6 +453,7 @@
    */
   function mount(frameEl, src, opts) {
     opts = opts || {};
+    if (opts.tok) whoSet(opts.tok, 'S');   // 🔭 누구 화면인가(위) — 학생 껍데기
     var appWin = null, lastH = -1, lastTop = -1, zeroTimer = null, diagEl = null;
 
     if (opts.diag) {
@@ -1280,7 +1329,7 @@
     var wq = whoQ(src);
     if (homeQ()) mainHome();   // 홈 표시면 교재 주소가 없어 whoQ 는 늘 null
     else if (wq) (bookCfFor(src, null, wq) || Promise.resolve(null)).then(function (cf) {   // 📖 판 사본 힌트와 한 지붕(bookCfFor)
-      if (!cf) return mainExec();
+      if (!cf) { gpSh('book', 'nocf'); return mainExec(); }   // 🔭 첫 판 사본 힌트 없음 → 통째 구글(위 gpSh)
       var mk = mainBook(src), cold = homeCold();   // ⛔ 아래에서 onfOutUsed 를 지금으로 적기 **전에** 잰다
       function onQ(ev) { if (mainOut && ev && ev.data && ev.data.onf === 'outQueue' && ev.source === frameEl.contentWindow && ev.origin === OUT_ORG) outPend(mk, ev.data.n); }   // 🧺 그 액자 창 · 정적 판 출처만
       try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}
