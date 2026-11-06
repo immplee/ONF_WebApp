@@ -1,0 +1,46 @@
+/* 🎧 발음 피드백 중계(Ownify 2026-11-06 2단계) — teacher/index.html 의 hwFbClean·hwFbRelay·hwFbSync·hwFbBack 만 떼어 돌린다.
+   잰다: ① 과제 판 hwFb → 옆 교재 fbBook(꼴 거름 · 남는 칸 없음 · 글 길이 자름) ② 교재가 늦게 노크하면 마지막 목록을 다시(댓글은 다시 안 보냄)
+        ③ 옆 교재가 없으면 댓글은 과제 판에 바로 「nobook」 ④ 교재 → 과제 판 fbPick·fbFocus·fbCmtAck 만 · 그 출처로 ⑤ 받는 자리 = 교재 액자 길(bookFrom 뒤) · 과제 판 허용 목록에 hwFb
+   실행: node test/fb-relay.test.js */
+const assert = require('assert'), fs = require('fs'), path = require('path'), vm = require('vm');
+const src = fs.readFileSync(path.join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
+const A = src.indexOf('var hwFbLast = null;'), B = src.indexOf('/* 과제 판 전용 교재 액자가 하는 말');
+assert.ok(A > 0 && B > A, '구간을 못 찾음');
+let pass = 0, fail = 0; const t = (n, f) => { try { f(); console.log('  ✅ ' + n); pass++; } catch (e) { console.log('  ❌ ' + n + '\n     ' + e.message); fail++; } };
+const win = () => { const w = { sent: [] }; w.postMessage = (m, o) => w.sent.push([m, o]); return w; };
+function run() { const ctx = { hwBk: null, hwWin: win(), hwOrigin: 'https://board.example' }; vm.createContext(ctx); vm.runInContext(src.slice(A, B), ctx); return ctx; }
+t('① 과제 판 목록 → 옆 교재(꼴 거름 · 그 출처로)', () => {
+  const c = run(); c.hwBk = { win: win(), origin: 'https://book.example' };
+  c.hwFbRelay({ onf: 'hwFb', on: 1, items: [{ id: 'abc', n: 2, row: '15', w0: 3, w1: 4, ipa: 'x'.repeat(500), sent: 0, sheet: 'E1', evil: '<script>' }], junk: 1 });
+  const [m, o] = c.hwBk.win.sent[0];
+  assert.strictEqual(o, 'https://book.example');
+  assert.deepStrictEqual(Object.keys(m).sort(), ['items', 'on', 'onf']);
+  assert.strictEqual(m.onf, 'fbBook'); assert.strictEqual(m.on, 1);
+  assert.deepStrictEqual(Object.keys(m.items[0]).sort(), ['id', 'ipa', 'n', 'row', 'sent', 'sheet', 'w0', 'w1']);
+  assert.strictEqual(m.items[0].row, 15); assert.strictEqual(m.items[0].ipa.length, 200);
+});
+t('② 교재가 늦게 노크 → 마지막 목록만 다시(댓글은 다시 안 보냄)', () => {
+  const c = run(); c.hwBk = { win: win(), origin: 'https://book.example' };
+  c.hwFbRelay({ on: 1, items: [], cmt: [{ id: 'k1', row: 3, sheet: 'E1', text: '💬' }] });
+  assert.ok(c.hwBk.win.sent[0][0].cmt.length === 1);
+  c.hwBk.win = win(); c.hwFbSync();
+  assert.strictEqual(c.hwBk.win.sent.length, 1); assert.strictEqual(c.hwBk.win.sent[0][0].cmt, undefined, '⛔ 다시 노크할 때마다 댓글이 또 달린다');
+});
+t('③ 옆 교재가 없으면 댓글은 과제 판에 바로 nobook', () => {
+  const c = run(); c.hwFbRelay({ on: 1, items: [], cmt: [{ id: 'k1', row: 3, sheet: 'E1', text: 'x' }] });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.hwWin.sent.map((x) => x[0]))), [{ onf: 'fbCmtAck', id: 'k1', ok: 0, why: 'nobook' }]);
+});
+t('④ 교재 → 과제 판: 세 가지만 · 꼴 거름 · 과제 판 출처로', () => {
+  const c = run();
+  c.hwFbBack({ onf: 'fbPick', row: 7, w0: 1, w1: 2, text: 'show', ipa: 'ʃoʊ', sheet: 'E1', extra: 1 });
+  c.hwFbBack({ onf: 'fbFocus', id: 'abc' }); c.hwFbBack({ onf: 'fbCmtAck', id: 'abc', ok: true }); c.hwFbBack({ onf: 'hwbook', x: 1 });
+  assert.deepStrictEqual(c.hwWin.sent.map((x) => x[0].onf), ['fbPick', 'fbFocus', 'fbCmtAck']);
+  assert.ok(c.hwWin.sent.every((x) => x[1] === 'https://board.example'));
+  assert.deepStrictEqual(Object.keys(c.hwWin.sent[0][0]).sort(), ['ipa', 'onf', 'row', 'sheet', 'text', 'w0', 'w1']);
+});
+t('⑤ 받는 자리 — 과제 판 허용 목록에 hwFb · 교재 말은 bookFrom 걸러진 길 안', () => {
+  assert.match(src, /d\.onf !== 'hwPen' && d\.onf !== 'hwFb' &&/);
+  const i = src.indexOf("if (d.onf === 'fbPick' || d.onf === 'fbFocus' || d.onf === 'fbCmtAck') { hwFbBack(d); return; }"), g = src.lastIndexOf('if (!d || !hwBk || !bookFrom(ev, hwBk.el, true)) return;', i);
+  assert.ok(i > 0 && g > 0 && i - g < 1500, '⛔ 교재 말을 출처 확인 없이 받는다');
+});
+console.log(`fb-relay: ${pass} 통과${fail ? ' · ' + fail + ' 실패' : ''}`); process.exitCode = fail ? 1 : 0;
