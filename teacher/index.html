@@ -1598,7 +1598,7 @@ function rsBoot() {
 /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판·📖 판(bookBoard)·📖 노크 전 판 후보(bookCand)는 안 건드린다(books 는 오래 안 쓴 것이 앞). */
 /* ⛔ 자격 내린 판(gone — 늙음·stale·답 없음)은 **세지도 지우지도 않는다**(2단계 반박 🟠 2026-10-17) — 맺음(안 보낸 칸·실패 카드·오프라인 백업)이 끝나기 전에 지우면 그 글이 사라진다 · 30분 지우기(bookIdle)가 치운다. */
 function bookRoom(n) { var bd = bookBoard(), c = 0, i, q; for (i = 0; i < books.length; i++) if (!books[i].gone) c++; for (i = 0; c > n && i < books.length; ) { q = books[i]; if (q.parked && q !== bd && !q.gone && !bookCand(q)) { bookDrop(q); c--; } else i++; } }
-function bookPre(href, left, m, r, out) {
+function bookPre(href, left, m, r, out, cf) {   // cf = 홈 사본 힌트(thBookPre — out:1 줄만 · 2026-11-06) — 숨긴 정적 판이 구글 다리 대신 Worker /book/boot(학생 bookPre 쌍둥이)
   var src = teacherBookSrc(href), b;
   if (!src || bookFind(src)) return;
   b = bookBoardFor(src, out);
@@ -1616,7 +1616,7 @@ function bookPre(href, left, m, r, out) {
   if (!bookMine(src) && !outWant(src, out) && books.some(function (q) { return bookCand(q) && !q.out; })) { if (bookQ.length < BOOK_Q_MAX && bookQ.indexOf(src) < 0) bookQ.push(src); return; }   // 📖 곧 판이 될 판이 노크 전 — 줄에 세운다(아래 bookQ)   // 🌤 정적 판 미리는 줄에 안 선다(구글 판에 안 흘린다) · 정적 판 후보 뒤엔 안 선다(그 판은 판이 안 된다)
   if (BOOK_SW && phone()) return;   // 📖 D1 — 폰은 미리 판을 안 띄운다(첫 [열기]로 생긴 판을 쓴다)
   bookRoom(bookMax() - 1);   // 자리가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 — 종전엔 안 띄웠다 · 📱 폰은 홈이 안 보낸다)
-  bookPlace(bookMake(src, true, out), left, m, r);
+  bookPlace(bookMake(src, true, out, cf), left, m, r);
 }
 /* ═══ 📖 교재 판 한 장 1d (2026-10-16 · 설계 ONF_SlackBot docs/2026-10-15-교재판-한장-설계.md §5.1 · 판 쪽 약속은 Ownify ONF_Share_WebApp_Html onfBookSwap 이 정본) ═══
    홈에서 연 판 하나(판)가 다른 교재로 **갈아 끼운다** — 새 판(GAS doGet ≈5초) 대신 판이 값만 받아 표를 바꾼다(받아 둔 값 ≤0.5초 · 서버 ≈2.5~3.2초).
@@ -1783,7 +1783,7 @@ window.addEventListener('message', function (ev) {
     if (d.onf === 'reload') { var rp = bookShown(); if (rp) rsSave(rp); reopenLog('pull'); location.reload(); return; }
     if (d.onf === 'homeTab') { if (/^[a-z]{1,8}$/.test(String(d.v))) { try { sessionStorage.setItem(TAB_KEY, d.v); } catch (eS) {} } return; }   // 🔄 홈이 고른 탭 — 이 탭에 적는다   // 🔄 홈의 당겨서 새로고침(Ownify ONF_Shell_Js)
     if (d.onf === 'openBook' && typeof d.href === 'string') { bookHome = ev.source; bookHomeOrigin = ev.origin; bookOpen(d.href, d.left, d.m, d.r, true, d.cf, d.out === 1); var hq = bookShown(); if (hq) hq.back = null; return; }   // 홈에서 연 판은 앞 판 기억 없음(종전 · 4.4) · 📖 판이 있으면 갈아 끼움
-    if (d.onf === 'bookWarm' && d.panel === 1 && typeof d.href === 'string') { bookPre(d.href, d.left, d.m, d.r, d.out === 1); return; }   // 지금·곧 할 수업 교재를 숨긴 판으로 미리(10-13)
+    if (d.onf === 'bookWarm' && d.panel === 1 && typeof d.href === 'string') { bookPre(d.href, d.left, d.m, d.r, d.out === 1, d.cf); return; }   // 지금·곧 할 수업 교재를 숨긴 판으로 미리(10-13)
     /* 📐 창 크기가 바뀌었다(2026-10-16 · 학생 껍데기와 같다) — 홈이 다시 잰 메뉴 끝·여백·모서리를 판 전부(보이는 판·숨긴 판)에 새로 단다. 보이기·숨기기·주소는 안 건드린다. 내 액자(위 bookFrom)에서 온 말만. */
     if (d.onf === 'bookBox') { for (i = 0; i < books.length; i++) bookPlace(books[i], d.left, d.m, d.r); bookKb(); return; }
     if (d.onf === 'bookDismiss') { bookClose(true); return; }   // 메뉴를 눌렀다 = 전부 닫고 홈(앞 판을 보이지 않는다)
