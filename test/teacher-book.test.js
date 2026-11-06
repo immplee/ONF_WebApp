@@ -1253,6 +1253,23 @@ t('O1 홈 openBook{out:1} → 판 액자 = 정적 판(주소에 토큰 없음) �
   assert.strictEqual(bootOf(w2).length, 0, '⛔ 남의 출처 hello 에 outBoot 을 보냈다');
 });
 
+t('O1b 홈 bookWarm{panel:1, out:1, cf} → 숨긴 정적 판 outBoot 에 그 cf(2026-11-06 「처음 교재 여는데 한참」 — 없으면 판이 구글 다리 boot 11.9초 · gp bk:boot:nocf) · cf 없는 말 = cf null(종전) · 꼴 틀린 cf 는 뺀다', () => {
+  let s = phoneRun({ wide: true, frame: true });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270, out: 1, cf: CFT }, s.home);
+  let P = s.panel();
+  assert.ok(P && isStatic(P), '⛔ out:1 미리 띄우기가 정적 판이 아니다');
+  let b = bootOf(outUp(s, P));
+  assert.deepStrictEqual(b, [[{ onf: 'outBoot', tok: '', src: srcOf(s, E1) + '&park=1', cf: CFT }, OUT_O]], '⛔ 숨긴 정적 판 outBoot 에 cf 가 없다: ' + JSON.stringify(b));
+  s = phoneRun({ wide: true, frame: true });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270, out: 1 }, s.home);
+  b = bootOf(outUp(s, s.panel()));
+  assert.strictEqual(b.length === 1 && b[0][0].cf, null, '⛔ cf 없는 미리 띄우기 말인데 outBoot cf 가 null 이 아니다');
+  s = phoneRun({ wide: true, frame: true });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270, out: 1, cf: { f: 'x', s: 'E1', k: 'nope' } }, s.home);
+  b = bootOf(outUp(s, s.panel()));
+  assert.strictEqual(b.length === 1 && b[0][0].cf, null, '⛔ 꼴 틀린 cf 를 그대로 실었다');
+});
+
 t('O2 out 없음 → 종전 구글 판(openExec) · ⭐ 내 문장(mode=mine)+out:1 → 정적 /mine/(2026-10-31 넓히기 ③ · outBoot src 에 ttok·tas 그대로) · 내 문장 out 없음 = 지금 길 · onf-frame.js 가 outOpen 을 모르면 지금 길', () => {
   let s = phoneRun({ wide: true, frame: true });
   s.send({ onf: 'openBook', href: E1 }, s.home);
