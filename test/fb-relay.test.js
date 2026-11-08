@@ -8,7 +8,7 @@ const A = src.indexOf('var hwFbLast = null;'), B = src.indexOf('/* 과제 판 �
 assert.ok(A > 0 && B > A, '구간을 못 찾음');
 let pass = 0, fail = 0; const t = (n, f) => { try { f(); console.log('  ✅ ' + n); pass++; } catch (e) { console.log('  ❌ ' + n + '\n     ' + e.message); fail++; } };
 const win = () => { const w = { sent: [] }; w.postMessage = (m, o) => w.sent.push([m, o]); return w; };
-function run() { const ctx = { hwBk: null, hwWin: win(), hwOrigin: 'https://board.example' }; vm.createContext(ctx); vm.runInContext(src.slice(A, B), ctx); return ctx; }
+function run() { const ctx = { hwBk: null, hwWin: win(), hwOrigin: 'https://board.example', appWin: null, appOrigin: '' }; vm.createContext(ctx); vm.runInContext(src.slice(A, B), ctx); return ctx; }
 t('① 과제 판 목록 → 옆 교재(꼴 거름 · 그 출처로)', () => {
   const c = run(); c.hwBk = { win: win(), origin: 'https://book.example' };
   c.hwFbRelay({ onf: 'hwFb', on: 1, items: [{ id: 'abc', n: 2, row: '15', w0: 3, w1: 4, ipa: 'x'.repeat(500), sent: 0, sheet: 'E1', evil: '<script>' }], junk: 1 });
@@ -54,8 +54,10 @@ t('⑦ 지난 수업 자료 열기: 꼴 맞으면 그 수업을 열고 · 그 �
   c.hwLessonGo({ onf: 'hwbookLesson', l: 'nope', fb: { from: '2026-11-04', to: '2026-11-11' } });
   c.hwLessonGo({ onf: 'hwbookLesson', l: L, fb: { from: '2026-11-4', to: '2026-11-11' } });
   assert.strictEqual(opened.length, 0, '⛔ 꼴이 틀린 말로 수업 자료를 열었다');
+  c.appWin = win(); c.appOrigin = 'https://home.example';
   c.hwLessonGo({ onf: 'hwbookLesson', l: L, fb: { from: '2026-11-04', to: '2026-11-11', evil: 1 } });
   assert.deepStrictEqual(opened, [['TOKSTU', L]]);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.appWin.sent)), [[{ onf: 'hwOpened', t: 'TOKSTU', l: L }, 'https://home.example']], '⛔ 바뀐 수업 판을 홈에 안 알렸다(새로 고침 뒤 판이 사라진다 · Ownify onfThHw)');
   c.hwWin = win(); c.hwOrigin = 'https://board.example';
   c.hwFbAskAns(); c.hwFbAskAns();
   assert.deepStrictEqual(JSON.parse(JSON.stringify(c.hwWin.sent)), [[{ onf: 'hwFbAuto', from: '2026-11-04', to: '2026-11-11' }, 'https://board.example']], '⛔ 한 번만 · 그 출처로');
