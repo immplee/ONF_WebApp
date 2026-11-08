@@ -371,6 +371,16 @@ t('📝 과제 판 — 「열어 줘(hwbook)」 = 껍데기 주소를 안 바꾸
   assert.ok(told.some((m) => m.onf === 'hwOpened' && m.t === 'Tok_1' && m.l === L), '⛔ 홈에 hwOpened(띄운 판 t·l — 홈이 새로 고침 뒤 다시 연다 · 2026-11-08)');
   assert.ok(!JSON.stringify(R.calls).includes('PHOTO') && R.g.sessionStorage.getItem('onfHwGo') === null, '⛔ 고른 사진을 주소·저장소에 남겼다');
 });
+t('🔄 새로 고침 되살리기 표(rs · 2026-11-08 검토 ④) — 홈이 rs:1 로 연 판에만 노크 답 hw.rs = 1 · 보통 열기엔 없음(판이 제 기억 쪽·보기를 안 쓴다) · 꼴은 정확히 1 만', () => {
+  for (const [rs, want] of [[1, 1], [undefined, undefined], ['1', undefined], [true, undefined]]) {
+    const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
+    R.knockAs(me);
+    R.postAs({ onf: 'hwbook', t: 'Tok_1', l: '402d6a62-96ae-817f-86ec-ecaf4f919ab9', rs }, me);
+    const fr = R.created.filter((e) => e.tag === 'iframe')[0], got = [], inner = { parent: { parent: fr.contentWindow }, postMessage: (m) => got.push(m) };
+    R.postAs({ onf: 'auth-please' }, inner);
+    assert.strictEqual(got[0].hw && got[0].hw.rs, want, '⛔ rs=' + JSON.stringify(rs) + ' → hw.rs ' + JSON.stringify(got[0].hw && got[0].hw.rs));
+  }
+});
 t('🎧 들으며 필기(4단계 · 2026-10-24) — 홈이 고른 녹음(날짜·올린 시각)이 판 노크 답 hw.a 로 간다 · 꼴이 틀리면 null', () => {
   const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
   R.knockAs(me);
