@@ -666,6 +666,7 @@ window.addEventListener('message', function (ev) {
     if (d.other) {
       try { localStorage.removeItem(TOKKEY); } catch (e1) {}
       if (typeof tchDrop === 'function') tchDrop();   // 🏫 다른 계정 = 그 계정 입장권도 버린다
+      if (typeof rsDrop === 'function') rsDrop();   // 🔐 그 계정의 교재 판 기억도
       try { google.accounts.id.disableAutoSelect(); } catch (e2) {}
     }
     try { google.accounts.id.cancel(); google.accounts.id.prompt(); } catch (e3) {}
@@ -1693,7 +1694,16 @@ var RS_KEY = 'onfThOpenBook', RS_MS = 12 * 3600 * 1000, rsBooted = false;
 /* 홈 탭도(학생 껍데기 TAB0 와 같다) — 돌려줄 값은 읽힐 때 한 번 잡는다(홈이 처음 그린 오늘 탭이 먼저 와서 덮지 않게) */
 var TAB_KEY = 'onfThHomeTab', TAB0 = (function () { try { return sessionStorage.getItem(TAB_KEY) || ''; } catch (e) { return ''; } })();
 function rsMark(p, href, out, cf) { if (!p) return; p.href = href; p.hout = out ? 1 : 0; p.hcf = bookCfOk(cf); rsSave(p); }   // 📖 hcf = 홈이 실은 사본 힌트(밖으로 7 · 2026-11-01) — 되살린 정적 판도 Worker /book/boot(없으면 다리 3.5초 · 5단계에 남긴 틈)   // 🌤 hout = 홈이 out:1 로 연 판(되살릴 때 같은 길 · 학생 껍데기 rsMark 쌍둥이 · 2026-10-28)
-function rsSave(p) { if (!p || !p.href) return; try { sessionStorage.setItem(RS_KEY, JSON.stringify({ h: p.href, l: p.left, m: p.m, r: p.r, o: p.hout || 0, c: p.hcf || null, st: p.st || null, at: Date.now() })); } catch (e) {} }
+/* 🔐 교재 판 기억 = **그 선생님** 것(Peter 2026-11-08 「로그아웃해도 마지막에 연 교재 기억이 남는다」) — 기억 주소엔 학생 토큰이 들어 있다.
+   같은 탭에서 다른 계정으로 들어오면(다른 계정으로 로그인 · 입장권 바뀜) 그 교재가 열렸다 → 적을 때 지금 신원(이메일)을 같이 적고, 되살릴 때 다르거나 모르면 버린다.
+   신원 = 지금 구글 토큰·기기 열쇠(pending)의 email · 없으면(입장권만 연 정적 홈) 입장권 e. 「다른 계정으로 로그인」을 누르면 바로 지운다. */
+function idNow() {
+  var bd = function (t) { try { var x = String(t).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'); while (x.length % 4) x += '='; var j = JSON.parse(atob(x)); return j && typeof j === 'object' ? j : {}; } catch (e) { return {}; } };
+  var e = String(bd(typeof pending !== 'undefined' ? pending : '').email || '').toLowerCase();
+  if (!e && typeof tchGet === 'function') { var t = tchGet(); if (t) e = String(bd(t.tk).e || '').toLowerCase(); }
+  return e;
+}
+function rsSave(p) { if (!p || !p.href) return; try { sessionStorage.setItem(RS_KEY, JSON.stringify({ h: p.href, l: p.left, m: p.m, r: p.r, o: p.hout || 0, c: p.hcf || null, st: p.st || null, e: idNow(), at: Date.now() })); } catch (e) {} }
 function rsDrop() { try { sessionStorage.removeItem(RS_KEY); } catch (e) {} }
 function rsTell(p) { if (!p || !p.rs || !p.win) return; var st = p.rs; p.rs = null; try { p.win.postMessage({ onf: 'bookRestore', st: st }, p.origin); } catch (e) {} }
 /* 🔄 2차(Peter 2026-11-08 「새로 고침 빨리」) — 되살릴 주소를 교재가 알린 회차(st.sheet)로 고친다 → 첫 받기부터 그 회차(종전: 연 회차를 먼저 그리고 bookRestore 로 한 번 더 받아 회차가 튀었다).
@@ -1717,6 +1727,7 @@ function rsBoot() {
   var v = null;
   try { v = JSON.parse(sessionStorage.getItem(RS_KEY) || 'null'); } catch (e) { v = null; }
   if (!v || typeof v.h !== 'string' || !(Date.now() - Number(v.at) < RS_MS)) return;
+  var who = idNow(); if (!who || typeof v.e !== 'string' || v.e !== who) { rsDrop(); return; }   // 🔐 다른 계정·신원 모름·옛 기억(e 없음) — 남의 교재(학생 토큰)를 안 연다
   var sn = v.st && typeof v.st.sheet === 'string' ? v.st.sheet : '', h = rsOnce(rsHref(v.h, sn), v.st), c = bookCfOk(v.c);
   if (c && h !== v.h) { if (sn.length <= 100) c.s = sn; else c = null; }   // 사본 힌트도 그 회차(입장권은 교재 단위 — 회차를 안 묶는다 · Worker /book/get) · 힌트 꼴(100자)을 넘으면 힌트 없이
   bookOpen(h, typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, c, v.o === 1);   // 입장권(12시간)이 낡았으면 Worker 가 403 → 판이 다리로(종전과 같다)
@@ -2037,6 +2048,7 @@ function offerOther() {
   b.onclick = function () {
     try { localStorage.removeItem(TOKKEY); } catch (e) {}
     tchDrop();   // 🏫 다른 계정 = 그 계정 입장권도 버린다
+    rsDrop();   // 🔐 그 계정의 교재 판 기억(학생 토큰 든 주소)도
     try { google.accounts.id.disableAutoSelect(); } catch (e2) {}
     say('계정을 고르는 창을 띄웠어요.');
     try { google.accounts.id.prompt(); } catch (e3) {

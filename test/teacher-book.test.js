@@ -1411,7 +1411,7 @@ t('O8 고침 1 — 홈 목록이 bookWarm{out:1, panel:1} 여섯(다른 교재)�
 });
 
 t('O9 고침 2 — 새로고침 되살리기가 길(out)을 기억한다: 정적 판으로 연 교재는 다시 읽힌 뒤에도 정적 판 · 구글 판은 구글 판', () => {
-  const mk = (ss) => run({ frame: true, pre(g) { g.sessionStorage = ss; } });
+  const mk = (ss) => run({ frame: true, pre(g) { g.sessionStorage = ss; g.pending = 'x.' + Buffer.from(JSON.stringify({ email: 't@ownify.co.kr' })).toString('base64url') + '.y'; g.atob = atob; } });
   const ss = { s: {}, getItem(k) { return k in this.s ? this.s[k] : null; }, setItem(k, v) { this.s[k] = String(v); }, removeItem(k) { delete this.s[k]; } };
   let s = mk(ss);
   s.send({ onf: 'openBook', href: E1, left: 270, out: 1 }, s.home);
@@ -1427,7 +1427,7 @@ t('O9 고침 2 — 새로고침 되살리기가 길(out)을 기억한다: 정적
 });
 
 t('O9b 되살린 정적 판도 사본 힌트(cf)를 싣는다(밖으로 7 · 2026-11-01 — 5단계 틈: 새로고침 뒤 판은 cf 없이 다리 3.5초) · 꼴 틀린 힌트는 안 싣는다', () => {
-  const mk = (ss) => run({ frame: true, pre(g) { g.sessionStorage = ss; } });
+  const mk = (ss) => run({ frame: true, pre(g) { g.sessionStorage = ss; g.pending = 'x.' + Buffer.from(JSON.stringify({ email: 't@ownify.co.kr' })).toString('base64url') + '.y'; g.atob = atob; } });
   const store = () => ({ s: {}, getItem(k) { return k in this.s ? this.s[k] : null; }, setItem(k, v) { this.s[k] = String(v); }, removeItem(k) { delete this.s[k]; } });
   const ss = store();
   let s = mk(ss);
