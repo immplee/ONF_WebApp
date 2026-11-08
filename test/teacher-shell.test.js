@@ -33,7 +33,7 @@ function boot(store, opt) {
   const calls = [], handlers = {}, els = {}, timers = new Map(), created = [];
   const spin = { gone: false, parentNode: { removeChild() { spin.gone = true; } } };   // #wait .onf-spin — 걷히면 gone
   let clock = 0, tid = 0;
-  const el = (id) => els[id] || (els[id] = { id, hidden: id === 'app' || id === 'wait', style: {}, classList: { add() {}, remove() {}, toggle() {} },
+  const el = (id) => els[id] || (els[id] = { id, hidden: id === 'app' || id === 'wait', style: { setProperty() {}, removeProperty() {} }, classList: { add() {}, remove() {}, toggle() {} },
     contentWindow: id === 'app' ? { name: 'appwin', postMessage() {} } : null, appendChild() {}, setAttribute() {}, parentNode: null, textContent: '', innerHTML: '', querySelector: () => null,
     _on: {}, addEventListener(tp, f) { (this._on[tp] = this._on[tp] || []).push(f); } });
   const ls = store || {};
@@ -45,14 +45,15 @@ function boot(store, opt) {
       documentElement: { setAttribute() {}, getAttribute() {} } },
     location: { search: opt.search || '', pathname: '/teacher/', href: 'https://class.ownify.co.kr/teacher', reload() { calls.push('reload'); } },
     history: { state: null, length: 2, replaceState() {}, pushState(st) { calls.push('push:' + JSON.stringify(st)); g.history.state = st; }, go(n) { calls.push('go:' + n); }, back() { calls.push('back'); } },
-    sessionStorage: (() => { const m = {}; return { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } }; })(),
+    sessionStorage: (() => { const m = Object.assign({}, opt.ss || {}); return { getItem: (k) => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = String(v); }, removeItem: (k) => { delete m[k]; } }; })(),
     addEventListener: (type, fn) => { (handlers[type] = handlers[type] || []).push(fn); },
     removeEventListener: (type, fn) => { handlers[type] = (handlers[type] || []).filter((f) => f !== fn); },
     setTimeout: (fn, ms) => { timers.set(++tid, { fn, at: clock + (ms || 0) }); return tid; },
     clearTimeout: (id) => { timers.delete(id); }, setInterval: () => 0, clearInterval() {},
     google: { accounts: { id: { initialize() {}, renderButton() {}, prompt: () => calls.push('prompt'), cancel() {}, disableAutoSelect() {} } } }
   };
-  g.window = g; g.top = g; g.self = g;
+  g.window = g; g.top = g; g.self = g; if (!g.URL) g.URL = URL;   // 교재 판 주소 거름(teacherBookSrc)이 쓴다
+  Object.assign(g, opt.g || {});   // opt.g = 더 실을 전역(교재 판 = onf-api.js 의 ONF.api.EXEC)
   vm.createContext(g); vm.runInContext(SW + '\n' + main, g);
   const app = els.app;
   const R = {
@@ -370,6 +371,48 @@ t('📝 과제 판 — 「열어 줘(hwbook)」 = 껍데기 주소를 안 바꾸
   assert.ok(R.calls.some((c) => /^push:\{"onfHw":1/.test(c)), '⛔ 뒤로 = 닫기 칸이 없다');
   assert.ok(told.some((m) => m.onf === 'hwOpened' && m.t === 'Tok_1' && m.l === L), '⛔ 홈에 hwOpened(띄운 판 t·l — 홈이 새로 고침 뒤 다시 연다 · 2026-11-08)');
   assert.ok(!JSON.stringify(R.calls).includes('PHOTO') && R.g.sessionStorage.getItem('onfHwGo') === null, '⛔ 고른 사진을 주소·저장소에 남겼다');
+});
+t('🔄 새로 고침 덮개(Peter 2026-11-08 「수업 자료를 연 채 새로 고침하면 잠깐 반짝 홈이 보이고 다시 수업 자료」) — 판이 떠 있던 탭이면 홈 액자를 붙이는 순간 판과 같은 덮개 · 판이 뜨면/홈이 hwRsNo 면/로그인 화면이면 걷힘 · 판을 닫으면 표시도 지움 · 토큰 없음', () => {
+  const L = '402d6a62-96ae-817f-86ec-ecaf4f919ab9';
+  const covers = (R) => R.created.filter((e) => e.className === 'onf-hwcover' && !e.removed);
+  //   판을 띄우면 표시(시각만 — 토큰·수업 id 없음) · 닫으면 지움
+  const A = boot({ onf_id_tok: odk() }), me = { parent: A.els.app.contentWindow, postMessage() {} }; A.knockAs(me);
+  A.postAs({ onf: 'hwbook', t: 'Tok_1', l: L }, me);
+  const up = A.g.sessionStorage.getItem('onfHwUp');
+  assert.ok(/^\d+$/.test(String(up)), '⛔ 판을 띄웠는데 이 탭에 표시를 안 남겼다: ' + up);
+  //   새로 고침 — 표시가 있으면 덮개 · 없으면 없음 · 주소로 연 창(mode=…)엔 없음
+  const R = boot({ onf_id_tok: odk() }, { ss: { onfHwUp: String(Date.now()) } });
+  assert.strictEqual(covers(R).length, 1, '⛔ 판이 떠 있던 탭인데 새로 고침 때 덮개가 없다(홈이 반짝 보인다)');
+  assert.strictEqual(covers(boot({ onf_id_tok: odk() })).length, 0, '⛔ 판이 없던 탭에 덮개를 깔았다');
+  assert.strictEqual(covers(boot({ onf_id_tok: odk() }, { ss: { onfHwUp: String(Date.now() - 13 * 3600000) } })).length, 0, '⛔ 12시간 넘은 표시로 덮었다');
+  assert.strictEqual(covers(boot({ onf_id_tok: odk() }, { ss: { onfHwUp: String(Date.now()) }, search: '?mode=student&t=Tok_1' })).length, 0, '⛔ 주소로 연 학생 창에 덮개를 깔았다');
+  //   판이 다시 뜨면 걷힘(판의 같은 「불러오는 중」으로 이어짐)
+  const me2 = { parent: R.els.app.contentWindow, postMessage() {} }; R.knockAs(me2);
+  R.postAs({ onf: 'hwbook', t: 'Tok_1', l: L, rs: 1 }, me2);
+  assert.strictEqual(covers(R).length, 0, '⛔ 판이 떴는데 덮개가 남았다');
+  //   홈이 안 되살림 → 바로 걷고 표시도 지움 · 다른 창의 말은 무시
+  const N = boot({ onf_id_tok: odk() }, { ss: { onfHwUp: String(Date.now()) } }), me3 = { parent: N.els.app.contentWindow, postMessage() {} }; N.knockAs(me3);
+  N.postAs({ onf: 'hwRsNo' }, { parent: N.els.app.contentWindow, postMessage() {} });
+  assert.strictEqual(covers(N).length, 1, '⛔ 홈이 아닌 창의 말로 덮개를 걷었다');
+  N.postAs({ onf: 'hwRsNo' }, me3);
+  assert.ok(covers(N).length === 0 && N.g.sessionStorage.getItem('onfHwUp') === null, '⛔ 홈이 「안 되살린다」고 했는데 덮개·표시가 남았다');
+  //   10초 안전판
+  const T = boot({ onf_id_tok: odk() }, { ss: { onfHwUp: String(Date.now()) } }); T.advance(10001);
+  assert.ok(covers(T).length === 0 && T.g.sessionStorage.getItem('onfHwUp') === null, '⛔ 아무 말이 없는데 덮개가 10초 넘게 남는다');
+  assert.ok(/function gate\([^)]*\) \{[^\n]*\n  gateGo = go; gateBackOn = !!back;\n  gating\(true\);[^\n]*\n  hwCoverOff\(false\);/.test(html) && /html\.onf-gating \.onf-hwcover/.test(html), '⛔ 로그인 화면(gate)을 덮개가 가린다');
+});
+t('🔄 새로 고침 = 교재 판을 홈 노크(bookHello)를 안 기다리고 액자를 붙이는 순간(mount) 되살린다(Peter 2026-11-08 「모든 창 빨리」 · 학생 껍데기 rsBoot 와 같다) · 노크가 와도 두 번 안 연다 · 기억 없음·주소로 연 창 = 안 연다', () => {
+  const E1 = 'https://class.ownify.co.kr/young-s1-e1-jungah?mode=share&t=STUTOK';
+  const keep = JSON.stringify({ h: E1, l: 270, m: 0, r: 0, o: 0, c: null, st: null, at: Date.now() });
+  const panels = (R) => R.created.filter((e) => e.className === 'onf-bookpanel' && !e.removed);
+  const API = { ONF: { api: { EXEC: 'https://script.google.com/macros/s/BOOKEXEC/exec' } } };
+  const R = boot({ onf_id_tok: odk() }, { ss: { onfThOpenBook: keep }, g: API });
+  assert.strictEqual(panels(R).length, 1, '⛔ 새로 고침 뒤 교재 판이 홈 노크를 기다린다(홈이 먼저 보인다)');
+  const me = { parent: R.els.app.contentWindow, postMessage() {} }; R.knockAs(me);
+  R.postAs({ onf: 'bookHello' }, me);
+  assert.strictEqual(panels(R).length, 1, '⛔ 홈 노크에 판을 또 열었다');
+  assert.strictEqual(panels(boot({ onf_id_tok: odk() }, { g: API })).length, 0, '⛔ 기억이 없는데 판을 열었다');
+  assert.strictEqual(panels(boot({ onf_id_tok: odk() }, { ss: { onfThOpenBook: keep }, search: '?mode=student&t=Tok_1', g: API })).length, 0, '⛔ 주소로 연 학생 창에서 mount 때 판을 열었다(종전대로 노크 때)');
 });
 t('🔄 새로 고침 되살리기 표(rs · 2026-11-08 검토 ④) — 홈이 rs:1 로 연 판에만 노크 답 hw.rs = 1 · 보통 열기엔 없음(판이 제 기억 쪽·보기를 안 쓴다) · 꼴은 정확히 1 만', () => {
   for (const [rs, want] of [[1, 1], [undefined, undefined], ['1', undefined], [true, undefined]]) {

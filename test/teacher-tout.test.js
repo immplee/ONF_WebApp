@@ -677,7 +677,7 @@ t('W5b 입장권만으로 연 홈(tchOnly)의 정적 과제 판(기본) — 로�
   //   보이는 정적 판이 안 떴다 → 로그인 화면(판 층 숨김) · 돌아가기 = 판 닫기
   R.g.hwOutBack(R.g.hwOut, 'paint');
   assert.ok(R.els.lock.hidden === false && R.els.gateBack.hidden === false && R.g.hwBox && R.g.gateBackOn === true, '⛔ 구글 판으로 물러날 때 로그인 화면을 안 거쳤다(쿠키 없는 액자)');
-  assert.ok(/html\.onf-gating \.onf-hwbox, html\.onf-gating \.onf-hwbk, html\.onf-gating \.onf-hwdiv \{ visibility:hidden !important/.test(html) && /function gate\([^)]*\) \{[^\n]*\n  gateGo = go; gateBackOn = !!back;\n  gating\(true\);/.test(html), '⛔ 로그인 화면 동안 판 층(과제 판·옆 교재·손잡이)을 숨기지 않는다 — 판이 로그인 화면을 덮는다');
+  assert.ok(/html\.onf-gating \.onf-hwbox, html\.onf-gating \.onf-hwbk, html\.onf-gating \.onf-hwdiv, html\.onf-gating \.onf-hwcover \{ visibility:hidden !important/.test(html) && /function gate\([^)]*\) \{[^\n]*\n  gateGo = go; gateBackOn = !!back;\n  gating\(true\);/.test(html), '⛔ 로그인 화면 동안 판 층(과제 판·옆 교재·손잡이)을 숨기지 않는다 — 판이 로그인 화면을 덮는다');
   R.els.gateBack.onclick();
   assert.ok(R.els.lock.hidden === true && !R.g.hwBox, '⛔ 「홈으로 돌아가기」가 물러난 과제 판을 안 닫았다');
   //   미리 띄운 정적 판이 안 떴다 → 조용히 걷는다(로그인 화면 없음)
