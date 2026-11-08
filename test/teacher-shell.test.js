@@ -478,7 +478,16 @@ t('🔄 2차(Peter 2026-11-08) 과제 판 옆 교재 — 그 교재가 알린 �
   P.postAs({ onf: 'bookHi' }, pw);
   assert.ok(!pg.some((m) => m.onf === 'bookRestore'), '⛔ 숨긴 옆 교재에 되살리기를 써 버렸다');
   P.postAs({ onf: 'hwbookView', v: 'side', href: HREF }, P.inner);
+  assert.ok(!pg.some((m) => m.onf === 'bookRestore'), '⛔ 보이는 그 순간(교재가 제 크기를 받기 전)에 되살리기를 보냈다');
+  P.advance(200);
   assert.deepStrictEqual(pg.filter((m) => m.onf === 'bookRestore').map((m) => m.st.sheet), ['E5_Five'], '⛔ 숨긴 판이 보였는데 되살리기를 안 줬다');
+  //   숨긴 판을 1분 넘어 보여도 — 액자가 기억한 회차로 받았으면 굴린 자리·옆 창까지 마저 준다
+  const Q = open({ onfThHwBk: kept }), qg = [];
+  Q.postAs({ onf: 'hwbookBookWarm', href: HREF }, Q.inner);
+  const qk = Q.created.filter((x) => x.tag === 'iframe').slice(-1)[0], qw = { parent: qk.contentWindow, postMessage: (m) => qg.push(JSON.parse(JSON.stringify(m))) };
+  Q.postAs({ onf: 'bookHi' }, qw); Q.g.Date = { now: () => Date.now() + 61000 };
+  Q.postAs({ onf: 'hwbookView', v: 'side', href: HREF }, Q.inner); Q.advance(200);
+  assert.deepStrictEqual(qg.filter((m) => m.onf === 'bookRestore').map((m) => m.st.top), [900], '⛔ 기억한 회차로 받은 숨긴 판을 1분 뒤 보였더니 굴린 자리를 안 줬다(반쪽)');
   //   1분 넘어 노크하면(되살리기 자리가 지났다) 안 준다
   const D = open({ onfThHwBk: kept }); D.g.Date = { now: () => Date.now() + 61000 }; const dd = D.side(HREF);
   assert.ok(!dd.got.some((m) => m.onf === 'bookRestore'), '⛔ 되살리기 자리가 지나 연 교재에 옛 상태를 줬다');

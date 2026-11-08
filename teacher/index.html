@@ -884,7 +884,7 @@ function hwBookFrame(src, out, cf, park) {   // park = 미리 띄우기(hwBookWa
     hwBk.src = src; hwBk.win = null; hwBk.out = o; hwBk.parked = !!park; hwBk.unpark = false;   // 새 교재 = 새 노크를 기다린다 · ⛔ src 엔 park 를 안 붙인다(누를 때 같은 주소 = 다시 안 받음)
     /* 🔄 되살리기(아래 hwBkRs) 1분 안 같은 교재면 액자엔 기억한 회차 주소를 싣는다 — 첫 받기부터 그 회차(Peter 2026-11-08 2차 「회차 튐」 · 홈 옆 판 rsBoot 와 같은 rsHref).
        ⛔ 비교 열쇠(hwBk.src)는 판이 보낸 원래 주소 그대로 — 판이 같은 주소로 「옆에」를 다시 보내도 액자를 새로 안 받는다 · 사본 힌트(cf)도 그 회차 */
-    var ld = hwBkRsSrc(src);
+    var ld = hwBkRsSrc(src); hwBk.rsLd = ld !== src;   // rsLd = 이 액자는 기억한 회차로 받았다 — 1분이 지나 보여도 굴린 자리·옆 창까지 마저 준다(회차만 맞고 나머지가 처음이면 반쪽)
     if (ld !== src) { var cf2 = bookCfOk(cf), sn2 = hwBkRs.st.sheet; cf = cf2 && sn2.length <= 100 ? { f: cf2.f, s: sn2, k: cf2.k } : null; }
     var u = park ? ld + (ld.indexOf('?') < 0 ? '?' : '&') + 'park=1' : ld;
     if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} hwBk.oe = null; }
@@ -925,7 +925,7 @@ function hwBkRsSrc(src) {
 function hwBkSave(st) { var b = hwBk && hwBkId(hwBk.src); if (!b || !histSmall(st)) return; try { sessionStorage.setItem(HWBK_KEY, JSON.stringify({ b: b, st: JSON.parse(JSON.stringify(st)), at: Date.now() })); } catch (e) {} }
 function hwBkRsTell() {
   var r = hwBkRs; if (!r || !r.until || !hwBk || !hwBk.win || hwBk.parked) return;
-  if (Date.now() > r.until) { hwBkRs = null; return; }
+  if (Date.now() > r.until && !hwBk.rsLd) { hwBkRs = null; return; }
   if (r.b !== hwBkId(hwBk.src)) return;   // 다른 교재(미리 띄운 다른 책) — 그 책 노크를 기다린다
   hwBkRs = null;
   try { hwBk.win.postMessage({ onf: 'bookRestore', st: r.st }, hwBk.origin); } catch (e) {}
@@ -934,7 +934,7 @@ function hwBkRsTell() {
 function hwBkUnpark() {
   if (!hwBk || !hwBk.parked) return;
   hwBk.parked = false;
-  if (hwBk.win) { try { hwBk.win.postMessage({ onf: 'bookPark', on: false }, hwBk.origin); } catch (e) {} hwBkRsTell(); } else hwBk.unpark = true;   // 🔄 숨긴 채 노크했던 옆 교재 — 보일 때 되살리기(위 hwBkRs)
+  if (hwBk.win) { try { hwBk.win.postMessage({ onf: 'bookPark', on: false }, hwBk.origin); } catch (e) {} setTimeout(hwBkRsTell, 150); } else hwBk.unpark = true;   // 🔄 숨긴 채 노크했던 옆 교재 — 보인 뒤(교재가 제 크기를 받은 뒤 · 다른 출처 액자는 크기가 늦게 간다) 되살리기(위 hwBkRs)
 }
 /* 🖥️ 확장 창 = 보이는 칸에 딱(Peter 2026-11-04 TV 사진 「좌우상하 여백이 일정하지 않고 아래 여백이 없어 — 정가운데로」).
    재현기는 16:9·4:3·세로 모두 위아래 12px 로 가운데 — 어긋남은 실기기(아이패드 크롬 창을 모니터로 옮겨 전체 화면)에서만 난다.
