@@ -418,8 +418,8 @@ t('🔄 2차(Peter 2026-11-08) 교재 판 되살리기 = 첫 받기부터 교재
   const API = { ONF: { api: { EXEC: 'https://script.google.com/macros/s/BOOKEXEC/exec' } } };
   const panelSrc = (R) => (R.g.books.filter((q) => !q.parked)[0] || {}).src || '';
   const go = (h, sheet) => boot({ onf_id_tok: odk() }, { ss: { onfThOpenBook: JSON.stringify({ h, l: 270, m: 0, r: 0, o: 0, c: null, st: sheet === undefined ? null : { sheet, top: 0, left: 0, side: null }, at: Date.now() }) }, g: API });
-  const SL = 'https://class.ownify.co.kr/young-s1-e1-jungah?mode=share&t=STUTOK&line=40';
-  assert.ok(/slug=young-s1-e3-jungah/.test(panelSrc(go(SL, 'E3_Third'))) && !/line=/.test(panelSrc(go(SL, 'E3_Third'))), '⛔ slug 주소를 알린 회차로 안 고쳤다(연 회차를 먼저 그리고 다시 받는다): ' + panelSrc(go(SL, 'E3_Third')));
+  const SL = 'https://class.ownify.co.kr/young-s1-e1-jungah?mode=share&t=STUTOK&line=40&view=cards';
+  assert.ok(/slug=young-s1-e3-jungah/.test(panelSrc(go(SL, 'E3_Third'))) && !/line=|view=/.test(panelSrc(go(SL, 'E3_Third'))), '⛔ slug 주소를 알린 회차로 안 고쳤다(연 회차를 먼저 그리고 다시 받는다): ' + panelSrc(go(SL, 'E3_Third')));
   assert.ok(/slug=young-s1-e1-jungah/.test(panelSrc(go(SL, 'E1_First'))) && /line=40/.test(panelSrc(go(SL, 'E1_First'))), '⛔ 같은 회차인데 주소(줄)를 고쳤다');
   assert.ok(/slug=young-s1-e1-jungah/.test(panelSrc(go(SL, 'Bonus'))), '⛔ 회차 번호 없는 이름으로 slug 를 고쳤다');
   assert.ok(/slug=young-s1-e1-jungah/.test(panelSrc(go(SL))), '⛔ 상태 없는 기억으로 주소를 고쳤다');
@@ -431,13 +431,13 @@ t('🔄 2차(Peter 2026-11-08) 교재 판 되살리기 = 첫 받기부터 교재
 });
 t('🔄 2차(Peter 2026-11-08) 과제 판 옆 교재 — 그 교재가 알린 상태(bookState)를 이 탭에 적고(교재 줄기만 · 토큰 없음) 새로 고침 뒤 같은 교재가 노크하면 한 번 돌려준다(bookRestore) · 다른 교재엔 안 준다 · 판을 닫으면 잊는다 · 판 열기 전 비우기엔 안 지운다', () => {
   const HREF = 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILEaaaaaaaa01&sheetName=E3';
-  const open = (ss) => {
+  const open = (ss, fresh) => {
     const R = boot({ onf_id_tok: odk() }, { ss }), me = { parent: R.els.app.contentWindow, postMessage() {} };
     const ce = R.g.document.createElement; R.g.document.createElement = (tag) => { const e = ce(tag); e.style.setProperty = (k, v) => { e.style[k] = v; }; e.style.removeProperty = (k) => { delete e.style[k]; }; e.blur = () => {}; return e; };
     R.g.ONF = Object.assign({}, R.g.ONF || {}, { api: { EXEC: R.g.EXEC } }); if (R.g.window && R.g.window !== R.g) R.g.window.ONF = R.g.ONF;
-    R.knockAs(me); R.postAs({ onf: 'hwbook', t: 'Tok_1', rs: 1 }, me);
+    R.knockAs(me); R.postAs(fresh ? { onf: 'hwbook', t: 'Tok_1' } : { onf: 'hwbook', t: 'Tok_1', rs: 1 }, me);
     const fr = R.created.filter((e) => e.tag === 'iframe')[0], inner = { parent: { parent: fr.contentWindow }, postMessage() {} };
-    R.postAs({ onf: 'auth-please' }, inner);
+    R.postAs({ onf: 'auth-please' }, inner); R.inner = inner;
     R.side = (href) => { R.postAs({ onf: 'hwbookView', v: 'side', href }, inner); const bk = R.created.filter((e) => e.tag === 'iframe').slice(-1)[0], got = [], w = { parent: bk.contentWindow, postMessage: (m) => got.push(JSON.parse(JSON.stringify(m))) }; R.postAs({ onf: 'bookHi' }, w); return { w, got }; };
     return R;
   };
@@ -457,6 +457,17 @@ t('🔄 2차(Peter 2026-11-08) 과제 판 옆 교재 — 그 교재가 알린 �
   //   판을 닫으면 잊는다
   B.g.hwClose();
   assert.strictEqual(B.g.sessionStorage.getItem('onfThHwBk'), null, '⛔ 과제 판을 닫았는데 옆 교재 기억이 남았다');
+  //   되살리기(rs)가 아닌 열기 — 사람이 새로 연 판엔 옛 상태를 안 준다(판 hwShape rs 와 같은 약속 · 2차 검토)
+  const E = open({ onfThHwBk: kept }, true), e = E.side(HREF);
+  assert.ok(!e.got.some((m) => m.onf === 'bookRestore'), '⛔ 되살리기가 아닌 판 열기에 옛 옆 교재 상태를 줬다');
+  //   숨긴(미리 띄운 park) 옆 교재가 먼저 노크해도 그때는 안 준다(안 보이는 판은 굴린 자리가 0) — 보일 때(hwBkUnpark) 준다
+  const P = open({ onfThHwBk: kept }), pg = [];
+  P.postAs({ onf: 'hwbookBookWarm', href: HREF }, P.inner);
+  const pk = P.created.filter((x) => x.tag === 'iframe').slice(-1)[0], pw = { parent: pk.contentWindow, postMessage: (m) => pg.push(JSON.parse(JSON.stringify(m))) };
+  P.postAs({ onf: 'bookHi' }, pw);
+  assert.ok(!pg.some((m) => m.onf === 'bookRestore'), '⛔ 숨긴 옆 교재에 되살리기를 써 버렸다');
+  P.postAs({ onf: 'hwbookView', v: 'side', href: HREF }, P.inner);
+  assert.deepStrictEqual(pg.filter((m) => m.onf === 'bookRestore').map((m) => m.st.sheet), ['E5_Five'], '⛔ 숨긴 판이 보였는데 되살리기를 안 줬다');
   //   1분 넘어 노크하면(되살리기 자리가 지났다) 안 준다
   const D = open({ onfThHwBk: kept }); D.g.Date = { now: () => Date.now() + 61000 }; const dd = D.side(HREF);
   assert.ok(!dd.got.some((m) => m.onf === 'bookRestore'), '⛔ 되살리기 자리가 지나 연 교재에 옛 상태를 줬다');

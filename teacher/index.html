@@ -739,6 +739,7 @@ function hwFrom(win) {
   return false;
 }
 function hwOpen(t, l, f, hwt, au, rs) {   // rs = 🔄 새로 고침 되살리기(홈 onfThHw) — 판이 제 기억(쪽·보기·교재 회차)을 이때만 쓴다
+  if (hwBkRs) { if (rs) hwBkRs.until = Date.now() + 60000; else hwBkRs = null; }   // 🔄 옆 교재 되살리기도 되살리기 열기에만(아래 hwBkRs)
   var files0 = f, tk0 = hwt; hwL = String(l || '');   // 📚 hwFbAskAns 가 「그 수업」인지 본다
   if (hwBox && hwWarmOn && hwT === t) {   // 미리 띄운 판 — 보이고 「이 수업·이 사진으로 열어」 만
     hwWarmOn = false; clearTimeout(hwWarmTm);
@@ -906,14 +907,15 @@ function hwBookWarm(href, out, cf) {
 }
 /* 🔄 과제 판 옆 교재도 새로 고침 뒤 회차·굴린 자리·옆 창 그대로(Peter 2026-11-08 2차 · 종전엔 그 교재가 알린 bookState 를 안 받아 판이 고른 처음 회차로 열렸다).
    판(Ownify onfHbKeep)이 교재·보기를 다시 고르고 열면 · 그 교재가 알린 상태(이 탭 sessionStorage · 홈 옆 판 rsSave 와 같은 거르개 histSmall)를 첫 노크 때 돌려준다(bookRestore — 홈 옆 판 rsTell 과 같은 말).
-   같은 교재(fileId · slug 의 회차 뺀 줄기)일 때만 · 한 번만 · 껍데기가 뜬 뒤 1분 안(되살리기 자리) · 과제 판을 닫으면 지운다(hwClose) · 12시간 넘은 기억은 버린다. ⛔ 학생 토큰·주소는 안 적는다(교재 줄기만). */
+   같은 교재(fileId · slug 의 회차 뺀 줄기)일 때만 · 한 번만 · 홈이 판을 **되살리기로(rs)** 연 뒤 1분 안(사람이 새로 연 판엔 안 쓴다 — 판 hwShape rs 와 같은 약속) ·
+   숨긴(미리 띄운 park) 옆 교재엔 안 준다(안 보이는 판은 굴린 자리가 0 으로 잘린다 — 보일 때 hwBkUnpark 가 준다) · 과제 판을 닫으면 지운다(hwClose) · 12시간 넘은 기억은 버린다. ⛔ 학생 토큰·주소는 안 적는다(교재 줄기만). */
 var HWBK_KEY = 'onfThHwBk', hwBkRs = (function () {
-  try { var v = JSON.parse(sessionStorage.getItem(HWBK_KEY) || 'null'); return v && typeof v.b === 'string' && v.b && v.st && typeof v.st === 'object' && Date.now() - Number(v.at) < 12 * 3600000 ? { b: v.b, st: v.st, until: Date.now() + 60000 } : null; } catch (e) { return null; }
+  try { var v = JSON.parse(sessionStorage.getItem(HWBK_KEY) || 'null'); return v && typeof v.b === 'string' && v.b && v.st && typeof v.st === 'object' && Date.now() - Number(v.at) < 12 * 3600000 ? { b: v.b, st: v.st, until: 0 } : null; } catch (e) { return null; }
 })();
 function hwBkId(src) { try { var q = new URL(src).searchParams, f = q.get('fileId'), g = (q.get('slug') || '').split('-'); return f ? 'f:' + f : g.length === 4 ? 's:' + g[0] + '-' + g[1] + '-' + g[3] : ''; } catch (e) { return ''; } }
 function hwBkSave(st) { var b = hwBk && hwBkId(hwBk.src); if (!b || !histSmall(st)) return; try { sessionStorage.setItem(HWBK_KEY, JSON.stringify({ b: b, st: JSON.parse(JSON.stringify(st)), at: Date.now() })); } catch (e) {} }
 function hwBkRsTell() {
-  var r = hwBkRs; if (!r || !hwBk || !hwBk.win) return;
+  var r = hwBkRs; if (!r || !r.until || !hwBk || !hwBk.win || hwBk.parked) return;
   if (Date.now() > r.until) { hwBkRs = null; return; }
   if (r.b !== hwBkId(hwBk.src)) return;   // 다른 교재(미리 띄운 다른 책) — 그 책 노크를 기다린다
   hwBkRs = null;
@@ -923,7 +925,7 @@ function hwBkRsTell() {
 function hwBkUnpark() {
   if (!hwBk || !hwBk.parked) return;
   hwBk.parked = false;
-  if (hwBk.win) { try { hwBk.win.postMessage({ onf: 'bookPark', on: false }, hwBk.origin); } catch (e) {} } else hwBk.unpark = true;
+  if (hwBk.win) { try { hwBk.win.postMessage({ onf: 'bookPark', on: false }, hwBk.origin); } catch (e) {} hwBkRsTell(); } else hwBk.unpark = true;   // 🔄 숨긴 채 노크했던 옆 교재 — 보일 때 되살리기(위 hwBkRs)
 }
 /* 🖥️ 확장 창 = 보이는 칸에 딱(Peter 2026-11-04 TV 사진 「좌우상하 여백이 일정하지 않고 아래 여백이 없어 — 정가운데로」).
    재현기는 16:9·4:3·세로 모두 위아래 12px 로 가운데 — 어긋남은 실기기(아이패드 크롬 창을 모니터로 옮겨 전체 화면)에서만 난다.
@@ -1683,14 +1685,14 @@ function rsSave(p) { if (!p || !p.href) return; try { sessionStorage.setItem(RS_
 function rsDrop() { try { sessionStorage.removeItem(RS_KEY); } catch (e) {} }
 function rsTell(p) { if (!p || !p.rs || !p.win) return; var st = p.rs; p.rs = null; try { p.win.postMessage({ onf: 'bookRestore', st: st }, p.origin); } catch (e) {} }
 /* 🔄 2차(Peter 2026-11-08 「새로 고침 빨리」) — 되살릴 주소를 교재가 알린 회차(st.sheet)로 고친다 → 첫 받기부터 그 회차(종전: 연 회차를 먼저 그리고 bookRestore 로 한 번 더 받아 회차가 튀었다).
-   slug 주소 = 경로의 -eN-(서버가 slug 로 회차를 고른다) · fileId 주소 = sheetName · 줄(line)은 연 회차의 행이라 뺀다 · 회차 없음·모르는 꼴·이미 같으면 그대로(교재가 종전대로 옮긴다). */
+   slug 주소 = 경로의 -eN-(서버가 slug 로 회차를 고른다) · fileId 주소 = sheetName · 줄(line)·바로 열기(view)는 연 회차 몫이라 뺀다 · 회차 없음·모르는 꼴·이미 같으면 그대로(교재가 종전대로 옮긴다). */
 function rsHref(h, sn) {
   try {
     var u = new URL(h, location.href), m = /^[Ee](\d+)/.exec(sn || ''), p;
     if (!sn) return h;   // 내 문장 판은 회차를 안 알린다(sheet '')
     if (u.searchParams.get('fileId')) { if (u.searchParams.get('sheetName') === sn) return h; u.searchParams.set('sheetName', sn); }
     else { if (!m) return h; p = u.pathname.replace(/-e\d+-(?=[a-z0-9]+\/?$)/i, '-e' + Number(m[1]) + '-'); if (p === u.pathname) return h; u.pathname = p; }
-    u.searchParams.delete('line');
+    u.searchParams.delete('line'); u.searchParams.delete('view');   // 줄·바로 열기(🗂️ 카드 view=cards)는 연 회차 몫 — 떠 있던 창은 교재가 st.win 으로 되살린다
     return u.toString();
   } catch (e) { return h; }
 }
@@ -1700,7 +1702,7 @@ function rsBoot() {
   try { v = JSON.parse(sessionStorage.getItem(RS_KEY) || 'null'); } catch (e) { v = null; }
   if (!v || typeof v.h !== 'string' || !(Date.now() - Number(v.at) < RS_MS)) return;
   var sn = v.st && typeof v.st.sheet === 'string' ? v.st.sheet : '', h = rsHref(v.h, sn), c = bookCfOk(v.c);
-  if (c && h !== v.h) c.s = sn;   // 사본 힌트도 그 회차(입장권은 교재 단위 — 회차를 안 묶는다 · Worker /book/get)
+  if (c && h !== v.h) { if (sn.length <= 100) c.s = sn; else c = null; }   // 사본 힌트도 그 회차(입장권은 교재 단위 — 회차를 안 묶는다 · Worker /book/get) · 힌트 꼴(100자)을 넘으면 힌트 없이
   bookOpen(h, typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, c, v.o === 1);   // 입장권(12시간)이 낡았으면 Worker 가 403 → 판이 다리로(종전과 같다)
   var p = bookShown(); if (!p) return;
   p.st = v.st && typeof v.st === 'object' ? v.st : null; p.rs = p.st; rsTell(p);

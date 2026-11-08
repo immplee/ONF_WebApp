@@ -794,6 +794,16 @@ t('🚀 기억한 첫 교재가 있으면 홈을 띄우자마자 숨긴 판(park
     assert.strictEqual(q.panels().length, 0, '⛔ ' + why + ' 인데 미리 띄웠다');
   }
 });
+t('🔄 2차 검토(2026-11-08) — 되살릴 판이 같은 교재(다른 회차)면 기억한 첫 교재 숨긴 판을 또 안 띄운다(두 판이 한꺼번에 받던 것) · 다른 교재면 종전대로 띄운다', () => {
+  const bs = (h) => { const u = new URL(h); return /mode=share/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=share&slug=' + u.pathname.slice(1) + '&embed=1' : null; };
+  const both = (rsH) => (g) => { g.localStorage = LSf({ onfPreBook: JSON.stringify({ k: 'kA', h: PB, ph: 0, t: 1.7e12 }) });
+    g.sessionStorage = LSf({ onfOpenBook: JSON.stringify({ h: rsH, l: 184, m: 0, r: 0, o: 0, st: { sheet: 'E3_Y', top: 0, left: 0, side: null }, at: 1.7e12 }) }); };
+  const s = setup(bs, { preKey: 'kA', pre: both(PB) });
+  const srcs = s.panels().map((x) => x.kids[0].src);
+  assert.ok(srcs.length === 1 && /slug=a-s1-e3-b/.test(srcs[0]), '⛔ 같은 교재를 두 판(기억한 e1 숨긴 판 + 되살린 e3)으로 띄웠다: ' + srcs.join(' | '));
+  const o = setup(bs, { preKey: 'kA', pre: both('https://class.ownify.co.kr/c-s1-e2-d?mode=share') });
+  assert.strictEqual(o.panels().length, 2, '⛔ 다른 교재를 되살리는데 기억한 첫 교재 미리 띄우기를 막았다');
+});
 t('🚀 홈의 첫 bookWarm(panel:1) 주소를 다음 열기용으로 기억 — 한 번만(첫 것) · 열쇠 없으면 안 적는다 · 미리 띄운 판이 있으면 같은 주소로 판을 또 안 만든다', () => {
   const ls = LSf();
   const s = setup(null, { preKey: 'kA', pre: pre(ls) });

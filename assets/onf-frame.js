@@ -1009,14 +1009,14 @@
     function rsDrop() { try { global.sessionStorage.removeItem(RS_KEY); } catch (e) {} }
     function rsTell(p) { if (!p || !p.rs || !p.win) return; var st = p.rs; p.rs = null; try { p.win.postMessage({ onf: 'bookRestore', st: st }, p.origin); } catch (e) {} }
     /* 🔄 2차(Peter 2026-11-08 「새로 고침 빨리」) — 되살릴 주소를 교재가 알린 회차(st.sheet)로 고친다 → 첫 받기부터 그 회차(종전: 연 회차를 먼저 그리고 bookRestore 로 한 번 더 받아 회차가 튀었다).
-       slug 주소 = 경로의 -eN-(서버가 slug 로 회차를 고른다) · fileId 주소 = sheetName · 줄(line)은 연 회차의 행이라 뺀다 · 회차 없음·모르는 꼴·이미 같으면 그대로(교재가 종전대로 옮긴다). */
+       slug 주소 = 경로의 -eN-(서버가 slug 로 회차를 고른다) · fileId 주소 = sheetName · 줄(line)·바로 열기(view)는 연 회차 몫이라 뺀다 · 회차 없음·모르는 꼴·이미 같으면 그대로(교재가 종전대로 옮긴다). */
     function rsHref(h, sn) {
       try {
         var u = new URL(h, (global.location && global.location.href) || undefined), m = /^[Ee](\d+)/.exec(sn || ''), p;
         if (!sn) return h;   // 내 문장 판은 회차를 안 알린다(sheet '')
         if (u.searchParams.get('fileId')) { if (u.searchParams.get('sheetName') === sn) return h; u.searchParams.set('sheetName', sn); }
         else { if (!m) return h; p = u.pathname.replace(/-e\d+-(?=[a-z0-9]+\/?$)/i, '-e' + Number(m[1]) + '-'); if (p === u.pathname) return h; u.pathname = p; }
-        u.searchParams.delete('line');
+        u.searchParams.delete('line'); u.searchParams.delete('view');   // 줄·바로 열기(🗂️ 카드 view=cards)는 연 회차 몫 — 떠 있던 창은 교재가 st.win 으로 되살린다
         return u.toString();
       } catch (e) { return h; }
     }
@@ -1259,6 +1259,10 @@
       var v = null;
       try { v = JSON.parse(global.localStorage.getItem(PRE_LS) || 'null'); } catch (e) { v = null; }
       if (!v || v.k !== opts.preKey || typeof v.h !== 'string' || v.ph !== (phone() ? 1 : 0) || !(Date.now() - Number(v.t) < PRE_AGE_MS)) return;
+      /* 🔄 바로 뒤 rsBoot 가 같은 교재를 (다른 회차로 고친 주소로) 다시 열면 숨긴 판을 또 띄우지 않는다 — 두 판이 한꺼번에 받았다(2026-11-08 2차 검토) */
+      var rv = null; try { rv = JSON.parse(global.sessionStorage.getItem(RS_KEY) || 'null'); } catch (e) { rv = null; }
+      var rb = rv && typeof rv.h === 'string' && Date.now() - Number(rv.at) < RS_MS ? bookBook(opts.bookSrc(rv.h) || '') : '';
+      if (rb && rb === bookBook(opts.bookSrc(v.h) || '')) return;
       bookPre(v.h, undefined, undefined, undefined, v.o === 1);   // 🌤 o 없는 옛 기억은 지금 길
       preP = bookFind(opts.bookSrc(v.h));   // 🚀 미리 띄운 판(위 preSave 가 오늘 주소와 견준다)
     }
