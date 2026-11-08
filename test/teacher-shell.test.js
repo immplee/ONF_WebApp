@@ -451,15 +451,26 @@ t('🔄 2차(Peter 2026-11-08) 과제 판 옆 교재 — 그 교재가 알린 �
   assert.deepStrictEqual(b.got.filter((m) => m.onf === 'bookRestore').map((m) => [m.st.sheet, m.st.top, m.st.side.t]), [['E5_Five', 900, 'note']], '⛔ 새로 고침 뒤 옆 교재에 상태를 안 돌려줬다(판이 고른 처음 회차로 열린다)');
   B.postAs({ onf: 'bookHi' }, b.w);
   assert.strictEqual(b.got.filter((m) => m.onf === 'bookRestore').length, 1, '⛔ 노크마다 옛 상태를 또 보냈다');
+  //   첫 받기부터 기억한 회차(액자 주소) · 비교 열쇠는 판이 보낸 원래 주소 — 판이 같은 주소로 「옆에」를 다시 보내도 액자를 새로 안 받는다(2차 「회차 튐」)
+  const bfr = () => B.created.filter((e) => e.tag === 'iframe');
+  const bsrc = bfr().slice(-1)[0].src || '';
+  assert.ok(/sheetName=E5_Five/.test(bsrc) && !/sheetName=E3(&|$)/.test(bsrc), '⛔ 옆 교재가 판이 고른 회차(E3)로 먼저 받는다(그다음 E5 로 튄다): ' + bsrc);
+  assert.ok(/sheetName=E3(&|$)/.test(B.g.hwBk.src), '⛔ 비교 열쇠가 원래 주소가 아니다: ' + B.g.hwBk.src);
+  const nB = bfr().length; B.postAs({ onf: 'hwbookView', v: 'book', href: HREF }, B.inner);
+  assert.strictEqual(bfr().length, nB, '⛔ 판이 같은 주소를 다시 보내자 옆 교재를 새로 받았다');
+  //   exec 주소의 slug= 칸도 회차를 고친다(slug 로 연 교재)
+  assert.ok(/slug=young-s1-e5-jungah/.test(B.g.rsHref('https://script.google.com/x/exec?t=T&mode=share&slug=young-s1-e3-jungah&embed=1', 'E5_Five')), '⛔ exec 주소 slug 칸 회차를 안 고쳤다');
   //   다른 교재 — 안 준다
   const C = open({ onfThHwBk: kept }), c = C.side(HREF.replace('FILEaaaaaaaa01', 'FILEbbbbbbbb02'));
   assert.ok(!c.got.some((m) => m.onf === 'bookRestore'), '⛔ 다른 교재에 옛 상태를 줬다');
+  assert.ok(!/E5_Five/.test(C.created.filter((x) => x.tag === 'iframe').slice(-1)[0].src || ''), '⛔ 다른 교재 주소를 옛 회차로 고쳤다');
   //   판을 닫으면 잊는다
   B.g.hwClose();
   assert.strictEqual(B.g.sessionStorage.getItem('onfThHwBk'), null, '⛔ 과제 판을 닫았는데 옆 교재 기억이 남았다');
   //   되살리기(rs)가 아닌 열기 — 사람이 새로 연 판엔 옛 상태를 안 준다(판 hwShape rs 와 같은 약속 · 2차 검토)
   const E = open({ onfThHwBk: kept }, true), e = E.side(HREF);
   assert.ok(!e.got.some((m) => m.onf === 'bookRestore'), '⛔ 되살리기가 아닌 판 열기에 옛 옆 교재 상태를 줬다');
+  assert.ok(/sheetName=E3(&|$)/.test(E.created.filter((x) => x.tag === 'iframe').slice(-1)[0].src || ''), '⛔ 되살리기가 아닌 판 열기에 옛 회차 주소를 실었다');
   //   숨긴(미리 띄운 park) 옆 교재가 먼저 노크해도 그때는 안 준다(안 보이는 판은 굴린 자리가 0) — 보일 때(hwBkUnpark) 준다
   const P = open({ onfThHwBk: kept }), pg = [];
   P.postAs({ onf: 'hwbookBookWarm', href: HREF }, P.inner);
@@ -471,6 +482,7 @@ t('🔄 2차(Peter 2026-11-08) 과제 판 옆 교재 — 그 교재가 알린 �
   //   1분 넘어 노크하면(되살리기 자리가 지났다) 안 준다
   const D = open({ onfThHwBk: kept }); D.g.Date = { now: () => Date.now() + 61000 }; const dd = D.side(HREF);
   assert.ok(!dd.got.some((m) => m.onf === 'bookRestore'), '⛔ 되살리기 자리가 지나 연 교재에 옛 상태를 줬다');
+  assert.ok(/sheetName=E3(&|$)/.test(D.created.filter((x) => x.tag === 'iframe').slice(-1)[0].src || ''), '⛔ 되살리기 자리가 지났는데 옛 회차 주소를 실었다');
 });
 t('🔄 새로 고침 되살리기 표(rs · 2026-11-08 검토 ④) — 홈이 rs:1 로 연 판에만 노크 답 hw.rs = 1 · 보통 열기엔 없음(판이 제 기억 쪽·보기를 안 쓴다) · 꼴은 정확히 1 만', () => {
   for (const [rs, want] of [[1, 1], [undefined, undefined], ['1', undefined], [true, undefined]]) {

@@ -882,7 +882,11 @@ function hwBookFrame(src, out, cf, park) {   // park = 미리 띄우기(hwBookWa
   var o = typeof outWant === 'function' && outWant(src, out);   // 판 블록(onf-book)의 거름 — 같은 페이지 · 검사 하네스가 이 블록만 돌리면 지금 길
   if (hwBk.src !== src || hwBk.out !== o) {
     hwBk.src = src; hwBk.win = null; hwBk.out = o; hwBk.parked = !!park; hwBk.unpark = false;   // 새 교재 = 새 노크를 기다린다 · ⛔ src 엔 park 를 안 붙인다(누를 때 같은 주소 = 다시 안 받음)
-    var u = park ? src + (src.indexOf('?') < 0 ? '?' : '&') + 'park=1' : src;
+    /* 🔄 되살리기(아래 hwBkRs) 1분 안 같은 교재면 액자엔 기억한 회차 주소를 싣는다 — 첫 받기부터 그 회차(Peter 2026-11-08 2차 「회차 튐」 · 홈 옆 판 rsBoot 와 같은 rsHref).
+       ⛔ 비교 열쇠(hwBk.src)는 판이 보낸 원래 주소 그대로 — 판이 같은 주소로 「옆에」를 다시 보내도 액자를 새로 안 받는다 · 사본 힌트(cf)도 그 회차 */
+    var ld = hwBkRsSrc(src);
+    if (ld !== src) { var cf2 = bookCfOk(cf), sn2 = hwBkRs.st.sheet; cf = cf2 && sn2.length <= 100 ? { f: cf2.f, s: sn2, k: cf2.k } : null; }
+    var u = park ? ld + (ld.indexOf('?') < 0 ? '?' : '&') + 'park=1' : ld;
     if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} hwBk.oe = null; }
     var exec = function () {
       /* ⛔ 로그인 문을 두지 마라 — 교재 exec(ONF.api.EXEC = 래퍼)는 익명 배포(ANYONE_ANONYMOUS)라 구글 쿠키가 필요 없다(학생 아이폰도 로그인 없이 연다 · 홈 옆 판 bookMake 도 그대로). 2026-10-31 한 번 넣었다가 걷음(전수 검수 🟠3). */
@@ -913,6 +917,11 @@ var HWBK_KEY = 'onfThHwBk', hwBkRs = (function () {
   try { var v = JSON.parse(sessionStorage.getItem(HWBK_KEY) || 'null'); return v && typeof v.b === 'string' && v.b && v.st && typeof v.st === 'object' && Date.now() - Number(v.at) < 12 * 3600000 ? { b: v.b, st: v.st, until: 0 } : null; } catch (e) { return null; }
 })();
 function hwBkId(src) { try { var q = new URL(src).searchParams, f = q.get('fileId'), g = (q.get('slug') || '').split('-'); return f ? 'f:' + f : g.length === 4 ? 's:' + g[0] + '-' + g[1] + '-' + g[3] : ''; } catch (e) { return ''; } }
+/** 되살리기 자리(rs 1분 · 같은 교재)면 그 회차로 고친 주소 · 아니면 그대로 */
+function hwBkRsSrc(src) {
+  var r = hwBkRs, sn = r && r.st && typeof r.st.sheet === 'string' ? r.st.sheet : '';
+  return r && r.until && Date.now() <= r.until && sn && r.b === hwBkId(src) ? rsHref(src, sn) : src;
+}
 function hwBkSave(st) { var b = hwBk && hwBkId(hwBk.src); if (!b || !histSmall(st)) return; try { sessionStorage.setItem(HWBK_KEY, JSON.stringify({ b: b, st: JSON.parse(JSON.stringify(st)), at: Date.now() })); } catch (e) {} }
 function hwBkRsTell() {
   var r = hwBkRs; if (!r || !r.until || !hwBk || !hwBk.win || hwBk.parked) return;
@@ -1691,6 +1700,7 @@ function rsHref(h, sn) {
     var u = new URL(h, location.href), m = /^[Ee](\d+)/.exec(sn || ''), p;
     if (!sn) return h;   // 내 문장 판은 회차를 안 알린다(sheet '')
     if (u.searchParams.get('fileId')) { if (u.searchParams.get('sheetName') === sn) return h; u.searchParams.set('sheetName', sn); }
+    else if (u.searchParams.get('slug')) { if (!m) return h; p = u.searchParams.get('slug').replace(/-e\d+-(?=[a-z0-9]+$)/i, '-e' + Number(m[1]) + '-'); if (p === u.searchParams.get('slug')) return h; u.searchParams.set('slug', p); }   // exec 주소(과제 판 옆 교재 · teacherBookSrc 가 slug= 로 싣는다)
     else { if (!m) return h; p = u.pathname.replace(/-e\d+-(?=[a-z0-9]+\/?$)/i, '-e' + Number(m[1]) + '-'); if (p === u.pathname) return h; u.pathname = p; }
     u.searchParams.delete('line'); u.searchParams.delete('view');   // 줄·바로 열기(🗂️ 카드 view=cards)는 연 회차 몫 — 떠 있던 창은 교재가 st.win 으로 되살린다
     return u.toString();
