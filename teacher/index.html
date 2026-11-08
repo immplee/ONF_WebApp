@@ -1219,7 +1219,7 @@ window.addEventListener('message', function (ev) {
   if (!/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(l)) l = '';
   var hf = d.f, hk = d.hwt, ha = d.a, hw = appWin, ho = appOrigin, go = function () {
     hwOpen(t, l, hf, hk, ha);
-    try { hw.postMessage({ onf: 'hwOpened' }, ho); } catch (e) {}   // 홈 창은 이 말을 받고 모아 보기 창을 닫는다
+    try { hw.postMessage({ onf: 'hwOpened', t: t, l: l }, ho); } catch (e) {}   // 홈 창은 이 말을 받고 모아 보기 창을 닫는다 · 🔄 t·l = 띄운 판 — 홈이 새로 고침 뒤 다시 연다(Ownify onfThHw · 2026-11-08 · t 는 그 홈이 준 값 그대로 그 홈에만)
   };
   /* 📱 입장권만으로 연 홈(tchOnly)은 구글 창구 전이다 — 구글 판(exec)이면 로그인 화면(gate)을 한 번 거쳐 연다 · 「홈으로 돌아가기」로 그만둘 수 있다.
      정적 과제 판(hwOutQ · 입장권으로 연다)이면 묻지 않는다 — 구글을 안 지나는데 로그인부터 묻던 순서였다(Peter 2026-10-31 아이패드 ?tout=2 「순서가 이상해」).
