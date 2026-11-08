@@ -1085,12 +1085,16 @@ function hwPenSync() {
 var hwFbLast = null;
 function hwFbClean(d) {
   var S = function (v, n) { return String(v == null ? '' : v).slice(0, n); }, I = function (v) { v = Number(v); return isFinite(v) ? Math.max(0, Math.min(1e6, Math.floor(v))) : 0; };
+  if (d.go && typeof d.go === 'object') return { onf: 'fbBook', go: { row: I(d.go.row), sheet: S(d.go.sheet, 100) } };   // 📍 카드를 누르면 옆 교재 그 대사 칸으로(Ownify #398 · 2026-11-08) — 줄·회차만
   var m = { onf: 'fbBook', on: d.on === 1 ? 1 : 0, items: (Array.isArray(d.items) ? d.items.slice(0, 300) : []).map(function (x) { x = x || {}; return { id: S(x.id, 40), n: I(x.n), row: I(x.row), w0: I(x.w0), w1: I(x.w1), ipa: S(x.ipa, 200), sent: x.sent ? 1 : 0, sheet: S(x.sheet, 100) }; }) };
   if (Array.isArray(d.cmt) && d.cmt.length) m.cmt = d.cmt.slice(0, 100).map(function (x) { x = x || {}; return { id: S(x.id, 40), row: I(x.row), sheet: S(x.sheet, 100), text: S(x.text, 4000) }; });
   return m;
 }
 function hwFbRelay(d) {
-  var m = hwFbClean(d), keep = { onf: m.onf, on: m.on, items: m.items };
+  var m = hwFbClean(d), keep;
+  //   ⛔ 「그 줄로」는 목록이 아니다 — 목록(hwFbLast)을 안 건드리고 옆 교재에만 · 종전엔 go 를 몰라 「꺼짐 + 빈 목록」으로 바꿔 보내 교재 표시·고르기가 꺼졌다(2026-11-08 검수)
+  if (m.go) { if (hwBk && hwBk.win) { try { hwBk.win.postMessage(m, hwBk.origin); } catch (e) {} } return; }
+  keep = { onf: m.onf, on: m.on, items: m.items };
   hwFbLast = keep;
   if (hwBk && hwBk.win) { try { hwBk.win.postMessage(m, hwBk.origin); } catch (e) {} }
   else if (m.cmt && hwWin) m.cmt.forEach(function (x) { try { hwWin.postMessage({ onf: 'fbCmtAck', id: x.id, ok: 0, why: 'nobook' }, hwOrigin); } catch (e) {} });   // 옆 교재가 없다 — 과제 판이 바로 알린다
