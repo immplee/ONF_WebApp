@@ -1138,9 +1138,9 @@ var hwFbNext = null, hwL = '';
 function hwLessonGo(d) {
   var l = String(d.l || ''), fb = d.fb || {}, f = String(fb.from || ''), t = String(fb.to || ''), D = /^\d{4}-\d{2}-\d{2}$/;
   if (!hwT || !/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(l) || !D.test(f) || !D.test(t)) return;
-  hwFbNext = { l: l, from: f, to: t, at: Date.now() };
   var tk = hwT;
-  hwOpen(tk, l, [], d.hwt);   // ⚡ 입장권 + 새 사진 없음 = 그 수업 자료가 Worker /hw/open 으로 바로(이어 쓰기와 같은 길 · 꼴은 hwShape 가 거른다) · 종전엔 맡김 없이 구글로 열어 늦었다(2026-11-08)
+  hwOpen(tk, l, [], d.hwt);
+  hwFbNext = { l: l, from: f, to: t, at: Date.now() };   // ⛔ 연 뒤에 — hwOpen 안 hwClose 가 남은 것을 지운다(검수 2026-11-08: 뒤로 나갔다 2분 안 그 수업을 다시 열면 시작 창이 저절로 떴다)   // ⚡ 입장권 + 새 사진 없음 = 그 수업 자료가 Worker /hw/open 으로 바로(이어 쓰기와 같은 길 · 꼴은 hwShape 가 거른다) · 종전엔 맡김 없이 구글로 열어 늦었다(2026-11-08)
   hwOpenedTell(appWin, appOrigin, tk, l);   // 🔄 홈이 이 판(바뀐 수업)을 적는다 — 안 알리면 새로 고침 뒤 앞 판(hwClose → hwClosed 로 이미 지움)도 이 판도 없다
 }
 /** 홈에 「판을 띄웠다」 — 홈은 모아 보기 창을 닫고 · 🔄 t·l 을 적어 새로 고침 뒤 다시 연다(Ownify onfThHw · 2026-11-08) · t 는 그 홈이 준 값 그대로 그 홈에만 */
@@ -1196,7 +1196,8 @@ window.addEventListener('message', function (ev) {
   if (d.onf === 'bookClose') { hwViewSet('photo'); hwTellView(); }
 });
 function hwClose() {
-  hwUpMark(false);
+  hwFbNext = null;   // 📚 「지난 수업 자료 열기」 범위는 그 판이 떠 있는 동안만
+  hwUpMark(false);   // 🔄 판을 걷었다 — 새로 고침 덮개 표시도(hwOpenedTell 이 다시 적는다)
   if (hwBox && !hwWarmOn) { hwBkRs = null; try { sessionStorage.removeItem(HWBK_KEY); } catch (e) {} }   // 🔄 보이던 판을 걷었다 — 옆 교재 기억도(위 hwBkRs) · ⛔ 판을 새로 열기 전 비우기(hwOpen·hwWarm 이 먼저 부른다 — 되살리기 열기 포함)엔 안 지운다   // 🔄 판을 걷었다 — 새로 고침 덮개 표시도(hwOpenedTell 이 다시 적는다)
   if (hwBox && appWin) { try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (e) {} }   // 홈이 카드 상태(완료 등)를 다시 받게 · 미리 띄운 판이 걷혀도(10분·물러남) — 홈이 HWWARM 을 풀고 다음에 다시 띄운다(2026-10-31 전수 검수)
   if (hwBk) { if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} } if (hwBk.box.parentNode) hwBk.box.parentNode.removeChild(hwBk.box); hwBk = null; }   // 과제 판을 닫으면 그 교재 액자도 지운다
@@ -1284,7 +1285,7 @@ window.addEventListener('message', function (ev) {
   /* 📱 입장권만으로 연 홈(tchOnly)은 구글 창구 전이다 — 구글 판(exec)이면 로그인 화면(gate)을 한 번 거쳐 연다 · 「홈으로 돌아가기」로 그만둘 수 있다.
      정적 과제 판(hwOutQ · 입장권으로 연다)이면 묻지 않는다 — 구글을 안 지나는데 로그인부터 묻던 순서였다(Peter 2026-10-31 아이패드 ?tout=2 「순서가 이상해」).
      정적 판이 안 뜨면 그때 묻는다(hwOutBack). */
-  if (tchOnly && !pending && !hwOutQ() && !(hwBox && hwWarmOn && hwT === t && hwOut)) gate(go, '과제 판은 구글 로그인 뒤에 열려요.', true); else go();   // 미리 띄운 정적 판이 살아 있으면 그것을 쓴다(반박 🟡8)
+  if (tchOnly && !pending && !hwOutQ() && !(hwBox && hwWarmOn && hwT === t && hwOut)) gate(go, '과제 판은 구글 로그인 뒤에 열려요.', true, hrs ? function () { hwUpMark(false); try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (eB) {} } : null); else go();   // 🔄 되살리기(rs) 문에서 「홈으로 돌아가기」 = 판 기억(껍데기 onfHwUp · 홈 onfThHw)을 지운다 — 안 지우면 새로 고침마다 이 문이 다시 떴다(검토 2 ⑤)   // 미리 띄운 정적 판이 살아 있으면 그것을 쓴다(반박 🟡8)
 });
 /* ═══ 📝 정적 과제 판(2026-10-31 · Peter 「과제 판도 같은 방식으로」 · 정적 선생님 홈 onf-tout 과 같은 꼴) ═══
    과제 판 액자를 구글 doGet(1.7~2.2초) 대신 Pages /hwbook/(같은 템플릿 · Ownify tools/outside/hwbook-boot.js)로 먼저 연다 — 미리 띄우기(hwWarm)·열기(hwOpen) 둘 다 이 한 곳(hwSrc).
