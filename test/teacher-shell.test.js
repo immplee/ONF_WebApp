@@ -414,6 +414,86 @@ t('🔄 새로 고침 = 교재 판을 홈 노크(bookHello)를 안 기다리고 
   assert.strictEqual(panels(boot({ onf_id_tok: odk() }, { g: API })).length, 0, '⛔ 기억이 없는데 판을 열었다');
   assert.strictEqual(panels(boot({ onf_id_tok: odk() }, { ss: { onfThOpenBook: keep }, search: '?mode=student&t=Tok_1', g: API })).length, 0, '⛔ 주소로 연 학생 창에서 mount 때 판을 열었다(종전대로 노크 때)');
 });
+t('🔄 2차(Peter 2026-11-08) 교재 판 되살리기 = 첫 받기부터 교재가 알린 회차(st.sheet) — slug 주소는 경로 -eN- · fileId 주소는 sheetName · 줄(line)은 뺀다 · 같으면·모르는 꼴·내 문장은 그대로', () => {
+  const API = { ONF: { api: { EXEC: 'https://script.google.com/macros/s/BOOKEXEC/exec' } } };
+  const panelSrc = (R) => (R.g.books.filter((q) => !q.parked)[0] || {}).src || '';
+  const go = (h, sheet) => boot({ onf_id_tok: odk() }, { ss: { onfThOpenBook: JSON.stringify({ h, l: 270, m: 0, r: 0, o: 0, c: null, st: sheet === undefined ? null : { sheet, top: 0, left: 0, side: null }, at: Date.now() }) }, g: API });
+  const SL = 'https://class.ownify.co.kr/young-s1-e1-jungah?mode=share&t=STUTOK&line=40&view=cards';
+  assert.ok(/slug=young-s1-e3-jungah/.test(panelSrc(go(SL, 'E3_Third'))) && !/line=|view=/.test(panelSrc(go(SL, 'E3_Third'))), '⛔ slug 주소를 알린 회차로 안 고쳤다(연 회차를 먼저 그리고 다시 받는다): ' + panelSrc(go(SL, 'E3_Third')));
+  assert.ok(/slug=young-s1-e1-jungah/.test(panelSrc(go(SL, 'E1_First'))) && !/line=|view=/.test(panelSrc(go(SL, 'E1_First'))), '⛔ 같은 회차라도 교재가 상태를 알렸는데 한 번 쓰는 말(line·view)이 남았다 — 닫은 카드가 다시 열린다: ' + panelSrc(go(SL, 'E1_First')));
+  assert.ok(/line=40/.test(panelSrc(go(SL))) && /view=cards/.test(panelSrc(go(SL))), '⛔ 상태 없는 옛 기억에서 line·view 를 뺐다(그 기억은 주소가 전부다)');
+  assert.ok(/slug=young-s1-e1-jungah/.test(panelSrc(go(SL, 'Bonus'))), '⛔ 회차 번호 없는 이름으로 slug 를 고쳤다');
+  assert.ok(/slug=young-s1-e1-jungah/.test(panelSrc(go(SL))), '⛔ 상태 없는 기억으로 주소를 고쳤다');
+  const FI = 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILEaaaaaaaa01&sheetName=E3&line=12';
+  const f = panelSrc(go(FI, 'E5_Five'));
+  assert.ok(/sheetName=E5_Five/.test(f) && !/sheetName=E3(&|$)/.test(f) && !/line=/.test(f), '⛔ fileId 주소의 회차(sheetName)를 안 고쳤다: ' + f);
+  assert.strictEqual(R0rs('https://class.ownify.co.kr/?mode=mine&t=Tok_1', 'E5_Five'), 'https://class.ownify.co.kr/?mode=mine&t=Tok_1', '⛔ 내 문장 주소를 고쳤다');
+  function R0rs(h, sn) { return go(SL).g.rsHref(h, sn); }
+});
+t('🔄 2차(Peter 2026-11-08) 과제 판 옆 교재 — 그 교재가 알린 상태(bookState)를 이 탭에 적고(교재 줄기만 · 토큰 없음) 새로 고침 뒤 같은 교재가 노크하면 한 번 돌려준다(bookRestore) · 다른 교재엔 안 준다 · 판을 닫으면 잊는다 · 판 열기 전 비우기엔 안 지운다', () => {
+  const HREF = 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILEaaaaaaaa01&sheetName=E3';
+  const open = (ss, fresh) => {
+    const R = boot({ onf_id_tok: odk() }, { ss }), me = { parent: R.els.app.contentWindow, postMessage() {} };
+    const ce = R.g.document.createElement; R.g.document.createElement = (tag) => { const e = ce(tag); e.style.setProperty = (k, v) => { e.style[k] = v; }; e.style.removeProperty = (k) => { delete e.style[k]; }; e.blur = () => {}; return e; };
+    R.g.ONF = Object.assign({}, R.g.ONF || {}, { api: { EXEC: R.g.EXEC } }); if (R.g.window && R.g.window !== R.g) R.g.window.ONF = R.g.ONF;
+    R.knockAs(me); R.postAs(fresh ? { onf: 'hwbook', t: 'Tok_1' } : { onf: 'hwbook', t: 'Tok_1', rs: 1 }, me);
+    const fr = R.created.filter((e) => e.tag === 'iframe')[0], inner = { parent: { parent: fr.contentWindow }, postMessage() {} };
+    R.postAs({ onf: 'auth-please' }, inner); R.inner = inner;
+    R.side = (href) => { R.postAs({ onf: 'hwbookView', v: 'side', href }, inner); const bk = R.created.filter((e) => e.tag === 'iframe').slice(-1)[0], got = [], w = { parent: bk.contentWindow, postMessage: (m) => got.push(JSON.parse(JSON.stringify(m))) }; R.postAs({ onf: 'bookHi' }, w); return { w, got }; };
+    return R;
+  };
+  const A = open({}), a = A.side(HREF);
+  A.postAs({ onf: 'bookState', st: { sheet: 'E5_Five', top: 900, left: 0, side: { t: 'note' } } }, a.w);
+  const kept = A.g.sessionStorage.getItem('onfThHwBk');
+  assert.ok(kept && JSON.parse(kept).b === 'f:FILEaaaaaaaa01' && JSON.parse(kept).st.sheet === 'E5_Five', '⛔ 옆 교재 상태를 안 적었다: ' + kept);
+  assert.ok(kept.indexOf('Tok_1') < 0, '⛔ 학생 토큰이 저장소에 들어갔다');
+  //   새로 고침 — 판이 같은 교재를 다시 열면 첫 노크에 한 번
+  const B = open({ onfThHwBk: kept }), b = B.side(HREF);
+  assert.deepStrictEqual(b.got.filter((m) => m.onf === 'bookRestore').map((m) => [m.st.sheet, m.st.top, m.st.side.t]), [['E5_Five', 900, 'note']], '⛔ 새로 고침 뒤 옆 교재에 상태를 안 돌려줬다(판이 고른 처음 회차로 열린다)');
+  B.postAs({ onf: 'bookHi' }, b.w);
+  assert.strictEqual(b.got.filter((m) => m.onf === 'bookRestore').length, 1, '⛔ 노크마다 옛 상태를 또 보냈다');
+  //   첫 받기부터 기억한 회차(액자 주소) · 비교 열쇠는 판이 보낸 원래 주소 — 판이 같은 주소로 「옆에」를 다시 보내도 액자를 새로 안 받는다(2차 「회차 튐」)
+  const bfr = () => B.created.filter((e) => e.tag === 'iframe');
+  const bsrc = bfr().slice(-1)[0].src || '';
+  assert.ok(/sheetName=E5_Five/.test(bsrc) && !/sheetName=E3(&|$)/.test(bsrc), '⛔ 옆 교재가 판이 고른 회차(E3)로 먼저 받는다(그다음 E5 로 튄다): ' + bsrc);
+  assert.ok(/sheetName=E3(&|$)/.test(B.g.hwBk.src), '⛔ 비교 열쇠가 원래 주소가 아니다: ' + B.g.hwBk.src);
+  const nB = bfr().length; B.postAs({ onf: 'hwbookView', v: 'book', href: HREF }, B.inner);
+  assert.strictEqual(bfr().length, nB, '⛔ 판이 같은 주소를 다시 보내자 옆 교재를 새로 받았다');
+  //   exec 주소의 slug= 칸도 회차를 고친다(slug 로 연 교재)
+  assert.ok(/slug=young-s1-e5-jungah/.test(B.g.rsHref('https://script.google.com/x/exec?t=T&mode=share&slug=young-s1-e3-jungah&embed=1', 'E5_Five')), '⛔ exec 주소 slug 칸 회차를 안 고쳤다');
+  //   다른 교재 — 안 준다
+  const C = open({ onfThHwBk: kept }), c = C.side(HREF.replace('FILEaaaaaaaa01', 'FILEbbbbbbbb02'));
+  assert.ok(!c.got.some((m) => m.onf === 'bookRestore'), '⛔ 다른 교재에 옛 상태를 줬다');
+  assert.ok(!/E5_Five/.test(C.created.filter((x) => x.tag === 'iframe').slice(-1)[0].src || ''), '⛔ 다른 교재 주소를 옛 회차로 고쳤다');
+  //   판을 닫으면 잊는다
+  B.g.hwClose();
+  assert.strictEqual(B.g.sessionStorage.getItem('onfThHwBk'), null, '⛔ 과제 판을 닫았는데 옆 교재 기억이 남았다');
+  //   되살리기(rs)가 아닌 열기 — 사람이 새로 연 판엔 옛 상태를 안 준다(판 hwShape rs 와 같은 약속 · 2차 검토)
+  const E = open({ onfThHwBk: kept }, true), e = E.side(HREF);
+  assert.ok(!e.got.some((m) => m.onf === 'bookRestore'), '⛔ 되살리기가 아닌 판 열기에 옛 옆 교재 상태를 줬다');
+  assert.ok(/sheetName=E3(&|$)/.test(E.created.filter((x) => x.tag === 'iframe').slice(-1)[0].src || ''), '⛔ 되살리기가 아닌 판 열기에 옛 회차 주소를 실었다');
+  //   숨긴(미리 띄운 park) 옆 교재가 먼저 노크해도 그때는 안 준다(안 보이는 판은 굴린 자리가 0) — 보일 때(hwBkUnpark) 준다
+  const P = open({ onfThHwBk: kept }), pg = [];
+  P.postAs({ onf: 'hwbookBookWarm', href: HREF }, P.inner);
+  const pk = P.created.filter((x) => x.tag === 'iframe').slice(-1)[0], pw = { parent: pk.contentWindow, postMessage: (m) => pg.push(JSON.parse(JSON.stringify(m))) };
+  P.postAs({ onf: 'bookHi' }, pw);
+  assert.ok(!pg.some((m) => m.onf === 'bookRestore'), '⛔ 숨긴 옆 교재에 되살리기를 써 버렸다');
+  P.postAs({ onf: 'hwbookView', v: 'side', href: HREF }, P.inner);
+  assert.ok(!pg.some((m) => m.onf === 'bookRestore'), '⛔ 보이는 그 순간(교재가 제 크기를 받기 전)에 되살리기를 보냈다');
+  P.advance(200);
+  assert.deepStrictEqual(pg.filter((m) => m.onf === 'bookRestore').map((m) => m.st.sheet), ['E5_Five'], '⛔ 숨긴 판이 보였는데 되살리기를 안 줬다');
+  //   숨긴 판을 1분 넘어 보여도 — 액자가 기억한 회차로 받았으면 굴린 자리·옆 창까지 마저 준다
+  const Q = open({ onfThHwBk: kept }), qg = [];
+  Q.postAs({ onf: 'hwbookBookWarm', href: HREF }, Q.inner);
+  const qk = Q.created.filter((x) => x.tag === 'iframe').slice(-1)[0], qw = { parent: qk.contentWindow, postMessage: (m) => qg.push(JSON.parse(JSON.stringify(m))) };
+  Q.postAs({ onf: 'bookHi' }, qw); Q.g.Date = { now: () => Date.now() + 61000 };
+  Q.postAs({ onf: 'hwbookView', v: 'side', href: HREF }, Q.inner); Q.advance(200);
+  assert.deepStrictEqual(qg.filter((m) => m.onf === 'bookRestore').map((m) => m.st.top), [900], '⛔ 기억한 회차로 받은 숨긴 판을 1분 뒤 보였더니 굴린 자리를 안 줬다(반쪽)');
+  //   1분 넘어 노크하면(되살리기 자리가 지났다) 안 준다
+  const D = open({ onfThHwBk: kept }); D.g.Date = { now: () => Date.now() + 61000 }; const dd = D.side(HREF);
+  assert.ok(!dd.got.some((m) => m.onf === 'bookRestore'), '⛔ 되살리기 자리가 지나 연 교재에 옛 상태를 줬다');
+  assert.ok(/sheetName=E3(&|$)/.test(D.created.filter((x) => x.tag === 'iframe').slice(-1)[0].src || ''), '⛔ 되살리기 자리가 지났는데 옛 회차 주소를 실었다');
+});
 t('🔄 검토 2026-11-08 — 숨긴 미리 판(hwbookWarm)이 먼저 와도 hwRsNo 면 덮개를 걷는다 · 교재 판 되살리기는 로고 막 뒤에 붙는다(같은 z 5) · 로그인 화면엔 교재 판도 숨긴다', () => {
   const covers = (R) => R.created.filter((e) => e.className === 'onf-hwcover' && !e.removed);
   const R = boot({ onf_id_tok: odk() }, { ss: { onfHwUp: String(Date.now()) } }), me = { parent: R.els.app.contentWindow, postMessage() {} }; R.knockAs(me);

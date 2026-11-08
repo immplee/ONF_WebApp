@@ -794,6 +794,16 @@ t('🚀 기억한 첫 교재가 있으면 홈을 띄우자마자 숨긴 판(park
     assert.strictEqual(q.panels().length, 0, '⛔ ' + why + ' 인데 미리 띄웠다');
   }
 });
+t('🔄 2차 검토(2026-11-08) — 되살릴 판이 같은 교재(다른 회차)면 기억한 첫 교재 숨긴 판을 또 안 띄운다(두 판이 한꺼번에 받던 것) · 다른 교재면 종전대로 띄운다', () => {
+  const bs = (h) => { const u = new URL(h); return /mode=share/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=share&slug=' + u.pathname.slice(1) + '&embed=1' : null; };
+  const both = (rsH) => (g) => { g.localStorage = LSf({ onfPreBook: JSON.stringify({ k: 'kA', h: PB, ph: 0, t: 1.7e12 }) });
+    g.sessionStorage = LSf({ onfOpenBook: JSON.stringify({ h: rsH, l: 184, m: 0, r: 0, o: 0, st: { sheet: 'E3_Y', top: 0, left: 0, side: null }, at: 1.7e12 }) }); };
+  const s = setup(bs, { preKey: 'kA', pre: both(PB) });
+  const srcs = s.panels().map((x) => x.kids[0].src);
+  assert.ok(srcs.length === 1 && /slug=a-s1-e3-b/.test(srcs[0]), '⛔ 같은 교재를 두 판(기억한 e1 숨긴 판 + 되살린 e3)으로 띄웠다: ' + srcs.join(' | '));
+  const o = setup(bs, { preKey: 'kA', pre: both('https://class.ownify.co.kr/c-s1-e2-d?mode=share') });
+  assert.strictEqual(o.panels().length, 2, '⛔ 다른 교재를 되살리는데 기억한 첫 교재 미리 띄우기를 막았다');
+});
 t('🚀 홈의 첫 bookWarm(panel:1) 주소를 다음 열기용으로 기억 — 한 번만(첫 것) · 열쇠 없으면 안 적는다 · 미리 띄운 판이 있으면 같은 주소로 판을 또 안 만든다', () => {
   const ls = LSf();
   const s = setup(null, { preKey: 'kA', pre: pre(ls) });
@@ -948,6 +958,18 @@ t('🔄 새로고침 = 열린 창 그대로(Peter 2026-10-24) — 보이는 판 
   assert.strictEqual(ss.getItem('onfOpenBook'), null, '⛔ 닫았는데 기억이 남았다(새로고침하면 닫은 판이 다시 열린다)');
   const u = phoneSetup({ wide: true, pre });
   assert.ok(!u.panel(), '⛔ 닫은 뒤 새로고침에 판을 열었다');
+  //   🔄 2차(Peter 2026-11-08) — 판 안에서 다른 회차로 옮겼으면 되살릴 때 첫 받기부터 그 회차(slug -eN- · 쌍둥이: 선생님 껍데기 rsHref) — 종전엔 연 회차(e2)를 먼저 그리고 다시 받았다
+  const w = phoneSetup({ wide: true, pre });
+  w.send({ onf: 'openBook', href: E2, left: 184 }, w.homeInner);
+  w.send({ onf: 'bookState', st: { sheet: 'E3_Y', top: 0, left: 0, side: null } }, hi(w, w.panel()));
+  const x = phoneSetup({ wide: true, pre });
+  assert.ok(x.panel() && /a-s1-e3-b/.test(x.opened.slice(-1).join()) && !/a-s1-e2-b/.test(x.opened.join()), '⛔ 되살린 판이 연 회차(e2)로 먼저 열렸다: ' + x.opened.join(' | '));
+  //   같은 회차라도 교재가 상태를 알렸으면 한 번 쓰는 말(view·line)을 뺀다(쌍둥이: 선생님 rsOnce)
+  const y = phoneSetup({ wide: true, pre });
+  y.send({ onf: 'openBook', href: E2 + '&view=cards&line=9', left: 184 }, y.homeInner);
+  y.send({ onf: 'bookState', st: { sheet: 'E2_X', top: 0, left: 0, side: null } }, hi(y, y.panel()));
+  const z = phoneSetup({ wide: true, pre });
+  assert.ok(z.panel() && !/view=|line=/.test(z.opened.slice(-1).join()), '⛔ 학생 껍데기 — 닫은 카드(view=cards)·줄이 새로 고침마다 다시: ' + z.opened.slice(-1).join());
 });
 
 t('🔄 홈 탭도 새로고침 뒤 그대로(Peter 2026-10-24) — 홈이 고른 탭(homeTab)을 이 탭에 적고 · 다시 읽히면 홈의 첫 노크(bookHello)에 한 번 돌려준다 · 읽힐 때 잡은 값(홈이 처음 그린 탭이 먼저 와도 안 덮임)', () => {
