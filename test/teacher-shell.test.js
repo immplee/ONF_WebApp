@@ -403,7 +403,7 @@ t('🔄 새로 고침 덮개(Peter 2026-11-08 「수업 자료를 연 채 새로
 });
 t('🔄 새로 고침 = 교재 판을 홈 노크(bookHello)를 안 기다리고 액자를 붙이는 순간(mount) 되살린다(Peter 2026-11-08 「모든 창 빨리」 · 학생 껍데기 rsBoot 와 같다) · 노크가 와도 두 번 안 연다 · 기억 없음·주소로 연 창 = 안 연다', () => {
   const E1 = 'https://class.ownify.co.kr/young-s1-e1-jungah?mode=share&t=STUTOK';
-  const keep = JSON.stringify({ h: E1, l: 270, m: 0, r: 0, o: 0, c: null, st: null, at: Date.now() });
+  const keep = JSON.stringify({ h: E1, l: 270, m: 0, r: 0, o: 0, c: null, st: null, e: 't@ownify.co.kr', at: Date.now() });
   const panels = (R) => R.created.filter((e) => e.className === 'onf-bookpanel' && !e.removed);
   const API = { ONF: { api: { EXEC: 'https://script.google.com/macros/s/BOOKEXEC/exec' } } };
   const R = boot({ onf_id_tok: odk() }, { ss: { onfThOpenBook: keep }, g: API });
@@ -417,7 +417,7 @@ t('🔄 새로 고침 = 교재 판을 홈 노크(bookHello)를 안 기다리고 
 t('🔄 2차(Peter 2026-11-08) 교재 판 되살리기 = 첫 받기부터 교재가 알린 회차(st.sheet) — slug 주소는 경로 -eN- · fileId 주소는 sheetName · 줄(line)은 뺀다 · 같으면·모르는 꼴·내 문장은 그대로', () => {
   const API = { ONF: { api: { EXEC: 'https://script.google.com/macros/s/BOOKEXEC/exec' } } };
   const panelSrc = (R) => (R.g.books.filter((q) => !q.parked)[0] || {}).src || '';
-  const go = (h, sheet) => boot({ onf_id_tok: odk() }, { ss: { onfThOpenBook: JSON.stringify({ h, l: 270, m: 0, r: 0, o: 0, c: null, st: sheet === undefined ? null : { sheet, top: 0, left: 0, side: null }, at: Date.now() }) }, g: API });
+  const go = (h, sheet) => boot({ onf_id_tok: odk() }, { ss: { onfThOpenBook: JSON.stringify({ h, l: 270, m: 0, r: 0, o: 0, c: null, st: sheet === undefined ? null : { sheet, top: 0, left: 0, side: null }, e: 't@ownify.co.kr', at: Date.now() }) }, g: API });
   const SL = 'https://class.ownify.co.kr/young-s1-e1-jungah?mode=share&t=STUTOK&line=40&view=cards';
   assert.ok(/slug=young-s1-e3-jungah/.test(panelSrc(go(SL, 'E3_Third'))) && !/line=|view=/.test(panelSrc(go(SL, 'E3_Third'))), '⛔ slug 주소를 알린 회차로 안 고쳤다(연 회차를 먼저 그리고 다시 받는다): ' + panelSrc(go(SL, 'E3_Third')));
   assert.ok(/slug=young-s1-e1-jungah/.test(panelSrc(go(SL, 'E1_First'))) && !/line=|view=/.test(panelSrc(go(SL, 'E1_First'))), '⛔ 같은 회차라도 교재가 상태를 알렸는데 한 번 쓰는 말(line·view)이 남았다 — 닫은 카드가 다시 열린다: ' + panelSrc(go(SL, 'E1_First')));
@@ -504,6 +504,20 @@ t('🔄 검토 2026-11-08 — 숨긴 미리 판(hwbookWarm)이 먼저 와도 hwR
   const m = html.slice(html.indexOf('function mount() {'), html.indexOf('\nfunction ', html.indexOf('function mount() {') + 20));
   assert.ok(m.indexOf('ONF.load.bind') >= 0 && m.indexOf('rsBoot()') > m.indexOf('ONF.load.bind'), '⛔ 교재 판 되살리기가 로고 막보다 먼저 붙는다(막 밑에 깔려 안 보이는데 눌린다)');
   assert.ok(/html\.onf-gating \.onf-bookpanel/.test(html), '⛔ 로그인 화면(gate) 위에 교재 판이 남는다');
+});
+t('🔐 교재 판 기억 = 그 선생님 것(Peter 2026-11-08 「로그아웃해도 마지막에 연 교재 기억이 남는다」) — 다른 계정·신원 모름·옛 기억(e 없음)이면 안 열고 지운다 · 같은 계정이면 연다 · 「다른 계정으로 로그인」은 바로 지운다', () => {
+  const E1 = 'https://class.ownify.co.kr/young-s1-e1-jungah?mode=share&t=STUTOK';
+  const API = { ONF: { api: { EXEC: 'https://script.google.com/macros/s/BOOKEXEC/exec' } } };
+  const keepOf = (e) => JSON.stringify(Object.assign({ h: E1, l: 270, m: 0, r: 0, o: 0, c: null, st: null, at: Date.now() }, e === undefined ? {} : { e }));
+  const panels = (R) => R.created.filter((x) => x.className === 'onf-bookpanel' && !x.removed);
+  assert.strictEqual(panels(boot({ onf_id_tok: odk() }, { ss: { onfThOpenBook: keepOf('t@ownify.co.kr') }, g: API })).length, 1, '⛔ 같은 계정인데 교재 판을 안 되살렸다');
+  for (const [e, why] of [['other@ownify.co.kr', '다른 계정'], [undefined, '옛 기억(신원 없음)']]) {
+    const R = boot({ onf_id_tok: odk() }, { ss: { onfThOpenBook: keepOf(e) }, g: API });
+    assert.ok(panels(R).length === 0 && R.g.sessionStorage.getItem('onfThOpenBook') === null, '⛔ ' + why + ' 기억으로 남의 교재(학생 토큰)를 열었다(또는 안 지웠다)');
+  }
+  const R = boot({ onf_id_tok: odk() }, { ss: { onfThOpenBook: keepOf('t@ownify.co.kr') }, g: API });
+  R.g.offerOther(); R.els.other.onclick();
+  assert.strictEqual(R.g.sessionStorage.getItem('onfThOpenBook'), null, '⛔ 「다른 계정으로 로그인」 뒤에도 앞 계정의 교재 기억이 남았다');
 });
 t('🔄 새로 고침 되살리기 표(rs · 2026-11-08 검토 ④) — 홈이 rs:1 로 연 판에만 노크 답 hw.rs = 1 · 보통 열기엔 없음(판이 제 기억 쪽·보기를 안 쓴다) · 꼴은 정확히 1 만', () => {
   for (const [rs, want] of [[1, 1], [undefined, undefined], ['1', undefined], [true, undefined]]) {
