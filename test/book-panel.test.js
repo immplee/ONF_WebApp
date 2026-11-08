@@ -964,6 +964,12 @@ t('🔄 새로고침 = 열린 창 그대로(Peter 2026-10-24) — 보이는 판 
   w.send({ onf: 'bookState', st: { sheet: 'E3_Y', top: 0, left: 0, side: null } }, hi(w, w.panel()));
   const x = phoneSetup({ wide: true, pre });
   assert.ok(x.panel() && /a-s1-e3-b/.test(x.opened.slice(-1).join()) && !/a-s1-e2-b/.test(x.opened.join()), '⛔ 되살린 판이 연 회차(e2)로 먼저 열렸다: ' + x.opened.join(' | '));
+  //   같은 회차라도 교재가 상태를 알렸으면 한 번 쓰는 말(view·line)을 뺀다(쌍둥이: 선생님 rsOnce)
+  const y = phoneSetup({ wide: true, pre });
+  y.send({ onf: 'openBook', href: E2 + '&view=cards&line=9', left: 184 }, y.homeInner);
+  y.send({ onf: 'bookState', st: { sheet: 'E2_X', top: 0, left: 0, side: null } }, hi(y, y.panel()));
+  const z = phoneSetup({ wide: true, pre });
+  assert.ok(z.panel() && !/view=|line=/.test(z.opened.slice(-1).join()), '⛔ 학생 껍데기 — 닫은 카드(view=cards)·줄이 새로 고침마다 다시: ' + z.opened.slice(-1).join());
 });
 
 t('🔄 홈 탭도 새로고침 뒤 그대로(Peter 2026-10-24) — 홈이 고른 탭(homeTab)을 이 탭에 적고 · 다시 읽히면 홈의 첫 노크(bookHello)에 한 번 돌려준다 · 읽힐 때 잡은 값(홈이 처음 그린 탭이 먼저 와도 안 덮임)', () => {

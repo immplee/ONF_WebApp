@@ -1706,12 +1706,15 @@ function rsHref(h, sn) {
     return u.toString();
   } catch (e) { return h; }
 }
+/** 🔄 교재가 상태를 알린 기억이면(st 있음) 주소의 한 번 쓰는 말(줄 line · 바로 열기 view)을 뺀다 — 굴린 자리·떠 있던 창은 교재가 st 로 되살린다
+ *  (종전: 닫은 🗂️ 카드가 새로 고침마다 view=cards 로 다시 열리고 · line 건너뛰기가 되살린 굴림과 다퉜다 · 2차 재검토). 상태 없는 옛 기억은 그대로. */
+function rsOnce(h, st) { if (!st || typeof st !== 'object') return h; try { var u = new URL(h, location.href); if (!u.searchParams.has('line') && !u.searchParams.has('view')) return h; u.searchParams.delete('line'); u.searchParams.delete('view'); return u.toString(); } catch (e) { return h; } }
 function rsBoot() {
   if (rsBooted) return; rsBooted = true;
   var v = null;
   try { v = JSON.parse(sessionStorage.getItem(RS_KEY) || 'null'); } catch (e) { v = null; }
   if (!v || typeof v.h !== 'string' || !(Date.now() - Number(v.at) < RS_MS)) return;
-  var sn = v.st && typeof v.st.sheet === 'string' ? v.st.sheet : '', h = rsHref(v.h, sn), c = bookCfOk(v.c);
+  var sn = v.st && typeof v.st.sheet === 'string' ? v.st.sheet : '', h = rsOnce(rsHref(v.h, sn), v.st), c = bookCfOk(v.c);
   if (c && h !== v.h) { if (sn.length <= 100) c.s = sn; else c = null; }   // 사본 힌트도 그 회차(입장권은 교재 단위 — 회차를 안 묶는다 · Worker /book/get) · 힌트 꼴(100자)을 넘으면 힌트 없이
   bookOpen(h, typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, c, v.o === 1);   // 입장권(12시간)이 낡았으면 Worker 가 403 → 판이 다리로(종전과 같다)
   var p = bookShown(); if (!p) return;

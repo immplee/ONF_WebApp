@@ -420,7 +420,8 @@ t('🔄 2차(Peter 2026-11-08) 교재 판 되살리기 = 첫 받기부터 교재
   const go = (h, sheet) => boot({ onf_id_tok: odk() }, { ss: { onfThOpenBook: JSON.stringify({ h, l: 270, m: 0, r: 0, o: 0, c: null, st: sheet === undefined ? null : { sheet, top: 0, left: 0, side: null }, at: Date.now() }) }, g: API });
   const SL = 'https://class.ownify.co.kr/young-s1-e1-jungah?mode=share&t=STUTOK&line=40&view=cards';
   assert.ok(/slug=young-s1-e3-jungah/.test(panelSrc(go(SL, 'E3_Third'))) && !/line=|view=/.test(panelSrc(go(SL, 'E3_Third'))), '⛔ slug 주소를 알린 회차로 안 고쳤다(연 회차를 먼저 그리고 다시 받는다): ' + panelSrc(go(SL, 'E3_Third')));
-  assert.ok(/slug=young-s1-e1-jungah/.test(panelSrc(go(SL, 'E1_First'))) && /line=40/.test(panelSrc(go(SL, 'E1_First'))), '⛔ 같은 회차인데 주소(줄)를 고쳤다');
+  assert.ok(/slug=young-s1-e1-jungah/.test(panelSrc(go(SL, 'E1_First'))) && !/line=|view=/.test(panelSrc(go(SL, 'E1_First'))), '⛔ 같은 회차라도 교재가 상태를 알렸는데 한 번 쓰는 말(line·view)이 남았다 — 닫은 카드가 다시 열린다: ' + panelSrc(go(SL, 'E1_First')));
+  assert.ok(/line=40/.test(panelSrc(go(SL))) && /view=cards/.test(panelSrc(go(SL))), '⛔ 상태 없는 옛 기억에서 line·view 를 뺐다(그 기억은 주소가 전부다)');
   assert.ok(/slug=young-s1-e1-jungah/.test(panelSrc(go(SL, 'Bonus'))), '⛔ 회차 번호 없는 이름으로 slug 를 고쳤다');
   assert.ok(/slug=young-s1-e1-jungah/.test(panelSrc(go(SL))), '⛔ 상태 없는 기억으로 주소를 고쳤다');
   const FI = 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILEaaaaaaaa01&sheetName=E3&line=12';

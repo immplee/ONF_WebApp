@@ -1020,11 +1020,14 @@
         return u.toString();
       } catch (e) { return h; }
     }
+    /** 🔄 교재가 상태를 알린 기억이면(st 있음) 주소의 한 번 쓰는 말(줄 line · 바로 열기 view)을 뺀다 — 굴린 자리·떠 있던 창은 교재가 st 로 되살린다
+     *  (종전: 닫은 🗂️ 카드가 새로 고침마다 view=cards 로 다시 열리고 · line 건너뛰기가 되살린 굴림과 다퉜다 · 2차 재검토). 상태 없는 옛 기억은 그대로. */
+    function rsOnce(h, st) { if (!st || typeof st !== 'object') return h; try { var u = new URL(h, (global.location && global.location.href) || undefined); if (!u.searchParams.has('line') && !u.searchParams.has('view')) return h; u.searchParams.delete('line'); u.searchParams.delete('view'); return u.toString(); } catch (e) { return h; } }   // ⚠️ 쌍둥이: teacher/index.html rsOnce
     function rsBoot() {
       var v = null;
       try { v = JSON.parse(global.sessionStorage.getItem(RS_KEY) || 'null'); } catch (e) { v = null; }
       if (!v || typeof v.h !== 'string' || !(Date.now() - Number(v.at) < RS_MS)) return;
-      bookOpen(rsHref(v.h, v.st && typeof v.st.sheet === 'string' ? v.st.sheet : ''), typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, null, v.o === 1);   // ⚠️ 쌍둥이: teacher/index.html rsHref
+      bookOpen(rsOnce(rsHref(v.h, v.st && typeof v.st.sheet === 'string' ? v.st.sheet : ''), v.st), typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, null, v.o === 1);   // ⚠️ 쌍둥이: teacher/index.html rsHref
       var p = bookShown(); if (!p) return;
       p.st = v.st && typeof v.st === 'object' ? v.st : null; p.rs = p.st; rsTell(p);   // 노크 전이면 노크 때(bookHi) 보낸다
     }
