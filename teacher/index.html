@@ -1110,7 +1110,7 @@ function hwLessonGo(d) {
   if (!hwT || !/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(l) || !D.test(f) || !D.test(t)) return;
   hwFbNext = { l: l, from: f, to: t, at: Date.now() };
   var tk = hwT;
-  hwOpen(tk, l);
+  hwOpen(tk, l, [], d.hwt);   // ⚡ 입장권 + 새 사진 없음 = 그 수업 자료가 Worker /hw/open 으로 바로(이어 쓰기와 같은 길 · 꼴은 hwShape 가 거른다) · 종전엔 맡김 없이 구글로 열어 늦었다(2026-11-08)
   hwOpenedTell(appWin, appOrigin, tk, l);   // 🔄 홈이 이 판(바뀐 수업)을 적는다 — 안 알리면 새로 고침 뒤 앞 판(hwClose → hwClosed 로 이미 지움)도 이 판도 없다
 }
 /** 홈에 「판을 띄웠다」 — 홈은 모아 보기 창을 닫고 · 🔄 t·l 을 적어 새로 고침 뒤 다시 연다(Ownify onfThHw · 2026-11-08) · t 는 그 홈이 준 값 그대로 그 홈에만 */

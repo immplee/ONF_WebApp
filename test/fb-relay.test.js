@@ -50,7 +50,7 @@ t('⑥ 카드 → 그 줄로(go): 줄·회차만 옆 교재에 · 목록(켜짐�
 });
 t('⑦ 지난 수업 자료 열기: 꼴 맞으면 그 수업을 열고 · 그 수업 자료가 물을 때 한 번만 범위를 준다 · 다른 수업·2분 넘음·꼴 틀림 = 안 줌', () => {
   const L = '0123abcd-0000-4000-8000-00000000000a', opened = [];
-  const c = run(); c.hwT = 'TOKSTU'; c.hwOpen = (t, l) => { opened.push([t, l]); c.hwL = l; };
+  const c = run(); c.hwT = 'TOKSTU'; c.hwOpen = (t, l, f, hwt) => { opened.push([t, l]); c.hwL = l; c.lastOpen = { f, hwt }; };
   c.hwLessonGo({ onf: 'hwbookLesson', l: 'nope', fb: { from: '2026-11-04', to: '2026-11-11' } });
   c.hwLessonGo({ onf: 'hwbookLesson', l: L, fb: { from: '2026-11-4', to: '2026-11-11' } });
   assert.strictEqual(opened.length, 0, '⛔ 꼴이 틀린 말로 수업 자료를 열었다');
@@ -58,6 +58,8 @@ t('⑦ 지난 수업 자료 열기: 꼴 맞으면 그 수업을 열고 · 그 �
   c.hwLessonGo({ onf: 'hwbookLesson', l: L, fb: { from: '2026-11-04', to: '2026-11-11', evil: 1 } });
   assert.deepStrictEqual(opened, [['TOKSTU', L]]);
   assert.deepStrictEqual(JSON.parse(JSON.stringify(c.appWin.sent)), [[{ onf: 'hwOpened', t: 'TOKSTU', l: L }, 'https://home.example']], '⛔ 바뀐 수업 판을 홈에 안 알렸다(새로 고침 뒤 판이 사라진다 · Ownify onfThHw)');
+  c.hwLessonGo({ onf: 'hwbookLesson', l: L, fb: { from: '2026-11-04', to: '2026-11-11' }, hwt: { p: '{"s":"x"}', sig: 'S'.repeat(43) } });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.lastOpen)), { f: [], hwt: { p: '{"s":"x"}', sig: 'S'.repeat(43) } }, '⛔ 입장권·빈 사진 목록을 안 넘겼다 — 그 수업 자료가 구글로 늦게 열린다');
   c.hwWin = win(); c.hwOrigin = 'https://board.example';
   c.hwFbAskAns(); c.hwFbAskAns();
   assert.deepStrictEqual(JSON.parse(JSON.stringify(c.hwWin.sent)), [[{ onf: 'hwFbAuto', from: '2026-11-04', to: '2026-11-11' }, 'https://board.example']], '⛔ 한 번만 · 그 출처로');
