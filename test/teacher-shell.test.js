@@ -368,7 +368,7 @@ t('📝 과제 판 — 「열어 줘(hwbook)」 = 껍데기 주소를 안 바꾸
   assert.equal(frames().length, 1);
   assert.equal(frames()[0].src, R.g.EXEC + '?mode=hwbook&t=Tok_1&l=' + L, '⛔ 과제 판 액자 주소');
   assert.ok(R.calls.some((c) => /^push:\{"onfHw":1/.test(c)), '⛔ 뒤로 = 닫기 칸이 없다');
-  assert.ok(told.some((m) => m.onf === 'hwOpened'), '⛔ 홈에 hwOpened');
+  assert.ok(told.some((m) => m.onf === 'hwOpened' && m.t === 'Tok_1' && m.l === L), '⛔ 홈에 hwOpened(띄운 판 t·l — 홈이 새로 고침 뒤 다시 연다 · 2026-11-08)');
   assert.ok(!JSON.stringify(R.calls).includes('PHOTO') && R.g.sessionStorage.getItem('onfHwGo') === null, '⛔ 고른 사진을 주소·저장소에 남겼다');
 });
 t('🎧 들으며 필기(4단계 · 2026-10-24) — 홈이 고른 녹음(날짜·올린 시각)이 판 노크 답 hw.a 로 간다 · 꼴이 틀리면 null', () => {
