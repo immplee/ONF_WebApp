@@ -904,6 +904,21 @@ function hwBookWarm(href, out, cf) {
   hwBookFrame(src, out, cf, true);
   if (hwBk) hwBk.box.style.display = 'none';
 }
+/* 🔄 과제 판 옆 교재도 새로 고침 뒤 회차·굴린 자리·옆 창 그대로(Peter 2026-11-08 2차 · 종전엔 그 교재가 알린 bookState 를 안 받아 판이 고른 처음 회차로 열렸다).
+   판(Ownify onfHbKeep)이 교재·보기를 다시 고르고 열면 · 그 교재가 알린 상태(이 탭 sessionStorage · 홈 옆 판 rsSave 와 같은 거르개 histSmall)를 첫 노크 때 돌려준다(bookRestore — 홈 옆 판 rsTell 과 같은 말).
+   같은 교재(fileId · slug 의 회차 뺀 줄기)일 때만 · 한 번만 · 껍데기가 뜬 뒤 1분 안(되살리기 자리) · 과제 판을 닫으면 지운다(hwClose) · 12시간 넘은 기억은 버린다. ⛔ 학생 토큰·주소는 안 적는다(교재 줄기만). */
+var HWBK_KEY = 'onfThHwBk', hwBkRs = (function () {
+  try { var v = JSON.parse(sessionStorage.getItem(HWBK_KEY) || 'null'); return v && typeof v.b === 'string' && v.b && v.st && typeof v.st === 'object' && Date.now() - Number(v.at) < 12 * 3600000 ? { b: v.b, st: v.st, until: Date.now() + 60000 } : null; } catch (e) { return null; }
+})();
+function hwBkId(src) { try { var q = new URL(src).searchParams, f = q.get('fileId'), g = (q.get('slug') || '').split('-'); return f ? 'f:' + f : g.length === 4 ? 's:' + g[0] + '-' + g[1] + '-' + g[3] : ''; } catch (e) { return ''; } }
+function hwBkSave(st) { var b = hwBk && hwBkId(hwBk.src); if (!b || !histSmall(st)) return; try { sessionStorage.setItem(HWBK_KEY, JSON.stringify({ b: b, st: JSON.parse(JSON.stringify(st)), at: Date.now() })); } catch (e) {} }
+function hwBkRsTell() {
+  var r = hwBkRs; if (!r || !hwBk || !hwBk.win) return;
+  if (Date.now() > r.until) { hwBkRs = null; return; }
+  if (r.b !== hwBkId(hwBk.src)) return;   // 다른 교재(미리 띄운 다른 책) — 그 책 노크를 기다린다
+  hwBkRs = null;
+  try { hwBk.win.postMessage({ onf: 'bookRestore', st: r.st }, hwBk.origin); } catch (e) {}
+}
 /** 미리 띄운(대기) 교재를 보인다 — 노크(bookHi) 전이면 노크 때 보낸다 */
 function hwBkUnpark() {
   if (!hwBk || !hwBk.parked) return;
@@ -1157,7 +1172,8 @@ function hwFbBack(d) {
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
   if (!d || !hwBk || !bookFrom(ev, hwBk.el, true)) return;   // 🌤 판 출처(구글 또는 정적 판 · 2026-10-31 넓히기 ②)
-  if (d.onf === 'bookHi') { hwBk.win = ev.source; hwBk.origin = ev.origin; if (hwBk.unpark) { hwBk.unpark = false; try { hwBk.win.postMessage({ onf: 'bookPark', on: false }, hwBk.origin); } catch (e) {} } hwPenSync(); hwFbSync(); return; }
+  if (d.onf === 'bookHi') { hwBk.win = ev.source; hwBk.origin = ev.origin; if (hwBk.unpark) { hwBk.unpark = false; try { hwBk.win.postMessage({ onf: 'bookPark', on: false }, hwBk.origin); } catch (e) {} } hwPenSync(); hwFbSync(); hwBkRsTell(); return; }
+  if (d.onf === 'bookState') { hwBkSave(d.st); return; }   // 🔄 옆 교재의 지금 상태(위 hwBkRs)
   if (d.onf === 'fbPick' || d.onf === 'fbFocus' || d.onf === 'fbCmtAck') { hwFbBack(d); return; }   // 🎧 옆 교재 → 과제 판
   if (d.onf === 'hwTap') { histTap(); return; }   // 👆 옆·교재만에서 교재만 만져도(반박 🟠2)
   if (d.onf === 'penAct') { if (hwView === 'side' && hwWin) { try { hwWin.postMessage({ onf: 'bookPenAct' }, hwOrigin); } catch (e) {} } return; }
@@ -1167,7 +1183,8 @@ window.addEventListener('message', function (ev) {
   if (d.onf === 'bookClose') { hwViewSet('photo'); hwTellView(); }
 });
 function hwClose() {
-  hwUpMark(false);   // 🔄 판을 걷었다 — 새로 고침 덮개 표시도(hwOpenedTell 이 다시 적는다)
+  hwUpMark(false);
+  if (hwBox && !hwWarmOn) { hwBkRs = null; try { sessionStorage.removeItem(HWBK_KEY); } catch (e) {} }   // 🔄 보이던 판을 걷었다 — 옆 교재 기억도(위 hwBkRs) · ⛔ 판을 새로 열기 전 비우기(hwOpen·hwWarm 이 먼저 부른다 — 되살리기 열기 포함)엔 안 지운다   // 🔄 판을 걷었다 — 새로 고침 덮개 표시도(hwOpenedTell 이 다시 적는다)
   if (hwBox && appWin) { try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (e) {} }   // 홈이 카드 상태(완료 등)를 다시 받게 · 미리 띄운 판이 걷혀도(10분·물러남) — 홈이 HWWARM 을 풀고 다음에 다시 띄운다(2026-10-31 전수 검수)
   if (hwBk) { if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} } if (hwBk.box.parentNode) hwBk.box.parentNode.removeChild(hwBk.box); hwBk = null; }   // 과제 판을 닫으면 그 교재 액자도 지운다
   hwView = 'photo'; hwRecR = null; hwBand = 0; hwCutTold = -1; hwHistWait = false; hwHvWait = false;
@@ -1665,12 +1682,26 @@ function rsMark(p, href, out, cf) { if (!p) return; p.href = href; p.hout = out 
 function rsSave(p) { if (!p || !p.href) return; try { sessionStorage.setItem(RS_KEY, JSON.stringify({ h: p.href, l: p.left, m: p.m, r: p.r, o: p.hout || 0, c: p.hcf || null, st: p.st || null, at: Date.now() })); } catch (e) {} }
 function rsDrop() { try { sessionStorage.removeItem(RS_KEY); } catch (e) {} }
 function rsTell(p) { if (!p || !p.rs || !p.win) return; var st = p.rs; p.rs = null; try { p.win.postMessage({ onf: 'bookRestore', st: st }, p.origin); } catch (e) {} }
+/* 🔄 2차(Peter 2026-11-08 「새로 고침 빨리」) — 되살릴 주소를 교재가 알린 회차(st.sheet)로 고친다 → 첫 받기부터 그 회차(종전: 연 회차를 먼저 그리고 bookRestore 로 한 번 더 받아 회차가 튀었다).
+   slug 주소 = 경로의 -eN-(서버가 slug 로 회차를 고른다) · fileId 주소 = sheetName · 줄(line)은 연 회차의 행이라 뺀다 · 회차 없음·모르는 꼴·이미 같으면 그대로(교재가 종전대로 옮긴다). */
+function rsHref(h, sn) {
+  try {
+    var u = new URL(h, location.href), m = /^[Ee](\d+)/.exec(sn || ''), p;
+    if (!sn) return h;   // 내 문장 판은 회차를 안 알린다(sheet '')
+    if (u.searchParams.get('fileId')) { if (u.searchParams.get('sheetName') === sn) return h; u.searchParams.set('sheetName', sn); }
+    else { if (!m) return h; p = u.pathname.replace(/-e\d+-(?=[a-z0-9]+\/?$)/i, '-e' + Number(m[1]) + '-'); if (p === u.pathname) return h; u.pathname = p; }
+    u.searchParams.delete('line');
+    return u.toString();
+  } catch (e) { return h; }
+}
 function rsBoot() {
   if (rsBooted) return; rsBooted = true;
   var v = null;
   try { v = JSON.parse(sessionStorage.getItem(RS_KEY) || 'null'); } catch (e) { v = null; }
   if (!v || typeof v.h !== 'string' || !(Date.now() - Number(v.at) < RS_MS)) return;
-  bookOpen(v.h, typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, bookCfOk(v.c), v.o === 1);   // 입장권(12시간)이 낡았으면 Worker 가 403 → 판이 다리로(종전과 같다)
+  var sn = v.st && typeof v.st.sheet === 'string' ? v.st.sheet : '', h = rsHref(v.h, sn), c = bookCfOk(v.c);
+  if (c && h !== v.h) c.s = sn;   // 사본 힌트도 그 회차(입장권은 교재 단위 — 회차를 안 묶는다 · Worker /book/get)
+  bookOpen(h, typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, c, v.o === 1);   // 입장권(12시간)이 낡았으면 Worker 가 403 → 판이 다리로(종전과 같다)
   var p = bookShown(); if (!p) return;
   p.st = v.st && typeof v.st === 'object' ? v.st : null; p.rs = p.st; rsTell(p);
 }

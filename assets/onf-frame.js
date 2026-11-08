@@ -1008,11 +1008,23 @@
     function rsSaveNow() { var p = bookShown(); if (p) rsSave(p); }
     function rsDrop() { try { global.sessionStorage.removeItem(RS_KEY); } catch (e) {} }
     function rsTell(p) { if (!p || !p.rs || !p.win) return; var st = p.rs; p.rs = null; try { p.win.postMessage({ onf: 'bookRestore', st: st }, p.origin); } catch (e) {} }
+    /* 🔄 2차(Peter 2026-11-08 「새로 고침 빨리」) — 되살릴 주소를 교재가 알린 회차(st.sheet)로 고친다 → 첫 받기부터 그 회차(종전: 연 회차를 먼저 그리고 bookRestore 로 한 번 더 받아 회차가 튀었다).
+       slug 주소 = 경로의 -eN-(서버가 slug 로 회차를 고른다) · fileId 주소 = sheetName · 줄(line)은 연 회차의 행이라 뺀다 · 회차 없음·모르는 꼴·이미 같으면 그대로(교재가 종전대로 옮긴다). */
+    function rsHref(h, sn) {
+      try {
+        var u = new URL(h, (global.location && global.location.href) || undefined), m = /^[Ee](\d+)/.exec(sn || ''), p;
+        if (!sn) return h;   // 내 문장 판은 회차를 안 알린다(sheet '')
+        if (u.searchParams.get('fileId')) { if (u.searchParams.get('sheetName') === sn) return h; u.searchParams.set('sheetName', sn); }
+        else { if (!m) return h; p = u.pathname.replace(/-e\d+-(?=[a-z0-9]+\/?$)/i, '-e' + Number(m[1]) + '-'); if (p === u.pathname) return h; u.pathname = p; }
+        u.searchParams.delete('line');
+        return u.toString();
+      } catch (e) { return h; }
+    }
     function rsBoot() {
       var v = null;
       try { v = JSON.parse(global.sessionStorage.getItem(RS_KEY) || 'null'); } catch (e) { v = null; }
       if (!v || typeof v.h !== 'string' || !(Date.now() - Number(v.at) < RS_MS)) return;
-      bookOpen(v.h, typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, null, v.o === 1);
+      bookOpen(rsHref(v.h, v.st && typeof v.st.sheet === 'string' ? v.st.sheet : ''), typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, null, v.o === 1);   // ⚠️ 쌍둥이: teacher/index.html rsHref
       var p = bookShown(); if (!p) return;
       p.st = v.st && typeof v.st === 'object' ? v.st : null; p.rs = p.st; rsTell(p);   // 노크 전이면 노크 때(bookHi) 보낸다
     }

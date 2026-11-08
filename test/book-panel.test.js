@@ -948,6 +948,12 @@ t('🔄 새로고침 = 열린 창 그대로(Peter 2026-10-24) — 보이는 판 
   assert.strictEqual(ss.getItem('onfOpenBook'), null, '⛔ 닫았는데 기억이 남았다(새로고침하면 닫은 판이 다시 열린다)');
   const u = phoneSetup({ wide: true, pre });
   assert.ok(!u.panel(), '⛔ 닫은 뒤 새로고침에 판을 열었다');
+  //   🔄 2차(Peter 2026-11-08) — 판 안에서 다른 회차로 옮겼으면 되살릴 때 첫 받기부터 그 회차(slug -eN- · 쌍둥이: 선생님 껍데기 rsHref) — 종전엔 연 회차(e2)를 먼저 그리고 다시 받았다
+  const w = phoneSetup({ wide: true, pre });
+  w.send({ onf: 'openBook', href: E2, left: 184 }, w.homeInner);
+  w.send({ onf: 'bookState', st: { sheet: 'E3_Y', top: 0, left: 0, side: null } }, hi(w, w.panel()));
+  const x = phoneSetup({ wide: true, pre });
+  assert.ok(x.panel() && /a-s1-e3-b/.test(x.opened.slice(-1).join()) && !/a-s1-e2-b/.test(x.opened.join()), '⛔ 되살린 판이 연 회차(e2)로 먼저 열렸다: ' + x.opened.join(' | '));
 });
 
 t('🔄 홈 탭도 새로고침 뒤 그대로(Peter 2026-10-24) — 홈이 고른 탭(homeTab)을 이 탭에 적고 · 다시 읽히면 홈의 첫 노크(bookHello)에 한 번 돌려준다 · 읽힐 때 잡은 값(홈이 처음 그린 탭이 먼저 와도 안 덮임)', () => {
