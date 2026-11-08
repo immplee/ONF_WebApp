@@ -414,6 +414,17 @@ t('🔄 새로 고침 = 교재 판을 홈 노크(bookHello)를 안 기다리고 
   assert.strictEqual(panels(boot({ onf_id_tok: odk() }, { g: API })).length, 0, '⛔ 기억이 없는데 판을 열었다');
   assert.strictEqual(panels(boot({ onf_id_tok: odk() }, { ss: { onfThOpenBook: keep }, search: '?mode=student&t=Tok_1', g: API })).length, 0, '⛔ 주소로 연 학생 창에서 mount 때 판을 열었다(종전대로 노크 때)');
 });
+t('🔄 검토 2026-11-08 — 숨긴 미리 판(hwbookWarm)이 먼저 와도 hwRsNo 면 덮개를 걷는다 · 교재 판 되살리기는 로고 막 뒤에 붙는다(같은 z 5) · 로그인 화면엔 교재 판도 숨긴다', () => {
+  const covers = (R) => R.created.filter((e) => e.className === 'onf-hwcover' && !e.removed);
+  const R = boot({ onf_id_tok: odk() }, { ss: { onfHwUp: String(Date.now()) } }), me = { parent: R.els.app.contentWindow, postMessage() {} }; R.knockAs(me);
+  R.postAs({ onf: 'hwbookWarm', t: 'Tok_1' }, me);   // 학생 창 위 수업 준비 창을 되살리며 미리 띄움
+  assert.ok(R.g.hwBox && R.g.hwWarmOn, '전제: 숨긴 미리 판이 있다');
+  R.postAs({ onf: 'hwRsNo' }, me);
+  assert.strictEqual(covers(R).length, 0, '⛔ 숨긴 미리 판 때문에 「안 되살린다」를 무시하고 덮개를 10초 남겼다');
+  const m = html.slice(html.indexOf('function mount() {'), html.indexOf('\nfunction ', html.indexOf('function mount() {') + 20));
+  assert.ok(m.indexOf('ONF.load.bind') >= 0 && m.indexOf('rsBoot()') > m.indexOf('ONF.load.bind'), '⛔ 교재 판 되살리기가 로고 막보다 먼저 붙는다(막 밑에 깔려 안 보이는데 눌린다)');
+  assert.ok(/html\.onf-gating \.onf-bookpanel/.test(html), '⛔ 로그인 화면(gate) 위에 교재 판이 남는다');
+});
 t('🔄 새로 고침 되살리기 표(rs · 2026-11-08 검토 ④) — 홈이 rs:1 로 연 판에만 노크 답 hw.rs = 1 · 보통 열기엔 없음(판이 제 기억 쪽·보기를 안 쓴다) · 꼴은 정확히 1 만', () => {
   for (const [rs, want] of [[1, 1], [undefined, undefined], ['1', undefined], [true, undefined]]) {
     const R = boot({ onf_id_tok: odk() }), me = { parent: R.els.app.contentWindow, postMessage() {} };
