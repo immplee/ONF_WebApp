@@ -1256,7 +1256,7 @@ window.addEventListener('message', function (ev) {
   /* 📱 입장권만으로 연 홈(tchOnly)은 구글 창구 전이다 — 구글 판(exec)이면 로그인 화면(gate)을 한 번 거쳐 연다 · 「홈으로 돌아가기」로 그만둘 수 있다.
      정적 과제 판(hwOutQ · 입장권으로 연다)이면 묻지 않는다 — 구글을 안 지나는데 로그인부터 묻던 순서였다(Peter 2026-10-31 아이패드 ?tout=2 「순서가 이상해」).
      정적 판이 안 뜨면 그때 묻는다(hwOutBack). */
-  if (tchOnly && !pending && !hwOutQ() && !(hwBox && hwWarmOn && hwT === t && hwOut)) gate(go, '과제 판은 구글 로그인 뒤에 열려요.', true); else go();   // 미리 띄운 정적 판이 살아 있으면 그것을 쓴다(반박 🟡8)
+  if (tchOnly && !pending && !hwOutQ() && !(hwBox && hwWarmOn && hwT === t && hwOut)) gate(go, '과제 판은 구글 로그인 뒤에 열려요.', true, hrs ? function () { hwUpMark(false); try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (eB) {} } : null); else go();   // 🔄 되살리기(rs) 문에서 「홈으로 돌아가기」 = 판 기억(껍데기 onfHwUp · 홈 onfThHw)을 지운다 — 안 지우면 새로 고침마다 이 문이 다시 떴다(검토 2 ⑤)   // 미리 띄운 정적 판이 살아 있으면 그것을 쓴다(반박 🟡8)
 });
 /* ═══ 📝 정적 과제 판(2026-10-31 · Peter 「과제 판도 같은 방식으로」 · 정적 선생님 홈 onf-tout 과 같은 꼴) ═══
    과제 판 액자를 구글 doGet(1.7~2.2초) 대신 Pages /hwbook/(같은 템플릿 · Ownify tools/outside/hwbook-boot.js)로 먼저 연다 — 미리 띄우기(hwWarm)·열기(hwOpen) 둘 다 이 한 곳(hwSrc).

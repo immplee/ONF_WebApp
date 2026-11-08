@@ -636,6 +636,20 @@ t('W4 입장권만으로 연 정적 홈(tchOnly)이 그리기 전에 물러나�
   assert.ok(Q.execOpen() && Q.els.lock.hidden === true, '⛔ 구글 토큰이 있는데 로그인 화면을 또 보였다');
 });
 
+t('W5r 🔄 새로 고침 되살리기(rs:1) 판이 로그인 문에 걸려 「홈으로 돌아가기」 = 판 기억을 지운다(껍데기 onfHwUp · 홈에 hwClosed) — 안 지우면 새로 고침마다 문이 다시 떴다(검토 2 ⑤) · 보통 열기 문은 종전 그대로', async () => {
+  for (const rs of [1, 0]) {
+    const R = boot({ onf_tch: tchCell(20), onf_tout: '2', onf_hwout: '0' }, { nav: IPAD });
+    R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'homeDrawn' }); R.fromApp({ onf: 'auth-please', stale: false }); R.sent.length = 0;
+    try { R.g.sessionStorage.setItem('onfHwUp', String(Date.now())); } catch (e) {}
+    R.fromApp(rs ? { onf: 'hwbook', t: 'tokA', l: '', rs: 1 } : { onf: 'hwbook', t: 'tokA', l: '' });
+    assert.ok(R.els.lock.hidden === false, '전제: 로그인 문');
+    R.els.gateBack.onclick();
+    const closed = R.sentTo(APP).some((m) => m.onf === 'hwClosed'), up = R.g.sessionStorage.getItem('onfHwUp');
+    if (rs) assert.ok(closed && up === null, '⛔ 되살리기 문에서 돌아갔는데 판 기억이 남았다(다음 새로 고침에 또 문)');
+    else assert.ok(!closed && up !== null, '⛔ 보통 열기 문에서 돌아가기가 판 기억을 건드렸다');
+  }
+});
+
 t('W5 입장권만으로 연 홈(tchOnly)의 구글 과제 판(정적 판 끔 ?hwout=0) — 미리 띄우기(hwbookWarm)는 안 하고 · 열기(hwbook)는 로그인 화면(+「홈으로 돌아가기」) → 누르면 과제 판 + hwOpened · 돌아가기 = 정적 홈 그대로 · 로그인 뒤엔 바로', async () => {
   const R = boot({ onf_tch: tchCell(20), onf_tout: '2', onf_hwout: '0' }, { nav: IPAD });
   R.fromApp({ onf: 'outHello' }); R.fromApp({ onf: 'homeDrawn' }); R.fromApp({ onf: 'auth-please', stale: false }); R.sent.length = 0;
