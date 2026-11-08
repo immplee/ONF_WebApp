@@ -95,7 +95,7 @@ var tPre = (function () {
           color:var(--onf-ink); }
   .lock .em { font-size:34px; margin-bottom:12px; }
   /* 🔐 로그인 화면(gate)을 띄운 동안 과제 판·옆 교재·경계 손잡이 층(z 50~55)을 숨긴다 — 인라인 visibility 를 hwLay 가 되돌려도(회전 등) 이긴다(2026-10-31 반박 🟡6) */
-  html.onf-gating .onf-hwbox, html.onf-gating .onf-hwbk, html.onf-gating .onf-hwdiv { visibility:hidden !important; pointer-events:none !important; }
+  html.onf-gating .onf-hwbox, html.onf-gating .onf-hwbk, html.onf-gating .onf-hwdiv, html.onf-gating .onf-hwcover { visibility:hidden !important; pointer-events:none !important; }
   .lock h2 { margin:0 0 9px; font-size:20px; font-weight:800; }
   .lock p { margin:0 0 18px; color:var(--onf-brown); }
   .lock .why { font-size:12.5px; color:var(--onf-mute); margin-top:14px; }
@@ -181,6 +181,7 @@ var tchOnly = false, gateGo = null, gateBackOn = false;
 function gate(go, msg, back, onBack) {   // onBack = 「홈으로 돌아가기」 때 더 할 일(과제 판 닫기 — hwOutBack)
   gateGo = go; gateBackOn = !!back;
   gating(true);   // 과제 판 층이 로그인 화면을 덮지 않게(위 CSS)
+  hwCoverOff(false);   // 🔄 새로 고침 덮개도 걷는다(로그인 화면을 가리지 않게)   // 과제 판 층이 로그인 화면을 덮지 않게(위 CSS)
   frame.hidden = true;
   document.getElementById('wait').hidden = true;
   document.getElementById('lock').hidden = false;
@@ -353,6 +354,7 @@ function mount() {
      없었고(#why 는 #lock 안이라 같이 숨는다), 「3초」와 「영영」이 같은 흰 종이였다. */
   document.getElementById('wait').hidden = false;
   frame.hidden = false;
+  if (!new URLSearchParams(location.search).get('mode')) { hwCoverOn(); rsBoot(); }   // 🔄 판을 연 채 새로 고침 — 홈이 판을 다시 열 때까지 홈을 안 보인다(위 hwCoverOn) · 교재 판은 홈을 안 기다리고 지금(학생 껍데기 rsBoot 와 같다 · Peter 2026-11-08 「모든 창 빨리」)
   /* 🟠 로고 로딩 막 — 여기서 처음 그린다(로그인 화면을 치운 뒤). 노크(auth-please)가 오면 안쪽이 첫 화면을 그릴 때까지 기다리고(grace 15초 —
      선생님 홈은 노크 뒤 토큰을 받아 자료를 사 와서 그린다) · 안쪽이 「다 그렸다」(brand)를 보내면 그 자리로 날아가거나 걷힌다.
      ⛔ 다시 로그인하라는 노크(stale)·8초 막힘 안내(watch) 땐 바로 걷는다 — 막이 로그인 창·안내를 가리면 안 된다.
@@ -1114,7 +1116,28 @@ function hwLessonGo(d) {
   hwOpenedTell(appWin, appOrigin, tk, l);   // 🔄 홈이 이 판(바뀐 수업)을 적는다 — 안 알리면 새로 고침 뒤 앞 판(hwClose → hwClosed 로 이미 지움)도 이 판도 없다
 }
 /** 홈에 「판을 띄웠다」 — 홈은 모아 보기 창을 닫고 · 🔄 t·l 을 적어 새로 고침 뒤 다시 연다(Ownify onfThHw · 2026-11-08) · t 는 그 홈이 준 값 그대로 그 홈에만 */
-function hwOpenedTell(w, o, t, l) { if (w && o) { try { w.postMessage({ onf: 'hwOpened', t: t, l: l }, o); } catch (e) {} } }
+function hwOpenedTell(w, o, t, l) { hwUpMark(true); hwCoverOff(false); if (w && o) { try { w.postMessage({ onf: 'hwOpened', t: t, l: l }, o); } catch (e) {} } }
+/* 🔄 새로 고침 덮개(Peter 2026-11-08 「수업 자료를 연 채 새로 고침하면 잠깐 반짝 홈이 보이고 다시 수업 자료」) — 판을 다시 여는 건 홈이다(토큰 뒤 onfThHw · 학생 토큰을 껍데기 저장소에 안 둔다 #417).
+   그 사이(홈이 그려지고 · 학생 창 · 그 위 판) 홈이 그대로 보였다 → 이 탭에 판이 떠 있었다는 표시만(onfHwUp · 시각 하나 · 토큰 없음) 적어 두고,
+   새로 고침해 홈 액자를 붙이는 순간(mount) 판과 똑같은 덮개(바탕 + 「불러오는 중」)를 먼저 깐다. 걷기 = 판이 떴다(hwOpenedTell — 판의 같은 덮개로 이어짐) ·
+   홈이 안 되살린다고 알림(hwRsNo — 볼 수 없는 학생·기억 없음) · 10초(홈이 오류 화면이면 그 뒤에 보인다). ⛔ 로그인 화면(gate)은 가리지 않는다(onf-gating + 걷기) · 주소로 연 창(mode=…)엔 안 깐다. */
+var HWUP_KEY = 'onfHwUp', hwCover = null, hwCoverTm = 0;
+function hwUpMark(on) { try { if (on) sessionStorage.setItem(HWUP_KEY, String(Date.now())); else sessionStorage.removeItem(HWUP_KEY); } catch (e) {} }
+function hwUpWas() { try { var v = +sessionStorage.getItem(HWUP_KEY); return v > 0 && Date.now() - v < 12 * 3600000; } catch (e) { return false; } }
+function hwCoverOn() {
+  if (hwCover || hwBox || !hwUpWas()) return;
+  hwCover = document.createElement('div'); hwCover.className = 'onf-hwcover';
+  hwCover.style.cssText = 'position:fixed;inset:0;z-index:50;background:var(--bg,#1d1712)';
+  hwCover.innerHTML = '<div class="onf-wait"><div class="onf-spin"></div><span>불러오는 중</span></div>';
+  document.body.appendChild(hwCover);
+  hwCoverTm = setTimeout(function () { hwCoverOff(true); }, 10000);
+}
+function hwCoverOff(drop) { if (hwCoverTm) { clearTimeout(hwCoverTm); hwCoverTm = 0; } if (hwCover && hwCover.parentNode) hwCover.parentNode.removeChild(hwCover); hwCover = null; if (drop) hwUpMark(false); }
+if (typeof window !== 'undefined') window.addEventListener('message', function (ev) {   // 홈: 「판을 안 되살린다」 — 덮개를 바로 걷는다(15초 안 기다림)
+  var d = ev && ev.data;
+  if (!d || d.onf !== 'hwRsNo' || !appWin || ev.source !== appWin || ev.origin !== appOrigin) return;
+  if (!hwBox) hwCoverOff(true);
+});
 function hwFbAskAns() {
   var n = hwFbNext; if (!n || !hwWin) return;
   if (Date.now() - n.at > 120000 || n.l !== hwL) { hwFbNext = null; return; }
@@ -1144,6 +1167,7 @@ window.addEventListener('message', function (ev) {
   if (d.onf === 'bookClose') { hwViewSet('photo'); hwTellView(); }
 });
 function hwClose() {
+  hwUpMark(false);   // 🔄 판을 걷었다 — 새로 고침 덮개 표시도(hwOpenedTell 이 다시 적는다)
   if (hwBox && appWin) { try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (e) {} }   // 홈이 카드 상태(완료 등)를 다시 받게 · 미리 띄운 판이 걷혀도(10분·물러남) — 홈이 HWWARM 을 풀고 다음에 다시 띄운다(2026-10-31 전수 검수)
   if (hwBk) { if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} } if (hwBk.box.parentNode) hwBk.box.parentNode.removeChild(hwBk.box); hwBk = null; }   // 과제 판을 닫으면 그 교재 액자도 지운다
   hwView = 'photo'; hwRecR = null; hwBand = 0; hwCutTold = -1; hwHistWait = false; hwHvWait = false;
@@ -1831,7 +1855,8 @@ window.addEventListener('message', function (ev) {
       if (BOOK_SW) cp.swap = 1;
       try { ev.source.postMessage(cp, ev.origin); } catch (e) {}
       if (TAB0) { try { ev.source.postMessage({ onf: 'homeTab', v: TAB0 }, ev.origin); } catch (eT) {} TAB0 = ''; }   // 🔄 새로고침 전에 고른 홈 탭(아래 TAB0)
-      if (!rsBooted) { bookHome = ev.source; bookHomeOrigin = ev.origin; rsBoot(); }   // 🔄 새로고침 전에 열려 있던 판(위 rsBoot) — 홈이 뜬 뒤 한 번
+      if (!bookHome) { bookHome = ev.source; bookHomeOrigin = ev.origin; }   // 판 소식(bookPerf·bookClosed)을 받을 홈 — 되살린 판은 홈보다 먼저 떴다(mount rsBoot)
+      if (!rsBooted) rsBoot();   // 🔄 새로고침 전에 열려 있던 판(위 rsBoot) — 주소로 연 창 등 mount 에서 안 띄운 때만 여기서 한 번
       return;
     }
     if (d.onf === 'hwTap') { histTap(); return; }   // 👆 홈을 만지고 뗐다 — 줄에 미뤄 둔 칸을 이 손짓 안에서
