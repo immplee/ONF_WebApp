@@ -38,6 +38,16 @@ t('④ 교재 → 과제 판: 세 가지만 · 꼴 거름 · 과제 판 출처�
   assert.ok(c.hwWin.sent.every((x) => x[1] === 'https://board.example'));
   assert.deepStrictEqual(Object.keys(c.hwWin.sent[0][0]).sort(), ['ipa', 'onf', 'row', 'sheet', 'text', 'w0', 'w1']);
 });
+t('⑥ 카드 → 그 줄로(go): 줄·회차만 옆 교재에 · 목록(켜짐·항목)은 그대로', () => {
+  const c = run(); c.hwBk = { win: win(), origin: 'https://book.example' };
+  c.hwFbRelay({ onf: 'hwFb', on: 1, items: [{ id: 'abc', n: 1, row: 5, w0: 0, w1: 0, sheet: 'E1' }] });
+  c.hwFbRelay({ onf: 'hwFb', go: { row: '15', sheet: 'E1', evil: 1 } });
+  const [m, o] = c.hwBk.win.sent[1];
+  assert.strictEqual(o, 'https://book.example');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(m)), { onf: 'fbBook', go: { row: 15, sheet: 'E1' } }, '⛔ go 가 「꺼짐 + 빈 목록」으로 바뀌었다');
+  c.hwBk.win = win(); c.hwFbSync();
+  assert.strictEqual(c.hwBk.win.sent[0][0].on, 1, '⛔ go 가 마지막 목록을 꺼짐으로 덮었다'); assert.strictEqual(c.hwBk.win.sent[0][0].items.length, 1);
+});
 t('⑤ 받는 자리 — 과제 판 허용 목록에 hwFb · 교재 말은 bookFrom 걸러진 길 안', () => {
   assert.match(src, /d\.onf !== 'hwPen' && d\.onf !== 'hwFb' &&/);
   const i = src.indexOf("if (d.onf === 'fbPick' || d.onf === 'fbFocus' || d.onf === 'fbCmtAck') { hwFbBack(d); return; }"), g = src.lastIndexOf('if (!d || !hwBk || !bookFrom(ev, hwBk.el, true)) return;', i);
