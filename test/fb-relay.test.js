@@ -48,6 +48,23 @@ t('⑥ 카드 → 그 줄로(go): 줄·회차만 옆 교재에 · 목록(켜짐�
   c.hwBk.win = win(); c.hwFbSync();
   assert.strictEqual(c.hwBk.win.sent[0][0].on, 1, '⛔ go 가 마지막 목록을 꺼짐으로 덮었다'); assert.strictEqual(c.hwBk.win.sent[0][0].items.length, 1);
 });
+t('⑦ 지난 수업 자료 열기: 꼴 맞으면 그 수업을 열고 · 그 수업 자료가 물을 때 한 번만 범위를 준다 · 다른 수업·2분 넘음·꼴 틀림 = 안 줌', () => {
+  const L = '0123abcd-0000-4000-8000-00000000000a', opened = [];
+  const c = run(); c.hwT = 'TOKSTU'; c.hwOpen = (t, l) => { opened.push([t, l]); c.hwL = l; };
+  c.hwLessonGo({ onf: 'hwbookLesson', l: 'nope', fb: { from: '2026-11-04', to: '2026-11-11' } });
+  c.hwLessonGo({ onf: 'hwbookLesson', l: L, fb: { from: '2026-11-4', to: '2026-11-11' } });
+  assert.strictEqual(opened.length, 0, '⛔ 꼴이 틀린 말로 수업 자료를 열었다');
+  c.hwLessonGo({ onf: 'hwbookLesson', l: L, fb: { from: '2026-11-04', to: '2026-11-11', evil: 1 } });
+  assert.deepStrictEqual(opened, [['TOKSTU', L]]);
+  c.hwWin = win(); c.hwOrigin = 'https://board.example';
+  c.hwFbAskAns(); c.hwFbAskAns();
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.hwWin.sent)), [[{ onf: 'hwFbAuto', from: '2026-11-04', to: '2026-11-11' }, 'https://board.example']], '⛔ 한 번만 · 그 출처로');
+  c.hwLessonGo({ onf: 'hwbookLesson', l: L, fb: { from: '2026-11-04', to: '2026-11-11' } }); c.hwL = 'other'; c.hwWin = win(); c.hwFbAskAns();
+  assert.strictEqual(c.hwWin.sent.length, 0, '⛔ 다른 수업 자료에 범위를 줬다');
+  c.hwLessonGo({ onf: 'hwbookLesson', l: L, fb: { from: '2026-11-04', to: '2026-11-11' } }); c.hwFbNext.at -= 121000; c.hwWin = win(); c.hwFbAskAns();
+  assert.strictEqual(c.hwWin.sent.length, 0, '⛔ 2분 넘은 것을 줬다');
+  assert.match(src, /d\.onf !== 'hwbookLesson' && d\.onf !== 'hwFbAsk' &&/, '⛔ 수업 자료 말 허용 목록에 없다');
+});
 t('⑤ 받는 자리 — 과제 판 허용 목록에 hwFb · 교재 말은 bookFrom 걸러진 길 안', () => {
   assert.match(src, /d\.onf !== 'hwPen' && d\.onf !== 'hwFb' &&/);
   const i = src.indexOf("if (d.onf === 'fbPick' || d.onf === 'fbFocus' || d.onf === 'fbCmtAck') { hwFbBack(d); return; }"), g = src.lastIndexOf('if (!d || !hwBk || !bookFrom(ev, hwBk.el, true)) return;', i);
