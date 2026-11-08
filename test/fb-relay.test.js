@@ -68,6 +68,11 @@ t('⑦ 지난 수업 자료 열기: 꼴 맞으면 그 수업을 열고 · 그 �
   c.hwLessonGo({ onf: 'hwbookLesson', l: L, fb: { from: '2026-11-04', to: '2026-11-11' } }); c.hwFbNext.at -= 121000; c.hwWin = win(); c.hwFbAskAns();
   assert.strictEqual(c.hwWin.sent.length, 0, '⛔ 2분 넘은 것을 줬다');
   assert.match(src, /d\.onf !== 'hwbookLesson' && d\.onf !== 'hwFbAsk' &&/, '⛔ 수업 자료 말 허용 목록에 없다');
+  //   판을 닫으면 범위도 버린다 — 진짜 hwOpen 은 안에서 hwClose(= 범위 지움)를 부르니 범위는 연 뒤에 적어야 한다
+  const c2 = run(); c2.hwT = 'TOKSTU'; c2.hwOpen = (t, l) => { c2.hwFbNext = null; c2.hwL = l; };
+  c2.hwLessonGo({ onf: 'hwbookLesson', l: L, fb: { from: '2026-11-04', to: '2026-11-11' } });
+  assert.ok(c2.hwFbNext && c2.hwFbNext.l === L, '⛔ 범위를 연 뒤에 안 적었다 — hwOpen 안 hwClose 가 지워 시작 창이 안 뜬다');
+  assert.match(src, /function hwClose\(\) \{\n  hwFbNext = null;/, '⛔ 판을 닫아도 범위가 남는다(2분 안 같은 수업을 다시 열면 시작 창이 저절로)');
 });
 t('⑤ 받는 자리 — 과제 판 허용 목록에 hwFb · 교재 말은 bookFrom 걸러진 길 안', () => {
   assert.match(src, /d\.onf !== 'hwPen' && d\.onf !== 'hwFb' &&/);
