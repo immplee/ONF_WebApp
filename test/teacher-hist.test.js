@@ -13,7 +13,7 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'teacher', 'index.html'),
 const A = src.indexOf('/* onf-hist:begin */'), B = src.indexOf('/* onf-hist:end */');
 /* 📱 이 블록은 onf-book 블록의 판 칸 도우미 셋(histTop·bookOwner·histRun — 2026-10-14 폰 판)을 부른다 — 그 진짜 줄(한 줄짜리)을 떼어 같이 돌린다. */
 const BK = src.slice(src.indexOf('/* onf-book:begin */'), src.indexOf('/* onf-book:end */'));
-const HELP = ['^var histQ = .*$'].concat(['histTop', 'bookOwner', 'histRun', 'histPush', 'histFlush', 'histGo', 'histVirtPop', 'histTap'].map((n) => '^function ' + n + '\\(.*$')).map((re) => (new RegExp(re, 'm').exec(BK) || [''])[0]).join('\n');   // 👆 기록 칸 줄(histQ · 2026-10-31)도 한 줄짜리라 같이
+const HELP = ['^var histQ = .*$'].concat(['histTop', 'bookOwner', 'histRun', 'histPush', 'histEnq', 'histFlush', 'histGo', 'histVirtPop', 'histTap'].map((n) => '^function ' + n + '\\(.*$')).map((re) => (new RegExp(re, 'm').exec(BK) || [''])[0]).join('\n');   // 👆 기록 칸 줄(histQ · 2026-10-31)도 한 줄짜리라 같이
 let pass = 0, fail = 0;
 function t(label, fn) {
   try { fn(); console.log('  ✅ ' + label); pass++; }
@@ -559,6 +559,13 @@ t('「다른 계정으로」는 지금처럼 칸을 지운다 — 열쇠도 같�
   assert.ok(R.calls.includes('disableAutoSelect') && R.calls[R.calls.length - 1] === 'prompt', R.calls);
   const oo = src.slice(src.indexOf('function offerOther()'), src.indexOf('var reused'));
   assert.ok(/localStorage\.removeItem\(TOKKEY\)/.test(oo), '⛔ 껍데기의 [다른 계정으로] 버튼이 칸을 안 지운다');
+});
+
+t('🔙 줄 안 차례 — 되살릴 때 판 칸이 먼저 줄에 서도 홈 칸은 그 아래로 · 판 칸의 n(아래 홈 칸 수) +1 (Peter 2026-11-11 「뒤로 = 켠 순서 역순」)', () => {
+  const c = vm.createContext({ history: { state: null, pushState() {} } });
+  vm.runInContext(HELP + '\nfunction hwHistLate() { return true; }', c);
+  vm.runInContext("histPush({ onfBook: 1, n: 0, bd: 1 }); histPush({ onfBook: 1, n: 0, bd: 2, lg: 1 }); histPush({ onfHist: 'peek', s: {}, n: 1 }); histPush({ onfHist: 'in', s: {}, n: 1, b: 1, bd: 3 });", c);
+  assert.deepStrictEqual(JSON.parse(vm.runInContext('JSON.stringify(histQ.map(function (x) { return [x.onfHist || "book", x.n]; }))', c)), [['peek', 1], ['book', 1], ['book', 1], ['in', 1]], '⛔ 홈 칸이 판 칸 위에 섰다(또는 판 안쪽 칸까지 내렸다)');
 });
 
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패');
