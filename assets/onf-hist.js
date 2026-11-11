@@ -29,7 +29,8 @@
     if (d) o.onfD = d; else delete o.onfD;
     return o;
   }
-  function late() { try { var ua = g.navigator.userActivation; return GQ && !!ua && !ua.isActive; } catch (e) { return false; } }
+  var gestAt = 0;   // 마지막 손짓(hwTap·껍데기 누름) — 손 뗌 알림은 그 손짓의 칸 밀기 말보다 **먼저** 온다(안쪽이 pointerup 에 보내고 칸은 click 에 민다) → 3초 안이면 손짓 안으로 친다(WebKit 창은 10초)
+  function late() { try { var ua = g.navigator.userActivation; return GQ && !!ua && !ua.isActive && Date.now() - gestAt > 3000; } catch (e) { return false; } }
   function bookish(s) { return !!(s && (s.onfBook || s.b)); }
   function enq(a) {
     var st = a[0], i, j, c;
@@ -90,7 +91,7 @@
     }
     if (Q.length) Q = [];                                // 줄에 세운 채 진짜 뒤로 — 줄 칸은 그 아래 칸보다 위였다(선생님 histQ 와 같은 약속)
   }, true);
-  function gesture() { flush(true); }
+  function gesture() { gestAt = Date.now(); flush(true); }
   g.addEventListener('message', function (ev) { var d = ev && ev.data; if (d && d.onf === 'hwTap' && ev.source && ev.source !== g) gesture(); });
   g.addEventListener('pointerup', gesture, true);
   g.addEventListener('keyup', gesture, true);

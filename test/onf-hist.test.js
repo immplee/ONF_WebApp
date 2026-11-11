@@ -55,6 +55,7 @@ t('학생(data-gq) — 손짓 밖 칸은 줄(state·back 은 줄 먼저) · 손 
   h.back(); W.run(); assert.strictEqual(W.pops.length, 1); assert.ok(!h.state.lg);
   W.ls.message.forEach((f) => f({ data: { onf: 'hwTap' }, source: {} })); W.run();
   assert.deepStrictEqual(W.entries.slice(1).map((e) => [e.onfHist || 'book', e.n, e.onfD]), [['h', 1, 1], ['book', 1, 2]]);
+  h.pushState({ onfHist: 'w', n: 2 }, ''); assert.strictEqual(W.entries.length, 4, '⛔ 손 뗌 알림 직후(3초 안) 민 칸을 줄에 세웠다 — 알림이 칸 말보다 먼저 온다');
 });
 t('선생님(gq 없음)은 줄을 안 선다(제 histQ 가 맡는다) · 배포 전 칸(onfD 없음) = 바닥 0 — 종전 그대로 · 변이(바닥 무시)는 위 검사가 잡는다', () => {
   let W = world({ active: false }); W.g.history.pushState({ onfHist: 'x', n: 1 }, ''); assert.strictEqual(W.entries.length, 2);
