@@ -797,7 +797,7 @@ t('🚀 기억한 첫 교재가 있으면 홈을 띄우자마자 숨긴 판(park
 t('🔄 2차 검토(2026-11-08) — 되살릴 판이 같은 교재(다른 회차)면 기억한 첫 교재 숨긴 판을 또 안 띄운다(두 판이 한꺼번에 받던 것) · 다른 교재면 종전대로 띄운다', () => {
   const bs = (h) => { const u = new URL(h); return /mode=share/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=share&slug=' + u.pathname.slice(1) + '&embed=1' : null; };
   const both = (rsH) => (g) => { g.localStorage = LSf({ onfPreBook: JSON.stringify({ k: 'kA', h: PB, ph: 0, t: 1.7e12 }) });
-    g.sessionStorage = LSf({ onfOpenBook: JSON.stringify({ h: rsH, l: 184, m: 0, r: 0, o: 0, st: { sheet: 'E3_Y', top: 0, left: 0, side: null }, at: 1.7e12 }) }); };
+    g.sessionStorage = LSf({ onfOpenBook: JSON.stringify({ h: rsH, l: 184, m: 0, r: 0, o: 0, st: { sheet: 'E3_Y', top: 0, left: 0, side: null }, e: 'k' + (5381).toString(36), at: 1.7e12 }) }); };   // e = 토큰 없는 검사 마운트의 지문(onf-frame.js rsFp('') · 2026-11-11 기억에 토큰 지문)
   const s = setup(bs, { preKey: 'kA', pre: both(PB) });
   const srcs = s.panels().map((x) => x.kids[0].src);
   assert.ok(srcs.length === 1 && /slug=a-s1-e3-b/.test(srcs[0]), '⛔ 같은 교재를 두 판(기억한 e1 숨긴 판 + 되살린 e3)으로 띄웠다: ' + srcs.join(' | '));

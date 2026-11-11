@@ -732,12 +732,14 @@
     function bookMax() { return phone() ? BOOK_PHONE : BOOK_MAX; }
     function bookKey(src) { var i = bookSrcs.indexOf(src); if (i < 0) i = bookSrcs.push(src) - 1; return i + 1; }
     function histTop() { try { return history.state; } catch (e) { return null; } }
+    var rsRun = [];   // 🔙 판 칸 줄 거울(아래 rsLow · ⚠️ 쌍둥이: teacher/index.html histPush) — rsRun[bd-1] = 그 깊이 칸의 판 번호 · 판 칸을 미는 세 자리(histBook·histGuard·bookHist)가 runAt 으로 적는다
+    function runAt(st) { rsRun.length = Math.max(0, st.bd - 1); rsRun.push(bookOwner(st)); return st; }
     function bookOwner(s) { return (s && (s.onfBook || s.b)) || 0; }           // 판 칸·판 안쪽 칸이면 그 판 번호
     function histRun() { var t = histTop(); return bookOwner(t) ? Math.max(0, Number(t.bd) || 0) : 0; }   // 맨 위에서 이어진 판 칸 수
     function histBook(p) {
       if (bookOwner(histTop()) === p.key) return;      // 맨 위가 이미 이 판 칸(뒤로로 돌아온 판 · 판 안 창 칸 위)
       p.hb = histRun();                                // 🖥 이 판 칸 밑에 이어진 판 칸 수 — PC ✕ 가 제 칸만 걷는다(아래 bookClose 앞 판 규칙)
-      try { history.pushState({ onfBook: p.key, n: histDepth, bd: histRun() + 1 }, ''); } catch (e) {}   // 주소 칸은 비운다
+      try { history.pushState(runAt({ onfBook: p.key, n: histDepth, bd: histRun() + 1 }), ''); } catch (e) {}   // 주소 칸은 비운다
     }
     /* 「홈으로 나갈까요?」 칸 {onfBook, lg:1} — 껍데기가 판 칸 바로 위에 민다(Peter 2026-10-24 「스와이프하면 밀려나는 교재 밑에도 같은 교재가 보여 이상하다」).
        아이폰은 뒤로 스와이프 때 밑에 **그 칸을 떠날 때 찍어 둔 화면**을 깐다 — 교재가 뜬 뒤에 이 칸을 밀면(종전: 교재 쪽 onfLeave) 밑그림이 같은 교재였다.
@@ -750,7 +752,7 @@
       var t = histTop();
       if (t && t.lg && bookOwner(t) === p.key) return;   // 맨 위가 이미 이 판의 물음 칸
       if (bookOwner(t) !== p.key) return;               // 판 칸 위에만(판 안 창 칸이 위에 있으면 그 칸이 먼저 빠진다 — 물음 칸은 이미 그 밑에 있다)
-      try { history.pushState({ onfBook: p.key, n: histDepth, bd: histRun() + 1, lg: 1 }, ''); p.lgOn = true; } catch (e) {}
+      try { history.pushState(runAt({ onfBook: p.key, n: histDepth, bd: histRun() + 1, lg: 1 }), ''); p.lgOn = true; } catch (e) {}
     }
     /* 판 안쪽 기록 다리(폰) — 홈 다리(histMsg)와 같은 약속·같은 검증(op · id · 2KB · JSON 사본). hello 는 안 받는다(위 한계). */
     function bookHist(p, ev) {
@@ -764,7 +766,7 @@
       if (!p.hw || ev.source !== p.hw || ev.origin !== p.ho || typeof d.id !== 'string' || !HIST_ID.test(d.id)) return;
       t = histTop();
       if (d.op === 'push' && !p.parked && histSmall(d.state)) {
-        try { flat = JSON.parse(JSON.stringify(d.state)); history.pushState({ onfHist: d.id, s: flat, n: histDepth, b: p.key, bd: histRun() + 1 }, ''); } catch (e) {}
+        try { flat = JSON.parse(JSON.stringify(d.state)); history.pushState(runAt({ onfHist: d.id, s: flat, n: histDepth, b: p.key, bd: histRun() + 1 }), ''); } catch (e) {}
       } else if (d.op === 'back' && t && t.onfHist === d.id && t.b === p.key) history.back();   // 맨 위가 이 판의 그 칸일 때만(남의 칸 보호)
     }
     /* 기록 칸이 빠졌다(뒤로·앞으로) — 폰이면 맨 위 칸 주인 판을 보이고(없어졌으면 다시 받음) · 홈 칸·바닥이면 보이는 판을 숨긴다.
@@ -773,7 +775,7 @@
       var k = bookOwner(s), src = k ? bookSrcs[k - 1] : '', p = src ? bookFind(src) : null;
       {   // 🖥 PC 도 같다(2026-10-24) — 종전 PC 는 판 칸이 없어 뒤로가 앱째 떠났다
         if (src && !p) { p = bookBoardFor(src); if (p) { bookSwapTo(p, src); p = bookShown(); } else p = bookMake(src, false); }   // 📖 판이 있으면 그 주소로 갈아 끼운다(새 액자 대신) · 보인 판을 다시 집는다 — 판이 늙었으면 bookSwapTo 안 bookShow 가 새 판으로 바꿨다(옛 p 로 또 보이면 고아 액자 · 2단계 반박 🟡)
-        if (p) { lgPop = true; try { bookShow(p); } finally { lgPop = false; } } else bookHide();
+        if (p) { lgPop = true; try { bookShow(p); } finally { lgPop = false; } if (bookShown() && !rsH[bookShown().key] && rsH[k]) rsH[bookShown().key] = rsH[k]; rsSave(bookShown()); } else bookHide();   // 🔙 뒤로로 보인 판(밑 판)이 이제 열린 판(⚠️ 쌍둥이: teacher bookPop)
       }
       (p ? [p] : k ? [] : books).forEach(function (q) {
         if (q.hw) { try { q.hw.postMessage({ onf: 'hist-pop', id: p && s.onfHist ? s.onfHist : '', s: p && s.onfHist ? (s.s || null) : null }, q.ho); } catch (e) {} }
@@ -972,6 +974,7 @@
       else bookPlace(p, cur ? cur.left : null, cur ? cur.m : null, cur ? cur.r : null);   // 판 안 갈아 끼우기(left 없음)는 보이던 판 자리·칸 값(left·m·r) 그대로
       histBook(p); histGuard(p);   // 🖥 PC 도 판 칸(2026-10-24 · 뒤로 = 판 숨김) · 📱 물음 칸 — ⛔ 판을 보이기(park 걷기) **전에**: 아이폰 스와이프 밑그림이 홈이 되게(위 histGuard)
       if (p.parked) bookPark(p, false);
+      if (p.rs && p.win) setTimeout(function () { rsTell(p); }, 0);   // 🔙 숨긴 채 노크한 밑 판(아래 rsLowOpen) — 보일 때 되살릴 상태(노크 전이면 bookHi 가 보낸다)
       books.splice(books.indexOf(p), 1); books.push(p);   // 가장 최근
       bookRoom(bookMax());
       sync();
@@ -999,12 +1002,34 @@
        보이는 판의 연 주소(href · 자리 left·m·r · 길 out)와 교재가 알린 상태(bookState — 회차 · 굴린 자리 · 옆 창)를 **이 탭에만**(sessionStorage) 적는다.
        다시 읽히면(새로고침 · 당겨서 새로고침 reload) 그 주소로 다시 열고, 교재가 노크하면 bookRestore 로 상태를 돌려준다. 닫으면(bookHide) 지운다.
        ⛔ 상태는 2KB 안 JSON 사본만(기록 칸과 같은 거르개 histSmall) · 12시간 넘은 기억은 버린다 · 다른 탭엔 안 간다(sessionStorage). */
-    var RS_KEY = 'onfOpenBook', RS_MS = 12 * 3600 * 1000;
+    /* 🪟·🔐 창·학생마다(2026-11-11 Peter 「남은 것 하나도 빠짐없이」 · ⚠️ 쌍둥이: teacher/index.html rsWin · idNow) — 기억은 같은 탭 sessionStorage 라
+       ① 같은 탭에서 다른 학생 링크로 넘어오면(토큰 바뀜 · 형제 둘 · 선생님이 링크 시험) 앞 학생이 연 교재가 새 학생 토큰으로 되살아났다 → 적을 때 토큰 지문(e)을 같이 · 다르거나 모르면 버린다(토큰은 안 적는다).
+       ② 홈 ↔ 주소로 연 교재(짧은 주소 · ?fileId= · mode=…)를 같은 탭에서 오가면 한 열쇠를 나눠 써 서로의 판을 열었다 → 홈 아닌 창(opts.home === false)은 열쇠 끝에 그 주소 지문. */
+    function rsFp(x) { for (var i = 0, h = 5381; i < x.length; i++) h = ((h * 33) ^ x.charCodeAt(i)) >>> 0; return 'k' + h.toString(36); }
+    var RS_KEY = 'onfOpenBook' + (opts.home === false ? '.w.' + rsFp(String((global.location && global.location.pathname + global.location.search) || '')) : ''), RS_MS = 12 * 3600 * 1000, RS_E = rsFp(String(opts.tok || ''));
     /* 홈 탭도 같다(Peter 2026-10-24 「탭을 고르고 새로고침하면 무조건 홈」) — 홈이 탭을 바꿀 때 homeTab 으로 알리면 이 탭에 적고, 다시 읽히면 홈의 첫 노크(bookHello)에 돌려준다.
        ⛔ 돌려줄 값은 **읽힐 때 한 번** 잡아 둔다(TAB0) — 홈이 뜨자마자 처음 그린 탭(오늘)을 먼저 알리면 적힌 값이 그걸로 덮인다. */
     var TAB_KEY = 'onfHomeTab', TAB0 = (function () { try { return global.sessionStorage.getItem(TAB_KEY) || ''; } catch (e) { return ''; } })();
-    function rsMark(p, href, out) { if (!p) return; p.href = href; p.hout = out ? 1 : 0; rsSave(p); }
-    function rsSave(p) { if (!p || !p.href) return; try { global.sessionStorage.setItem(RS_KEY, JSON.stringify({ h: p.href, l: p.left, m: p.m, r: p.r, o: p.hout || 0, st: p.st || null, at: Date.now() })); } catch (e) {} }
+    function rsMark(p, href, out) { if (!p) return; p.href = href; p.hout = out ? 1 : 0; rsH[p.key] = { h: href, o: p.hout }; rsSave(p); }
+    /* 🔙 판 사슬(2026-11-11 Peter 「뒤로는 켠 순서 역순으로 하나씩」 · ⚠️ 쌍둥이: teacher/index.html rsLow — 정본 주석은 그쪽) — 보이는 판 밑 판들(u · 아래 것부터 · 상한 BOOK_MAX-1)도 적는다.
+       차례 = 기록 칸 그대로(rsRun) · 주소 = 그 판 번호로 연 링크(rsH) · b = 내 back 이 바로 밑 판. 맨 위가 이 판 줄이 아니면 앞서 적은 사슬(p.rsU) 그대로. */
+    var rsH = {};
+    function rsLow(p) {
+      var run = rsRun.slice(0, histRun()), ks = [], ps, u = [], i;
+      if (!run.length || run[run.length - 1] !== p.key) return null;
+      for (i = 0; i < run.length; i++) if (run[i] && run[i] !== ks[ks.length - 1]) ks.push(run[i]);
+      ks.pop(); ks = ks.slice(-(BOOK_MAX - 1));
+      while (ks.some(function (k) { return !rsH[k]; })) ks.shift();
+      ps = ks.map(function (k) { return bookFind(bookSrcs[k - 1]); });
+      ks.forEach(function (k, j) { u.push({ h: rsH[k].h, o: rsH[k].o || 0, st: (ps[j] && ps[j].st) || null, b: j && ps[j] && ps[j].back && ps[j].back === ps[j - 1] ? 1 : 0 }); });
+      return { u: u, b: ps.length && p.back && p.back === ps[ps.length - 1] ? 1 : 0 };
+    }
+    function rsSave(p) {
+      var k = p && (rsH[p.key] || (p.href ? { h: p.href, o: p.hout || 0 } : null)), lw;
+      if (!k) return;
+      lw = rsLow(p); if (lw) p.rsU = lw;
+      try { global.sessionStorage.setItem(RS_KEY, JSON.stringify({ h: k.h, l: p.left, m: p.m, r: p.r, o: k.o || 0, st: p.st || null, u: p.rsU ? p.rsU.u : [], b: p.rsU ? p.rsU.b : 0, e: RS_E, at: Date.now() })); } catch (e) {}
+    }
     function rsSaveNow() { var p = bookShown(); if (p) rsSave(p); }
     function rsDrop() { try { global.sessionStorage.removeItem(RS_KEY); } catch (e) {} }
     function rsTell(p) { if (!p || !p.rs || !p.win) return; var st = p.rs; p.rs = null; try { p.win.postMessage({ onf: 'bookRestore', st: st }, p.origin); } catch (e) {} }
@@ -1027,9 +1052,27 @@
       var v = null;
       try { v = JSON.parse(global.sessionStorage.getItem(RS_KEY) || 'null'); } catch (e) { v = null; }
       if (!v || typeof v.h !== 'string' || !(Date.now() - Number(v.at) < RS_MS)) return;
-      bookOpen(rsOnce(rsHref(v.h, v.st && typeof v.st.sheet === 'string' ? v.st.sheet : ''), v.st), typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, null, v.o === 1);   // ⚠️ 쌍둥이: teacher/index.html rsHref
+      if (v.e !== RS_E) { rsDrop(); return; }   // 🔐 다른 학생 토큰·모름(옛 기억 e 없음) — 앞 학생 교재를 안 연다(위 RS_E)
+      var low = null;   // 🔙 밑 판 사슬(위 rsLow) — 아래 것부터 숨긴 판으로 · 그 칸을 차례로 민다
+      (Array.isArray(v.u) ? v.u.slice(-(bookMax() - 1)) : []).forEach(function (x) { low = rsLowOpen(x, low); });
+      bookOpen(rsOne(v), typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, null, v.o === 1);   // ⚠️ 쌍둥이: teacher/index.html rsHref
       var p = bookShown(); if (!p) return;
+      if (v.b === 1 && low && low !== p && !phone()) p.back = low;   // 🅱 앞 판 규칙 그대로(✕ 한 단계)
       p.st = v.st && typeof v.st === 'object' ? v.st : null; p.rs = p.st; rsTell(p);   // 노크 전이면 노크 때(bookHi) 보낸다
+      rsSave(p);   // 위 bookOpen(rsMark)이 상태·back 없이 덮어썼다(⚠️ 쌍둥이: teacher rsBoot)
+    }
+    function rsOne(x) { return rsOnce(rsHref(x.h, x.st && typeof x.st.sheet === 'string' ? x.st.sheet : ''), x.st); }
+    /** 밑 판 하나 — 숨긴 판(park=1 · bookPre 와 같은 길)으로 만들고 그 판 칸·물음 칸을 민다(뒤로가 이 판을 보인다 = bookPop) · 꼴이 틀리면 건너뛴다(⚠️ 쌍둥이: teacher rsLowOpen) */
+    function rsLowOpen(x, below) {
+      if (!x || typeof x.h !== 'string') return below;
+      var h = rsOne(x), src = opts.bookSrc(h), p;
+      if (!src) return below;
+      p = bookFind(src) || bookMake(src, true, x.o === 1, null);
+      p.href = h; p.hout = x.o === 1 ? 1 : 0; rsH[p.key] = { h: h, o: p.hout };
+      p.st = x.st && typeof x.st === 'object' && histSmall(x.st) ? x.st : null; p.rs = p.st;
+      if (x.b === 1 && below && below !== p && !phone()) p.back = below;
+      histBook(p); histGuard(p);
+      return p;
     }
     /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판·📖 판(bookBoard)·📖 노크 전 판 후보(bookCand)은 안 건드린다 · ⭐ 내 문장 판은 정적 판이 있는 넓은 화면에서만 맨 나중(아래 pin · [복습 시작] 0초)(books 는 오래 안 쓴 것이 앞). */
     /* ⛔ 자격 내린 판(gone — 늙음·stale·답 없음)은 **세지도 지우지도 않는다**(2단계 반박 🟠 2026-10-17) — 맺음(안 보낸 칸·실패 카드·오프라인 백업)이 끝나기 전에 지우면 그 글이 사라진다 · 30분 지우기(bookIdle)가 치운다. */
@@ -1199,10 +1242,10 @@
       /* 📱 판 안쪽 기록 다리(폰 · 위 bookHist — 숨긴 판의 노크도 받는다: 미리 띄운 판은 숨긴 채 뜬다) · 키보드 노크 = 이 판의 키보드 높이 받는 창(kbAt) */
       if (d.onf === 'hist') { bookHist(p, ev); return; }
       if (d.onf === 'frameHello') { p.kb = ev.source; lastH = -1; lastTop = -1; sync(); return; }
+      if (d.onf === 'reload') { rsSaveNow(); global.location.reload(); return; }   // 🔄 교재의 당겨서 새로고침 — 숨긴 판도(당기는 사이 판이 숨어도 뗌은 그 판으로 간다 · ⚠️ 쌍둥이: teacher) · 기억은 보이는 판으로
       if (p.parked) return;                                 // ⛔ 숨긴 판은 닫기·전체·갈아 끼우기를 못 부른다
       if (d.onf === 'printTitle') { printTitle(d.t); return; }   // 📄 판 안 교재의 PDF 저장 이름(위 printTitle) — 보이는 판만
       if (d.onf === 'bookState') { if (histSmall(d.st)) { try { p.st = JSON.parse(JSON.stringify(d.st)); } catch (e) { return; } rsSave(p); } return; }   // 🔄 보이는 판의 지금 상태(위 rsSave)
-      if (d.onf === 'reload') { rsSave(p); global.location.reload(); return; }   // 🔄 교재의 당겨서 새로고침
       if (d.onf === 'bookLeaveKeep') { histGuard(p); try { p.win.postMessage({ onf: 'bookLeaveKept' }, p.origin); } catch (e) {} return; }   // 📱 「나갈까요?」 취소 — 물음 칸을 다시(되묻기가 떠 있는 채 · 위 histGuard) · 교재는 답을 받고 되묻기를 걷는다
       if (d.onf === 'bookClose') bookClose(d.all === 1);   // all:1 = 교재 머리줄 「홈」 — 앞 판 없이 전부 닫기
       else if (d.onf === 'bookFull') p.box.classList.toggle('full', !!d.on);
@@ -1211,7 +1254,7 @@
       else if (d.onf === 'openBook' && typeof d.href === 'string') {
         bookOpen(d.href);
         var q = bookShown();                                  // 🅱 앞 판 규칙(위 bookClose) — 새로 보이게 된 판 q 의 「나를 열어 준 판」을 p 로 · 돌아간 것이면 그대로 · 폰은 종전
-        if (q && q !== p && !phone() && !bookOpener(p, q)) q.back = p;
+        if (q && q !== p && !phone() && !bookOpener(p, q)) { q.back = p; rsSave(q); }   // 🔙 앞 판(b)도 기억에(위 bookOpen 의 rsMark 는 back 전이었다)
       }
     });
     global.addEventListener('keydown', function (e) { if (e.key === 'Escape') bookClose(false); });   // 껍데기에 초점이 있을 때만 닿는다(액자 안 키는 [✕]) · 보이는 판만(숨긴 판은 Esc 를 안 먹는다)
