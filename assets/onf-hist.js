@@ -13,6 +13,7 @@
       칸마다 이 문서(읽힌 회) 표 onfL(뜰 때 만든 무작위 · 읽힌 칸에도 찍는다 · 검토 2026-11-11 힌트). 다른 표 칸이 바닥 위면(앞으로) 껍데기에 안 알리고 있던 칸으로 되돌아간다
       (되돌아오는 popstate 도 삼킨다 · 앞으로 = 아무 일 없음) · 바닥 이하면 ①(밖으로). 표식뿐인 칸(onfD·onfL)은 껍데기엔 null.
    ④ 탭 첫 페이지가 껍데기면 밖이 없다 — 아래 toFirst.
+   ⑤ 붙잡기(hold · 검토 2026-11-12) — 되살린 판 칸을 홈이 창 칸을 되살릴 때까지 줄에 둔다(아래 holdSet · 자리 칸 sp) · 껍데기가 onfHistL.hold 로 켜고 끈다.
    ⚠️ 한계: 새로 고침 뒤 **한 번도 안 만지고** 누른 뒤로는 사이트 밖으로 나간다(손짓 밖 칸은 브라우저가 건너뛰고 · 그 아래는 옛 칸이다). 배포 전 칸(onfD 없음)은 바닥 0 으로 읽어 종전 그대로.
       바닥에 되돌아와 맨 위 하나만 닫는 길은 안 한다 — 진짜 선생님 껍데기 크롬 실측(test/repro/hist-floor.mjs): 옛 칸에 닿는 순간 홈 액자 1번 · 과제 판 액자 1번이 통째로 다시 읽혀
       (홈은 다시 읽히며 제 되살리기·hello 칸 정리를 또 돈다 — 닫는 흉내와 겨룬다) 「뒤로 = 하나 닫기」가 아니라 「화면 전부 다시 읽기」가 된다(WebKit 은 학생 껍데기로 재면 다시 읽힘 0 — 크롬이 문제다 · 아이폰 Safari 만 따로 켜는 길은 실기기 실측 뒤에).
@@ -37,9 +38,10 @@
     o.onfL = L;
     return o;
   }
-  function clean(s) { if (!s || typeof s !== 'object') return s === undefined ? null : s; for (var k in s) if (k !== 'onfD' && k !== 'onfL') return s; return null; }   // 표식뿐인 칸 = 아무것도 안 열림(껍데기엔 null · 종전과 같다)
+  function clean(s) { if (!s || typeof s !== 'object') return s === undefined ? null : s; if (s.onfSp) return null; for (var k in s) if (k !== 'onfD' && k !== 'onfL') return s; return null; }   // 표식뿐인 칸 = 아무것도 안 열림(껍데기엔 null · 종전과 같다)
   var gestAt = 0;   // 마지막 손짓(hwTap·껍데기 누름) — 손 뗌 알림은 그 손짓의 칸 밀기 말보다 **먼저** 온다(안쪽이 pointerup 에 보내고 칸은 click 에 민다) → 3초 안이면 손짓 안으로 친다(WebKit 창은 10초)
-  function late() { try { var ua = g.navigator.userActivation; return GQ && !!ua && !ua.isActive && Date.now() - gestAt > 3000; } catch (e) { return false; } }
+  function act() { try { var ua = g.navigator.userActivation; return !ua || ua.isActive || Date.now() - gestAt <= 3000; } catch (e) { return true; } }   // 손짓 안(또는 잴 수 없음)
+  function late() { return GQ && !act(); }
   function bookish(s) { return !!(s && (s.onfBook || s.b)); }
   function enq(a) {
     var st = a[0], i, j, c;
@@ -52,8 +54,28 @@
     }
     Q.push(a);
   }
-  function realPush(a) { try { nPush.call(H, stamp(a[0], D + 1), a[1] === undefined ? '' : a[1], a[2]); D++; } catch (e) {} }
-  function flush(force) { if (!Q.length || (!force && late())) return; var q = Q; Q = []; q.forEach(realPush); }
+  /* D < floor = 나가기가 안 먹어 옛 칸에 서 있다(④ 첫 페이지 탭 · 홈 「홈페이지를 나갈까요?」 확인의 액자 go(-2) 도 같다) — 그대로 D+1 에 밀면 새 칸이 바닥 깊이라
+     state 가 null(껍데기가 판을 모른다) · 뒤로 = 층이 삼키고 첫 칸으로(판이 열린 채 남았다). 밀기 전에 지금 칸을 이 문서 바닥으로 다시 찍는다(toFirst(0)) (검토 2026-11-12) */
+  function realPush(a) { if (D < floor) toFirst(0); try { nPush.call(H, stamp(a[0], D + 1), a[1] === undefined ? '' : a[1], a[2]); D++; } catch (e) {} }
+  /* 🔄 붙잡기(hold · 검토 2026-11-12) — 새로 고침 되살리기(onf-frame rsBoot)가 mount 때 판 칸을 줄에 세운 뒤, 홈이 창·탭 칸을 되살리기 **전에** 손짓이 오면
+     판 칸이 진짜 칸이 되고 그 뒤 온 홈 칸이 판 칸 **위**에 쌓였다(뒤로1 = 아무 일 없음 · 뒤로2 = 판·홈 창이 한꺼번에 닫힘). 껍데기가 hold(true) 한 동안은 칸을 줄에만 두고
+     (그 동안 온 홈 칸은 enq 가 판 칸 아래로 끼운다 · 두 껍데기 다 — 선생님 histQ 가 쌓는 칸도 여기 줄로 온다) 홈이 끝내면(hold(false)) 쌓는다.
+     단 손짓이 왔으면 늦어도 3초 안에 쌓는다 — 손짓 창(크롬 ≈5초 · WebKit 10초) 밖에 민 칸은 뒤로가 건너뛴다.
+     ⛔ 자리 칸(sp · {onfSp}) — 손짓이 온 순간 진짜 칸 하나를 미리 민다. 없으면 붙잡는 동안 뒤로가 바닥 아래 옛 칸에 닿아 사이트 밖으로 나갔다
+        (고치기 전엔 판 칸이 진짜라 판이 닫혔다 · test/repro/hw-reload-tap.mjs tapback 실측). 그 칸에서 뒤로 = 줄 맨 위 하나만 빠진 것으로 흉내 · 쌓을 땐 그 칸을 첫 칸으로 갈아 쓴다. */
+  var hold = false, holdT = 0, sp = false;
+  function arm() {
+    if (!holdT) holdT = g.setTimeout(function () { holdT = 0; hold = false; flush(true); }, 3000);
+    if (!sp) { if (D < floor) toFirst(0); try { nPush.call(H, stamp({ onfSp: 1 }, D + 1), ''); D++; sp = true; } catch (e) {} }
+  }
+  function flush(force) {
+    if (!Q.length || (!force && late())) return;
+    if (hold) { arm(); return; }
+    var q = Q; Q = [];
+    if (sp) { sp = false; try { nRep.call(H, stamp(q[0][0], D), q[0][1] === undefined ? '' : q[0][1], q[0][2]); } catch (e) {} q = q.slice(1); }
+    q.forEach(realPush);
+  }
+  function holdSet(on) { if (on) { hold = true; return; } if (!hold) return; hold = false; var t = holdT; holdT = 0; if (t) { g.clearTimeout(t); flush(true); } }
   function synth() {
     setTimeout(function () {
       virt = true;
@@ -61,8 +83,10 @@
     }, 0);
   }
   H.pushState = function (st, t, u) {
-    var q = Q.length || late(); note(q ? 'q' : 'push', st);
-    if (q) enq([st, t, u]); else realPush([st, t, u]);
+    var q = Q.length || late() || hold; note(q ? 'q' : 'push', st);
+    if (!q) { realPush([st, t, u]); return; }
+    enq([st, t, u]);
+    if (hold && act()) arm();                            // 🔄 붙잡는 중 손짓 안 — 자리 칸 · 3초 시한(위 arm)
   };
   H.replaceState = function (st, t, u) {
     note('rep', st);
@@ -78,6 +102,7 @@
     if (k >= 0) return nGo.call(H, k);
     var n = -k, v = Math.min(n, Q.length);
     if (v) { Q.length -= v; n -= v; }
+    if (v && sp && !Q.length) { sp = false; n++; }      // 🔄 줄이 비면 자리 칸도 같이 걷는다(그 진짜 popstate 가 흉내를 대신한다)
     n = Math.min(n, Math.max(0, D - floor));             // 바닥 아래(옛 칸)로는 안 내려간다
     if (n > 0) { nGo.call(H, -n); return; }              // 진짜 popstate 가 온다
     if (v) synth();
@@ -99,6 +124,12 @@
     if (virt) return;
     var was = D, st = nat(); D = dOf(st); note('pop', st);
     if (land) { land = false; ev.stopImmediatePropagation(); floor = D; try { nRep.call(H, stamp(st, D), ''); } catch (e) {} return; }   // ④ 탭 첫 칸에 내려앉았다 — 이 문서 칸으로 · 바닥
+    if (sp) {                                            // 🔄 붙잡는 중 자리 칸에서 뒤로(위 arm) — 줄 맨 위 칸 하나만 빠진 것으로(고치기 전처럼 판이 닫힌다) · 그 밖의 움직임은 아래 종전대로
+      sp = false;
+      /* 붙잡기도 놓고 남은 줄을 지금 쌓는다(손짓 3초 안 · 자리 칸이 있었다 = 시한 전) — 안 그러면 다음 뒤로가 바닥 아래 옛 칸 → 밖(재현기 reload-chain 실측 · 사슬 B → A 에서 A 를 건너뛰고 나갔다).
+         그 뒤 온 홈 칸은 판 칸 위 = 고치기 전과 같은 꼴(사람이 이미 뒤로로 판을 닫는 중이다) */
+      if (own(st) && D === was - 1 && Q.length) { ev.stopImmediatePropagation(); Q.length--; holdSet(false); synth(); return; }
+    } else if (own(st) && st.onfSp && D > floor) { ev.stopImmediatePropagation(); bounce = was; try { nGo.call(H, was - D); } catch (e) {} setTimeout(function () { bounce = -1; }, 1500); return; }   // 앞으로가 쓰고 난 자리 칸에 닿았다 — 있던 칸으로
     if (own(st)) { if (bounce >= 0 && D === bounce) { bounce = -1; ev.stopImmediatePropagation(); return; } }   // ③ 되돌아온 칸 — 껍데기는 그 자리에 그대로 있었다
     else if (D > floor) {                                // ③ 앞으로가 옛 문서 칸에 닿았다(뒤로 몇 칸 간 채 새로 고친 탭) — 껍데기에 안 알리고 있던 칸으로
       ev.stopImmediatePropagation(); bounce = was;
@@ -123,5 +154,5 @@
   g.addEventListener('message', function (ev) { var d = ev && ev.data; if (d && d.onf === 'hwTap' && ev.source && ev.source !== g) gesture(); });
   g.addEventListener('pointerup', gesture, true);
   g.addEventListener('keyup', gesture, true);
-  g.onfHistL = { floor: function () { return floor; }, peek: function () { return { D: D, floor: floor, q: Q.length }; }, log: LOG };
+  g.onfHistL = { floor: function () { return floor; }, peek: function () { return { D: D, floor: floor, q: Q.length, hold: hold, sp: sp }; }, hold: holdSet, log: LOG };
 })(window);

@@ -689,6 +689,12 @@
       try { if (a.length) localStorage.setItem('onfHwFin', JSON.stringify(a)); else localStorage.removeItem('onfHwFin'); } catch (e) {}
     }
     var histWin = null, histOrigin = '', histDepth = 0;   // 깊이 = 지금 기록에 쌓인 우리 칸 수(칸 state.n 에서 다시 읽는다)
+    /* 🔄 되살린 판 칸 붙잡기(검토 2026-11-12 · ⚠️ 쌍둥이: teacher/index.html rsHoldOn) — rsBoot 가 줄에 세운 판 칸을 홈이 창·탭 칸을 되살리기 끝낼 때까지 손짓에 안 쌓는다
+       (기록 층 onfHistL.hold · 그 동안 온 홈 칸은 층이 판 칸 아래로 끼운다). 끝 = 홈 hello 뒤 1.5초 동안 홈 칸이 없음 · 또는 되살린 뒤 6초. 손짓이 왔으면 층이 늦어도 3초 안에 쌓는다. */
+    var rsHoldTm = 0, rsHoldCap = 0;
+    function rsHoldEnd() { clearTimeout(rsHoldTm); clearTimeout(rsHoldCap); rsHoldTm = rsHoldCap = 0; try { global.onfHistL.hold(false); } catch (e) {} }
+    function rsHoldOn() { try { if (!global.onfHistL || !global.onfHistL.hold) return; global.onfHistL.hold(true); } catch (e) { return; } clearTimeout(rsHoldCap); rsHoldCap = setTimeout(rsHoldEnd, 6000); }
+    function rsHoldQuiet() { if (!rsHoldCap) return; clearTimeout(rsHoldTm); rsHoldTm = setTimeout(rsHoldEnd, 1500); }
     var HIST_ID = /^[A-Za-z0-9]{1,40}$/;
     function histSmall(st) {                              // JSON 으로 2KB 이하인 평범한 객체인가
       if (!st || Object.prototype.toString.call(st) !== '[object Object]') return false;
@@ -707,6 +713,7 @@
       }
       if (!histWin || ev.source !== histWin || ev.origin !== histOrigin) return;   // 우리가 정한 그 창·출처만
       if (d.op === 'hello') {                             // 안쪽이 새로 떴다 — 옛 안쪽이 남긴 죽은 칸을 치운다(같은 문서 안 칸이라 조용히 빠진다)
+        rsHoldQuiet();                                    // 🔄 되살린 판 칸 붙잡기 — 홈이 떴다 · 1.5초 조용하면 놓는다(아래 rsHoldOn)
         //   📱 판 칸이 맨 위면 안 치운다 — go(-n) 이 판 칸부터 걷는다(「맨 위 n 칸이 전부 홈 칸」 전제가 깨진다 · 죽은 홈 칸은 남는 한계)
         if (histDepth > 0 && !histRun()) { n = histDepth; histDepth = 0; try { history.go(-n); } catch (e) {} }
         return;
@@ -718,6 +725,7 @@
            pushState 의 구조화 복제가 덩어리째 기록 칸에 저장되고 popstate 마다 안쪽으로 되돌려 보낸다(선생님 껍데기 검수 2026-10-01). 평범한 JSON 값만 남긴다. */
         flat = null;
         try { flat = JSON.parse(JSON.stringify(d.state)); } catch (e) { return; }
+        if (rsHoldTm) rsHoldQuiet();                      // 🔄 hello 뒤 홈 칸(되살린 창·탭) — 조용함을 다시 센다
         try { history.pushState({ onfHist: d.id, s: flat, n: histDepth + 1 }, ''); histDepth++; } catch (e) {}   // 주소 칸은 비운다
         return;
       }
@@ -1116,6 +1124,7 @@
       (Array.isArray(v.u) ? v.u.slice(-(bookMax() - 1)) : []).forEach(function (x) { low = rsLowOpen(x, low); });
       bookOpen(rsOne(v), typeof v.l === 'number' ? v.l : undefined, v.m, v.r, true, null, v.o === 1);   // ⚠️ 쌍둥이: teacher/index.html rsHref
       var p = bookShown(); if (!p) return;
+      rsHoldOn();   // 🔄 방금 민 판 칸을 홈이 되살리기 끝낼 때까지 붙잡는다(위 rsHoldOn · 검토 2026-11-12)
       if (v.b === 1 && low && low !== p && !phone()) p.back = low;   // 🅱 앞 판 규칙 그대로(✕ 한 단계)
       p.st = v.st && typeof v.st === 'object' ? v.st : null; p.rs = p.st; rsTell(p);   // 노크 전이면 노크 때(bookHi) 보낸다
       rsSave(p);   // 위 bookOpen(rsMark)이 상태·back 없이 덮어썼다(⚠️ 쌍둥이: teacher rsBoot)
@@ -1364,10 +1373,16 @@
       var v = null;
       try { v = JSON.parse(global.localStorage.getItem(PRE_LS) || 'null'); } catch (e) { v = null; }
       if (!v || v.k !== opts.preKey || typeof v.h !== 'string' || v.ph !== (phone() ? 1 : 0) || !(Date.now() - Number(v.t) < PRE_AGE_MS)) return;
-      /* 🔄 바로 뒤 rsBoot 가 같은 교재를 (다른 회차로 고친 주소로) 다시 열면 숨긴 판을 또 띄우지 않는다 — 두 판이 한꺼번에 받았다(2026-11-08 2차 검토) */
+      /* 🔄 바로 뒤 rsBoot 가 같은 교재를 (다른 회차로 고친 주소로) 다시 열면 숨긴 판을 또 띄우지 않는다 — 두 판이 한꺼번에 받았다(2026-11-08 2차 검토)
+         밑 판 사슬(u)도 본다 · 사슬이 자리를 다 쓰면(맨 위 + 밑 판 + 미리 판 > 판 수) 안 띄운다 — 갓 띄운 미리 판은 bookRoom 이 못 비켜(bookCand) **밑 판**이 지워졌다
+         (뒤로 = 없는 판 칸 · 검토 2026-11-12 vm 실측: PC 사슬 셋·폰 사슬 둘 · 같은 교재든 다른 교재든) */
       var rv = null; try { rv = JSON.parse(global.sessionStorage.getItem(RS_KEY) || 'null'); } catch (e) { rv = null; }
-      var rb = rv && typeof rv.h === 'string' && Date.now() - Number(rv.at) < RS_MS ? bookBook(opts.bookSrc(rv.h) || '') : '';
-      if (rb && rb === bookBook(opts.bookSrc(v.h) || '')) return;
+      if (rv && typeof rv.h === 'string' && Date.now() - Number(rv.at) < RS_MS && rv.e === RS_E) {
+        var ru = (Array.isArray(rv.u) ? rv.u.slice(-(bookMax() - 1)) : []).filter(function (x) { return x && typeof x.h === 'string'; });
+        if (ru.length + 2 > bookMax()) return;
+        var pb = bookBook(opts.bookSrc(v.h) || '');
+        if (pb && [rv].concat(ru).some(function (x) { return bookBook(opts.bookSrc(x.h) || '') === pb; })) return;
+      }
       bookPre(v.h, undefined, undefined, undefined, v.o === 1);   // 🌤 o 없는 옛 기억은 지금 길
       preP = bookFind(opts.bookSrc(v.h));   // 🚀 미리 띄운 판(위 preSave 가 오늘 주소와 견준다)
     }
