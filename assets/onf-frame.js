@@ -277,7 +277,7 @@
        hard  = 그 밖(판이 스스로 못 그린다고 말함 · 스위치 off …) → 하루(종전 그대로) · 연속은 +1
      · 물러날 때마다 clog 한 줄 {k:'err', c:'fallback:<판>:<까닭>:<연속 n>', d:기기 꼴} — 값(토큰·주소) 없음 · sendBeacon 만.
      ⚠️ 선생님 껍데기 머리 tPre 는 이 파일이 뜨기 전이라 칸 앞 숫자만 직접 읽는다(같은 꼴 · 검사 teacher-tout P1). 저장소가 막힌 창 = 막힘(열 때마다 시한을 안 낸다 · 종전 그대로). */
-  var FALL_KEY = { book: 'onfOutFail', home: 'onfOutFailHome', thome: 'onfTOutFail', hwbook: 'onfHwOutFail', hwext: 'onfHwExtOutFail' };   // 🖥️ hwext = 정적 화면 확장 창(2026-11-01 · teacher/index.html tOutExt)   // 📝 hwbook = 정적 과제 판(2026-10-31 · teacher/index.html onf-hwout)
+  var FALL_KEY = { book: 'onfOutFail', home: 'onfOutFailHome', thome: 'onfTOutFail', hwbook: 'onfHwOutFail', hwext: 'onfHwExtOutFail', print: 'onfPrintOutFail' };   // 🖨️ print = 정적 프린트용 교재 판(2026-11-12 · 아래 printOut)   // 🖥️ hwext = 정적 화면 확장 창(2026-11-01 · teacher/index.html tOutExt)   // 📝 hwbook = 정적 과제 판(2026-10-31 · teacher/index.html onf-hwout)
   var FALL_STEP = [0, 600000, 3600000, 86400000], FALL_DAY = 86400000, FALL_API = 3600000;
   var FALL_SLOW_PAN = { book: ['fail-bridge'], thome: ['fail-none', 'fail-stale'], hwbook: ['fail-bridge', 'notch', 'stale'], hwext: ['fail-bridge', 'notch'] };   // 📝 과제 판 다리가 늦음(구글 바닥)·입장권 없음/거절 = 곧 풀리는 것 → 느림 갈래   // 🏫 선생님 홈 사본 없음·낡음 = 5분 틱이 곧 고쳐 놓는 상태 → 느림 갈래(2026-10-31 · 사본은 3시간·날짜마다 다시 짓는다 #155)
   /* 📖 교재 판 다리 늦음(fail-bridge) = 느림(2026-11-05 Peter 「A로 고쳐」 · 2차 검수 8번) — 종전 hard(하루)라 다리가 한 번 늦으면(배포 사이·구글 붐빔)
@@ -384,6 +384,65 @@
       fallBack('book', why);
       onBack(why);
     }, tok);
+  }
+  /* ═══ 🖨️ 프린트용 교재 정적 먼저(2026-11-12 Peter 「아직 구글에 있는 건 전부 구글 밖으로」) ═══
+     종전: 프린트용 교재(?fileId=…&mode=print)는 늘 구글 doGet — 열 때마다 스프레드시트를 열어(0.5~2.5초) 서버에서 화면을 지었다.
+     이제: 선생님 입장권(tch. — 선생님 껍데기가 **이 출처** 저장소 onf_tch 에 둔 것 · teacher/index.html tchGet 과 같은 꼴 검사 · 여기선 읽기만)이 있으면
+       같은 액자에 정적 판(Pages /print/?f&s · Ownify tools/outside/print-boot.js)을 열고, 판 문서와 **나란히** Worker /t/print 첫 값을 미리 받아 outBoot 에 싣는다.
+     판 말(그 액자 창 · 그 판 출처만): outHello → outBoot{tk[, d]}(⛔ 입장권은 주소에 안 싣는다 — postMessage 로만 · 몸통으로만) · outDrawn = 섰다 ·
+       outFail{why[, s]} = 못 선다·못 잇는다 → onBack(회차) — 부른 쪽(index.html)이 같은 액자에 지금 길(구글 화면)을 연다. 그린 뒤의 outFail 은 보던 회차(s)로.
+     안 타는 때(false = 부른 쪽이 바로 지금 길): 스위치 꺼짐(PRINT_ON · 기기 pout=0) · 입장권 없음(로그인 안 한 기기 · script 출처 — vercel.json 이 프린트 주소를 class 로 넘긴다) ·
+       파일 값 꼴 아님 · 물러남 기억에 막힘(hello·paint·망 — 느림 갈래: 이번만 → 10분 → 1시간 → 하루). 그 밖 까닭(입장권 거절·프린트 원본 아님·날짜 칸…)은 그 파일·그 순간 일이라
+       기억하지 않는다(기록만 fallback:print:<까닭>:0). 🔭 정적 판을 안 탄 까닭도 한 줄(gp sh:print:<까닭>) — 종전엔 프린트 화면이 기록에 안 보였다.
+     ponytail: 시한 둘은 짐작(hello = OUT_MS · 첫 표 6초 = Worker 시트 읽기 + 여유) — 라이브 재기로 고친다. */
+  var ONF_OUT_PRINT = 'https://app.ownify.co.kr/print/', PRINT_ON = true, PRINT_PAINT_MS = 6000, PRINT_MEM = ['hello', 'paint', 'fail-net'];
+  var PRINT_TK = /^tch\.[A-Za-z0-9_-]{10,600}\.[A-Za-z0-9_-]{20,100}$/, PRINT_F = /^[A-Za-z0-9_-]{10,200}$/;
+  function printTk() {
+    try { var v = JSON.parse(global.localStorage.getItem('onf_tch') || 'null'); return v && typeof v.tk === 'string' && PRINT_TK.test(v.tk) && Number(v.x) > Math.floor(Date.now() / 1000) ? v.tk : ''; } catch (e) { return ''; }
+  }
+  /** a = {f 파일, s 회차(없으면 ''), sw 주소 pout 값} · onBack(회차 | '') · hooks = 로고 막(첫 표에 ok) → true = 정적 판을 열었다 · false = 안 탄다 */
+  function printOut(el, a, onBack, hooks) {
+    var f, s, tk, url, org, done = false, drawn = false, tm = 0, pre;
+    try {   // ⛔ 무엇이 던져도 지금 길(false)
+      f = String(a.f || ''); s = String(a.s || '');
+      var sw = a.sw;
+      try { if (sw === '1' || sw === '0') { global.localStorage.setItem('onfPrintOut', sw); if (sw === '1') global.localStorage.removeItem(FALL_KEY.print); } else sw = global.localStorage.getItem('onfPrintOut'); } catch (eS) {}
+      if (!PRINT_F.test(f) || s.length > 100 || typeof global.fetch !== 'function') return false;
+      if (!PRINT_ON || sw === '0') { gpSh('print', 'off'); return false; }
+      if (!(tk = printTk())) { gpSh('print', 'notch'); return false; }
+      if (fallBlocked('print')) return false;
+      url = ONF_OUT_PRINT + '?f=' + encodeURIComponent(f) + (s ? '&s=' + encodeURIComponent(s) : ''); org = new URL(ONF_OUT_PRINT).origin;
+      pre = global.fetch(wBase() + '/t/print', { method: 'POST', body: JSON.stringify(s ? { tk: tk, f: f, s: s } : { tk: tk, f: f }) })
+        .then(function (r) { return r.json(); }).then(function (j) { return j && typeof j === 'object' ? j : null; }, function () { return null; });   // 못 받으면 판이 스스로 묻는다(서울 길 → workers.dev)
+    } catch (e) { return false; }
+    function back(why, sheet) {
+      if (done) return;
+      done = true; clearTimeout(tm); global.removeEventListener('message', onMsg);
+      why = String(why || 'x').replace(/[^a-z0-9-]/g, '').slice(0, 20) || 'x';
+      try { console.info('[onf] 정적 프린트 판이 안 떴다 — 지금 길로 다시'); } catch (eC) {}
+      if (PRINT_MEM.indexOf(why) >= 0) fallBack('print', why); else whoBeacon({ k: 'err', c: 'fallback:print:' + why + ':0' });
+      onBack(typeof sheet === 'string' && sheet.length <= 100 ? sheet : '');
+    }
+    function onMsg(ev) {
+      var d = ev && ev.data;
+      if (done || !d || ev.source !== el.contentWindow || ev.origin !== org) return;   // 그 액자 창 · 정적 판 출처만
+      if (d.onf === 'outFail') return back((drawn ? 'late-' : 'fail-') + d.why, drawn ? d.s : '');
+      if (d.onf === 'outHello') {   // hello 마다(다시 읽힌 판도 받게)
+        var w = ev.source;
+        clearTimeout(tm);
+        if (!drawn) tm = setTimeout(function () { back('paint'); }, PRINT_PAINT_MS);
+        pre.then(function (j) { if (done) return; try { w.postMessage(j ? { onf: 'outBoot', tk: tk, d: j } : { onf: 'outBoot', tk: tk }, org); } catch (e) {} });
+        return;
+      }
+      if (d.onf === 'outDrawn' && !drawn) {
+        drawn = true; clearTimeout(tm); fallOk('print');
+        try { if (hooks && typeof hooks.ok === 'function') hooks.ok(); } catch (eH) {}
+      }
+    }
+    global.addEventListener('message', onMsg);
+    tm = setTimeout(function () { back('hello'); }, OUT_MS);
+    try { if (el.isConnected && el.contentWindow) el.contentWindow.location.replace(url); else el.src = url; } catch (e) { el.src = url; }   // 📱 replace — openExec 끝 주석(WebKit 기록 칸)
+    return true;
   }
   /* 🌤 밖으로 2(2026-10-24) — 링크 직행 교재(fileId·slug)를 Worker 에 묻는다: q = {f, s?} | {slug} (없는 칸은 안 싣는다 — 빈 글자는 400 bad).
      POST · text/plain 몸통(사전 요청 없음) · 토큰은 몸통에만. WHO_MS 안 답이 없거나 실패·ok:false·api≠2(약속 어긋남) 면 null(지금 길) — 늦은 답은 이미 정해진 Promise 라 버려진다.
@@ -1348,7 +1407,14 @@
       try { if (frameEl.isConnected && frameEl.contentWindow) frameEl.contentWindow.location.replace(ONF_OUT_HOME_URL); else frameEl.src = ONF_OUT_HOME_URL; } catch (e) { frameEl.src = ONF_OUT_HOME_URL; }   // 📱 replace — openExec 끝 주석
     }
     var wq = whoQ(src);
-    if (homeQ()) mainHome();   // 홈 표시면 교재 주소가 없어 whoQ 는 늘 null
+    /* 🖨️ 프린트용 교재(opts.print — index.html 이 mode=print 일 때만 넘긴다 · 위 printOut) — 정적 판을 열었으면 여기서 끝 · 못 서면 같은 액자에 지금 길(mainExec).
+       그린 뒤 물러나면(정적 판에서만 못 여는 회차) 보던 회차로 연다 — 주소의 sheetName 만 바꾼다. */
+    function printBack(sheet) {
+      if (sheet) { try { var pu = new URL(src); pu.searchParams.set('sheetName', sheet); src = pu.href; } catch (eP) {} }
+      mainExec(true);   // 정적 판 이동이 아직 안 섰을 수 있다(hello 시한) — 정적 홈 물러남과 같이 「이동 중」으로 연다(load 가 올 때까지 옛 문서 말을 노크로 안 받는다 · 안 뜨면 openExec 가 한 번 더 연다)
+    }
+    if (opts.print && printOut(frameEl, opts.print, printBack, opts.hooks || null)) { /* 정적 프린트 판이 열렸다 */ }
+    else if (homeQ()) mainHome();   // 홈 표시면 교재 주소가 없어 whoQ 는 늘 null
     else if (wq) (bookCfFor(src, null, wq) || Promise.resolve(null)).then(function (cf) {   // 📖 판 사본 힌트와 한 지붕(bookCfFor)
       if (!cf) { gpSh('book', 'nocf'); return mainExec(); }   // 🔭 첫 판 사본 힌트 없음 → 통째 구글(위 gpSh)
       var mk = mainBook(src), cold = homeCold();   // ⛔ 아래에서 onfOutUsed 를 지금으로 적기 **전에** 잰다
@@ -1497,6 +1563,7 @@
     tokenFromPath: tokenFromPath,
     openExec: openExec,   // 🔐 선생님 껍데기 판도 쓴다(teacher/index.html bookMake)
     openApp: openApp, OUT_BOOK: ONF_OUT_BOOK,   // 🌤 선생님 껍데기 정적 판도 같은 손·같은 주소(밖으로 4-① 2026-10-28 · teacher/index.html bookMake)
+    printOut: printOut,   // 🖨️ 프린트용 교재 정적 먼저(2026-11-12 · index.html 이 mode=print 일 때만 부른다)
     outOpen: outOpen,   // 🌤 교재 판을 정적 판으로 여는 한 함수(학생·선생님 bookMake · 선생님 「교재 옆에」 · 2026-10-31 넓히기)
     fallBack: fallBack, fallBlocked: fallBlocked, fallOk: fallOk,   // 🔁 물러남 기억 한 곳(위 FALL_KEY) — 선생님 껍데기 정적 홈·정적 교재도 이 셋만
     get WORKER() { return wBase(); },   // 🏫 Worker 바탕 주소(밖으로 4-④-2c 2026-10-30 · 선생님 껍데기 /t/login·/clog) — 위 wBase() 한 곳에서(서울 길 · 물러나면 workers.dev)
