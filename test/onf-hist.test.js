@@ -71,4 +71,12 @@ t('배선 — 두 껍데기가 onf-frame.js 보다 먼저 싣는다(학생은 da
   assert.ok(/\{ histEnq\(st\); return true; \}/.test(T), '⛔ 선생님 줄이 차례(홈 칸은 판 칸 아래)를 안 본다');
   assert.ok(/d\.onf !== 'hwTap' && d\.onf !== 'reload' &&/.test(T) && /if \(d\.onf === 'reload'\) \{ reopenLog\('pullhw'\); location\.reload\(\); return; \}/.test(T) && /reopenLog\('pullhwbk'\); location\.reload\(\)/.test(T));
 });
+t('🪟 수업 자료 판 안 창 뒤로(2026-11-11) — 판이 hwWin 으로 알린 동안의 뒤로는 판에 hwWinBack 만 · 빠진 칸(보기·물음)은 다시 민다 · 판을 걷으면 잊는다 · 판 액자 말만 받는다', () => {
+  const T = fs.readFileSync(path.join(ROOT, 'teacher', 'index.html'), 'utf8');
+  const i = T.indexOf('if (hwWinOn && hwWin) {'), blk = T.slice(i, i + 700);
+  assert.ok(i > 0 && /hwWinOn = false;\s*try \{ hwWin\.postMessage\(\{ onf: 'hwWinBack' \}, hwOrigin\)/.test(blk), '⛔ 한 번 쓰고 끄기 · 판 출처로만 보내기');
+  assert.ok(/\(!s\.hv && hwView !== 'photo'\) \? \{ onfHw: 1, n: s\.n \|\| 0, lg: 1, hv: 1 \} : !s\.lg \? \{ onfHw: 1, n: s\.n \|\| 0, lg: 1 \} : null/.test(blk) && /return;\s*\}/.test(blk), '⛔ 빠진 칸 다시 밀기(보기 칸 먼저 · 아니면 물음 칸) 뒤 그 뒤로를 끝낸다');
+  assert.ok(T.indexOf("if (!hwBox || hwWarmOn || !s || !s.onfHw) return;") < i && i < T.indexOf("if (!s.hv && hwView !== 'photo') { hwViewSet('photo', null, true)"), '⛔ 자리 — 판 칸이 맨 위일 때만 · 보기·되묻기 처리보다 먼저');
+  assert.ok(/d\.onf !== 'reload' && d\.onf !== 'hwWin' &&/.test(T) && /if \(d\.onf === 'hwWin'\) \{ hwWinOn = d\.on === 1; return; \}/.test(T) && /hwHvWait = false; hwWinOn = false;/.test(T));
+});
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패'); if (fail) process.exit(1);

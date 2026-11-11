@@ -1204,7 +1204,7 @@ function hwClose() {
   if (hwBox && !hwWarmOn) { hwBkRs = null; try { sessionStorage.removeItem(HWBK_KEY); } catch (e) {} }   // 🔄 보이던 판을 걷었다 — 옆 교재 기억도(위 hwBkRs) · ⛔ 판을 새로 열기 전 비우기(hwOpen·hwWarm 이 먼저 부른다 — 되살리기 열기 포함)엔 안 지운다   // 🔄 판을 걷었다 — 새로 고침 덮개 표시도(hwOpenedTell 이 다시 적는다)
   if (hwBox && appWin) { try { appWin.postMessage({ onf: 'hwClosed' }, appOrigin); } catch (e) {} }   // 홈이 카드 상태(완료 등)를 다시 받게 · 미리 띄운 판이 걷혀도(10분·물러남) — 홈이 HWWARM 을 풀고 다음에 다시 띄운다(2026-10-31 전수 검수)
   if (hwBk) { if (hwBk.oe) { try { hwBk.oe.stop(); } catch (e) {} } if (hwBk.box.parentNode) hwBk.box.parentNode.removeChild(hwBk.box); hwBk = null; }   // 과제 판을 닫으면 그 교재 액자도 지운다
-  hwView = 'photo'; hwRecR = null; hwBand = 0; hwCutTold = -1; hwHistWait = false; hwHvWait = false;
+  hwView = 'photo'; hwRecR = null; hwBand = 0; hwCutTold = -1; hwHistWait = false; hwHvWait = false; hwWinOn = false;
   if (hwDiv && hwDiv.parentNode) hwDiv.parentNode.removeChild(hwDiv); hwDiv = null;   // ⛔ 위 줄 주석 끝에 붙으면 실행이 안 된다(2026-10-31 회귀 · 판을 닫아도 경계 손잡이가 홈 위에 남았다)
   if (hwBox && gateGo && gateBackOn) { gateGo = null; gateShut(); }   // 판(과제 판·옆 교재)이 띄운 로그인 화면은 판과 같이 닫는다(반박 🟡7 · 돌아가기 단추가 있는 문 = 과제 판 문뿐)
   if (hwBox && hwBox.parentNode) hwBox.parentNode.removeChild(hwBox);
@@ -1212,6 +1212,7 @@ function hwClose() {
   if (hwOut) { clearTimeout(hwOut.tm); hwOut = null; }
 }
 /* onf-hist 블록 popstate 가 묻는다 — 과제 판 칸이 맨 위거나 방금 그 칸을 걷었으면 홈에 「뒤로」를 안 보낸다(홈은 안 바뀌었다) */
+var hwWinOn = false;   // 🪟 판 안 창이 떠 있나(판이 hwWin 으로 알린다 · 위 popstate)
 function hwSkipPop() { var k = hwSkip || !!(history.state && history.state.onfHw); hwSkip = false; return k; }
 window.addEventListener('popstate', function () {
   if (typeof histQ !== 'undefined' && !histVirt) histQ.length = 0;   // 👆 진짜 뒤로(브라우저) — 줄에 남은 칸은 그 아래 칸보다 위였다 → 버린다(맨 먼저 도는 popstate 손 · onf-book histQ)
@@ -1219,6 +1220,16 @@ window.addEventListener('popstate', function () {
   var s = history.state;
   if (hwBox && !hwWarmOn && !(s && s.onfHw)) { var waited = hwHistWait; hwClose(); hwSkip = !waited; return; }   // 뒤로·스와이프 = 과제 판 닫기(안 보이는 미리 띄운 판은 그대로) · 칸을 미뤄 둔 채였으면(👆) 이 뒤로는 홈 칸을 뺐다 — 홈도 한 칸 되돌린다(어긋남 방지)
   if (!hwBox || hwWarmOn || !s || !s.onfHw) return;
+  /* 🪟 판 안 창이 떠 있다(가져오기·발음기호·수업 완료 시트 · 메뉴 · 수업 메모 · 📍 메모장 — 판이 hwWin 으로 알린다 · 2026-11-11 Peter 「뒤로 = 켠 순서 역순으로 하나씩」) —
+     이 뒤로는 그 창 몫이다: 판에 「맨 위 창 닫아」(hwWinBack)만 하고, 방금 빠진 칸(보기 칸 또는 물음 칸)은 다시 민다(판 보기·되묻기는 그대로). 종전엔 창은 둔 채 보기가 사진만으로 바뀌거나 「홈으로 나갈까요?」가 떴다.
+     ⛔ 판 칸 수 셈(hwHistUp)은 안 건드린다 — 창에 칸을 따로 주지 않는다. */
+  if (hwWinOn && hwWin) {
+    hwWinOn = false;
+    try { hwWin.postMessage({ onf: 'hwWinBack' }, hwOrigin); } catch (e) {}
+    var up = (!s.hv && hwView !== 'photo') ? { onfHw: 1, n: s.n || 0, lg: 1, hv: 1 } : !s.lg ? { onfHw: 1, n: s.n || 0, lg: 1 } : null;
+    if (up) { try { history.pushState(up, ''); } catch (e) {} }
+    return;
+  }
   if (!s.hv && hwView !== 'photo') { hwViewSet('photo', null, true); hwTellView(); }   // ③ 보기 칸 빠짐 = 교재 → 사진만(한 칸)
   if (!s.lg && !hwAsking) {   // ③ 물음 칸 빠짐 = 「홈으로 나갈까요?」 — 판이 아직 노크 전이면 묻지 않고 닫는다
     if (!hwWin) { history.back(); return; }
@@ -1228,7 +1239,7 @@ window.addEventListener('popstate', function () {
 });
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
-  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwbookBookWarm' && d.onf !== 'hwTap' && d.onf !== 'reload' && d.onf !== 'hwPen' && d.onf !== 'hwFb' && d.onf !== 'hwbookLesson' && d.onf !== 'hwFbAsk' && d.onf !== 'hwLeaveKeep' && d.onf !== 'hwRec' && d.onf !== 'hwBand' && d.onf !== 'hwPenOp' && d.onf !== 'outHello' && d.onf !== 'outFail')) return;
+  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwbookBookWarm' && d.onf !== 'hwTap' && d.onf !== 'reload' && d.onf !== 'hwWin' && d.onf !== 'hwPen' && d.onf !== 'hwFb' && d.onf !== 'hwbookLesson' && d.onf !== 'hwFbAsk' && d.onf !== 'hwLeaveKeep' && d.onf !== 'hwRec' && d.onf !== 'hwBand' && d.onf !== 'hwPenOp' && d.onf !== 'outHello' && d.onf !== 'outFail')) return;
   if (hwFr && hwFrom(ev.source)) {   // 과제 판 액자에서 온 말
     /* 📝 정적 과제 판이 살아 있으면(hwOut) 그 판 창(액자 직접 자식 — 정적 판은 겹이 없다) + 그 판 출처만 · 판 안 구글 액자(다리)는 안 받는다 · 그 밖(구글 판)은 종전 그대로 googleusercontent 만 */
     if (hwOut) { if (ev.source !== hwFr.contentWindow || ev.origin !== hwOut.org) return; }
@@ -1260,6 +1271,7 @@ window.addEventListener('message', function (ev) {
       return;
     }
     if (d.onf === 'themeAsk') { themeAsk(ev); return; }
+    if (d.onf === 'hwWin') { hwWinOn = d.on === 1; return; }   // 🪟 판 안 창 열림·닫힘(위 popstate)
     if (d.onf === 'reload') { reopenLog('pullhw'); location.reload(); return; }   // 🔄 과제 판의 당겨서 새로고침(2026-11-11)
     if (d.onf === 'hwTap') { histTap(); return; }   // 👆 미뤄 둔 뒤로 칸 — 판을 만진 손짓 안에서(위 hwHistLate · 판·홈 줄 먼저)
     if (d.onf === 'hwbookBack') hwBack();
