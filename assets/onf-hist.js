@@ -26,7 +26,7 @@
   var cs = g.document && g.document.currentScript, GQ = !!(cs && cs.getAttribute && cs.getAttribute('data-gq') !== null);
   var nat = function () { try { return sd.get.call(H); } catch (e) { return null; } };
   var dOf = function (s) { return (s && typeof s === 'object' && s.onfD > 0) ? (s.onfD | 0) : 0; };
-  var D = dOf(nat()), floor = D, bounce = -1, land = false, Q = [], virt = false, out = false, LOG = [];   // bounce = 위 ③ · land = 위 ④
+  var D = dOf(nat()), floor = D, bounce = -1, land = false, Q = [], virt = false, out = false, stuck = false, LOG = [];   // bounce = 위 ③ · land = 위 ④
   var L = 'L' + Math.random().toString(36).slice(2, 10);   // ③ 이 문서(읽힌 회) 표 — 칸마다 onfL 로 찍는다 · 다른 표(또는 없음) = 옛 문서 칸
   var own = function (s) { return !!(s && typeof s === 'object' && s.onfL === L); };
   function note(k, st) { if (LOG.length < 80) LOG.push(k + (st && typeof st === 'object' ? ':' + Object.keys(st).filter(function (x) { return x !== 'onfD' && x !== 'onfL' && x !== 's'; }).map(function (x) { return x + '=' + st[x]; }).join(',') : '') + ' [D' + D + ' f' + floor + ' q' + Q.length + ']'); }   // 🔭 진단(표식·수만 — 안쪽 state(s)는 안 싣는다)
@@ -107,11 +107,14 @@
       return;
     } else {                                             // ① 옛 칸(바닥 아래 · 같은 깊이의 옛 칸)에 닿았다 — 껍데기에 안 알리고 곧장 밖으로
       ev.stopImmediatePropagation();
+      if (stuck) { stuck = false; toFirst(D); return; }   // ④ 지난번 나가기가 안 먹었다(밖이 없다) — 이번 뒤로에 첫 칸까지
       /* 나가는 중에 또 popstate = 아직 사이트 안(액자 문서가 바뀐 칸은 같은 깊이로 하나 더 있다 — 판·홈 액자가 처음 뜰 때의 기록 칸 · 학생 재현기 reload-chain 실측) → 남은 만큼 또 */
       var first = !out;
       out = true;
       try { nGo.call(H, -(D + 1)); } catch (e) {}
-      if (first) setTimeout(function () { if (out && !own(nat())) toFirst(D); out = false; }, 1500);   // ④ 못 나갔다 = 밖이 없다
+      /* ④ 1.5초 뒤에도 그 자리 = 밖이 없을 **수도** 있다 — ⛔ 여기서 또 움직이지 마라(검토 2026-11-12 실측: 앞 페이지가 1.8초 넘게 늦게 뜨면 나가는 중인데 한 번 더 go 해 탭 첫 칸(about:blank)까지 지나쳤다 · 크롬·WebKit).
+         표시만 해 두고 다음 뒤로에 첫 칸으로(그 사이 나가면 이 문서가 없어져 아무 일 없다) — 첫 페이지 탭은 뒤로 두 번에 첫 칸. */
+      if (first) setTimeout(function () { if (out && !own(nat())) stuck = true; out = false; }, 1500);
       return;
     }
     if (Q.length) Q = [];                                // 줄에 세운 채 진짜 뒤로 — 줄 칸은 그 아래 칸보다 위였다(선생님 histQ 와 같은 약속)

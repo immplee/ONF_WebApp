@@ -61,13 +61,15 @@ t('③ 앞 칸(2026-11-11) — 뒤로 몇 칸 간 채 새로 고치면 그 위 �
   const M = world({ active: true }); open3(M); M.realBack(); M.realBack(); M.boot(SRC.replace('else if (D > floor) {', 'else if (false) {'));
   M.i = 3; M.fire(); M.run(); assert.ok(M.i !== 1 || M.left, '변이가 안 먹었다');
 });
-t('④ 탭 첫 페이지가 껍데기(검토 2026-11-11) — 새로 고침 뒤 뒤로가 옛 칸에 닿으면 밖이 없으니 탭 첫 칸까지 한 번에 · 그 자리가 바닥(껍데기엔 안 알림 · 헛도는 뒤로 0) · 못 나간 것은 1.5초 뒤에 안다(navigation index 는 같은 출처 칸만 세 못 쓴다)', () => {
+t('④ 탭 첫 페이지가 껍데기(검토 2026-11-11) — 새로 고침 뒤 뒤로가 옛 칸에 닿아 밖으로 못 나가면 다음 뒤로에 탭 첫 칸까지(타이머로 또 움직이지 않는다 — 앞 페이지가 늦으면 지나친다) · 그 자리가 바닥(껍데기엔 안 알림 · 헛도는 뒤로 0) · 못 나간 것은 1.5초 뒤에 안다(navigation index 는 같은 출처 칸만 세 못 쓴다)', () => {
   {
     const W = world({ active: true }); W.entries = [null]; W.i = 0; W.boot(); open3(W); W.boot();
     const timers = []; W.g.setTimeout = (f, ms) => { if (!ms) W.tasks.push(f); else timers.push(f); return 1; };
     W.realBack();                                               // 옛 칸 2 — go(-3) 은 탭 밖이라 안 먹는다(가짜 기록: left)
     assert.ok(W.left, '전제: 밖으로 가려 했다'); W.left = false; timers.forEach((f) => f()); W.run();
-    assert.ok(!W.left && W.i === 0 && W.g.onfHistL.floor() === 0, '⛔ 1.5초 뒤 탭 첫 칸까지 안 내려갔다: i' + W.i + ' f' + W.g.onfHistL.floor());
+    assert.ok(W.i === 2, '⛔ 1.5초 뒤 저절로 또 움직였다(앞 페이지가 늦게 뜨는 중이면 탭 첫 칸까지 지나친다 · 검토 2026-11-12 실측)');
+    W.realBack();                                               // 다음 뒤로 — 지난번에 못 나갔다 = 밖이 없다 → 첫 칸까지
+    assert.ok(!W.left && W.i === 0 && W.g.onfHistL.floor() === 0, '⛔ 둘째 뒤로에 탭 첫 칸까지 안 내려갔다: i' + W.i + ' f' + W.g.onfHistL.floor());
     assert.deepStrictEqual(W.pops, [], '⛔ 껍데기에 옛 칸을 알렸다');
     W.g.history.pushState({ onfHist: 'n', n: 1 }, ''); W.realBack(); assert.ok(W.pops.length === 1 && W.pops[0] === null, '⛔ 새 칸 뒤로 = 바닥(null)');
   }

@@ -59,10 +59,10 @@ for (const gq of [false, true]) {
   await q.evaluate(() => { history.pushState({ onfHist: 'a', n: 1 }, ''); history.pushState({ onfHist: 'b', n: 2 }, ''); history.pushState({ onfHist: 'c', n: 3 }, ''); });
   await q.reload(); await q.waitForTimeout(200);
   const len4 = await q.evaluate(() => history.length);
-  await q.goBack().catch(() => {}); await q.waitForTimeout(2200);
+  await q.goBack().catch(() => {}); await q.waitForTimeout(2200); await q.goBack().catch(() => {}); await q.waitForTimeout(600);   // 첫 뒤로 = 나가기 시도(밖 없음) · 둘째 = 첫 칸까지
   if (!/shell\.test\/app/.test(q.url())) { say('④ 전제: 이 탭의 첫 칸이 껍데기(길이 ' + len4 + ')', q.url(), false); await c2.close(); continue; }
   const r4 = await q.evaluate(() => ({ L: onfHistL.peek(), pops: pops.splice(0), s: history.state, len: history.length }));
-  say('④ 첫 페이지 껍데기 · 뒤로 한 번 = 탭 첫 칸 · 바닥 0 · 껍데기 popstate 0 (1.5초 뒤)', r4, r4.L.D === 0 && r4.L.floor === 0 && r4.pops.length === 0 && r4.s === null);
+  say('④ 첫 페이지 껍데기 · 뒤로 두 번 = 탭 첫 칸 · 바닥 0 · 껍데기 popstate 0 (1.5초 뒤)', r4, r4.L.D === 0 && r4.L.floor === 0 && r4.pops.length === 0 && r4.s === null);
   await c2.close();
 }
 await b.close(); console.log(bad ? '❌ ' + bad + '건' : '✅ 전부'); process.exit(bad ? 1 : 0);
