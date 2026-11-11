@@ -50,7 +50,7 @@ function teacher(o) {
     matchMedia: () => ({ matches: o.phone ? false : true, addEventListener() {} }),
     addEventListener: (k, f) => { (L[k] = L[k] || []).push(f); }, removeEventListener: (k, f) => { L[k] = (L[k] || []).filter((x) => x !== f); },
     setTimeout: (f, ms) => { timers.push({ f, ms }); return timers.length; }, clearTimeout() {} };
-  g.window = g; g.appWin = home; vm.createContext(g);
+  g.window = g; g.appWin = home; if (o.pre) o.pre(g); vm.createContext(g);
   const blk = TSRC.slice(TA, TB), mb = o.mut ? o.mut(blk) : blk;
   if (o.mut) assert.notStrictEqual(mb, blk, '변이 자리');
   vm.runInContext(mb + TSRC.slice(HA, HB), g, { filename: 'teacher-book' });
@@ -100,6 +100,17 @@ t('되살린 뒤 뒤로 — B 물음 칸 → (B 칸) → A 가 보이고 A 에 �
   assert.ok(/e1/.test(b.rec().h) && b.rec().u.length === 0, '⛔ 뒤로로 A 가 보였는데 기억은 B(닫은 판)다: ' + b.rec().h);
   b.H.i = 0; (b.L.popstate || []).forEach((f) => f({}));
   assert.ok(b.shown().length === 0 && b.rec() === null, '⛔ 홈까지 뒤로 = 판 다 숨김 · 기억 지움');
+});
+t('🔐 검토 2026-11-12 — 밑 판 사슬(u)엔 Worker 입장권이 든 사본 힌트 c 를 안 적는다 · 맨 위 판 c 는 그대로 · c 없이도 밑 판은 숨긴 판으로 뜬다', () => {
+  const CF = { f: 'FILEaaaaaaaa01', s: 'E1_A', k: 'v1.AAAAticket.BBBBsig' };
+  const a = teacher(); a.send({ onf: 'openBook', href: TE1, left: 270, cf: CF }, a.home);
+  const ia = a.hi(a.panels()[0], 'a'); a.send({ onf: 'openBook', href: TE2 }, ia); a.hi(a.panels()[1], 'b');
+  let v = a.rec();
+  assert.ok(v.u.length === 1 && !('c' in v.u[0]) && JSON.stringify(v).indexOf('AAAAticket') < 0, '⛔ 밑 판에 입장권을 적었다: ' + JSON.stringify(v.u));
+  const b = teacher({ ss: a.ss }); b.send({ onf: 'bookHello' }, b.home);
+  assert.ok(b.panels().length === 2 && b.panels()[0].classList.contains('park'), '⛔ c 없는 밑 판을 못 열었다');
+  const t2 = teacher(); t2.send({ onf: 'openBook', href: TE1, left: 270, cf: CF }, t2.home);
+  assert.ok(t2.rec().c && t2.rec().c.k === CF.k, '⛔ 맨 위 판 c 가 사라졌다');
 });
 t('판 수 상한 — 넷 사슬(A → B → C → D)은 위 셋만(밑 판 BOOK_MAX-1 = 2) · 📱 폰은 둘(밑 판 1)', () => {
   const go = (o) => {
@@ -162,17 +173,17 @@ const SE1 = 'https://class.ownify.co.kr/a-s1-e1-b?mode=share', SE2 = SE1.replace
 function student(o) {
   o = o || {};
   const L = {}, E = els(), top = win('shell'), ss = o.ss || store(), H = hist(), timers = [], reloads = [];
-  const g = { listeners: L, top, URL, innerWidth: 1440, localStorage: null, sessionStorage: ss, history: H, navigator: { userAgent: 'node' },
+  const g = { listeners: L, top, URL, innerWidth: 1440, localStorage: o.ls || null, sessionStorage: ss, history: H, navigator: { userAgent: 'node' },
     location: { pathname: o.path || '/', search: o.search || '', href: 'https://class.ownify.co.kr' + (o.path || '/') + (o.search || ''), reload() { reloads.push(1); } },
     document: { addEventListener() {}, body: E.body, createElement: E.mkEl, documentElement: E.root },
     matchMedia: () => ({ matches: o.phone ? false : true, addEventListener() {} }),
     addEventListener: (k, f) => { (L[k] = L[k] || []).push(f); }, removeEventListener: (k, f) => { L[k] = (L[k] || []).filter((x) => x !== f); },
     setTimeout: (f, ms) => { timers.push({ f, ms }); return timers.length; }, clearTimeout() {} };
-  g.window = g; vm.createContext(g);
+  g.window = g; if (o.pre) o.pre(g); vm.createContext(g);
   vm.runInContext(o.mut ? o.mut(FSRC) : FSRC, g, { filename: 'onf-frame.js' });
   const homeWin = win('home-exec', top), home = win('home-user', homeWin);
   const frameEl = { contentWindow: homeWin, style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 800 }), addEventListener() {} };
-  g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { phone: true, lg: true, tok: o.tok === undefined ? 'TokA' : o.tok, home: o.home === undefined ? true : o.home,
+  g.ONF.frame.mount(frameEl, 'https://script.google.com/x/exec?t=T', { phone: true, lg: true, preKey: o.preKey, swap: !!o.swap, tok: o.tok === undefined ? 'TokA' : o.tok, home: o.home === undefined ? true : o.home,
     bookSrc: (h) => { const m = /\/([a-z0-9-]+)\?mode=share/.exec(h); return m ? 'https://script.google.com/x/exec?t=T&mode=share&slug=' + m[1] + '&embed=1' : null; } });
   const s = hands({ g, L, top, home, ss, H, timers, reloads, body: E.body, key: o.key || 'onfOpenBook' });
   s.send = (data, source, origin) => (L.message || []).forEach((f) => f({ data, source, origin: origin || 'https://n-abc-0lu-script.googleusercontent.com' }));
@@ -199,6 +210,26 @@ t('학생도 같은 약속 — A → B 를 연 채 새로 고침 = A 숨긴 판 
   b.H.i = 2; (b.L.popstate || []).forEach((f) => f({}));
   assert.ok(!ps[0].classList.contains('park') && ps[1].classList.contains('park') && /e1/.test(b.rec().h), '⛔ 뒤로가 A 를 안 보였거나 기억이 B 에 남았다');
 });
+t('🚀 검토 2026-11-12 — 첫 교재 미리 띄우기(preEarly)가 사슬 되살리기의 밑 판을 지우지 않는다 · 사슬 안 같은 교재(회차만 다름)·자리를 다 쓰는 사슬이면 안 띄운다 · 사슬이 짧으면 종전대로 띄운다', () => {
+  const A1 = SE1, A3 = SE1.replace('e1', 'e3'), B1 = 'https://class.ownify.co.kr/b-s1-e1-x?mode=share', C1 = 'https://class.ownify.co.kr/c-s1-e1-d?mode=share', D1 = 'https://class.ownify.co.kr/d-s1-e1-z?mode=share';
+  const lbl = (b) => b.panels().map((x) => (x.classList.contains('park') ? 'hid:' : 'on:') + ((x.kids[0].src.match(/slug=([a-z])-/) || [])[1]));
+  const run = (chain, phone, pre, mut) => {
+    const ls = store(), a = student({ ls, phone, swap: true }); a.send({ onf: 'openBook', href: chain[0], left: 184 }, a.home);
+    let w = a.hi(a.panels()[0], 'a0');
+    chain.slice(1).forEach((h, i) => { a.send({ onf: 'openBook', href: h }, w); w = a.hi(a.panels()[a.panels().length - 1], 'a' + (i + 1)); });
+    ls.setItem('onfPreBook', JSON.stringify({ k: 'kP', h: pre, ph: phone ? 1 : 0, t: Date.now() }));
+    return lbl(student({ ss: a.ss, ls, preKey: 'kP', phone, swap: true, mut }));
+  };
+  assert.deepStrictEqual(run([A1, B1, C1], false, A3), ['hid:a', 'hid:b', 'on:c'], '⛔ PC 사슬 셋 + 같은 교재 미리 판 — 밑 판이 지워졌다');
+  assert.deepStrictEqual(run([A1, B1, C1], false, D1), ['hid:a', 'hid:b', 'on:c'], '⛔ PC 사슬 셋 + 다른 교재 미리 판 — 밑 판이 지워졌다');
+  assert.deepStrictEqual(run([A1, C1], true, D1), ['hid:a', 'on:c'], '⛔ 폰 사슬 둘 + 미리 판 — 밑 판이 지워졌다');
+  assert.deepStrictEqual(run([A1, C1], false, A3), ['hid:a', 'on:c'], '⛔ PC 사슬 둘 · 밑 판과 같은 교재 — 미리 판을 또 띄웠다');
+  assert.deepStrictEqual(run([A1, C1], false, D1), ['hid:d', 'hid:a', 'on:c'], '⛔ 자리가 남는 사슬인데 미리 판을 안 띄웠다');
+  const m = run([A1, B1, C1], false, D1, (x) => x.replace('if (ru.length + 2 > bookMax()) return;', ''));
+  assert.notDeepStrictEqual(m, ['hid:a', 'hid:b', 'on:c'], '변이가 안 먹었다');
+  const m2 = run([A1, C1], false, A3, (x) => x.replace('if (pb && [rv].concat(ru).some(', 'if (pb && [rv].some('));
+  assert.notDeepStrictEqual(m2, ['hid:a', 'on:c'], '변이가 안 먹었다(사슬 거름)');
+});
 t('같은 탭에서 다른 학생 토큰으로 넘어오면 앞 학생 교재를 안 연다(기억 지움) · 옛 기억(지문 없음)도 안 연다 · 같은 학생이면 연다', () => {
   const { b } = studentAB({ tok2: 'TokB' });
   assert.ok(b.panels().length === 0 && b.rec() === null, '⛔ 다른 학생 토큰으로 앞 학생 교재를 열었다');
@@ -221,5 +252,33 @@ t('학생 숨긴 판의 reload 도 받는다 — 기억은 보이는 판', () =>
   const ia = a.hi(a.panels()[0], 'a'); a.send({ onf: 'openBook', href: SE3 }, a.home); a.hi(a.panels()[1], 'b');
   a.send({ onf: 'reload' }, ia);
   assert.ok(a.reloads.length === 1 && /e3/.test(a.rec().h), '⛔ 숨긴 판 reload 무시 · 또는 숨긴 판을 적었다');
+});
+console.log('[🔄 되살린 판 칸 붙잡기 배선 — 검토 2026-11-12]');
+/** 붙잡기 배선 — 되살리면 기록 층 hold(true) · 홈 hello 뒤 1.5초 조용 = hold(false) · hello 뒤 홈 칸은 다시 센다 · 상한 6초 · 되살릴 것 없으면 안 붙잡는다 */
+function holdWire(kind, mk, mut) {
+  const calls = [], pre = (g) => { g.onfHistL = { hold: (on) => calls.push(on) }; };
+  const b = mk({ pre, mut });
+  if (mut) { assert.deepStrictEqual(calls, [], '변이가 안 먹었다'); return; }
+  assert.deepStrictEqual(calls, [true], '⛔ ' + kind + ' 되살린 판 칸을 안 붙잡았다');
+  assert.ok(b.timers.some((x) => x.ms === 6000), '⛔ ' + kind + ' 6초 상한');
+  if (kind === '학생') b.send({ onf: 'hist', op: 'hi' }, b.home);
+  b.send({ onf: 'hist', op: 'hello' }, b.home);
+  const n1 = b.timers.filter((x) => x.ms === 1500).length;
+  b.send({ onf: 'hist', op: 'push', id: 'w1', state: { onfPeek: 1 } }, b.home);
+  const q = b.timers.filter((x) => x.ms === 1500);
+  assert.ok(n1 === 1 && q.length === 2, '⛔ ' + kind + ' hello 뒤 1.5초 · 홈 칸에 다시 세기: ' + n1 + '/' + q.length);
+  q[1].f(); assert.deepStrictEqual(calls, [true, false], '⛔ ' + kind + ' 조용하면 놓기');
+}
+t('학생 — rsBoot 가 되살리면 붙잡고(onfHistL.hold) 홈 hello 뒤 1.5초 조용하면 놓는다 · 되살릴 것 없으면 안 붙잡는다', () => {
+  const a = student(); a.send({ onf: 'openBook', href: SE1, left: 184 }, a.home); a.hi(a.panels()[0], 'a');
+  holdWire('학생', (o) => student(Object.assign({ ss: a.ss }, o)));
+  holdWire('학생', (o) => student(Object.assign({ ss: a.ss }, o)), (x) => x.replace('      rsHoldOn();   //', '      //'));
+  const calls = []; student({ pre: (g) => { g.onfHistL = { hold: (on) => calls.push(on) }; } }); assert.deepStrictEqual(calls, [], '⛔ 되살릴 판 없이 붙잡았다');
+});
+t('선생님 — 같은 배선(rsBoot · onf-hist hello·push)', () => {
+  const a = teacher(); a.send({ onf: 'openBook', href: TE1, left: 270 }, a.home); a.hi(a.panels()[0], 'a');
+  const mk = (o) => { const b = teacher(Object.assign({ ss: a.ss }, o)); b.send({ onf: 'bookHello' }, b.home); return b; };
+  holdWire('선생님', mk);
+  holdWire('선생님', mk, (x) => x.replace('  rsHoldOn();   //', '  //'));
 });
 console.log('\n' + pass + '개 통과, ' + fail + '개 실패'); if (fail) process.exit(1);

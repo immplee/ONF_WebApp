@@ -494,6 +494,14 @@ t('🔄 2차(Peter 2026-11-08) 과제 판 옆 교재 — 그 교재가 알린 �
   assert.ok(!dd.got.some((m) => m.onf === 'bookRestore'), '⛔ 되살리기 자리가 지나 연 교재에 옛 상태를 줬다');
   assert.ok(/sheetName=E3(&|$)/.test(D.created.filter((x) => x.tag === 'iframe').slice(-1)[0].src || ''), '⛔ 되살리기 자리가 지났는데 옛 회차 주소를 실었다');
 });
+t('🪟 검토 2026-11-12 — 과제 판 옆 교재 기억도 창마다 열쇠(rsWin · RS_KEY 와 같다) — 홈 기억(옛 열쇠 그대로)을 학생 창이 안 읽고 · 학생 창 기억은 제 열쇠', () => {
+  const mem = JSON.stringify({ b: 'f:FILEaaaaaaaa01', st: { sheet: 'E5_Five', top: 9 }, at: Date.now() });
+  const H = boot({ onf_id_tok: odk() }, { ss: { onfThHwBk: mem } }), S = boot({ onf_id_tok: odk() }, { ss: { onfThHwBk: mem }, search: '?mode=student&t=Tok_1' });
+  assert.ok(H.g.HWBK_KEY === 'onfThHwBk' && H.g.hwBkRs && H.g.hwBkRs.b === 'f:FILEaaaaaaaa01', '⛔ 홈이 제(옛 열쇠) 기억을 못 읽는다');
+  assert.ok(/^onfThHwBk\.s\.[a-z0-9]+$/.test(S.g.HWBK_KEY) && S.g.hwBkRs === null, '⛔ 학생 창이 홈 옆 교재 기억을 읽었다: ' + S.g.HWBK_KEY);
+  const S2 = boot({ onf_id_tok: odk() }, { ss: { [S.g.HWBK_KEY]: mem }, search: '?mode=student&t=Tok_1' });
+  assert.ok(S2.g.hwBkRs && S2.g.hwBkRs.st.sheet === 'E5_Five', '⛔ 학생 창이 제 기억을 못 읽는다');
+});
 t('🔄 검토 2026-11-08 — 숨긴 미리 판(hwbookWarm)이 먼저 와도 hwRsNo 면 덮개를 걷는다 · 교재 판 되살리기는 로고 막 뒤에 붙는다(같은 z 5) · 로그인 화면엔 교재 판도 숨긴다', () => {
   const covers = (R) => R.created.filter((e) => e.className === 'onf-hwcover' && !e.removed);
   const R = boot({ onf_id_tok: odk() }, { ss: { onfHwUp: String(Date.now()) } }), me = { parent: R.els.app.contentWindow, postMessage() {} }; R.knockAs(me);
