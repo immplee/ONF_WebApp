@@ -64,8 +64,9 @@
   //      읽음 장부가 남의 칸에 쌓이고 '내 글' 표시도 어긋난다(2026-08-12).
   //    line = 내 문장의 「📖 교재에서 보기」가 실어 오는 교재 줄 번호 · view = 내 문장 모드가 처음 열 칸(드라마 시즌)
   //      (2026-10-09). 둘 다 빠져 있어서 점프와 「그 칸으로 열기」가 라이브에서 조용히 죽을 뻔했다 — 이름이 아니라 **목록**이 문이다.
+  //    tsg = 선생님 이름(tas) 서명(2026-11-12 · Ownify _onfTasSig) — 없으면 교재가 선생님 댓글 쓰기를 거절한다(값은 그대로 통과만).
   //    osg = 👑 오너 서명(Peter·Mary 줄 편집 · 2026-11-06) — 교재 서버가 tas 이름과 같이 확인한다(값은 그대로 통과만).
-  ['fileId', 'sheetName', 'mode', 'back', 'ttok', 'tas', 'osg', 'line', 'view'].forEach(function (k) {
+  ['fileId', 'sheetName', 'mode', 'back', 'ttok', 'tas', 'osg', 'tsg', 'line', 'view'].forEach(function (k) {
     if (q.get(k)) extra.push(k + '=' + encodeURIComponent(q.get(k)));
   });
   if (q.get('diag') === '1') extra.push('diag=1');

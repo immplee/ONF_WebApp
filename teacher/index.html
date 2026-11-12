@@ -1419,7 +1419,8 @@ function edgeOurs(w) { for (var i = 0; i < 8 && w; i++) { try { if (w.parent ===
 /* onf-book:begin */
 var BOOK_MAX = 3, BOOK_IDLE_MS = 30 * 60 * 1000, BOOK_PHONE = 2;
 var books = [], bookHome = null, bookHomeOrigin = '';   // books = 판들(오래 안 쓴 것이 앞) · { box, el, src, key, parked, win, origin, kb, ko, hw, ho, idle, left }
-var BOOK_KEYS = ['t', 'mode', 'fileId', 'sheetName', 'back', 'line', 'view', 'ttok', 'tas', 'osg'];   // osg = 👑 오너 서명(Peter·Mary 줄 편집 · Ownify _onfOwnSig 2026-11-06) — 빠지면 교재가 오너를 모른다
+var BOOK_KEYS = ['t', 'mode', 'fileId', 'sheetName', 'back', 'line', 'view', 'ttok', 'tas', 'osg', 'tsg'];   // tsg = 선생님 이름 서명(2026-11-12) — 빠지면 교재에서 선생님 댓글을 못 쓴다
+   // osg = 👑 오너 서명(Peter·Mary 줄 편집 · Ownify _onfOwnSig 2026-11-06) — 빠지면 교재가 오너를 모른다
 /* ⚠️ 폰 = 이 물음이 아닌 화면 — Ownify 선생님 홈 dhBookWide 와 **글자까지 같아야** 한다(다르면 홈은 폰으로 보내고 껍데기는 PC 판으로 띄운다). matchMedia 가 없으면 PC(종전). */
 var BOOK_WIDE_Q = '(min-width:1100px) and (hover:hover) and (pointer:fine)', wideMq = null, bookSrcs = [];
 try { wideMq = window.matchMedia ? window.matchMedia(BOOK_WIDE_Q) : null; } catch (eM) {}
@@ -1580,7 +1581,7 @@ function outSame(p, src, out) { return !!p.out === outWant(src, out); }
 var OUT_USED_MS = 14 * 86400000, OUT_PEND = 'onfOutPending:', FLUSH_MS = 60000, FLUSH_WAIT_MS = 15000, flushed = {}, flushLive = [];
 function bookStrip(src, ks) { try { var u = new URL(src); ks.forEach(function (k) { u.searchParams.delete(k); }); return u.href; } catch (e) { return ''; } }   // 못 읽으면 '' — 자격 든 주소를 그대로 열쇠로 안 쓴다
 function bookBase(src) { return bookStrip(src, ['view', 'line']); }                        // 넘겨줄 판이 여는 주소(자격 그대로 · 메모리만)
-function bookPendKey(src) { return bookStrip(src, ['view', 'line', 't', 'ttok', 'tas', 'osg']); }  // 기기 저장소 열쇠(자격 없음)
+function bookPendKey(src) { return bookStrip(src, ['view', 'line', 't', 'ttok', 'tas', 'osg', 'tsg']); }  // 기기 저장소 열쇠(자격 없음)
 function outOrg() { try { return new URL(ONF.frame.OUT_BOOK).origin; } catch (e) { return ''; } }
 function outPend(k, n) { if (!k) return; try { if (typeof n === 'number' && n > 0) localStorage.setItem(OUT_PEND + k, '1'); else if (n === 0) localStorage.removeItem(OUT_PEND + k); } catch (e) {} }
 function flushWorth(k, u) {
