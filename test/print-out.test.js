@@ -50,7 +50,7 @@ function setup(o) {
   g.addEventListener = (k, fn) => { (listeners[k] = listeners[k] || []).push(fn); };
   g.removeEventListener = (k, fn) => { listeners[k] = (listeners[k] || []).filter((x) => x !== fn); };
   if (o.fetch !== null) g.fetch = (url, init) => { asks.push({ url: String(url), method: init && init.method, body: init && init.body, headers: init && init.headers }); return (o.fetch || (() => Promise.resolve({ json: () => Promise.resolve(BOOT) })))(url, init); };
-  vm.runInContext(CODE, g, { filename: 'onf-frame.js' });
+  vm.runInContext(o.code || CODE, g, { filename: 'onf-frame.js' });   // o.code = 변이 검사(PO7)
   const frameWin = win('frame', top);
   const frameEl = { contentWindow: frameWin, style: {}, getBoundingClientRect: () => ({ top: 0, bottom: 800 }), addEventListener() {}, opened: [],
     get src() { return this._src || ''; }, set src(v) { this._src = v; this.opened.push(v); } };
@@ -171,6 +171,33 @@ ta('PO5 index.html — script 출처의 프린트 주소만 class 로 한 번(�
   const val = (search) => vm.runInNewContext('(' + line[1] + ')', { q: new URLSearchParams(search) });
   assert.deepStrictEqual(js(val(Q + '&pout=1')), { f: F, s: 'E1_First Day', sw: '1' });
   assert.strictEqual(val('?fileId=' + F + '&mode=share'), null, '⛔ 프린트가 아닌 주소에 print 값을 넘겼다(다른 화면이 그 갈래를 본다)');
+});
+
+ta('PO7 🔐 구글 프린트 화면이 묻는다(printTkAsk) — 내 액자 사슬·우리 출처에서 온 물음에만 그 창·그 출처로 입장권 · 없으면 빈 값 · 프린트 아닌 껍데기·남의 창·남의 출처는 무시 · 변이(자물쇠·프린트 확인 뺌)는 빨강', async () => {
+  const ask = (s, src, origin) => { s.send({ onf: 'printTkAsk' }, src, origin); return js(src.sent).filter((x) => x[0].onf === 'printTk'); };
+  //   물러난 뒤 같은 액자에 뜬 구글 화면 — 겉 래퍼(script.google.com) 안의 샌드박스 창이 묻는다(맨 위 = 이 껍데기)
+  let s = setup(); s.fire(2500);
+  const sandbox = win('sandbox', win('wrapper', s.frameWin));
+  assert.deepStrictEqual(ask(s, sandbox, GO), [[{ onf: 'printTk', tk: TK }, GO]], '⛔ 우리 구글 화면의 물음에 입장권을 안 줬다(또는 받는 곳이 그 출처가 아니다)');
+  assert.deepStrictEqual(leaks(s), [], '⛔ 입장권이 주소에 실렸다');
+  //   입장권 없음·지남 = 빈 값(화면이 안내 한 줄 — 기다리지 않게)
+  for (const ls of [LSf(), LSf({ onf_tch: tchLs({ x: NOW / 1000 - 5 }) })]) {
+    s = setup({ ls }); await flush();
+    assert.deepStrictEqual(ask(s, win('sandbox', win('wrapper', s.frameWin)), GO), [[{ onf: 'printTk', tk: '' }, GO]]);
+  }
+  //   남의 창(내 액자 사슬 밖) · 남의 출처 · 프린트가 아닌 껍데기 = 답 0
+  s = setup();
+  assert.deepStrictEqual(ask(s, win('stranger', s.top), GO), [], '⛔ 내 액자 밖 창에 입장권을 줬다');
+  assert.deepStrictEqual(ask(s, win('sandbox', win('wrapper', s.frameWin)), 'https://evil.example.com'), [], '⛔ 남의 출처에 입장권을 줬다');
+  const sh = setup({ print: null, src: 'https://script.google.com/x/exec?fileId=' + F + '&mode=share' });
+  assert.deepStrictEqual(ask(sh, win('sandbox', win('wrapper', sh.frameWin)), GO), [], '⛔ 프린트가 아닌 화면(교재·홈)에 입장권을 줬다');
+  //   변이 — 프린트 확인을 빼면 교재 화면에도 준다 · 자물쇠(내 액자 사슬)를 빼면 남의 창에도 준다
+  const MUT = (from, to) => { assert.ok(CODE.indexOf(from) > 0, '변이 자리'); return CODE.replace(from, to); };
+  const withCode = (code, o) => setup(Object.assign({ code }, o));
+  const m1 = withCode(MUT("if (opts.print) { try { ev.source.postMessage({ onf: 'printTk'", "if (true) { try { ev.source.postMessage({ onf: 'printTk'"), { print: null, src: 'https://script.google.com/x/exec?fileId=' + F + '&mode=share' });
+  assert.strictEqual(ask(m1, win('sandbox', win('wrapper', m1.frameWin)), GO).length, 1, '변이(프린트 확인 뺌)가 안 잡힌다');
+  const m2 = withCode(MUT('if (!_fromOurFrame(ev.source, frameEl)) return;', ''));
+  assert.strictEqual(ask(m2, win('stranger', m2.top), GO).length, 1, '변이(자물쇠 뺌)가 안 잡힌다');
 });
 
 ta('PO6 쌍둥이 — 입장권 칸·꼴 = 선생님 껍데기 · 정적 판 출처 = 교재 정적 판', async () => {
