@@ -613,6 +613,10 @@
       } catch (e) { return; }
       if (homeGone && ev.source === frameEl.contentWindow && ev.origin === OUT_HOME_ORG) return;   // 🌤 물러난 정적 홈(아래 mainHome back) — 구글 응답이 들어설 때까지 살아 있는 옛 문서가 창 손잡이를 다시 가져가지 않게
       if (ev.data.onf === 'hist') { histMsg(ev); return; }   // 기록 칸 다리 — 위 자물쇠를 통과한 말만(아래 블록)
+      /* 🔐 프린트용 교재 구글 화면이 입장권을 묻는다(2026-11-12 · Ownify ONF_Print_WebApp_Html onfPrintAskTk · 서버 ONF_WebApp.js _onfPrintCred) — 옛 구글 프린트 화면도 이제
+         증거 없이는 안 연다. 그 화면은 정적 판이 못 섰거나(printOut 물러남) 안 탄 때 이 액자에 뜬다 → 정적 판에 주는 그 입장권(printTk)을 준다(없으면 빈 값 = 화면이 안내 한 줄).
+         ⛔ 프린트로 연 껍데기(opts.print)만 · 위 자물쇠(내 액자 사슬 + 우리 화면 출처)를 지난 말만 · 받는 곳 = 물은 그 창·그 출처('*' 금지 — 선생님 껍데기 auth 와 같은 수) · 주소엔 안 싣는다. */
+      if (ev.data.onf === 'printTkAsk') { if (opts.print) { try { ev.source.postMessage({ onf: 'printTk', tk: printTk() }, ev.origin); } catch (eP) {} } return; }
       if (ev && ev.data && ev.data.onf === 'frameHello') {
         appWin = ev.source; lastH = -1; lastTop = -1; sync();
       }
