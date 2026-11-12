@@ -14,3 +14,9 @@ assert.ok(/[?&]osg=SIG_value-1(&|$)/.test(src), '⛔ 선생님 홈 판이 osg �
 assert.ok(!/osg=/.test(c.bookPendKey(src)), '⛔ 기기 저장소 열쇠에 osg 가 남았다');
 assert.ok(/\['fileId', 'sheetName', 'mode', 'back', 'ttok', 'tas', 'osg',/.test(S), '⛔ 교재 껍데기(index.html)가 osg 를 앱에 안 넘긴다');
 console.log('✓ owner-sig 3개 통과');
+//   2026-11-12 tsg(선생님 이름 서명) — 교재 껍데기·선생님 홈 둘 다 넘기고, 기기 저장소 열쇠에서는 뺀다
+assert.ok(/\['fileId', 'sheetName', 'mode', 'back', 'ttok', 'tas', 'osg', 'tsg',/.test(S), '⛔ 교재 껍데기(index.html)가 tsg 를 앱에 안 넘긴다 — 선생님 댓글 쓰기가 막힌다');
+{ const TH = require('fs').readFileSync(require('path').join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
+  assert.ok(/var BOOK_KEYS = \[[^\]]*'tsg'/.test(TH), '⛔ 선생님 홈이 교재 주소에 tsg 를 안 싣는다');
+  assert.ok(/function bookPendKey\(src\) \{ return bookStrip\(src, \[[^\]]*'tsg'/.test(TH), '⛔ 기기 저장소 열쇠에 서명(tsg)이 남는다'); }
+console.log('owner-sig tsg 통과');
