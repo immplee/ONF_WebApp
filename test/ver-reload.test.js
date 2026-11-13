@@ -17,8 +17,9 @@ function setup(o) {
   const srv = { 'https://app.ownify.co.kr/v.json': { ok: true, v: 'A' }, 'https://class.ownify.co.kr/teacher/': { ok: true, etag: '"p1"' }, 'https://class.ownify.co.kr/assets/onf-frame.js': { ok: true, etag: 'W/"f1"' } };
   const asked = [], beacons = [], ticks = [], vis = [], ML = [], TO = [];
   //   🔒 판 액자(2026-11-14 검토) — 다시 읽기 전에 {onf:'canReload'} 를 묻는다 · 답 = o.busy(기본 false) · o.mute = 답 없음(옛 판) · o.frames 로 갈아 끼움
-  const mkFr = (src, ans) => { const w = { postMessage: (m, org) => { w.asked = (w.asked || 0) + 1; w.org = org; if (ans === 'mute') return; ML.slice().forEach((f) => f({ data: { onf: 'canReloadAns', id: m.id, busy: typeof ans === 'function' ? ans() : !!ans }, source: w })); } }; return { src, contentWindow: w }; };
-  const frames = o.frames || [mkFr('https://app.ownify.co.kr/teacher/', () => !!o.busy), mkFr('https://accounts.google.com/gsi/button', 'mute')];
+  //   ⛔ 진짜 꼴(2026-11-14 재검토): 홈·교재 판 액자는 붙인 뒤 contentWindow.location.replace 로 열어 src 속성이 **빈 채**다 · 구글 로그인 단추만 src 를 단다
+  const mkFr = (src, ans) => { const w = { postMessage: (m, org) => { w.asked = (w.asked || 0) + 1; w.org = org; if (ans === 'mute') return; ML.slice().forEach((f) => f({ data: { onf: 'canReloadAns', id: m.id, busy: typeof ans === 'function' ? ans() : !!ans }, source: w })); } }; return { getAttribute: (k) => (k === 'src' ? src : null), contentWindow: w }; };
+  const frames = o.frames || [mkFr('', () => !!o.busy), mkFr('', () => !!o.busy2), mkFr('https://accounts.google.com/gsi/button?x=1', 'mute')];
   const doc = { hidden: false, addEventListener(k, f) { if (k === 'visibilitychange') vis.push(f); }, documentElement: { setAttribute() {} },
     querySelectorAll: (q) => (q === 'iframe' ? frames : [{ src: 'https://class.ownify.co.kr/assets/onf-frame.js' }, { src: 'https://accounts.google.com/gsi/client' }, { href: 'https://class.ownify.co.kr/assets/onf-frame.js' }]) };
   const g = { URL, document: doc, location: { origin: 'https://class.ownify.co.kr', pathname: '/teacher/', search: o.search || '', href: 'https://class.ownify.co.kr/teacher/' },
@@ -38,7 +39,7 @@ function setup(o) {
   g.window = g; vm.createContext(g);
   vm.runInContext(FSRC, g, { filename: 'onf-frame.js' });
   const calls = { nw: 0, back: 0 };
-  g.ONF.frame.verWatch('/teacher/', () => calls.nw++, () => calls.back++);
+  g.ONF.frame.verWatch('/teacher/', () => calls.nw++, () => { calls.back++; return o.backRet; });
   const hide = (ms) => { doc.hidden = true; vis.forEach((f) => f()); g.T += ms; doc.hidden = false; vis.forEach((f) => f()); };
   return { g, srv, asked, beacons, ticks, calls, hide, frames, mkFr, o, tick: () => ticks.forEach((x) => x[0]()), timeout: () => TO.splice(0).forEach((f) => f && f()) };
 }
@@ -84,29 +85,37 @@ t('못 읽은 칸(망 끊김 · 404 · 도장 없음)은 바뀜이 아니다 · 
   s.srv['https://app.ownify.co.kr/v.json'].v = 'B'; s.tick(); await flush();
   assert.strictEqual(s.calls.nw, 1, '⛔ 나중에 생긴 도장을 기준으로 안 잡았다');
 });
-t('🔒 판이 바쁘면(쓰던 메모·안 보낸 글) 안 읽는다 · 다음에 돌아왔을 때 안 바쁘면 읽는다 · 묻는 출처는 그 판 출처', async () => {
+t('🔒 판이 바쁘면(쓰던 메모·안 보낸 글) 안 읽는다 · src 가 빈 판 액자(location.replace)에도 다 묻는다 · 구글 로그인 단추는 뺀다 · 모두 안 바쁘면 읽는다', async () => {
   const s = setup(); s.o.busy = true; await flush();
   s.srv['https://app.ownify.co.kr/v.json'].v = 'B'; s.hide(60000); await flush();
   assert.deepStrictEqual(s.calls, { nw: 1, back: 0 }, '⛔ 판이 바쁜데(쓰던 글) 다시 읽었다 — 글이 사라진다');
-  assert.strictEqual(s.frames[0].contentWindow.org, 'https://app.ownify.co.kr', '⛔ 묻는 말을 아무 출처(*)로 보냈다');
-  s.o.busy = false; s.hide(60000); await flush();
+  assert.ok(s.frames[0].contentWindow.asked >= 1 && s.frames[1].contentWindow.asked >= 1, '⛔ src 가 빈 판 액자(location.replace 로 연 홈·교재)에 안 물었다 — 묻지도 않고 다시 읽어 초안이 사라진다');
+  assert.ok(!s.frames[2].contentWindow.asked, '⛔ 구글 로그인 단추 액자에 물었다(답이 없어 영영 못 읽는다)');
+  s.o.busy = false; s.o.busy2 = true; s.hide(60000); await flush();
+  assert.strictEqual(s.calls.back, 0, '⛔ 둘째 판(교재)이 바쁜데 다시 읽었다');
+  s.o.busy2 = false; s.hide(60000); await flush();
   assert.strictEqual(s.calls.back, 1, '⛔ 안 바빠졌는데 다시 안 읽는다');
 });
-t('🔒 답 없는 판(옛 판)·시한 = 안 읽는다 · 구글 길 액자(묻지 못하는 출처)가 있으면 묻지도 않고 안 읽는다', async () => {
-  const s = setup(); s.frames[0] = s.mkFr('https://app.ownify.co.kr/book/', 'mute'); await flush();
+t('🔒 답 없는 판(옛 판·구글 길·프린트)·시한 = 안 읽는다 · 시한 뒤 다음 돌아옴에 다시 묻는다', async () => {
+  const s = setup(); s.frames[0] = s.mkFr('', 'mute'); await flush();
   s.srv['https://app.ownify.co.kr/v.json'].v = 'B'; s.hide(60000); await flush(); s.timeout(); await flush();
   assert.strictEqual(s.calls.back, 0, '⛔ 답 없는 판(옛 코드)이 있는데 다시 읽었다');
-  s.frames[0] = s.mkFr('https://app.ownify.co.kr/book/', false); s.hide(60000); await flush();
+  s.frames[0] = s.mkFr('', false); s.hide(60000); await flush();
   assert.strictEqual(s.calls.back, 1, '⛔ 시한 뒤 다음 돌아옴에 다시 묻지 않는다(묻는 중 표시가 굳었다)');
-  const q = setup({ frames: [{ src: 'https://script.google.com/macros/s/x/exec', contentWindow: { postMessage() { throw new Error('should not ask'); } } }] }); await flush();
-  q.srv['https://app.ownify.co.kr/v.json'].v = 'B'; q.hide(60000); await flush();
-  assert.strictEqual(q.calls.back, 0, '⛔ 구글 길 액자(초안을 물을 수 없다)가 있는데 다시 읽었다');
+  const q = setup({ frames: [] }); q.frames.push(q.mkFr('', 'mute')); await flush();   // 구글 길 액자 = 답하는 손이 없다(프린트 판·옛 판도 같다)
+  q.srv['https://app.ownify.co.kr/v.json'].v = 'B'; q.hide(60000); await flush(); q.timeout(); await flush();
+  assert.strictEqual(q.calls.back, 0, '⛔ 답 못 하는 액자(구글 길·프린트)가 있는데 다시 읽었다');
 });
 t('겹친 확인(5분 틱 + 돌아옴이 같이 날아감) — onNew·다시 읽기는 한 번씩', async () => {
   const s = setup(); await flush();
   s.srv['https://app.ownify.co.kr/v.json'].v = 'B';
   s.tick(); s.hide(60000); await flush();
   assert.deepStrictEqual(s.calls, { nw: 1, back: 1 }, '⛔ 겹친 확인이 onNew·다시 읽기를 두 번 불렀다: ' + JSON.stringify(s.calls));
+});
+t('onBack 이 false(선생님 구글 길 — 안 읽음)면 clog reopen:ver 를 안 남긴다(헛 기록)', async () => {
+  const s = setup({ backRet: false }); await flush();
+  s.srv['https://app.ownify.co.kr/v.json'].v = 'B'; s.hide(60000); await flush();
+  assert.deepStrictEqual([s.calls.back, s.beacons.length], [1, 0], '⛔ 안 읽었는데 reopen:ver 를 남겼다: ' + JSON.stringify(s.beacons));
 });
 t('🖥️ 확장 창(주소 ext=1)은 알아채기를 아예 안 한다', async () => {
   const s = setup({ search: '?ext=1' }); await flush();
@@ -150,7 +159,7 @@ t('선생님 mount — 숨긴 판만 bookRetire · 미리 띄운(숨긴) 과제 
   g = wire(TSRC.slice(mi, me), re, { hwBox: {}, hwWarmOn: false, hwClose: () => g.log.push('hwClose'), tOutLive: () => 'https://app.ownify.co.kr' });
   g.got.a(); assert.ok(g.log.indexOf('hwClose') < 0, '⛔ 보이는 과제 판을 닫았다');
   g = wire(TSRC.slice(mi, me), re, { hwBox: {}, hwWarmOn: false, hwClose() {}, tOutLive: () => '' });
-  g.got.b(); assert.deepStrictEqual(g.log, [], '⛔ 정적 선생님 홈이 아닌데(구글 길 · 다시 읽으면 로그인에서 멈출 수 있다) 다시 읽었다');
+  assert.strictEqual(g.got.b(), false, '⛔ 안 읽었으면 false 를 돌려야 한다(헛 reopen:ver 기록)'); assert.deepStrictEqual(g.log, [], '⛔ 정적 선생님 홈이 아닌데(구글 길 · 다시 읽으면 로그인에서 멈출 수 있다) 다시 읽었다');
 });
 
 (async () => {
