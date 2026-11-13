@@ -322,6 +322,72 @@
     };
     if (who.p) who.p.then(send, send); else send();
   }
+  /* 🔄 새 코드 알아채기(2026-11-14 Peter 「새로 배포한 코드는 새로 고침을 안 눌러도」) — 학생 껍데기(mount)·선생님 껍데기(teacher/index.html mount)가 한 번씩 부른다.
+     잰다: 정적 판 도장 app.ownify.co.kr/v.json {v: 커밋 해시}(Ownify tools/outside-deploy.sh 가 구글 배포 **뒤** 판과 한 번에 올린다 · no-store) +
+       껍데기(Vercel) 자기 파일 — 이 문서(page)와 같은 출처 script·stylesheet 의 ETag(HEAD · 내용 해시라 배포마다만 바뀐다 · 2026-11-14 curl 확인).
+     때: 처음(= 기준) · 5분마다 · 숨었다 보일 때. 칸마다 처음 읽은 값이 기준 — 못 읽은 칸(망·404)은 이번엔 안 센다(헛 「바뀜」 없음).
+     바뀌면 ① onNew 한 번(숨긴 판 내리기 — 보이는 것은 안 건드린다) ② 그 뒤 **30초 넘게 숨었다 돌아올 때만** onBack(껍데기째 다시 읽기 · 당겨서 새로고침과 같은 되살리기).
+       ⛔ 보이며 쓰는 중엔 절대 다시 읽지 않는다(숨은 동안엔 칠 수 없다 = 안 보낸 글 없음). 다시 읽기 전 clog 한 줄 reopen:ver(값 없음).
+     ponytail: 「지금 바쁘다」 물어보기(안쪽 판과 말 주고받기)는 안 한다 — 돌아온 순간 0.1~0.3초(도장 받기) 안에 친 글자는 되살리기 몫이다. fetch 없는 창(검사 vm)은 아무것도 안 한다. */
+  var VER_EVERY_MS = 5 * 60 * 1000, VER_AWAY_MS = 30 * 1000;
+  function verWatch(page, onNew, onBack) {
+    var doc = global.document, base = {}, isNew = false, told = false, asking = false, hidAt = 0, urls, own, rlSeq = 0;
+    try {   // ⛔ 무엇이 던져도(옛 브라우저 · 검사 vm) mount 는 종전 그대로 — 알아채기만 없다
+      if (typeof global.fetch !== 'function' || typeof global.setInterval !== 'function' || !doc || !doc.querySelectorAll) return;
+      if (/[?&]ext=1(&|$)/.test(String(global.location.search || ''))) return;   // 🖥️ 확장 창은 안 한다(2026-11-14 검토 — 큰 창과 오가기만 해도 확장 창이 스스로 다시 읽혔다 · 확장 창은 큰 창을 따라간다)
+      own = global.location.origin + '/'; urls = [ONF_OUT_ORIGINS[0] + '/v.json', global.location.origin + page];
+      Array.prototype.forEach.call(doc.querySelectorAll('script[src],link[rel="stylesheet"]'), function (el) { var u = el.src || el.href || ''; if (u.indexOf(own) === 0 && urls.indexOf(u) < 0) urls.push(u); });
+    } catch (e0) { return; }
+    function one(u, i) {
+      return global.fetch(u, i ? { method: 'HEAD', cache: 'no-store' } : { cache: 'no-store' }).then(function (r) {
+        if (!r.ok) return null;
+        if (i) return String(r.headers.get('etag') || '').replace(/^W\//, '') || null;
+        return r.json().then(function (j) { return j && typeof j.v === 'string' && j.v ? j.v : null; });
+      }).catch(function () { return null; });
+    }
+    /* 🔒 다시 읽어도 되나(2026-11-14 검토 — 수업 메모 초안·쓰던 댓글이 메모리뿐이라 다시 읽으면 사라졌다) — 우리 판 액자마다 {onf:'canReload'} → 1.5초 안에 모두 busy:false 일 때만.
+         답 없음(옛 판·구글 길 액자 — 묻지 못하는 출처)·바쁨·시한 = 이번엔 안 읽는다(다음 돌아올 때 다시 묻는다) · 구글 로그인 단추 액자는 뺀다. */
+    function safe(cb) {
+      var want = [], wo = [], id = 'rl' + (++rlSeq), done = false, got = 0, bad = false;
+      Array.prototype.forEach.call(doc.querySelectorAll('iframe'), function (f) {
+        var o = ''; try { o = f.src ? new global.URL(f.src, global.location.href).origin : ''; } catch (e) { o = '?'; }
+        if (!o || o === 'https://accounts.google.com') return;
+        if ((ONF_OUT_ORIGINS.indexOf(o) >= 0 || o === global.location.origin) && f.contentWindow) { want.push(f.contentWindow); wo.push(o); } else bad = true;
+      });
+      if (bad) return cb(false);
+      if (!want.length) return cb(true);
+      var fin = function (ok) { if (done) return; done = true; global.removeEventListener('message', hear); global.clearTimeout(tm); cb(ok); };
+      var hear = function (ev) {
+        var d = ev && ev.data;
+        if (!d || d.onf !== 'canReloadAns' || d.id !== id || want.indexOf(ev.source) < 0) return;
+        if (d.busy !== false) return fin(false);
+        if (++got >= want.length) fin(true);
+      };
+      var tm = global.setTimeout(function () { fin(false); }, 1500);
+      global.addEventListener('message', hear);
+      want.forEach(function (w, i) { try { w.postMessage({ onf: 'canReload', id: id }, wo[i]); } catch (e) { fin(false); } });
+    }
+    function back() {
+      if (asking) return; asking = true;
+      safe(function (ok) { asking = false; if (!ok) return; whoBeacon({ k: 'err', c: 'reopen:ver' }); onBack(); });
+    }
+    function look(away) {
+      if (isNew) { if (away) back(); return; }
+      Promise.all(urls.map(one)).then(function (vs) {
+        vs.forEach(function (v, i) { if (v === null) return; if (!(i in base)) base[i] = v; else if (base[i] !== v) isNew = true; });
+        if (!isNew) return;
+        if (!told) { told = true; try { onNew(); } catch (e) {} }   // 한 번만(5분 박자·돌아옴이 겹쳐도 · 2026-11-14 검토)
+        if (away) back();
+      });
+    }
+    doc.addEventListener('visibilitychange', function () {
+      if (doc.hidden) { hidAt = Date.now(); return; }
+      var away = hidAt > 0 && Date.now() - hidAt >= VER_AWAY_MS; hidAt = 0;
+      look(away);
+    });
+    global.setInterval(function () { look(false); }, VER_EVERY_MS);
+    look(false);
+  }
   /* 🔭 통째 구글 화면 세기(2026-11-05 2차 검수 ②) — 물러남 기억에 막혀(fallBlocked) 정적 판을 아예 안 묻고 구글 화면을 연 것 · 첫 판 사본 힌트가 없어(/who 답 없음) 구글로 간 것.
      그 화면엔 gp 갈고리가 없어 안 보였다(막힌 동안 하루 내내 조용히 구글). k:'gp' c:'sh:<판>:<까닭>' — 한 화면(껍데기 문서) 판·까닭마다 한 번(gpLog 처럼 횟수는 실제보다 적다). */
   var shSeen = {};
@@ -1493,6 +1559,8 @@
     });
     else mainExec();   // 🟠 hooks = 첫 화면 로고 로딩(index.html · onf-load.js) · 🔐 여러 계정 우회(위) — 못 열면 index.html 의 「불러오는 중」 자리에 안내 · 기억은 홈 액자만 정한다
     preEarly();   // 🚀 홈 요청이 먼저 나간 **뒤** — 홈이 더 중요하다(둘이 같이 받는다)
+    /* 🔄 새 코드(위 verWatch) — 숨긴 판은 바로 내린다(bookRetire · 안 보낸 글이 있을 수 있어 지우지 않는다 · 30분 bookIdle 이 치운다 · 다음 열기는 새 판) · 돌아오면 당겨서 새로고침과 같은 길. */
+    verWatch('/index.html', function () { books.slice().forEach(function (p) { if (p.parked) bookRetire(p); }); }, function () { rsSaveNow(); global.location.reload(); });
     if (opts.bookSrc) rsBoot();   // 🔄 새로고침 전에 열려 있던 판을 그대로(위 rsBoot) — 미리 띄운 판이 같은 교재면 그 판을 보인다
     return { _books: books, _drop: bookDrop };   // 검사용으로만(test/book-panel.test.js 가 판 자격·back 을 본다) — 화면 코드에서 쓰지 마라
   }
@@ -1629,6 +1697,7 @@
     outOpen: outOpen,   // 🌤 교재 판을 정적 판으로 여는 한 함수(학생·선생님 bookMake · 선생님 「교재 옆에」 · 2026-10-31 넓히기)
     fallBack: fallBack, fallBlocked: fallBlocked, fallOk: fallOk,   // 🔁 물러남 기억 한 곳(위 FALL_KEY) — 선생님 껍데기 정적 홈·정적 교재도 이 셋만
     get WORKER() { return wBase(); },   // 🏫 Worker 바탕 주소(밖으로 4-④-2c 2026-10-30 · 선생님 껍데기 /t/login·/clog) — 위 wBase() 한 곳에서(서울 길 · 물러나면 workers.dev)
+    verWatch: verWatch,   // 🔄 새 코드 알아채기(2026-11-14 · 선생님 껍데기 mount 도 같은 함수)
     printTitle: printTitle,   // 📄 선생님 껍데기(teacher/index.html) 판도 같은 함수
     /* 검사용으로만 낸다 — 순수 판정 함수라 창 없이 잴 수 있다. 화면 코드에서 부르지 마라. */
     _fromOurFrame: _fromOurFrame,

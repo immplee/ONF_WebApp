@@ -350,6 +350,9 @@ function onCredential(res) {
 function mount() {
   if (!EXEC) return say('아직 주소가 설정되지 않았어요. (EXEC)');
   mounted = true;
+  /* 🔄 새 코드(onf-frame.js verWatch · 2026-11-14) — 숨긴 교재 판은 바로 내리고(bookRetire) 미리 띄운 과제 판은 닫는다(hwClose) · 30초 넘게 숨었다 돌아오면 당겨서 새로고침과 같은 길(rsSave → reload).
+     ⚠️ 쌍둥이: 학생 assets/onf-frame.js mount 의 verWatch 줄. onf-frame.js 를 못 받았으면 종전 그대로. */
+  if (window.ONF && ONF.frame && ONF.frame.verWatch) ONF.frame.verWatch('/teacher/', function () { books.slice().forEach(function (p) { if (p.parked) bookRetire(p); }); if (hwBox && hwWarmOn) hwClose(); }, function () { if (!tOutLive()) return; var rv = bookShown(); if (rv) rsSave(rv); location.reload(); });   // ⛔ 정적 선생님 홈(입장권 tch. 저장)이 떠 있을 때만 — 구글 길(물러난 날)은 다시 읽으면 구글 로그인에서 멈출 수 있다(2026-11-14 검토)
   document.getElementById('lock').hidden = true;
   /* ⛔ 잠금화면을 치우는 **그 순간**부터 표시가 있어야 한다. 종전엔 여기부터 화면에 아무것도
      없었고(#why 는 #lock 안이라 같이 숨는다), 「3초」와 「영영」이 같은 흰 종이였다. */
