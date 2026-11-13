@@ -328,7 +328,7 @@
      때: 처음(= 기준) · 5분마다 · 숨었다 보일 때. 칸마다 처음 읽은 값이 기준 — 못 읽은 칸(망·404)은 이번엔 안 센다(헛 「바뀜」 없음).
      바뀌면 ① onNew 한 번(숨긴 판 내리기 — 보이는 것은 안 건드린다) ② 그 뒤 **30초 넘게 숨었다 돌아올 때만** onBack(껍데기째 다시 읽기 · 당겨서 새로고침과 같은 되살리기).
        ⛔ 보이며 쓰는 중엔 절대 다시 읽지 않는다(숨은 동안엔 칠 수 없다 = 안 보낸 글 없음). 다시 읽기 전 clog 한 줄 reopen:ver(값 없음).
-     ponytail: 「지금 바쁘다」 물어보기(안쪽 판과 말 주고받기)는 안 한다 — 돌아온 순간 0.1~0.3초(도장 받기) 안에 친 글자는 되살리기 몫이다. fetch 없는 창(검사 vm)은 아무것도 안 한다. */
+     다시 읽기 전엔 모든 판 액자에 「바쁘냐」 묻는다(아래 safe · 2026-11-14) — 답 없음·바쁨·시한이면 이번엔 안 읽는다. fetch 없는 창(검사 vm)은 아무것도 안 한다. */
   var VER_EVERY_MS = 5 * 60 * 1000, VER_AWAY_MS = 30 * 1000;
   function verWatch(page, onNew, onBack) {
     var doc = global.document, base = {}, isNew = false, told = false, asking = false, hidAt = 0, urls, own, rlSeq = 0;
@@ -348,28 +348,31 @@
     /* 🔒 다시 읽어도 되나(2026-11-14 검토 — 수업 메모 초안·쓰던 댓글이 메모리뿐이라 다시 읽으면 사라졌다) — 우리 판 액자마다 {onf:'canReload'} → 1.5초 안에 모두 busy:false 일 때만.
          답 없음(옛 판·구글 길 액자 — 묻지 못하는 출처)·바쁨·시한 = 이번엔 안 읽는다(다음 돌아올 때 다시 묻는다) · 구글 로그인 단추 액자는 뺀다. */
     function safe(cb) {
-      var want = [], wo = [], id = 'rl' + (++rlSeq), done = false, got = 0, bad = false;
+      var want = [], id = 'rl' + (++rlSeq), done = false, got = [];
+      /* ⛔ 액자 출처를 src 속성으로 보지 않는다(2026-11-14 재검토) — 홈·교재 판은 붙인 뒤 contentWindow.location.replace 로 열어 src 가 끝까지 비어 있다.
+           종전엔 빈 src 를 건너뛰어 아무에게도 안 묻고 다시 읽었다(수업 메모 초안이 사라질 길) → 구글 로그인 단추(src 를 단다)만 빼고 **모든 액자**에 묻는다.
+           우리 출처마다 보낸다(답은 보낸 창 ev.source 로 가린다) · 답 없는 액자(구글 길·프린트 판·옛 판) = 바쁨. */
       Array.prototype.forEach.call(doc.querySelectorAll('iframe'), function (f) {
-        var o = ''; try { o = f.src ? new global.URL(f.src, global.location.href).origin : ''; } catch (e) { o = '?'; }
-        if (!o || o === 'https://accounts.google.com') return;
-        if ((ONF_OUT_ORIGINS.indexOf(o) >= 0 || o === global.location.origin) && f.contentWindow) { want.push(f.contentWindow); wo.push(o); } else bad = true;
+        if (/^https:\/\/accounts\.google\.com\//.test(String(f.getAttribute && f.getAttribute('src') || ''))) return;
+        if (f.contentWindow) want.push(f.contentWindow);
       });
-      if (bad) return cb(false);
       if (!want.length) return cb(true);
       var fin = function (ok) { if (done) return; done = true; global.removeEventListener('message', hear); global.clearTimeout(tm); cb(ok); };
       var hear = function (ev) {
         var d = ev && ev.data;
         if (!d || d.onf !== 'canReloadAns' || d.id !== id || want.indexOf(ev.source) < 0) return;
         if (d.busy !== false) return fin(false);
-        if (++got >= want.length) fin(true);
+        if (got.indexOf(ev.source) < 0) got.push(ev.source);   // 판마다 한 번(같은 판의 겹친 답을 둘로 세지 않는다)
+        if (got.length >= want.length) fin(true);
       };
       var tm = global.setTimeout(function () { fin(false); }, 1500);
       global.addEventListener('message', hear);
-      want.forEach(function (w, i) { try { w.postMessage({ onf: 'canReload', id: id }, wo[i]); } catch (e) { fin(false); } });
+      var orgs = ONF_OUT_ORIGINS.concat([global.location.origin]);   // 우리 출처마다 한 번(안 맞는 출처는 브라우저가 버린다 · '*' 안 씀 — 판 출처는 location.replace 라 모른다)
+      want.forEach(function (w) { orgs.forEach(function (o) { try { w.postMessage({ onf: 'canReload', id: id }, o); } catch (e) {} }); });
     }
     function back() {
       if (asking) return; asking = true;
-      safe(function (ok) { asking = false; if (!ok) return; whoBeacon({ k: 'err', c: 'reopen:ver' }); onBack(); });
+      safe(function (ok) { asking = false; if (!ok || onBack() === false) return; whoBeacon({ k: 'err', c: 'reopen:ver' }); });   // onBack 이 false = 안 읽었다(선생님 구글 길) — 헛 기록 없음 · 기록은 다시 읽기를 부른 뒤(같은 틱 · sendBeacon 은 떠나는 문서에서도 간다)
     }
     function look(away) {
       if (isNew) { if (away) back(); return; }
