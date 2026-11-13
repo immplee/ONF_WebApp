@@ -1557,7 +1557,7 @@ function bookFrom(ev, el, app) {   // app = 판 액자(정적 판 출처도) · 
 }
 function bookShown() { for (var i = 0; i < books.length; i++) if (!books[i].parked) return books[i]; return null; }
 /* 👆 보이는 맨 위 액자에 초점(2026-11-13 — 숨긴 액자가 초점을 쥐고 있으면 아이패드가 보이는 액자의 첫 손을 초점 옮기기에 쓰고 click 을 삼킨다) · 과제 판 > 보이는 교재 판 > 홈 */
-function focusTop() { try { var q = bookShown(); (typeof hwBox !== 'undefined' && hwBox && !hwWarmOn && hwFr ? hwFr : q ? q.el : frame).focus(); } catch (e) {} }
+function focusTop() { try { var q = bookShown(), hw = typeof hwBox !== 'undefined' && hwBox && !hwWarmOn && hwFr; (hw ? (hwView === 'book' && hwBk ? hwBk.el : hwFr) : q ? q.el : frame).focus(); } catch (e) {} }   // 과제 판이 교재만 보기면 그 교재(2026-11-14 검수 — 판에 주면 교재 첫 손이 먹혔다)
 function bookFind(src) { for (var i = 0; i < books.length; i++) if (books[i].src === src && !books[i].gone) return books[i]; return null; }   // 📖 gone = 내용과 주소가 어긋날 수 있는 판(아래 bookRetire)
 function bookPlace(p, left, m, r) {
   if (typeof left !== 'number' || !isFinite(left)) return;
