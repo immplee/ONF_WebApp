@@ -331,9 +331,10 @@
      ponytail: 「지금 바쁘다」 물어보기(안쪽 판과 말 주고받기)는 안 한다 — 돌아온 순간 0.1~0.3초(도장 받기) 안에 친 글자는 되살리기 몫이다. fetch 없는 창(검사 vm)은 아무것도 안 한다. */
   var VER_EVERY_MS = 5 * 60 * 1000, VER_AWAY_MS = 30 * 1000;
   function verWatch(page, onNew, onBack) {
-    var doc = global.document, base = {}, isNew = false, hidAt = 0, urls, own;
+    var doc = global.document, base = {}, isNew = false, told = false, asking = false, hidAt = 0, urls, own, rlSeq = 0;
     try {   // ⛔ 무엇이 던져도(옛 브라우저 · 검사 vm) mount 는 종전 그대로 — 알아채기만 없다
       if (typeof global.fetch !== 'function' || typeof global.setInterval !== 'function' || !doc || !doc.querySelectorAll) return;
+      if (/[?&]ext=1(&|$)/.test(String(global.location.search || ''))) return;   // 🖥️ 확장 창은 안 한다(2026-11-14 검토 — 큰 창과 오가기만 해도 확장 창이 스스로 다시 읽혔다 · 확장 창은 큰 창을 따라간다)
       own = global.location.origin + '/'; urls = [ONF_OUT_ORIGINS[0] + '/v.json', global.location.origin + page];
       Array.prototype.forEach.call(doc.querySelectorAll('script[src],link[rel="stylesheet"]'), function (el) { var u = el.src || el.href || ''; if (u.indexOf(own) === 0 && urls.indexOf(u) < 0) urls.push(u); });
     } catch (e0) { return; }
@@ -344,13 +345,38 @@
         return r.json().then(function (j) { return j && typeof j.v === 'string' && j.v ? j.v : null; });
       }).catch(function () { return null; });
     }
-    function back() { whoBeacon({ k: 'err', c: 'reopen:ver' }); onBack(); }
+    /* 🔒 다시 읽어도 되나(2026-11-14 검토 — 수업 메모 초안·쓰던 댓글이 메모리뿐이라 다시 읽으면 사라졌다) — 우리 판 액자마다 {onf:'canReload'} → 1.5초 안에 모두 busy:false 일 때만.
+         답 없음(옛 판·구글 길 액자 — 묻지 못하는 출처)·바쁨·시한 = 이번엔 안 읽는다(다음 돌아올 때 다시 묻는다) · 구글 로그인 단추 액자는 뺀다. */
+    function safe(cb) {
+      var want = [], wo = [], id = 'rl' + (++rlSeq), done = false, got = 0, bad = false;
+      Array.prototype.forEach.call(doc.querySelectorAll('iframe'), function (f) {
+        var o = ''; try { o = f.src ? new global.URL(f.src, global.location.href).origin : ''; } catch (e) { o = '?'; }
+        if (!o || o === 'https://accounts.google.com') return;
+        if ((ONF_OUT_ORIGINS.indexOf(o) >= 0 || o === global.location.origin) && f.contentWindow) { want.push(f.contentWindow); wo.push(o); } else bad = true;
+      });
+      if (bad) return cb(false);
+      if (!want.length) return cb(true);
+      var fin = function (ok) { if (done) return; done = true; global.removeEventListener('message', hear); global.clearTimeout(tm); cb(ok); };
+      var hear = function (ev) {
+        var d = ev && ev.data;
+        if (!d || d.onf !== 'canReloadAns' || d.id !== id || want.indexOf(ev.source) < 0) return;
+        if (d.busy !== false) return fin(false);
+        if (++got >= want.length) fin(true);
+      };
+      var tm = global.setTimeout(function () { fin(false); }, 1500);
+      global.addEventListener('message', hear);
+      want.forEach(function (w, i) { try { w.postMessage({ onf: 'canReload', id: id }, wo[i]); } catch (e) { fin(false); } });
+    }
+    function back() {
+      if (asking) return; asking = true;
+      safe(function (ok) { asking = false; if (!ok) return; whoBeacon({ k: 'err', c: 'reopen:ver' }); onBack(); });
+    }
     function look(away) {
       if (isNew) { if (away) back(); return; }
       Promise.all(urls.map(one)).then(function (vs) {
         vs.forEach(function (v, i) { if (v === null) return; if (!(i in base)) base[i] = v; else if (base[i] !== v) isNew = true; });
         if (!isNew) return;
-        try { onNew(); } catch (e) {}
+        if (!told) { told = true; try { onNew(); } catch (e) {} }   // 한 번만(5분 박자·돌아옴이 겹쳐도 · 2026-11-14 검토)
         if (away) back();
       });
     }
