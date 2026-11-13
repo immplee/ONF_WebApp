@@ -1139,7 +1139,9 @@ function hwPenSync() {
 var hwFbLast = null;
 function hwFbClean(d) {
   var S = function (v, n) { return String(v == null ? '' : v).slice(0, n); }, I = function (v) { v = Number(v); return isFinite(v) ? Math.max(0, Math.min(1e6, Math.floor(v))) : 0; };
-  if (d.go && typeof d.go === 'object') return { onf: 'fbBook', go: { row: I(d.go.row), sheet: S(d.go.sheet, 100) } };   // 📍 카드를 누르면 옆 교재 그 대사 칸으로(Ownify #398 · 2026-11-08) — 줄·회차만
+  if (d.go && typeof d.go === 'object') return { onf: 'fbBook', go: { row: I(d.go.row), sheet: S(d.go.sheet, 100) } };
+  /* 📖 지금 대사(Ownify 2026-11-13 Peter 「과제 사진에서 피드백 주다 교재로 넘어가면 표시가 안 이어져」) — 과제 판이 녹음에서 지금 읽는 대사를 바뀔 때만 보낸다 {r 시트 행, k 대사 번호, f 따라 굴리기, w 지금 낱말 [a,b]} · 0 = 없음 */
+  if (d.now !== undefined) { var n = d.now; return { onf: 'fbBook', now: n && typeof n === 'object' ? { r: I(n.r), k: I(n.k), f: n.f ? 1 : 0, w: Array.isArray(n.w) && n.w.length === 2 ? [I(n.w[0]), I(n.w[1])] : null } : 0 }; }   // 📍 카드를 누르면 옆 교재 그 대사 칸으로(Ownify #398 · 2026-11-08) — 줄·회차만
   var m = { onf: 'fbBook', on: d.on === 1 ? 1 : 0, items: (Array.isArray(d.items) ? d.items.slice(0, 300) : []).map(function (x) { x = x || {}; return { id: S(x.id, 40), n: I(x.n), row: I(x.row), w0: I(x.w0), w1: I(x.w1), ipa: S(x.ipa, 200), sent: x.sent ? 1 : 0, sheet: S(x.sheet, 100) }; }) };
   if (Array.isArray(d.cmt) && d.cmt.length) m.cmt = d.cmt.slice(0, 100).map(function (x) { x = x || {}; return { id: S(x.id, 40), row: I(x.row), sheet: S(x.sheet, 100), text: S(x.text, 4000) }; });
   return m;
@@ -1147,7 +1149,7 @@ function hwFbClean(d) {
 function hwFbRelay(d) {
   var m = hwFbClean(d), keep;
   //   ⛔ 「그 줄로」는 목록이 아니다 — 목록(hwFbLast)을 안 건드리고 옆 교재에만 · 종전엔 go 를 몰라 「꺼짐 + 빈 목록」으로 바꿔 보내 교재 표시·고르기가 꺼졌다(2026-11-08 검수)
-  if (m.go) { if (hwBk && hwBk.win) { try { hwBk.win.postMessage(m, hwBk.origin); } catch (e) {} } return; }
+  if (m.go || m.now !== undefined) { if (hwBk && hwBk.win) { try { hwBk.win.postMessage(m, hwBk.origin); } catch (e) {} } return; }   // 📖 지금 대사(now)도 목록이 아니다 — 옆 교재에만
   keep = { onf: m.onf, on: m.on, items: m.items };
   hwFbLast = keep;
   if (hwBk && hwBk.win) { try { hwBk.win.postMessage(m, hwBk.origin); } catch (e) {} }
@@ -1200,6 +1202,7 @@ function hwFbBack(d) {
   var S = function (v, n) { return String(v == null ? '' : v).slice(0, n); }, I = function (v) { v = Number(v); return isFinite(v) ? Math.max(0, Math.min(1e6, Math.floor(v))) : 0; }, m = null;
   if (d.onf === 'fbPick') m = { onf: 'fbPick', row: I(d.row), w0: I(d.w0), w1: I(d.w1), text: S(d.text, 400), ipa: S(d.ipa, 200), sheet: S(d.sheet, 100) };
   else if (d.onf === 'fbFocus') m = { onf: 'fbFocus', id: S(d.id, 40) };
+  else if (d.onf === 'fbWords') m = { onf: 'fbWords', k: I(d.k), ws: (Array.isArray(d.ws) ? d.ws.slice(0, 80) : []).map(function (x) { return S(x, 40); }) };   // 📖 옆 교재 그 대사 칸 낱말 글자(과제 판이 지금 낱말을 맞춘다 · 2026-11-13)
   else if (d.onf === 'fbCmtAck') m = { onf: 'fbCmtAck', id: S(d.id, 40), ok: d.ok ? 1 : 0, why: S(d.why, 20) };
   if (m) { try { hwWin.postMessage(m, hwOrigin); } catch (e) {} }
 }
@@ -1210,7 +1213,7 @@ window.addEventListener('message', function (ev) {
   if (d.onf === 'hist') { hwBkHist(ev); return; }   // 🔙 옆 교재 기록 다리(위 hwBkHist)
   if (d.onf === 'bookHi') { hwBk.win = ev.source; hwBk.origin = ev.origin; if (hwBk.unpark) { hwBk.unpark = false; try { hwBk.win.postMessage({ onf: 'bookPark', on: false }, hwBk.origin); } catch (e) {} } hwPenSync(); hwFbSync(); hwBkRsTell(); return; }
   if (d.onf === 'bookState') { hwBkSave(d.st); return; }   // 🔄 옆 교재의 지금 상태(위 hwBkRs)
-  if (d.onf === 'fbPick' || d.onf === 'fbFocus' || d.onf === 'fbCmtAck') { hwFbBack(d); return; }   // 🎧 옆 교재 → 과제 판
+  if (d.onf === 'fbPick' || d.onf === 'fbFocus' || d.onf === 'fbCmtAck' || d.onf === 'fbWords') { hwFbBack(d); return; }   // 🎧 옆 교재 → 과제 판
   if (d.onf === 'hwTap') { histTap(); return; }   // 👆 옆·교재만에서 교재만 만져도(반박 🟠2)
   if (d.onf === 'reload') { reopenLog('pullhwbk'); location.reload(); return; }   // 🔄 옆 교재의 당겨서 새로고침(2026-11-11 — 종전 이 액자의 말은 안 받았다 · 판·옆 교재 기억은 이미 적혀 있다)
   if (d.onf === 'penAct') { if (hwView === 'side' && hwWin) { try { hwWin.postMessage({ onf: 'bookPenAct' }, hwOrigin); } catch (e) {} } return; }

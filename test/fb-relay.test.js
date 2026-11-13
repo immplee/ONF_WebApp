@@ -48,6 +48,16 @@ t('⑥ 카드 → 그 줄로(go): 줄·회차만 옆 교재에 · 목록(켜짐�
   c.hwBk.win = win(); c.hwFbSync();
   assert.strictEqual(c.hwBk.win.sent[0][0].on, 1, '⛔ go 가 마지막 목록을 꺼짐으로 덮었다'); assert.strictEqual(c.hwBk.win.sent[0][0].items.length, 1);
 });
+t('⑧ 지금 대사(now · 2026-11-13): 옆 교재에만 · 꼴 거름 · 목록(켜짐·항목)은 그대로 · 0 = 없음 · 교재 → 과제 판 낱말 글자(fbWords) 거름', () => {
+  const c = run(); c.hwBk = { win: win(), origin: 'https://book.example' };
+  c.hwFbRelay({ onf: 'hwFb', on: 1, items: [{ id: 'abc', n: 1, row: 5, w0: 0, w1: 0, sheet: 'E1' }] });
+  c.hwFbRelay({ onf: 'hwFb', now: { r: '33', k: 4, f: true, w: [2, '3', 9], evil: 1 } }); c.hwFbRelay({ onf: 'hwFb', now: { r: 33, k: 4, f: 0, w: [1, 2] } }); c.hwFbRelay({ onf: 'hwFb', now: 0 });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.hwBk.win.sent.slice(1).map((x) => x[0]))), [{ onf: 'fbBook', now: { r: 33, k: 4, f: 1, w: null } }, { onf: 'fbBook', now: { r: 33, k: 4, f: 0, w: [1, 2] } }, { onf: 'fbBook', now: 0 }]);
+  c.hwBk.win = win(); c.hwFbSync();
+  assert.strictEqual(c.hwBk.win.sent[0][0].on, 1, '⛔ now 가 마지막 목록을 덮었다'); assert.strictEqual(c.hwBk.win.sent[0][0].items.length, 1);
+  c.hwFbBack({ onf: 'fbWords', k: '4', ws: ['I', 'x'.repeat(99), 3].concat(Array(100).fill('a')), evil: 1 });
+  const m = c.hwWin.sent.slice(-1)[0][0]; assert.deepStrictEqual(Object.keys(m).sort(), ['k', 'onf', 'ws']); assert.strictEqual(m.k, 4); assert.strictEqual(m.ws.length, 80); assert.strictEqual(m.ws[1].length, 40); assert.strictEqual(m.ws[2], '3');
+});
 t('⑦ 지난 수업 자료 열기: 꼴 맞으면 그 수업을 열고 · 그 수업 자료가 물을 때 한 번만 범위를 준다 · 다른 수업·2분 넘음·꼴 틀림 = 안 줌', () => {
   const L = '0123abcd-0000-4000-8000-00000000000a', opened = [];
   const c = run(); c.hwT = 'TOKSTU'; c.hwOpen = (t, l, f, hwt) => { opened.push([t, l]); c.hwL = l; c.lastOpen = { f, hwt }; };
@@ -76,7 +86,7 @@ t('⑦ 지난 수업 자료 열기: 꼴 맞으면 그 수업을 열고 · 그 �
 });
 t('⑤ 받는 자리 — 과제 판 허용 목록에 hwFb · 교재 말은 bookFrom 걸러진 길 안', () => {
   assert.match(src, /d\.onf !== 'hwPen' && d\.onf !== 'hwFb' &&/);
-  const i = src.indexOf("if (d.onf === 'fbPick' || d.onf === 'fbFocus' || d.onf === 'fbCmtAck') { hwFbBack(d); return; }"), g = src.lastIndexOf('if (!d || !hwBk || !bookFrom(ev, hwBk.el, true)) return;', i);
+  const i = src.indexOf("if (d.onf === 'fbPick' || d.onf === 'fbFocus' || d.onf === 'fbCmtAck' || d.onf === 'fbWords') { hwFbBack(d); return; }"), g = src.lastIndexOf('if (!d || !hwBk || !bookFrom(ev, hwBk.el, true)) return;', i);
   assert.ok(i > 0 && g > 0 && i - g < 1500, '⛔ 교재 말을 출처 확인 없이 받는다');
 });
 console.log(`fb-relay: ${pass} 통과${fail ? ' · ' + fail + ' 실패' : ''}`); process.exitCode = fail ? 1 : 0;
