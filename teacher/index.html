@@ -1149,10 +1149,10 @@ function hwPenSync() {
 var hwFbLast = null;
 function hwFbClean(d) {
   var S = function (v, n) { return String(v == null ? '' : v).slice(0, n); }, I = function (v) { v = Number(v); return isFinite(v) ? Math.max(0, Math.min(1e6, Math.floor(v))) : 0; };
-  if (d.go && typeof d.go === 'object') return { onf: 'fbBook', go: { row: I(d.go.row), sheet: S(d.go.sheet, 100) } };
+  if (d.go && typeof d.go === 'object') return { onf: 'fbBook', go: { row: I(d.go.row), sheet: S(d.go.sheet, 100), w0: I(d.go.w0), w1: I(d.go.w1) } };   // w0·w1 = 체크한 낱말 범위(그 낱말 전체 깜빡 · Ownify 연습 피드백 2026-11-15)
   /* 📖 지금 대사(Ownify 2026-11-13 Peter 「과제 사진에서 피드백 주다 교재로 넘어가면 표시가 안 이어져」) — 과제 판이 녹음에서 지금 읽는 대사를 바뀔 때만 보낸다 {r 시트 행, k 대사 번호, f 따라 굴리기, w 지금 낱말 [a,b]} · 0 = 없음 */
   if (d.now !== undefined) { var n = d.now; return { onf: 'fbBook', now: n && typeof n === 'object' ? { r: I(n.r), k: I(n.k), f: n.f ? 1 : 0, w: Array.isArray(n.w) && n.w.length === 2 ? [I(n.w[0]), I(n.w[1])] : null } : 0 }; }   // 📍 카드를 누르면 옆 교재 그 대사 칸으로(Ownify #398 · 2026-11-08) — 줄·회차만
-  var m = { onf: 'fbBook', on: d.on === 1 ? 1 : 0, items: (Array.isArray(d.items) ? d.items.slice(0, 300) : []).map(function (x) { x = x || {}; return { id: S(x.id, 40), n: I(x.n), row: I(x.row), w0: I(x.w0), w1: I(x.w1), ipa: S(x.ipa, 200), sent: x.sent ? 1 : 0, sheet: S(x.sheet, 100) }; }) };
+  var m = { onf: 'fbBook', on: d.on === 1 ? 1 : 0, draw: d.draw === 1 ? 1 : 0, items: (Array.isArray(d.items) ? d.items.slice(0, 300) : []).map(function (x) { x = x || {}; return { id: S(x.id, 40), n: I(x.n), row: I(x.row), w0: I(x.w0), w1: I(x.w1), ipa: S(x.ipa, 200), sent: x.sent ? 1 : 0, sheet: S(x.sheet, 100), st: /^[RMS]$/.test(String(x.st || '')) ? x.st : 'R', lv: Math.max(1, Math.min(3, I(x.lv) || 1)), sel: x.sel ? 1 : 0 }; }) };   // 🎯 단계 색(st)·겹친 진하기(lv 1~3)·고른 곳(sel) · draw = 필기(Ownify 연습 피드백 2026-11-15)
   if (Array.isArray(d.cmt) && d.cmt.length) m.cmt = d.cmt.slice(0, 100).map(function (x) { x = x || {}; return { id: S(x.id, 40), row: I(x.row), sheet: S(x.sheet, 100), text: S(x.text, 4000) }; });
   return m;
 }
