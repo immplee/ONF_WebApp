@@ -44,6 +44,16 @@ t('④ 교재 → 과제 판: 세 가지만 · 꼴 거름 · 과제 판 출처�
   assert.ok(c.hwWin.sent.every((x) => x[1] === 'https://board.example'));
   assert.deepStrictEqual(Object.keys(c.hwWin.sent[0][0]).sort(), ['ipa', 'onf', 'row', 'sheet', 'text', 'w0', 'w1']);
 });
+t('⑨ 💬 보낸 피드백 댓글 고치기·지우기(cs · 2026-11-15) — 꼴 거름(text null = 지우기) · 옆 교재 없으면 nobook(op·cm 같이) · 교재 → 판 답에 op·cm·cf · 다시 노크엔 안 실음 · 필기(draw)도 다시 노크에', () => {
+  const c = run(); c.hwBk = { win: win(), origin: 'https://book.example' };
+  c.hwFbRelay({ on: 1, draw: 1, items: [], cs: [{ id: 'a', cm: 'C1', cf: 'F1', text: 'x'.repeat(5000), evil: 1 }, { id: 'b', cm: 'C2', cf: 'F1', text: null }] });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.hwBk.win.sent[0][0].cs)), [{ id: 'a', cm: 'C1', cf: 'F1', text: 'x'.repeat(4000) }, { id: 'b', cm: 'C2', cf: 'F1', text: null }]);
+  c.hwBk.win = win(); c.hwFbSync(); assert.strictEqual(c.hwBk.win.sent[0][0].cs, undefined, '⛔ 다시 노크할 때 댓글 고치기를 또 보낸다'); assert.strictEqual(c.hwBk.win.sent[0][0].draw, 1, '⛔ 다시 노크하면 필기 중인 걸 잊는다');
+  const d = run(); d.hwFbRelay({ on: 1, items: [], cs: [{ id: 'b', cm: 'C2', cf: 'F1', text: null }] });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(d.hwWin.sent.map((x) => x[0]))), [{ onf: 'fbCmtAck', id: 'b', ok: 0, why: 'nobook', op: 'del', cm: 'C2' }]);
+  const e = run(); e.hwFbBack({ onf: 'fbCmtAck', id: 'a', ok: 1, op: 'add', cm: 'C1', cf: 'F1', x: 1 }); e.hwFbBack({ onf: 'fbCmtAck', id: 'a', ok: 1, op: 'evil', cm: 'C1' });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(e.hwWin.sent.map((x) => x[0]))), [{ onf: 'fbCmtAck', id: 'a', ok: 1, why: '', op: 'add', cm: 'C1', cf: 'F1' }, { onf: 'fbCmtAck', id: 'a', ok: 1, why: '' }]);
+});
 t('⑥ 카드 → 그 줄로(go): 줄·회차만 옆 교재에 · 목록(켜짐·항목)은 그대로', () => {
   const c = run(); c.hwBk = { win: win(), origin: 'https://book.example' };
   c.hwFbRelay({ onf: 'hwFb', on: 1, items: [{ id: 'abc', n: 1, row: 5, w0: 0, w1: 0, sheet: 'E1' }] });
