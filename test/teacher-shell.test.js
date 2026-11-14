@@ -923,5 +923,23 @@ t('🖥️ 과제 판 확장 창(mode=hwext) — 안쪽이 extBook 으로 교재
   assert.equal(H.created.filter((e) => e.tag === 'iframe').length, 0, '⛔ 확장 창이 아닌 화면이 교재 칸을 열었다');
 });
 
+t('⚡ 확장 창 옆 교재 미리(extBookPre · 2026-11-14) — 숨겨 미리 읽고(자리는 잡고 안 보임 = visibility) · 교재로 넘어가면(extBook 같은 주소) 다시 안 읽고 보이기만 · 보이는 칸은 미리 띄우기가 안 건드림 · 남의 창 무시', () => {
+  const B1 = 'https://class.ownify.co.kr/?mode=share&t=Tok_1&fileId=FILE1234567&sheetName=E2&ttok=TT&tas=Peter', B2 = B1.replace('E2', 'E3');
+  const R = boot({ onf_id_tok: odk() }, { search: '?mode=hwext&t=Tok_1&s=h0123456789abcdef0123&ext=1' }), me = { parent: R.els.app.contentWindow, postMessage() {} }, other = { parent: R.els.app.contentWindow, postMessage() {} };
+  R.knockAs(me);
+  R.g.ONF = Object.assign({}, R.g.ONF || {}, { api: { EXEC: R.g.EXEC } }); if (R.g.window && R.g.window !== R.g) R.g.window.ONF = R.g.ONF;
+  const frames = () => R.created.filter((e) => e.tag === 'iframe'), box = () => R.created.find((e) => e.className === 'onf-extbk'), seen = (b) => b.style.display !== 'none' && b.style.visibility !== 'hidden';
+  R.postAs({ onf: 'extBookPre', href: B1 }, other); assert.equal(frames().length, 0, '⛔ 남의 창 말로 미리 띄웠다');
+  R.postAs({ onf: 'extBookPre', href: B1 }, me);
+  assert.equal(frames().length, 1, '⛔ 미리 안 읽었다'); const src0 = String(frames()[0].src || '');
+  assert.ok(/[?&]ext=1(&|$)/.test(src0), '⛔ 시트만(ext=1) 아님: ' + src0);
+  assert.equal(seen(box()), false, '⛔ 미리 띄운 교재 칸이 과제 판을 덮는다'); assert.notEqual(box().style.display, 'none', '⛔ display:none — 교재가 크기 0 으로 그려진다');
+  R.postAs({ onf: 'extBook', href: B1 }, me);
+  assert.equal(frames().length, 1); assert.equal(String(frames()[0].src || ''), src0, '⛔ 교재로 넘어갈 때 다시 읽었다'); assert.equal(seen(box()), true, '⛔ 교재로 넘어갔는데 안 보인다');
+  R.postAs({ onf: 'extBookPre', href: B2 }, me); assert.equal(seen(box()), true, '⛔ 보이는 교재 칸을 미리 띄우기가 숨겼다'); assert.equal(String(frames()[0].src || ''), src0, '⛔ 보이는 교재 칸을 미리 띄우기가 갈아 끼웠다');
+  R.postAs({ onf: 'extBook', href: '' }, me); assert.equal(box().style.display, 'none');
+  R.postAs({ onf: 'extBookPre', href: B1 }, me); assert.equal(seen(box()), false, '⛔ 과제 판으로 돌아온 뒤 미리 띄우기가 교재 칸을 보였다');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);
