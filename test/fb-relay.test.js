@@ -11,13 +11,19 @@ const win = () => { const w = { sent: [] }; w.postMessage = (m, o) => w.sent.pus
 function run() { const ctx = { hwBk: null, hwWin: win(), hwOrigin: 'https://board.example', appWin: null, appOrigin: '' }; vm.createContext(ctx); vm.runInContext(src.slice(A, B), ctx); return ctx; }
 t('① 과제 판 목록 → 옆 교재(꼴 거름 · 그 출처로)', () => {
   const c = run(); c.hwBk = { win: win(), origin: 'https://book.example' };
-  c.hwFbRelay({ onf: 'hwFb', on: 1, items: [{ id: 'abc', n: 2, row: '15', w0: 3, w1: 4, ipa: 'x'.repeat(500), sent: 0, sheet: 'E1', evil: '<script>' }], junk: 1 });
+  c.hwFbRelay({ onf: 'hwFb', on: 1, draw: 1, items: [{ id: 'abc', n: 2, row: '15', w0: 3, w1: 4, ipa: 'x'.repeat(500), sent: 0, sheet: 'E1', st: 'M', lv: 7, sel: 1, evil: '<script>' }, { id: 'abd', st: '<b>', lv: 0 }], junk: 1 });
   const [m, o] = c.hwBk.win.sent[0];
   assert.strictEqual(o, 'https://book.example');
-  assert.deepStrictEqual(Object.keys(m).sort(), ['items', 'on', 'onf']);
+  assert.deepStrictEqual(Object.keys(m).sort(), ['draw', 'items', 'on', 'onf']); assert.strictEqual(m.draw, 1);
   assert.strictEqual(m.onf, 'fbBook'); assert.strictEqual(m.on, 1);
-  assert.deepStrictEqual(Object.keys(m.items[0]).sort(), ['id', 'ipa', 'n', 'row', 'sent', 'sheet', 'w0', 'w1']);
+  assert.deepStrictEqual(Object.keys(m.items[0]).sort(), ['id', 'ipa', 'lv', 'n', 'row', 'sel', 'sent', 'sheet', 'st', 'w0', 'w1']);
+  assert.deepStrictEqual([m.items[0].st, m.items[0].lv, m.items[0].sel, m.items[1].st, m.items[1].lv], ['M', 3, 1, 'R', 1], '⛔ 단계 색·진하기·고른 곳이 옆 교재로 안 간다(또는 거르지 않는다)');
   assert.strictEqual(m.items[0].row, 15); assert.strictEqual(m.items[0].ipa.length, 200);
+});
+t('①-2 카드 누름 → 옆 교재 그 대사 · 체크한 낱말 범위(w0·w1)까지', () => {
+  const c = run(); c.hwBk = { win: win(), origin: 'https://book.example' };
+  c.hwFbRelay({ onf: 'hwFb', go: { row: 9, sheet: 'E1', w0: 2, w1: 5, x: 1 } });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c.hwBk.win.sent[0][0])), { onf: 'fbBook', go: { row: 9, sheet: 'E1', w0: 2, w1: 5 } });
 });
 t('② 교재가 늦게 노크 → 마지막 목록만 다시(댓글은 다시 안 보냄)', () => {
   const c = run(); c.hwBk = { win: win(), origin: 'https://book.example' };
@@ -44,7 +50,7 @@ t('⑥ 카드 → 그 줄로(go): 줄·회차만 옆 교재에 · 목록(켜짐�
   c.hwFbRelay({ onf: 'hwFb', go: { row: '15', sheet: 'E1', evil: 1 } });
   const [m, o] = c.hwBk.win.sent[1];
   assert.strictEqual(o, 'https://book.example');
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(m)), { onf: 'fbBook', go: { row: 15, sheet: 'E1' } }, '⛔ go 가 「꺼짐 + 빈 목록」으로 바뀌었다');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(m)), { onf: 'fbBook', go: { row: 15, sheet: 'E1', w0: 0, w1: 0 } }, '⛔ go 가 「꺼짐 + 빈 목록」으로 바뀌었다');
   c.hwBk.win = win(); c.hwFbSync();
   assert.strictEqual(c.hwBk.win.sent[0][0].on, 1, '⛔ go 가 마지막 목록을 꺼짐으로 덮었다'); assert.strictEqual(c.hwBk.win.sent[0][0].items.length, 1);
 });
