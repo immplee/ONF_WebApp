@@ -340,7 +340,10 @@
         try {
           var L = root.clientHeight, I = global.innerHeight, V = vv ? vv.height : I;
           if (vv && Math.abs((vv.scale || 1) - 1) >= 0.02) return;   // 핀치 중
-          if (I - V > 100) return;                                     // 키보드
+          if (I - V > 100) {                                           // 키보드 — 새로 못 박지는 않는다(B3) · 단 못 박은 키가 문서 키보다 크면(키보드를 띄운 채 돌림) 풀어 준다(검수 2026-11-16 ④)
+            if (cur && cur > L) { cur = 0; root.style.height = ''; root.classList.toggle('onf-vcut', false); }
+            return;
+          }
           var cut = L - I, want = (cut >= 20 && cut <= 400 && I >= 300) ? Math.round(I) : 0;
           if (want === cur) return;
           cur = want; root.style.height = want ? want + 'px' : ''; root.classList.toggle('onf-vcut', !!want);
