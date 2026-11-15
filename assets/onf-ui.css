@@ -33,6 +33,9 @@ body {
 /* 앱 화면(교재)은 iframe 이 화면을 꽉 채운다 */
 .onf-full { overflow: hidden; }
 .onf-full iframe { display: block; width: 100%; height: 100%; border: 0; position: relative; z-index: 1; }
+/* 📐 보이는 키 맞춤(onf-frame.js vhFit · 2026-11-16) — 아이패드 크롬이 배치 창을 주소창만큼 길게 줄 때 html 키를 보이는 키로 못 박고 이 표식을 단다.
+   고정 요소(교재 판 · position:fixed)는 배치 창에 붙어 그만큼 길어지니, 그동안은 body(= 보이는 키)를 그 바탕으로 삼는다. 표식이 없으면 아무 일도 없다. */
+html.onf-vcut body { contain: layout; }
 
 /* 불러오는 동안 */
 .onf-wait {

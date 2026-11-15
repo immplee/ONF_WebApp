@@ -72,6 +72,7 @@ var tPre = (function () {
 <link rel="stylesheet" href="../assets/onf-ui.css">
 <style>
   html, body { margin:0; height:100%; background:var(--onf-bg); }
+  html.onf-vcut body { contain:layout; }   /* 📐 보이는 키 맞춤(onf-frame.js vhFit · 2026-11-16) — 쌍둥이 = assets/onf-ui.css · 고정 요소(과제 판·교재 판)가 보이는 키에 붙게 */
   /* ⛔ z-index 를 학생 액자와 **같은 겹침**으로 둔다(assets/onf-ui.css 의 .onf-full iframe).
      회전자(.onf-wait)는 z-index:0 이라 액자 뒤에 있고, 액자가 한 픽셀이라도 그리는 순간
      저절로 덮인다 — 걷는 JS 가 없으니 **노크를 놓쳐도 회전자에 갇히지 않는다**(2026-08-14 사고).
