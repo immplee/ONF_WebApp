@@ -1551,5 +1551,156 @@ t('O11 주소 out=1 은 그날 물러남 기억(onfOutFail)을 지운다 — 다
   assert.ok(isStatic(s.panel()), '⛔ out=1 뒤에도 그날 지금 길');
 });
 
+/* ═══ 📖 한 지붕 — view·line 만 다른 주소는 할 줄 아는 판에 bookView (2026-11-16 Peter 「같은 페이지·창에 들어가는 링크는 전부 한 지붕으로」) ═══
+   ⚠️ 쌍둥이: test/book-panel.test.js 「views review·cards·line」 검사(학생 껍데기 bookLike·bookView). 선생님 껍데기는 노크의 views 를 안 읽어 늘 새 판이었다 —
+   홈 댓글 「교재에서 이 줄 보기」(&line=) · 「⭐ 내 문장 열기」(view=<드라마 칸>) · ⭐ 판 안 「교재에서 보기」(&line=). */
+console.log('[📖 한 지붕 — 선생님 bookLike·bookView]');
+const viewsOf = (w) => sentOf(w).filter((m) => m.onf === 'bookView');
+/* 판에 교재 창을 붙이고 views 를 실은 노크(swap:1 이면 둘째 노크까지) */
+function vKnock(s, box, n, views, swap) {
+  const bw = win('vbook-exec' + n, s.top), bi = win('vbook-user' + n, win('vbook-sbx' + n, bw));
+  box.kids[0].contentWindow = bw;
+  s.send(views == null ? { onf: 'bookHi' } : { onf: 'bookHi', views }, bi);
+  if (swap) s.send({ onf: 'bookHi', views, swap: 1 }, bi);
+  bi.sent.length = 0;
+  return bi;
+}
+const L17 = E1 + '&line=17', L20 = E1 + '&line=20', MYD = MYS + '&view=Friends%20S2';
+
+t('V1 미리 띄운 교재(views cards,line) — 홈 댓글 「이 줄 보기」(line=17)는 새로 안 받고 그 판을 보이며 「보임」 다음 bookView{line:17} 을 노크한 창·출처로만 · 다른 줄도 같은 판 · 줄 없는 [열기]는 보이기만', () => {
+  const s = phoneRun({ wide: true });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+  const P = s.panel(), src0 = P.kids[0].src, bi = vKnock(s, P, 1, 'cards,line');
+  s.send({ onf: 'openBook', href: L17, left: 270 }, s.home);
+  assert.ok(s.panels().length === 1 && !P.classList.contains('park') && P.kids[0].src === src0, '⛔ 줄 링크에 새 판을 받았다(또는 미리 띄운 판을 안 보였다)');
+  assert.deepStrictEqual(jsn(bi.sent), [[{ onf: 'bookPark', on: false }, ORIGIN], [{ onf: 'bookView', line: 17 }, ORIGIN]], '⛔ 「보임」 다음 「17줄로」가 노크한 출처로 안 갔다');
+  s.send({ onf: 'openBook', href: L20, left: 270 }, s.home);
+  assert.ok(s.panels().length === 1 && viewsOf(bi).some((m) => m.line === 20), '⛔ 다른 줄에 새 판을 받았다(또는 「20줄로」가 안 갔다)');
+  bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
+  assert.ok(s.panels().length === 1 && viewsOf(bi).length === 0, '⛔ 줄 없는 [열기]에 「열어」를 보냈다(또는 새 판)');
+});
+
+t('V2 할 줄 모르는 판엔 안 맡긴다 — 노크 전 · 옛 교재(views 없음) · 다른 회차 · 덱(cards)을 모르는 판 = 종전 새 판 · 숫자 아닌·8자리 줄은 줄로 안 친다(말 0)', () => {
+  const cases = [['노크 전', null, L17], ['옛 교재', undefined, L17], ['다른 회차', 'cards,line', E2 + '&line=17'], ['덱 모름', 'line', E1 + '&view=cards']];
+  for (const [why, views, href] of cases) {
+    const s = phoneRun({ wide: true });
+    s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+    const P = s.panel(), bi = views === null ? null : vKnock(s, P, 1, views);
+    s.send({ onf: 'openBook', href, left: 270 }, s.home);
+    assert.ok(s.panels().length === 2 && P.classList.contains('park'), '⛔ ' + why + ' 판에 맡겼다(새 판이어야)');
+    assert.ok(!bi || viewsOf(bi).length === 0, '⛔ ' + why + ' 판에 「열어」를 보냈다');
+  }
+  for (const bad of ['x7', '12345678']) {
+    const s = phoneRun({ wide: true });
+    s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+    const bi = vKnock(s, s.panel(), 1, 'cards,line');
+    s.send({ onf: 'openBook', href: E1 + '&line=' + bad, left: 270 }, s.home);
+    assert.ok(viewsOf(bi).length === 0, '⛔ 숫자 아닌·8자리 줄 값을 판에 넘겼다: ' + bad);
+  }
+});
+
+t('V3 ⭐ 내 문장 판(views review,tab) — 「⭐ 내 문장 열기」(view=<드라마 칸>)는 그 판에 bookView{tab}(view 칸 아님) · 복습은 view · 덱(cards)은 내 문장 판에 절대 안 맡김 · tab 모르는 옛 내 문장 판은 새 판', () => {
+  let s = phoneRun({ wide: true });
+  s.send({ onf: 'openBook', href: MYS, left: 270 }, s.home);
+  const M = s.panel(), mi = vKnock(s, M, 1, 'review,tab');
+  s.send({ onf: 'bookClose' }, mi); mi.sent.length = 0;
+  s.send({ onf: 'openBook', href: MYD, left: 270 }, s.home);
+  assert.ok(s.panels().length === 1 && !M.classList.contains('park'), '⛔ 드라마 칸 링크에 새 판을 받았다');
+  assert.deepStrictEqual(viewsOf(mi), [{ onf: 'bookView', tab: 'Friends S2' }], '⛔ 드라마 칸이 tab 칸으로 안 갔다(view 칸에 섞였다)');
+  s.send({ onf: 'openBook', href: MYS + '&view=review', left: 270 }, s.home);
+  assert.deepStrictEqual(viewsOf(mi).slice(-1), [{ onf: 'bookView', view: 'review' }], '⛔ 복습이 view 칸으로 안 갔다');
+  s.send({ onf: 'openBook', href: MYS + '&view=cards', left: 270 }, s.home);
+  assert.ok(s.panels().length === 2 && viewsOf(mi).every((m) => m.view !== 'cards' && m.tab !== 'cards'), '⛔ 덱을 내 문장 판에 맡겼다');
+  s = phoneRun({ wide: true });
+  s.send({ onf: 'openBook', href: MYS, left: 270 }, s.home);
+  const M2 = s.panel(), m2 = vKnock(s, M2, 1, 'review');
+  s.send({ onf: 'openBook', href: MYD, left: 270 }, s.home);
+  assert.ok(s.panels().length === 2 && viewsOf(m2).length === 0, '⛔ tab 을 모르는 옛 내 문장 판에 드라마 칸을 맡겼다');
+});
+
+t('V4 ⭐ 판 안 「교재에서 보기」(line) — 홈에서 연 판(판 자격)을 그대로 보이고 bookView{line} · ✕ = ⭐(앞 판) · 그 판은 판 자격을 잃지 않는다(다음 홈 [열기] = 갈아 끼우기 · 새 판 0)', () => {
+  const s = phoneRun({ wide: true, search: '?swap=1' });
+  s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);
+  const P = s.panel(), bi = vKnock(s, P, 1, 'line', true);
+  s.send({ onf: 'openBook', href: MYS, left: 270 }, s.home);   // ⭐ 은 홈에서 따로 연다(교재가 열어 준 판이면 돌아가기 고리 규칙 — 앞 판 안 닮)
+  const M = s.panels().find((x) => x !== P), mi = vKnock(s, M, 2, 'review,tab');
+  bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: E1 + '&line=5' }, mi);
+  assert.ok(s.panels().length === 2 && shownOf(s)[0] === P, '⛔ 「교재에서 보기」가 떠 있는 교재 판을 안 썼다(새 판)');
+  assert.ok(viewsOf(bi).length === 1 && viewsOf(bi)[0].line === 5, '⛔ 「5줄로」가 안 갔다');
+  s.send({ onf: 'bookClose' }, bi); s.flush();   // 🖥 ✕ = 이 판 칸만 걷기(history.go) → popstate 가 앞 판을 보인다
+  assert.ok(shownOf(s)[0] === M, '⛔ ✕ 가 ⭐(앞 판)로 안 갔다');
+  bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: E2, left: 270 }, s.home);
+  assert.ok(s.panels().length === 2 && swapMsg(bi).length === 1 && shownOf(s)[0] === P, '⛔ 판이 자격을 잃었다 — 다음 홈 [열기]가 갈아 끼우기 대신 새 판');
+});
+
+t('V5 늙은 판(숨긴 채 2시간)엔 안 맡긴다 — bookShow 가 새로 띄워 줄을 잃는다', () => {
+  const s = phoneRun({ wide: true, search: '?swap=1' });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+  const P = s.panel(), bi = vKnock(s, P, 1, 'cards,line');
+  s.g.books[0].born -= 3 * 3600 * 1000;
+  s.send({ onf: 'openBook', href: L17, left: 270 }, s.home);
+  assert.ok(viewsOf(bi).length === 0 && s.panels().length === 2 && shownOf(s)[0] !== P, '⛔ 늙은 판에 줄을 맡겼다');
+  assert.ok(/[?&]line=17(&|$)/.test(shownOf(s)[0].kids[0].src), '⛔ 늙은 판 대신 띄운 새 판이 줄(line=17)을 잃었다 — bookShow 가 옛 주소로 새로 띄웠다');
+});
+
+t('V6 판 안 링크의 길 — 정적 판 교재가 떠 있으면 ⭐ 판 안 「교재에서 보기」도 정적 판을 쓴다(bookOutLike · 종전 = out 없음이라 자격 내리고 구글 새 판)', () => {
+  const s = phoneRun({ wide: true, frame: true });
+  s.send({ onf: 'openBook', href: E1, left: 270, out: 1 }, s.home);
+  const P = s.panel(), w = outUp(s, P);
+  s.send({ onf: 'bookHi', views: 'line' }, w, OUT_O);
+  s.send({ onf: 'openBook', href: MYS, left: 270 }, s.home);
+  const M = s.panels().find((x) => x !== P), mi = vKnock(s, M, 2, 'review,tab');
+  w.sent.length = 0;
+  s.send({ onf: 'openBook', href: E1 + '&line=9' }, mi);
+  assert.ok(s.panels().length === 2 && shownOf(s)[0] === P && !s.g.books.find((q) => q.box === P).gone, '⛔ 판 안 「교재에서 보기」가 정적 판을 버리고 새 판을 받았다');
+  assert.deepStrictEqual(jsn(w.sent).filter((x) => x[0].onf === 'bookView'), [[{ onf: 'bookView', line: 9 }, OUT_O]], '⛔ 정적 판에 「9줄로」가 그 출처로 안 갔다');
+  //   거꾸로 — 같은 교재가 지금 길(구글) 판이면 판 안 링크도 지금 길 그대로(정적 판으로 안 바꾼다)
+  const g = phoneRun({ wide: true, frame: true });
+  g.send({ onf: 'openBook', href: E1, left: 270 }, g.home);
+  const G = g.panel(), gi = vKnock(g, G, 1, 'line');
+  g.send({ onf: 'openBook', href: MYS, left: 270 }, g.home);
+  const GM = g.panels().find((x) => x !== G), gmi = vKnock(g, GM, 2, 'review,tab');
+  g.send({ onf: 'openBook', href: E1 + '&line=9' }, gmi);
+  assert.ok(g.panels().length === 2 && shownOf(g)[0] === G && viewsOf(gi).some((m) => m.line === 9), '⛔ 지금 길 판의 교재를 판 안 링크가 정적 판 새 판으로 바꿨다');
+});
+
+t("V4' 홈이 미리 띄운 판(bookWarm)도 같다 — ⭐ 판 안 「교재에서 보기」로 보인 뒤에도 판 자격(홈 [열기] = 갈아 끼우기)", () => {
+  const s = phoneRun({ wide: true, search: '?swap=1' });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+  const P = s.panel(), bi = vKnock(s, P, 1, 'cards,line', true);
+  s.send({ onf: 'openBook', href: MYS, left: 270 }, s.home);
+  const M = s.panels().find((x) => x !== P), mi = vKnock(s, M, 2, 'review,tab');
+  s.send({ onf: 'openBook', href: E1 + '&line=5' }, mi);
+  assert.ok(shownOf(s)[0] === P && viewsOf(bi).some((m) => m.line === 5), '전제: 미리 띄운 판에 「5줄로」');
+  s.send({ onf: 'bookClose' }, bi); s.flush(); bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: E2, left: 270 }, s.home);
+  assert.ok(s.panels().length === 2 && swapMsg(bi).length === 1, '⛔ 미리 띄운 판이 판 자격을 잃었다 — 홈 [열기]가 새 판');
+});
+
+t('V7 길이 다른 판엔 안 맡긴다 — 정적 판 교재가 떠 있어도 홈이 out 없이 연 줄 링크는 지금 길 새 판(정적 판에 bookView 0)', () => {
+  const s = phoneRun({ wide: true, frame: true });
+  s.send({ onf: 'openBook', href: E1, left: 270, out: 1 }, s.home);
+  const P = s.panel(), w = outUp(s, P);
+  s.send({ onf: 'bookHi', views: 'line' }, w, OUT_O); w.sent.length = 0;
+  s.send({ onf: 'openBook', href: L17, left: 270 }, s.home);
+  assert.ok(s.panels().length === 2 && jsn(w.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 길이 다른 판(정적 판)에 지금 길 줄 링크를 맡겼다');
+});
+
+t('V8 갈아 끼우는 중(답 전)인 판엔 bookView 를 안 보낸다 — 판은 아직 옛 교재다(같은 주소를 또 눌러도 · 다른 줄이면 다시 갈아 끼움 · 나중 것이 이긴다)', () => {
+  const { s, bi } = boardRun();
+  bi.sent.length = 0;
+  s.send({ onf: 'bookHi', views: 'cards,line', swap: 1 }, bi); bi.sent.length = 0;   // 판이 줄·덱을 할 줄 안다
+  s.send({ onf: 'openBook', href: E2 + '&line=3', left: 270 }, s.home);
+  s.send({ onf: 'openBook', href: E2 + '&line=3', left: 270 }, s.home);
+  assert.ok(viewsOf(bi).length === 0 && swapMsg(bi).length >= 1, '⛔ 갈아 끼우는 중인 판에 bookView 를 보냈다(옛 교재에서 줄을 굴린다)');
+  s.send({ onf: 'openBook', href: E2 + '&line=4', left: 270 }, s.home);
+  assert.ok(viewsOf(bi).length === 0 && swapMsg(bi).slice(-1)[0].src === srcOf(s, E2 + '&line=4'), '⛔ 갈아 끼우는 중 다른 줄을 bookView 로 보냈다(다시 갈아 끼워야)');
+  s.send({ onf: 'openBook', href: E2, left: 270 }, s.home);   // 줄 없는 [열기]도 갈아 끼우는 중인 판을 「이미 그 교재」로 치지 않는다
+  assert.ok(swapMsg(bi).slice(-1)[0].src === srcOf(s, E2), '⛔ 갈아 끼우는 중인 판을 줄 없는 [열기]가 그대로 보였다(나중 것이 이겨야)');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);

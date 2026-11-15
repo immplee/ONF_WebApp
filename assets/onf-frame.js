@@ -963,7 +963,8 @@
     }
     function bookShown() { for (var i = 0; i < books.length; i++) if (!books[i].parked) return books[i]; return null; }
     function bookFind(src) { for (var i = 0; i < books.length; i++) if (books[i].src === src && !books[i].gone) return books[i]; return null; }   // 📖 gone = 내용과 주소가 어긋날 수 있는 판(아래 bookRetire)
-    /* 📖 view 만 다른 주소는 같은 판에서 연다(2026-10-14 Peter 「미리 띄워 둔 내 문장 판에 '복습/카드 열어'를 전달해서, 다시 안 불러오고 바로 열기」).
+    /* ⚠️ 쌍둥이: teacher/index.html bookAsk·bookLike·bookCan·bookTabOf·bookCanView·bookOutLike(2026-11-16 — 선생님 껍데기도 같은 지붕 · 한쪽을 고치면 다른 쪽도).
+       📖 view 만 다른 주소는 같은 판에서 연다(2026-10-14 Peter 「미리 띄워 둔 내 문장 판에 '복습/카드 열어'를 전달해서, 다시 안 불러오고 바로 열기」).
        view 는 「열자마자 무엇을 띄울까」뿐이다 — 홈 [복습 시작] = ⭐ 내 문장 view=review(🔁 오늘 복습) · 「카드 시작」 = 교재 view=cards(🗂️ 회차 덱).
        종전엔 주소가 달라 판을 하나 새로 받았다(라이브 [복습 시작] ≈4.4초 — 미리 띄운 내 문장 판이 옆에 숨어 있는데도).
        · 그 view 를 할 줄 안다고 노크(bookHi views)한 판이 있으면 그 판을 보이고 {onf:'bookView', view} 를 보낸다(새로 안 받음 · 페이지가 view 로 연 것과 같은 길로 연다).
@@ -1292,8 +1293,8 @@
        ⚠️ 쌍둥이: teacher/index.html 「📖 교재 판 한 장 1d」 블록이 정본이다 — 같은 반박 검토 교훈(stale·14초는 자격만 내림 · 진 번호 시한 걷기 · 실패면 주소 되돌리고 새 판 · 2시간 숨긴 판은 보일 때 새로 ·
           노크 전 판 줄 · bookRoom 이 후보를 안 지움)을 그대로 옮겼다 · 까닭 주석은 거기. 판 쪽 약속은 Ownify ONF_Share_WebApp_Html onfBookSwap.
        홈에서 연 판 하나(판)가 다른 교재로 **갈아 끼운다** — 새 판(GAS doGet ≈5초) 대신 판이 값만 받아 표를 바꾼다(받아 둔 값 ≤0.5초 · 서버 ≈2.5~3.2초).
-       학생만의 점: ① view·line 만 다른 주소는 bookLike → bookView 를 먼저(위 bookOpen) ② 폰도 숨긴 미리 판 하나는 종전(위 bookPre) ③ 2시간 나이는 판 자격 있는 판만(⭐ 내 문장 판은 종전 — bookAged).
-         ④ 판 = **홈에서 연 판(home)** — 선생님 껍데기는 back === null 로 본다. 학생은 ⭐ 판 안 「교재에서 보기」가 bookLike 로 판을 그대로 다시 보이며 back = ⭐ 를 단다(✕ = ⭐ 0초 · 종전 앞 판 규칙) —
+       학생만의 점: ① (2026-11-16 부터 선생님 껍데기도 같다 — teacher/index.html bookLike) view·line 만 다른 주소는 bookLike → bookView 를 먼저(위 bookOpen) ② 폰도 숨긴 미리 판 하나는 종전(위 bookPre) ③ 2시간 나이는 판 자격 있는 판만(⭐ 내 문장 판은 종전 — bookAged).
+         ④ 판 = **홈에서 연 판(home)** — 선생님 껍데기는 back === null **또는 home**(2026-11-16 · ⭐ 「교재에서 보기」가 bookLike 로 판을 다시 보이게 되어 같은 함정). 학생은 ⭐ 판 안 「교재에서 보기」가 bookLike 로 판을 그대로 다시 보이며 back = ⭐ 를 단다(✕ = ⭐ 0초 · 종전 앞 판 규칙) —
             back 으로 보면 판이 자격을 잃어 다음 홈 [열기]가 새 판이 되고 판 셋 넘침이 그 판(안 보낸 글)을 쫓아냈다(크롬 실측 2026-10-17). 판 안에서 처음 연 판은 home 이 없어 종전대로 판이 아니다.
        ⛔ 학생 토큰은 판 주소(src — 판의 fetch 주소)에만 있다. 기록 칸엔 판 번호(key)뿐이다(histBook). */
     function bookBoard(o) {   // 🌤 o = 정적 판(p.out) 쪽 판 · 아니면 지금 길 판 — 정적 판이 없는 학생은 bookBoard(false) 가 종전 판 그대로

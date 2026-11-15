@@ -1195,7 +1195,7 @@ t('🔐 못 연 판 안내의 [닫기](이벤트가 인자로 온다)도 한 단
 
 /* ═══ 📖 교재 판 한 장 2단계 — 학생 홈에서 연 판 하나가 다른 교재로 갈아 끼운다 (설계 ONF_SlackBot docs/2026-10-15-교재판-한장-설계.md §5.2 · §7.2 갈래 표 4 · H1'~H9') ═══
    쌍둥이: test/teacher-book.test.js 「1d — 갈아 끼우기」(같은 반박 검토 교훈) · 판 쪽 약속은 Ownify ONF_Share_WebApp_Html onfBookSwap.
-   학생만의 점: view·line 만 다른 주소는 bookLike → bookView 를 **먼저**(할 줄 아는 판) · 폰도 숨긴 미리 판 하나 그대로(선생님 D1 아님) · 2시간 나이는 판 자격 있는 판만. */
+   학생만의 점: view·line 만 다른 주소는 bookLike → bookView 를 **먼저**(할 줄 아는 판 · 2026-11-16 부터 선생님도 — teacher-book.test.js V1~V8) · 폰도 숨긴 미리 판 하나 그대로(선생님 D1 아님) · 2시간 나이는 판 자격 있는 판만. */
 console.log('[📖 교재 판 한 장 2단계 — 학생 갈아 끼우기]');
 const RS = realSrc();
 const SE = (ep, x) => 'https://script.ownify.co.kr/thegoodplace-s1-' + ep + '-sunny?mode=share&t=TOK' + (x || '');
