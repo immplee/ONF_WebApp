@@ -978,12 +978,18 @@
       try { var q = new URL(src).searchParams, f = q.get('fileId'), g = (q.get('slug') || '').split('-'); return f ? 'f:' + f : g.length === 4 ? 's:' + g[0] + '-' + g[1] + '-' + g[3] : ''; } catch (e) { return ''; }
     }
     function bookBase(src) { try { var u = new URL(src); u.searchParams.delete('view'); u.searchParams.delete('line'); return u.href; } catch (e) { return src; } }
-    function bookCan(p, a) { return !!(p && !p.gone && !p.sw && !(p.out && a.view === 'cards') && (a.view || a.line) && (!a.view || p.views.indexOf(a.view) >= 0) && (!a.line || p.views.indexOf('line') >= 0)); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 [] · 🗂️ 카드 덱(view=cards)은 정적 판(p.out)에 절대 안 맡긴다(4-② 최종 검토 — 정적 /book/ 은 views 'line' 만 노크하지만 시간 맞물림에 기대지 않는다 · onfDeckView 가 정적 판에서 O.boot fail) · 📖 자격 내린 판(gone)·갈아 끼우는 중(sw — 아직 옛 교재)엔 「열어」를 안 보낸다
+    function bookCan(p, a) { return !!(p && !p.gone && !p.sw && !(p.out && a.view === 'cards') && (a.view || a.line) && (!a.view || bookCanView(p, a.view)) && (!a.line || p.views.indexOf('line') >= 0)); }   // views 는 노크(bookHi)가 채운다 — 노크 전엔 [] · 🗂️ 카드 덱(view=cards)은 정적 판(p.out)에 절대 안 맡긴다(4-② 최종 검토 — 정적 /book/ 은 views 'line' 만 노크하지만 시간 맞물림에 기대지 않는다 · onfDeckView 가 정적 판에서 O.boot fail) · 📖 자격 내린 판(gone)·갈아 끼우는 중(sw — 아직 옛 교재)엔 「열어」를 안 보낸다
+    /* ⭐ 내 문장 드라마 칸(2026-11-16 Peter 「교재 → 메뉴 → 내 문장이 아직도 오래 걸린다 · 어떤 길로 들어가든 같은 지붕」) — 교재 ☰ 「내 문장」·홈 드라마 줄은 주소에 view=<드라마 S시즌> 이 붙는다.
+       그 글자는 「열자마자 띄울 창」이 아니라 「어느 칸」이다 — 종전엔 미리 띄운 내 문장 판이 그 글자를 노크에 안 실어 매번 새 판(구글 길)을 통째로 받았다.
+       내 문장 판이 노크에 'tab' 을 실으면(Ownify ONF_Share_WebApp_Html bookHi) review·cards 밖의 view 는 그 판이 받는다 → {onf:'bookView', tab: 칸}(view 칸과 안 섞는다 · 칸 이름이 review 여도 안 헷갈리게).
+       ⛔ 교재 판은 종전 그대로(노크한 글자와 같아야) · 내 문장 판에 cards 는 절대 안 맡긴다. */
+    function bookTabOf(p, v) { return !!(v && v !== 'review' && v !== 'cards' && bookMine(p.src) && p.views.indexOf('tab') >= 0); }
+    function bookCanView(p, v) { return (bookMine(p.src) && v !== 'review') ? bookTabOf(p, v) : p.views.indexOf(v) >= 0; }
     /* 아무것도 안 묻는 열기([이어서 하기])도 **줄 링크로 연 판**(view 없음)이면 그 판(반박 검토 🟡4) — 판은 이미 그 교재다 · 할 말이 없으니 보이기만.
        ⛔ view 로 연 판(덱·복습)은 안 맡긴다 — 열자마자 그 창을 띄운 판이다(위 「view 없는 보통 열기」 검사). */
     function bookLike(src, a, out) {
       var b = bookBase(src), q;
-      for (var i = 0; i < books.length; i++) { q = books[i]; if (q.gone || q.sw || bookAged(q) || !outSame(q, src, out)) continue; if (bookBase(q.src) === b && (bookCan(q, a) || (!a.view && !a.line && !bookAsk(q.src).view))) return q; }   // 📖 늙은 판(bookAged)은 bookShow 가 그 주소로 새로 띄워 view·line 을 잃는다 — 갈아 끼우기(→ stale → 새 판)로 · 🌤 정적 판·지금 길 판은 서로 안 맡는다(검토 고침 1)
+      for (var i = 0; i < books.length; i++) { q = books[i]; if (q.gone || q.sw || bookAged(q) || !outSame(q, src, out)) continue; if (bookBase(q.src) === b && (bookCan(q, a) || (!a.view && !a.line && (!bookAsk(q.src).view || bookTabOf(q, bookAsk(q.src).view))))) return q; }   // 📖 늙은 판(bookAged)은 bookShow 가 그 주소로 새로 띄워 view·line 을 잃는다 — 갈아 끼우기(→ stale → 새 판)로 · 🌤 정적 판·지금 길 판은 서로 안 맡는다(검토 고침 1)
       return null;
     }
     /* left = 홈 왼쪽 메뉴의 오른쪽 끝(px · 홈이 잰다) — 있으면 판이 그 오른쪽부터 덮는다(2026-10-12 Peter 「창 모드일 때는 맨 왼쪽 탭만 보이게」).
@@ -1149,6 +1155,19 @@
       bookRoom(bookMax());
       sync();
     }
+    /* 🌤 판 안에서 온 openBook 의 길(2026-11-16 Peter 「같은 페이지·창에 들어가는 링크는 전부 한 지붕으로」) — 판 안 링크(교재 ☰ 「내 문장」 · 내 문장 「📖 교재에서 보기」)는 out 을 안 싣는다.
+       종전엔 그래서 정적 판(p.out · 홈이 out:1 로 미리 띄운 내 문장·켠 교재)과 늘 길이 달라(outSame) 미리 띄운 판을 못 쓰고 구글 새 판을 통째로 받았다.
+       이제 같은 판(주소 bookBase) 또는 같은 교재(bookBook — 다른 회차)의 판이 떠 있고(숨긴 판 포함) 그 판이 정적 판이면 그 길을 따른다.
+       ponytail: 그런 판이 이미 쫓겨났으면 종전 지금 길 — 홈 out:1 기억(outSeen)까지 보려면 그때 넓힌다.
+       ⛔ 길만 정한다 — 정적 판을 실제로 여는지는 종전대로 outWant(서버 스위치 opts.out · 물러남 기억)가 다시 본다. 아무것도 모르면 false(종전 그대로 지금 길). */
+    function bookOutLike(href) {
+      var src = opts.bookSrc(href), b, i, q;
+      if (!src) return false;
+      b = bookBook(src);
+      var same = function (x) { return bookBase(x) === bookBase(src) || (!!b && bookBook(x) === b); };
+      for (i = 0; i < books.length; i++) { q = books[i]; if (q && !q.gone && q.out && same(q.src)) return true; }
+      return false;
+    }
     /* home === true = 홈에서 온 openBook — 📖 같은 주소·할 줄 아는 판(bookLike)이 없고 판(bookBoard)이 있으면 새 판 대신 갈아 끼운다(아래 「교재 판 한 장」).
        ⛔ 판 안에서 온 openBook(⭐ → 「교재에서 보기」 · 판 안 링크)은 종전 새 판(창 B안 앞 판 0초). */
     function bookOpen(href, left, bm, br, home, cf, out) {   // ⚠️ 칸 값 m·r 은 이 안의 지역 m(bookView 말)과 겹쳐 bm·br 로 받는다 · cf = 📖 ☁️ 홈이 실은 사본 힌트(홈 openBook 만) · out = 🌤 홈이 out:1 로 연 교재(위 outOk)
@@ -1163,7 +1182,7 @@
       p = p || bookMake(src, false, out, cf);
       bookShow(p, left, bm, br);   // 🔐 못 연 판이면 bookShow 가 새 판으로 바꾼다 — 새 판은 노크 전이라 아래 bookCan 이 거짓(말 안 보냄)
       if (fl) bookFlushSoon(bookShown(), src);
-      if (a.view) m.view = a.view;
+      if (a.view) { if (bookTabOf(p, a.view)) m.tab = a.view; else m.view = a.view; }   // ⭐ 내 문장 드라마 칸은 tab 칸으로(위 bookTabOf)
       if (a.line) m.line = a.line;
       if (bookCan(p, a)) { try { p.win.postMessage(m, p.origin); } catch (e) {} }   // 보인다(bookPark) 다음에 — 페이지가 「보임」 손질 뒤 연다
       rsMark(bookShown(), href, out);
@@ -1423,7 +1442,7 @@
       /* 판 안에서 교재 ↔ ⭐ 내 문장을 오갈 때(2026-10-12) — 판만 바꾼다(홈째 넘어가면 「뒤로」에 홈을 다시 읽는다) · 10-13 부터 보이던 판은 숨기고 새 판(돌아가면 0초).
          ⚠️ 주소는 홈에서 온 것과 같은 거르개(opts.bookSrc)를 지난다 — 못 만들면 그대로 둔다. */
       else if (d.onf === 'openBook' && typeof d.href === 'string') {
-        bookOpen(d.href);
+        bookOpen(d.href, undefined, undefined, undefined, false, null, d.out === 1 || bookOutLike(d.href));   // 🌤 판 안 링크도 그 교재·내 문장의 길(정적 판)을 따른다(아래 bookOutLike)
         var q = bookShown();                                  // 🅱 앞 판 규칙(위 bookClose) — 새로 보이게 된 판 q 의 「나를 열어 준 판」을 p 로 · 돌아간 것이면 그대로 · 폰은 종전
         if (q && q !== p && !phone() && !bookOpener(p, q)) { q.back = p; rsSave(q); }   // 🔙 앞 판(b)도 기억에(위 bookOpen 의 rsMark 는 back 전이었다)
       }
