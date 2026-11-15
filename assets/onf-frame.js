@@ -322,6 +322,35 @@
     };
     if (who.p) who.p.then(send, send); else send();
   }
+  /* 🔭 화면 높이 실측(2026-11-16 Peter 「홈을 열면 아래가 잘려 있다가 한참 뒤에야 한 화면에 들어온다」) — 아이패드 크롬에서 처음엔 문서 키가 기기 전체(1024)로,
+     맞은 뒤엔 보이는 키(892)로 잡힌다(스크린샷 실측). 처음 상태에 **어느 값이 보이는 키를 말하는지** 알아야 고칠 수 있어 잰 값만 clog 로 보낸다(값 = 숫자뿐 · 신원 칸은 종전 whoBeacon).
+     아이패드만 · 한 번 열기에 스냅 10번까지 · 같은 값은 다시 안 보낸다. ⛔ 원인을 고친 뒤 이 덩어리는 지운다. */
+  (function vpProbe() {
+    try {
+      if (devOf() !== 'ipad' || !global.document || !global.addEventListener) return;
+      var doc = global.document, n = 0, last = '', R = Math.round;
+      var box = function (css) {   // 숨긴 고정 상자로 잰다 — 100dvh·svh·lvh · inset 0 · 안전 영역
+        try { var e = doc.createElement('div'); e.style.cssText = 'position:fixed;left:0;width:1px;visibility:hidden;pointer-events:none;' + css; doc.body.appendChild(e); var r = [e.offsetHeight, parseFloat(global.getComputedStyle(e).paddingTop) || 0, parseFloat(global.getComputedStyle(e).paddingBottom) || 0]; doc.body.removeChild(e); return r; } catch (eB) { return [-1, -1, -1]; }
+      };
+      var snap = function (tag) {
+        try {
+          if (n >= 10 || !doc.body) return;
+          var d = doc.documentElement, vv = global.visualViewport, f = doc.getElementById('app'), fr = f ? f.getBoundingClientRect() : null, sa = box('top:0;height:0;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)');
+          var a = ':i' + global.innerHeight + ':c' + d.clientHeight + ':v' + (vv ? R(vv.height) + '/' + R(vv.offsetTop) : '-') + ':s' + ((global.screen || {}).height || 0) + ':y' + R(global.scrollY || 0) + ':f' + (fr ? R(fr.height) + '@' + R(fr.top) : '-');
+          var b = ':d' + box('top:0;height:100dvh')[0] + '/' + box('top:0;height:100svh')[0] + '/' + box('top:0;height:100lvh')[0] + ':x' + box('top:0;bottom:0')[0] + ':a' + R(sa[1]) + '/' + R(sa[2]) + ':w' + global.innerWidth;
+          if (a + b === last) return; last = a + b; n++;
+          var ms = R((global.performance && global.performance.now && global.performance.now()) || 0);
+          whoBeacon({ k: 'perf', c: 'vp1:' + tag + a, ms: Math.min(ms, 599999) }); whoBeacon({ k: 'perf', c: 'vp2:' + tag + b, ms: Math.min(ms, 599999) });
+        } catch (eS) {}
+      };
+      snap('s'); global.addEventListener('load', function () { snap('l'); });
+      [1000, 3000, 8000, 20000].forEach(function (t, i) { global.setTimeout(function () { snap('t' + i); }, t); });
+      global.addEventListener('resize', function () { snap('r'); });
+      if (global.visualViewport) { global.visualViewport.addEventListener('resize', function () { snap('v'); }); global.visualViewport.addEventListener('scroll', function () { snap('o'); }); }
+      global.addEventListener('scroll', function () { snap('y'); }, { passive: true });
+      doc.addEventListener('visibilitychange', function () { snap(doc.hidden ? 'h' : 'b'); });
+    } catch (eP) {}
+  })();
   /* 🔄 새 코드 알아채기(2026-11-14 Peter 「새로 배포한 코드는 새로 고침을 안 눌러도」) — 학생 껍데기(mount)·선생님 껍데기(teacher/index.html mount)가 한 번씩 부른다.
      잰다: 정적 판 도장 app.ownify.co.kr/v.json {v: 커밋 해시}(Ownify tools/outside-deploy.sh 가 구글 배포 **뒤** 판과 한 번에 올린다 · no-store) +
        껍데기(Vercel) 자기 파일 — 이 문서(page)와 같은 출처 script·stylesheet 의 ETag(HEAD · 내용 해시라 배포마다만 바뀐다 · 2026-11-14 curl 확인).
