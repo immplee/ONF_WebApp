@@ -1596,7 +1596,7 @@ ta('FB2b 누구 화면(2026-11-05 2차 검수) — 해시를 잴 수 있으면 f
   g.window = g; g.Date = { now: () => g.T }; vm.createContext(g); vm.runInContext(CODE, g, { filename: 'onf-frame.js' });
   const F = g.ONF.frame;
   F.fallBack('thome', 'fail-anon'); F.fallBlocked('thome'); F.fallBlocked('thome'); F.fallBlocked('book');
-  for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+  for (let i = 0; i < 200 && beacons.length < 2; i++) await new Promise((r) => setImmediate(r));   // SHA-256(webcrypto)은 다른 일감 뒤로 밀릴 수 있다 — 횟수 대신 두 줄이 올 때까지(상한 200 · 흔들림 고침 2026-11-16)
   const want = h8(mail.toLowerCase());
   assert.deepStrictEqual(beacons, [{ k: 'err', c: 'fallback:thome:fail-anon:1', b: want, f: 'T', d: 'mac' }, { k: 'gp', c: 'sh:thome:blocked', b: want, f: 'T', d: 'mac' }], '⛔ 누구·통째 구글 줄 꼴: ' + JSON.stringify(beacons));
   assert.ok(JSON.stringify(beacons).toLowerCase().indexOf('peter') < 0 && JSON.stringify(beacons).indexOf('tch.') < 0, '⛔ 주소·입장권이 실렸다');
