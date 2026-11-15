@@ -49,6 +49,14 @@ t('키보드가 뜬 동안은 그대로 — 주소창이 접혀 innerHeight 가 
   const k = setup({ L: 892, I: 892, V: 892 }); k.set({ V: 470 });
   assert.strictEqual(k.h(), '', '⛔ 맞은 화면에서 키보드만 떴는데 못 박았다'); assert.strictEqual(k.on(), false);
 });
+t('키보드를 띄운 채 돌리면(세로 1234 로 못 박음 → 가로 문서 키 1024) 키보드가 떠 있어도 옛 키를 푼다 · 새로 못 박지는 않는다', () => {
+  const s = setup({ L: 1366, I: 1366, V: 1366 }); s.set({ I: 1234, V: 1234 });
+  assert.strictEqual(s.h(), '1234px', '전제: 세로에서 못 박음');
+  s.set({ I: 1234, V: 800 });    // 키보드
+  assert.strictEqual(s.h(), '1234px', '⛔ 키보드만 떴는데 풀었다');
+  s.set({ L: 1024, I: 892, V: 600 });   // 키보드 뜬 채 가로로
+  assert.strictEqual(s.h(), '', '⛔ 돌린 뒤 옛 방향 키(1234)가 남았다'); assert.strictEqual(s.on(), false);
+});
 t('핀치 중(innerHeight 가 배율 따라 준다)엔 그대로 · 차이가 없거나 작으면(20px 안) 아무것도 안 함 · 터무니없는 차이(400 넘음)도 안 함', () => {
   const s = setup({ L: 892, I: 892, V: 892 }); s.set({ I: 776, V: 776, scale: 1.15 });   // 1.15배 — 준 값(116px)이 주소창만 하다
   assert.strictEqual(s.h(), '', '⛔ 핀치 확대를 주소창으로 봤다: ' + s.h());
