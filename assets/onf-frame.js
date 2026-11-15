@@ -327,6 +327,7 @@
        0.15초 뒤   innerHeight  892 · 문서 키 **1024 그대로** · visualViewport 892 · 100dvh·svh·lvh·고정 inset 0 전부 1024
      = 크롬이 주소창(132px)만큼 「보이는 창」만 줄이고 **배치 창(height:100% 의 바탕)은 기기 전체로 둔다.** 껍데기는 html·body·액자를 100% 로 깔아 132px 길었고
      (아래 잘림 · 문서가 132px 굴러감 · 키보드 재기 h 가 132 로 나옴), 크롬이 나중에 배치 창을 고쳐 줄 때까지 그대로였다.
+     고친 뒤 같은 기기 실측(01:29): 문서 키 1024 · html·body·액자·고정 inset 0 전부 892 · 0.23초. (실측 덩어리 vpProbe 는 확인 뒤 지웠다 — 다시 잴 땐 ONF_WebApp #86.)
      → 보이는 키(innerHeight — iOS 는 키보드가 떠도 안 준다)가 문서 키보다 작으면 html 키를 그 값으로 못 박는다(body·액자는 100% 라 따라온다).
        고정 요소(교재 판·과제 판 · position:fixed inset 0)는 배치 창(1024)에 붙으니 그동안 body 를 그 바탕으로 삼는다(html.onf-vcut · onf-ui.css · teacher/index.html).
      ⛔ 핀치 중(innerHeight 가 배율 따라 준다)·키보드가 뜬 동안(크롬 iOS 는 주소창을 접어 innerHeight 가 는다 · B3)은 건드리지 않는다 — 그 전 값 그대로.
@@ -350,34 +351,6 @@
       doc.addEventListener('visibilitychange', fit);
       [100, 400, 1500, 4000].forEach(function (t) { global.setTimeout(fit, t); });
     } catch (e) {}
-  })();
-  /* 🔭 화면 높이 실측(2026-11-16 Peter 「홈을 열면 아래가 잘려 있다가 한참 뒤에야 한 화면에 들어온다」) — 아이패드 크롬에서 처음엔 문서 키가 기기 전체(1024)로,
-     맞은 뒤엔 보이는 키(892)로 잡힌다(스크린샷 실측). 처음 상태에 **어느 값이 보이는 키를 말하는지** 알아야 고칠 수 있어 잰 값만 clog 로 보낸다(값 = 숫자뿐 · 신원 칸은 종전 whoBeacon).
-     아이패드만 · 한 번 열기에 스냅 10번까지 · 같은 값은 다시 안 보낸다. ⛔ 원인을 고친 뒤 이 덩어리는 지운다. */
-  (function vpProbe() {
-    try {
-      if (devOf() !== 'ipad' || !global.document || !global.addEventListener) return;
-      var doc = global.document, n = 0, last = '', R = Math.round;
-      var box = function (css) {   // 숨긴 고정 상자로 잰다 — 100dvh·svh·lvh · inset 0 · 안전 영역
-        try { var e = doc.createElement('div'); e.style.cssText = 'position:fixed;left:0;width:1px;visibility:hidden;pointer-events:none;' + css; doc.body.appendChild(e); var r = [e.offsetHeight, parseFloat(global.getComputedStyle(e).paddingTop) || 0, parseFloat(global.getComputedStyle(e).paddingBottom) || 0]; doc.body.removeChild(e); return r; } catch (eB) { return [-1, -1, -1]; }
-      };
-      var snap = function (tag) {
-        try {
-          if (n >= 10 || !doc.body) return;
-          var d = doc.documentElement, vv = global.visualViewport, f = doc.getElementById('app'), fr = f ? f.getBoundingClientRect() : null, sa = box('top:0;height:0;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)');
-          var a = ':i' + global.innerHeight + ':c' + d.clientHeight + ':v' + (vv ? R(vv.height) + '/' + R(vv.offsetTop) : '-') + ':s' + ((global.screen || {}).height || 0) + ':y' + R(global.scrollY || 0) + ':f' + (fr ? R(fr.height) + '@' + R(fr.top) : '-');
-          var b = ':d' + box('top:0;height:100dvh')[0] + ':x' + box('top:0;bottom:0')[0] + ':a' + R(sa[1]) + '/' + R(sa[2]) + ':w' + global.innerWidth + ':h' + (parseInt(d.style.height, 10) || 0) + ':b' + (doc.body ? doc.body.clientHeight : 0);
-          if (a + b === last) return; last = a + b; n++;
-          var ms = R((global.performance && global.performance.now && global.performance.now()) || 0);
-          whoBeacon({ k: 'perf', c: 'vp1:' + tag + a, ms: Math.min(ms, 599999) }); whoBeacon({ k: 'perf', c: 'vp2:' + tag + b, ms: Math.min(ms, 599999) });
-        } catch (eS) {}
-      };
-      snap('s'); global.addEventListener('load', function () { snap('l'); });
-      [1000, 3000, 8000, 20000, 45000, 90000].forEach(function (t, i) { global.setTimeout(function () { snap('t' + i); }, t); });
-      global.addEventListener('resize', function () { snap('r'); });
-      if (global.visualViewport) global.visualViewport.addEventListener('resize', function () { snap('v'); });   // 굴림(scroll)은 안 잰다 — 첫 실측에서 굴림 줄이 한도 10을 다 먹어 「맞는 순간」을 놓쳤다
-      doc.addEventListener('visibilitychange', function () { snap(doc.hidden ? 'h' : 'b'); });
-    } catch (eP) {}
   })();
   /* 🔄 새 코드 알아채기(2026-11-14 Peter 「새로 배포한 코드는 새로 고침을 안 눌러도」) — 학생 껍데기(mount)·선생님 껍데기(teacher/index.html mount)가 한 번씩 부른다.
      잰다: 정적 판 도장 app.ownify.co.kr/v.json {v: 커밋 해시}(Ownify tools/outside-deploy.sh 가 구글 배포 **뒤** 판과 한 번에 올린다 · no-store) +
