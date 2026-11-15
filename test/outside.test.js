@@ -377,6 +377,65 @@ t('S5g 숨긴 내 문장 판(bookWarm panel:1 out:1) → /mine/ + park=1 · 그 
   assert.strictEqual(s.panels().length, 1, '⛔ [복습 시작]이 새 판을 띄웠다');
   assert.deepStrictEqual(js(w.sent), [[{ onf: 'bookPark', on: false }, OUT_O], [{ onf: 'bookView', view: 'review' }, OUT_O]], '⛔ 숨긴 내 문장 판에 bookView 가 안 갔다');
 });
+console.log('[⭐ 한 지붕 — 판 안 링크의 길 · 내 문장 드라마 칸 (2026-11-16 Peter 「교재 → 메뉴 → 내 문장이 아직도 오래 걸린다 · 같은 페이지·창은 전부 한 지붕」)]');
+/* 내 문장 드라마 칸 주소(view=<드라마 S시즌>)는 진짜 bookSrc 처럼 판 주소에 view 를 남긴다 */
+const BSV = (h) => { const u = new URL(h), v = u.searchParams.get('view'); return /mode=mine/.test(h) && v && v !== 'review' && !/ttok=/.test(h) ? 'https://script.google.com/x/exec?t=T&mode=mine&view=' + encodeURIComponent(v) + '&embed=1' : BS(h); };
+const TABV = MINE + '&view=' + encodeURIComponent('CoG S1');
+const mineWarm = (s, views) => { s.send({ onf: 'bookWarm', href: MINE, panel: 1, out: 1 }, s.homeInner); const box = s.panels()[s.panels().length - 1], w = outWin(s, box); s.send({ onf: 'outHello' }, w, OUT_O); s.send({ onf: 'bookHi', views }, w, OUT_O); w.sent.length = 0; return { box, w }; };
+const bookOpenOut = (s) => { s.send({ onf: 'openBook', href: E1, out: 1 }, s.homeInner); const box = s.panels()[s.panels().length - 1], w = outWin(s, box); s.send({ onf: 'outHello' }, w, OUT_O); s.send({ onf: 'bookHi', views: 'line' }, w, OUT_O); w.sent.length = 0; return { box, w }; };
+t('T1 교재 판 안 ☰ 「내 문장」(view=드라마 · out 없음) → 미리 띄운 정적 내 문장 판(views review,tab)을 보이고 bookView{tab} · 새 판 0 · 교재 판은 숨김', () => {
+  const s = setup({ swap: true, bs: BSV }), m = mineWarm(s, 'review,tab'), b = bookOpenOut(s);
+  assert.strictEqual(s.panels().length, 2);
+  s.send({ onf: 'openBook', href: TABV }, b.w, OUT_O);
+  assert.strictEqual(s.panels().length, 2, '⛔ 판 안 ☰ 「내 문장」이 새 판을 띄웠다(라이브 「아직도 오래 걸린다」)');
+  assert.ok(!m.box.classList.contains('park') && b.box.classList.contains('park'), '⛔ 내 문장 판이 안 보이거나 교재 판이 안 숨었다');
+  assert.deepStrictEqual(js(m.w.sent), [[{ onf: 'bookPark', on: false }, OUT_O], [{ onf: 'bookView', tab: 'CoG S1' }, OUT_O]], '⛔ 「보임」 다음 드라마 칸 말(tab)이 안 갔다(또는 view 칸으로 갔다)');
+});
+t('T2 홈 드라마 줄(view=드라마 · out:1) → 같은 판 + tab · 그 칸 판도 보통 「내 문장」 열기가 다시 쓴다(새 판 0)', () => {
+  const s = setup({ swap: true, bs: BSV }), m = mineWarm(s, 'review,tab');
+  s.send({ onf: 'openBook', href: TABV, out: 1 }, s.homeInner);
+  assert.strictEqual(s.panels().length, 1, '⛔ 홈 드라마 줄이 새 판을 띄웠다');
+  assert.deepStrictEqual(js(m.w.sent).map((x) => x[0]), [{ onf: 'bookPark', on: false }, { onf: 'bookView', tab: 'CoG S1' }]);
+  //   드라마 칸 주소로 태어난 판(미리 띄운 판 없음) — 보통 열기(view 없음)가 그 판을 쓴다
+  const v = setup({ swap: true, bs: BSV });
+  v.send({ onf: 'openBook', href: TABV, out: 1 }, v.homeInner);
+  const box = v.panels()[0], w = outWin(v, box); v.send({ onf: 'outHello' }, w, OUT_O); v.send({ onf: 'bookHi', views: 'review,tab' }, w, OUT_O);
+  v.send({ onf: 'bookDismiss' }, v.homeInner); w.sent.length = 0;
+  v.send({ onf: 'openBook', href: MINE, out: 1 }, v.homeInner);
+  assert.ok(v.panels().length === 1 && !box.classList.contains('park') && js(w.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 드라마 칸 판을 보통 「내 문장」이 안 썼다(또는 칸 말을 보냈다)');
+});
+t('T3 할 줄 모르는 판(옛 내 문장 · views review) → 종전대로 새 판 · 그래도 판 안 링크는 정적 길(out 이어받음 — 구글 판 아님) · 덱(cards)은 내 문장 판에 절대 안 맡긴다', () => {
+  const s = setup({ swap: true, bs: BSV }), m = mineWarm(s, 'review'), b = bookOpenOut(s);
+  s.send({ onf: 'openBook', href: TABV }, b.w, OUT_O);
+  assert.strictEqual(s.panels().length, 3, '옛 내 문장 판은 드라마 칸을 못 한다 — 새 판');
+  assert.strictEqual(s.panels()[2].kids[0].src, OUT_MINE, '⛔ 판 안 링크가 정적 길을 안 따랐다(구글 판 · 라이브 3~5초): ' + s.panels()[2].kids[0].src);
+  assert.ok(js(m.w.sent).every((x) => x[0].onf !== 'bookView'));
+  const c = setup({ swap: true, bs: BSV }), mc = mineWarm(c, 'review,tab');
+  c.send({ onf: 'openBook', href: MINE + '&view=cards', out: 1 }, c.homeInner);
+  assert.ok(js(mc.w.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 내 문장 판에 cards 를 칸 말로 보냈다');
+  const g2 = setup({ swap: true, bs: BSV, out: false });   // 지금 길 내 문장 판(정적 판 막기 p.out 이 없다)도
+  g2.send({ onf: 'bookWarm', href: MINE, panel: 1 }, g2.homeInner);
+  const gb = g2.panels()[0], gw = win('mine-exec', g2.top); gb.kids[0].contentWindow = gw; g2.send({ onf: 'bookHi', views: 'review,tab' }, gw); gw.sent.length = 0;
+  g2.send({ onf: 'openBook', href: MINE + '&view=cards' }, g2.homeInner);
+  assert.ok(js(gw.sent).every((x) => x[0].onf !== 'bookView'), '⛔ 지금 길 내 문장 판에 cards 를 칸 말로 보냈다');
+});
+t('T4 판 안 링크의 길 — 같은 교재 다른 회차(📖 교재에서 보기)도 정적 판 길 · 아무 판도 정적이 아니면 종전 지금 길 · 서버 스위치 끔(out:false)이면 정적 판 안 엶', () => {
+  const s = setup({ swap: true, bs: BSV }), m = mineWarm(s, 'review,tab');
+  s.send({ onf: 'openBook', href: MINE, out: 1 }, s.homeInner);   // 내 문장 판을 보인다(숨긴 판의 말은 안 받는다)
+  s.send({ onf: 'openBook', href: E2 }, m.w, OUT_O);   // ⭐ 내 문장 판 「📖 교재에서 보기」(다른 회차 · out 없음)
+  assert.strictEqual(s.panels()[1].kids[0].src, SRC2, '켠 교재 판이 없고 홈이 그 교재를 out 으로 연 적도 없다 — 종전 지금 길');
+  const k = setup({ swap: true, bs: BSV }), kb = bookOpenOut(k), km = mineWarm(k, 'review,tab');
+  k.send({ onf: 'openBook', href: MINE, out: 1 }, k.homeInner);
+  k.send({ onf: 'openBook', href: E2 }, km.w, OUT_O);
+  const np = k.panels().filter((x) => x !== kb.box && x !== km.box);
+  assert.ok(np.length === 1 && np[0].kids[0].src === OUT_BOOK, '⛔ 같은 교재(켠 교재)의 다른 회차를 판 안에서 여니 구글 판이다: ' + np.map((x) => x.kids[0].src));
+  assert.ok(kb.box.classList.contains('park'));
+  const off = setup({ swap: true, bs: BSV, out: false });
+  off.send({ onf: 'openBook', href: E1, out: 1 }, off.homeInner);
+  const ob = off.panels()[0], obw = win('book-exec', off.top); ob.kids[0].contentWindow = obw; off.send({ onf: 'bookHi', views: 'line' }, obw);
+  off.send({ onf: 'openBook', href: E2 }, ob.kids[0].contentWindow);
+  assert.strictEqual(off.panels()[1].kids[0].src, SRC2, '⛔ 서버 스위치를 껐는데 정적 판을 열었다');
+});
 console.log('[🌤 검토 고침 1차 — 켠 교재만 · 판 섞지 않기]');
 /* 판 노크 — 첫 노크 뒤 swap:1 노크(정적 판도 지금 교재와 같은 말) */
 function knock(s, box, origin, views) { const w = box.kids[0].contentWindow; s.send({ onf: 'bookHi', views: views || 'line' }, w, origin); s.send({ onf: 'bookHi', views: views || 'line', swap: 1 }, w, origin); w.sent.length = 0; return w; }
