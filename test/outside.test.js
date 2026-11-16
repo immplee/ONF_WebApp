@@ -1182,7 +1182,7 @@ ta('S6d 그리기 전 실패 — homeDrawn 이 HOME_PAINT_MS(outBoot 부터) 안
   assert.strictEqual(e.frameEl.src, HOME_URL, '⛔ 남의 창 outFail 로 물러났다');
   e.send({ onf: 'outFail', why: 'error' }, e.homeWin, OUT_O);
   assert.strictEqual(e.frameEl.src, HSRC, '⛔ outFail 인데 지금 길로 안 갈아 끼웠다');
-  assert.ok(held(e.g.localStorage.m, 'onfOutFailHome'), '⛔ 그리기 전 outFail 인데 그날 기록이 없다');
+  assert.strictEqual(e.g.localStorage.m.onfOutFailHome, '0,1', '⛔ 그리기 전 outFail(error) — 이번만(연속 1 · 막지 않음 · 2026-11-16 느림 갈래)이 아니다');
   assert.strictEqual(e.okN.n, 0, '⛔ 못 그린 정적 홈으로 로고 막을 걷었다');
   const n = hsetup();
   n.fire(2500);
@@ -1275,8 +1275,8 @@ ta('N4 그리기 전 mismatch → 지금 길 · 그날 기록 없음 — 새 기
     }
   }
 });
-ta('N5 새 기기의 다른 실패(error · 그리기 전 notice·stale · 스위치 꺼짐)는 종전 그대로 그날 기록 — 시한·mismatch 만 면제', async () => {
-  for (const why of ['error', 'notice', 'stale']) {
+ta('N5 새 기기의 다른 실패(그리기 전 notice·stale · 스위치 꺼짐)는 종전 그대로 그날 기록 — 시한·mismatch·그리기 전 error(2026-11-16 느림) 만 면제', async () => {
+  for (const why of ['notice', 'stale']) {
     const s = hsetup({ ls: LSf() });
     s.calls[0].ok(200, HANS()); await flush();
     s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
@@ -1537,11 +1537,13 @@ ta('FB1 까닭별 표 — slow(hello·paint·fail-time·fail-net) 연속 1 = 0 �
   }
   x.F.fallOk('book');
   assert.ok(!('onfOutFail' in x.ls.m) && !x.F.fallBlocked('book'), '⛔ 성공(fallOk)인데 연속이 남았다');
-  for (const why of ['fail-boot', 'fail-bridge', 'fail-copy', 'fail-error', 'late-error', 'late-mismatch', 'off', 'notch', 'fail-x']) {
+  for (const why of ['fail-boot', 'fail-bridge', 'fail-copy', 'late-error', 'late-mismatch', 'off', 'notch', 'fail-x']) {
     const y = mk();
     assert.strictEqual(y.F.fallBack('home', why), D, '⛔ ' + why + ' 는 hard(하루)');
     assert.strictEqual(y.ls.m.onfOutFailHome, String(1.7e12 + D) + ',1');
   }
+  const fe = mk();   // 🧯 그리기 전 스크립트 오류 = 느림(Peter 2026-11-16 「?out=1 없이 자동으로」 — 고친 배포 뒤 다음 열기에 바로 정적 홈)
+  for (const [n, ms] of [[1, 0], [2, 600000], [3, 3600000], [4, D]]) assert.strictEqual(fe.F.fallBack('home', 'fail-error'), ms, '⛔ 홈 fail-error 연속 ' + n);
   const fb = mk();   // 📖 교재 판 다리 늦음 = 느림 갈래(2026-11-05 · 2차 검수 8번) — 1번째 0 · 2번째 10분 · 3번째 1시간 · 홈 판은 위에서 그대로 하루
   for (const [n, ms] of [[1, 0], [2, 600000], [3, 3600000]]) assert.strictEqual(fb.F.fallBack('book', 'fail-bridge'), ms, '⛔ 교재 fail-bridge 연속 ' + n);
   assert.strictEqual(mk().F.fallBack('home', 'fail-bridge'), D, '⛔ 홈 판 fail-bridge 가 하루가 아니다');
@@ -1570,6 +1572,16 @@ ta('FB1 까닭별 표 — slow(hello·paint·fail-time·fail-net) 연속 1 = 0 �
   const thr = mk(); thr.g.localStorage = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); }, removeItem() { throw new Error('blocked'); } };
   assert.strictEqual(thr.F.fallBlocked('book'), true, '⛔ 저장소가 막힌 창은 막힘(종전 — 열 때마다 시한을 안 낸다)');
   assert.doesNotThrow(() => { thr.F.fallBack('book', 'hello'); thr.F.fallOk('book'); });
+});
+ta('FB1b 🧹 한 번 치우기(2026-11-16) — 11-16 13:50~16:00(서울)에 적힌 학생 홈 하루 막힘만 열 때 지운다 · 그 밖 막힘·다른 판은 그대로', () => {
+  const run = (init) => { const ls = LSf(init), g = { T: 1.7e12, localStorage: ls, setTimeout, clearTimeout, URL, console: { info() {}, log() {}, warn() {} }, navigator: { userAgent: 'x', sendBeacon: () => true }, document: { addEventListener() {} }, addEventListener() {} };
+    g.window = g; g.Date = { now: () => g.T }; vm.createContext(g); vm.runInContext(CODE, g, { filename: 'onf-frame.js' }); return ls.m; };
+  const D = 86400000, at = (h, m) => Date.UTC(2026, 10, 16, h - 9, m) + D;   // 서울 시각에 적힌 하루 막힘의 다시 시도 시각
+  assert.ok(!('onfOutFailHome' in run({ onfOutFailHome: at(13, 57) + ',1' })), '⛔ 13:57 에 적힌 홈 막힘이 남았다(Loki 기기)');
+  assert.ok(!('onfOutFailHome' in run({ onfOutFailHome: at(14, 23) + ',2' })), '⛔ 14:23 홈 막힘이 남았다');
+  assert.strictEqual(run({ onfOutFailHome: at(13, 40) + ',1' }).onfOutFailHome, at(13, 40) + ',1', '⛔ 창 밖(13:40) 막힘까지 지웠다');
+  assert.strictEqual(run({ onfOutFailHome: at(16, 30) + ',1' }).onfOutFailHome, at(16, 30) + ',1', '⛔ 창 밖(16:30) 막힘까지 지웠다');
+  assert.strictEqual(run({ onfOutFail: at(14, 0) + ',1' }).onfOutFail, at(14, 0) + ',1', '⛔ 교재 칸까지 지웠다');
 });
 ta('FB2 물러날 때마다 clog 한 줄 {k:err, c:fallback:<판>:<까닭>:<연속>, d} — 값 칸 없음 · Worker /clog · 판 글자는 a-z·- 20자로', async () => {
   const ls = LSf(), beacons = [], g = { T: 1.7e12, localStorage: ls, setTimeout, clearTimeout, URL, console: { info() {}, log() {}, warn() {} },
