@@ -1213,7 +1213,7 @@ function hwFbSync() { if (hwFbLast && hwBk && hwBk.win) { try { hwBk.win.postMes
 function hwFbBack(d) {
   if (!hwWin) return;
   var S = function (v, n) { return String(v == null ? '' : v).slice(0, n); }, I = function (v) { v = Number(v); return isFinite(v) ? Math.max(0, Math.min(1e6, Math.floor(v))) : 0; }, m = null;
-  if (d.onf === 'fbPick') m = { onf: 'fbPick', row: I(d.row), w0: I(d.w0), w1: I(d.w1), text: S(d.text, 400), ipa: S(d.ipa, 200), sheet: S(d.sheet, 100) };
+  if (d.onf === 'fbPick') { m = { onf: 'fbPick', row: I(d.row), w0: I(d.w0), w1: I(d.w1), text: S(d.text, 400), ipa: S(d.ipa, 200), sheet: S(d.sheet, 100), pv: S(d.pv, 40), nx: S(d.nx, 40) }; if (Array.isArray(d.cq)) m.cq = d.cq.slice(0, 40).map(function (x) { return S(x, 40); }); }   // 🎞️ pv·nx(앞뒤 낱말 — 안 읽음 가름) · cq(그 줄 낱말 — 드라마·회차 원음을 대사 글로 찾는다 · 2026-11-16 · 종전엔 껍데기가 셋 다 버렸다)
   else if (d.onf === 'fbFocus') m = { onf: 'fbFocus', id: S(d.id, 40) };
   else if (d.onf === 'fbWords') m = { onf: 'fbWords', k: I(d.k), ws: (Array.isArray(d.ws) ? d.ws.slice(0, 80) : []).map(function (x) { return S(x, 40); }) };   // 📖 옆 교재 그 대사 칸 낱말 글자(과제 판이 지금 낱말을 맞춘다 · 2026-11-13)
   else if (d.onf === 'fbCmtAck') { m = { onf: 'fbCmtAck', id: S(d.id, 40), ok: d.ok ? 1 : 0, why: S(d.why, 20) }; if (/^(add|edit|del)$/.test(String(d.op || ''))) { m.op = d.op; m.cm = S(d.cm, 40); m.cf = S(d.cf, 60); } }   // 💬 댓글 id(보낸 뒤 고치기·지우기)
