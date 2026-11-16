@@ -746,7 +746,7 @@ function hwFrom(win) {
   }
   return false;
 }
-function hwOpen(t, l, f, hwt, au, rs) {   // rs = 🔄 새로 고침 되살리기(홈 onfThHw) — 판이 제 기억(쪽·보기·교재 회차)을 이때만 쓴다
+function hwOpen(t, l, f, hwt, au, rs, fb) {   // fb = {rd} 선생님 홈 피드백 「고치기」 — 판이 그 회차로 바로 피드백 모드(2026-11-16)   // rs = 🔄 새로 고침 되살리기(홈 onfThHw) — 판이 제 기억(쪽·보기·교재 회차)을 이때만 쓴다
   if (hwBkRs) { if (rs) hwBkRs.until = Date.now() + 60000; else hwBkRs = null; }   // 🔄 옆 교재 되살리기도 되살리기 열기에만(아래 hwBkRs)
   var files0 = f, tk0 = hwt; hwL = String(l || '');   // 📚 hwFbAskAns 가 「그 수업」인지 본다
   if (hwBox && hwWarmOn && hwT === t) {   // 미리 띄운 판 — 보이고 「이 수업·이 사진으로 열어」 만
@@ -754,13 +754,13 @@ function hwOpen(t, l, f, hwt, au, rs) {   // rs = 🔄 새로 고침 되살리�
     hwBox.style.visibility = ''; hwBox.style.pointerEvents = '';
     try { hwFr.focus(); } catch (eF) {}
     hwHistPush();
-    hwGoMsg = { onf: 'hwbookGo', l: l, hw: hwShape(files0, tk0, au, rs) };
+    hwGoMsg = { onf: 'hwbookGo', l: l, hw: hwShape(files0, tk0, au, rs, fb) };
     if (hwOut) { hwOut.go = hwGoMsg.hw; hwOut.q = 't=' + encodeURIComponent(t) + (l ? '&l=' + encodeURIComponent(l) : ''); }   // 정적 판이 물러나면 구글 판은 warm 이 아닌 「이 수업 열기」로(종전엔 warm=1 로 다시 떠 hwbookGo 를 영영 기다렸다 · 2026-10-31 전수 검수 C2)
     if (hwWin) { try { hwWin.postMessage(hwGoMsg, hwOrigin); } catch (e) {} hwGoMsg = null; }
     return;
   }
   hwClose();
-  hwGo = hwShape(f, hwt, au, rs); hwT = t;
+  hwGo = hwShape(f, hwt, au, rs, fb); hwT = t;
   hwBox = document.createElement('div');
   hwBox.className = 'onf-hwbox';
   hwBox.style.cssText = 'position:fixed;inset:0;z-index:50;background:var(--bg,#1d1712)';
@@ -845,13 +845,14 @@ function hwViewHist(was, v) {   // 사진만 ↔ 교재 — 보기 칸을 넣고
   if (was === 'photo' && v !== 'photo' && s && s.onfHw && !s.hv) { try { history.pushState({ onfHw: 1, n: s.n || 0, lg: 1, hv: 1 }, ''); } catch (e) {} }
   else if (was !== 'photo' && v === 'photo' && s && s.onfHw && s.hv) { hwCode = true; setTimeout(function () { hwCode = false; }, 1000); if (Number(s.k) > 0) history.go(-1 - Number(s.k)); else history.back(); }   // 뒤따르는 popstate 는 이미 사진만이라 할 일이 없다 · 옆 교재 칸(k)까지 · hwCode = 그 popstate 는 판 안 창 뒤로가 아니다(검토 B — 종전엔 hwWinBack 으로 판 창을 닫았다)
 }
-function hwShape(f, hwt, au, rs) {
+function hwShape(f, hwt, au, rs, fb) {
   var files = Array.isArray(f) ? f.filter(function (x) { return x && /^[A-Za-z0-9_-]{10,200}$/.test(String(x.id || '')) && /^\d{4}-\d{2}-\d{2}$/.test(String(x.ymd || '')); })
     .slice(0, 80).map(function (x) { return { id: String(x.id), ymd: String(x.ymd) }; }) : null;
   var tk = hwt && typeof hwt.p === 'string' && hwt.p.length <= 12000 && /^[A-Za-z0-9_-]{43}$/.test(String(hwt.sig || '')) ? { p: hwt.p, sig: String(hwt.sig) } : null;
   var a = au && /^\d{4}-\d{2}-\d{2}$/.test(String(au.d || '')) && Number(au.at) >= 0 && Number(au.at) < 1e14 ? { d: String(au.d), at: Number(au.at) } : null;   // 🎧 들으며 필기 — 그 녹음(날짜 · 올린 시각)을 띄운 판(4단계 · 2026-10-24)
   var o = { f: files, hwt: tk, a: a };
-  if (rs) o.rs = 1;   // 🔄 새로 고침 되살리기 — 없으면 판은 처음 쪽·사진만(닫았다 다시 연 판이 옛 자리로 튀지 않게 · 2026-11-08 검토 ④)
+  if (rs) o.rs = 1;
+  if (fb && typeof fb === 'object' && typeof fb.rd === 'string' && /^[a-z0-9]{0,32}$/.test(fb.rd)) o.fb = { rd: fb.rd };   // ✏️ 피드백 회차(판 HB_FBGO · 꼴만 통과 — 회차 id [a-z0-9] · '' = 옛 묶음)   // 🔄 새로 고침 되살리기 — 없으면 판은 처음 쪽·사진만(닫았다 다시 연 판이 옛 자리로 튀지 않게 · 2026-11-08 검토 ④)
   return o;
 }
 function hwWarm(t) {
@@ -1338,8 +1339,8 @@ window.addEventListener('message', function (ev) {
   var t = String(d.t || ''), l = String(d.l || '');
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(t)) return;
   if (!/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(l)) l = '';
-  var hf = d.f, hk = d.hwt, ha = d.a, hrs = d.rs === 1, hw = appWin, ho = appOrigin, go = function () {
-    hwOpen(t, l, hf, hk, ha, hrs);
+  var hf = d.f, hk = d.hwt, ha = d.a, hrs = d.rs === 1, hfb = d.fb, hw = appWin, ho = appOrigin, go = function () {
+    hwOpen(t, l, hf, hk, ha, hrs, hfb);
     hwOpenedTell(hw, ho, t, l);   // 홈 창은 이 말을 받고 모아 보기 창을 닫는다 · 🔄 t·l = 띄운 판(아래 hwOpenedTell)
   };
   /* 📱 입장권만으로 연 홈(tchOnly)은 구글 창구 전이다 — 구글 판(exec)이면 로그인 화면(gate)을 한 번 거쳐 연다 · 「홈으로 돌아가기」로 그만둘 수 있다.

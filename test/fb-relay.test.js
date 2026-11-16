@@ -105,4 +105,12 @@ t('⑤ 받는 자리 — 과제 판 허용 목록에 hwFb · 교재 말은 bookF
   const i = src.indexOf("if (d.onf === 'fbPick' || d.onf === 'fbFocus' || d.onf === 'fbCmtAck' || d.onf === 'fbWords') { hwFbBack(d); return; }"), g = src.lastIndexOf('if (!d || !hwBk || !bookFrom(ev, hwBk.el, true)) return;', i);
   assert.ok(i > 0 && g > 0 && i - g < 1500, '⛔ 교재 말을 출처 확인 없이 받는다');
 });
+t('⑥ ✏️ 선생님 홈 피드백 「고치기」 — 노크 답 hw 에 fb.rd(회차 id 꼴만) · 없거나 이상하면 안 싣는다 · 판 열기 두 길(새 판·미리 띄운 판) 모두 (Ownify 2026-11-16)', () => {
+  const a = src.indexOf('function hwShape('), b = src.indexOf('\n}\n', a) + 3, c2 = { }; vm.createContext(c2); vm.runInContext(src.slice(a, b), c2);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c2.hwShape(null, null, null, false, { rd: 'rd0a1b2c', x: 1 }))), { f: null, hwt: null, a: null, fb: { rd: 'rd0a1b2c' } });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(c2.hwShape(null, null, null, false, { rd: '' }).fb)), { rd: '' }, '⛔ 옛 묶음(\'\')은 시작 창으로 가도록 그대로 넘긴다');
+  [undefined, null, 'rd1', { rd: '<b>' }, { rd: 'A'.repeat(5) }, { rd: 'a'.repeat(33) }].forEach((x) => assert.ok(!('fb' in c2.hwShape(null, null, null, false, x)), '⛔ 이상한 fb 를 판에 넘겼다: ' + JSON.stringify(x)));
+  assert.match(src, /hfb = d\.fb[\s\S]{0,120}hwOpen\(t, l, hf, hk, ha, hrs, hfb\)/, '⛔ 홈 말(d.fb)을 hwOpen 에 안 넘긴다');
+  assert.ok(/hwbookGo', l: l, hw: hwShape\(files0, tk0, au, rs, fb\)/.test(src) && /hwGo = hwShape\(f, hwt, au, rs, fb\)/.test(src), '⛔ 판 여는 두 길 중 하나가 fb 를 빠뜨렸다');
+});
 console.log(`fb-relay: ${pass} 통과${fail ? ' · ' + fail + ' 실패' : ''}`); process.exitCode = fail ? 1 : 0;
