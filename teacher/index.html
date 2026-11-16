@@ -1908,14 +1908,14 @@ function rsLowOpen(x, below) {
    홈이 미리 띄우는 곳이 여럿(지금 수업 1분마다 · 목록 물결 · 학생 창 · ⭐ 탭 · 마우스 올림)이고 숨긴 판 자리는 셋뿐인데, 종전엔 「가장 오래 안 쓴 것」만 보고 비켰다 →
    마지막에 미리 띄운 쪽이 늘 이겨, 한 길을 빠르게 하려고 더한 미리 띄우기가 다른 길의 미리 판을 밀어냈다(⭐ 미리 #810 이 학생 교재 판을 밀어 ⭐ 안 「교재에서 보기」 9초).
    이제 판마다 몫(pri)을 들고, 비킬 판은 이 한 곳(bookRoom)이 고른다:
-     · 홈 bookWarm{pri} — list 0(목록) · intent 1(마우스 올림) · now 3(지금 수업) · focus 4(지금 연 학생 창의 교재·⭐) · 몫 없는 옛 홈 = 0(종전 그대로).
-     · 사람이 본 판(bookShow) = seen 2 이상 · 보이는 판의 앞 판 사슬(✕ = 0초로 돌아갈 판) = 5.
+     · 홈 bookWarm{pri} — list 0(목록) · intent 2(마우스 올림) · now 3(지금 수업) · focus 4(지금 연 학생 창의 교재·⭐) · 몫 없는 옛 홈 = 0(종전 그대로).
+     · 사람이 본 판(bookShow) = seen 1 이상 · 보이는 판의 앞 판 사슬(✕ = 0초로 돌아갈 판) = 5.
      · 미리 띄우기는 **자기 몫 이하**만 비킨다 — 높은 몫 판을 밀 자리가 없으면 안 띄운다(낮은 몫이 높은 몫을 밀어 핑퐁하던 것 · 1분마다 지금 수업 ↔ 학생 창).
      · 사람이 누른 열기(n 만, pri 없음)는 무엇이든 비킬 수 있다 — 낮은 몫 → 오래된 것 차례.
    ⛔ 새 미리 띄우기를 더하면 몫을 하나 고르고 test/teacher-book.test.js 「흐름 표」(F1~)에 그 흐름을 한 줄 더한다 — 다른 길 차갑게 열기가 생기면 거기서 빨갛게 된다.
    판이 n 개를 넘으면 숨긴 판부터 지운다 — 보이는 판·📖 판(bookBoard)·📖 노크 전 판 후보(bookCand)는 안 건드린다(books 는 오래 안 쓴 것이 앞). 줄였으면 true. */
 /* ⛔ 자격 내린 판(gone — 늙음·stale·답 없음)은 **세지도 지우지도 않는다**(2단계 반박 🟠 2026-10-17) — 맺음(안 보낸 칸·실패 카드·오프라인 백업)이 끝나기 전에 지우면 그 글이 사라진다 · 30분 지우기(bookIdle)가 치운다. */
-var BOOK_PRI = { list: 0, intent: 1, seen: 2, now: 3, focus: 4 };
+var BOOK_PRI = { list: 0, seen: 1, intent: 2, now: 3, focus: 4 };   // ⚠️ intent > seen(2026-11-16 구멍 검수 F6) — 마우스 올림 = 곧 누름 · 예전에 본 판보다 앞선다(종전 「오래된 것 비킴」과 같은 결과 — 거꾸로 두면 본 판 셋이 찬 뒤 올림 미리가 사라져 그 길이 느려졌다)
 var bookFocusT = '';   // 🏷 마지막 focus 학생(토큰 t) — 학생을 바꾸면 앞 학생의 focus 판은 seen 으로 친다(지금 수업보다 먼저 비킨다)
 function bookTok(src) { try { return new URL(src).searchParams.get('t') || ''; } catch (e) { return ''; } }
 function bookRank(q, cur) { var r = q.pri || 0; if (cur && bookOpener(cur, q)) return 5; return r === BOOK_PRI.focus && bookTok(q.src) !== bookFocusT ? BOOK_PRI.seen : r; }
