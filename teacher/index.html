@@ -2112,6 +2112,7 @@ window.addEventListener('message', function (ev) {
     if (d.onf === 'bookHello') {   // 📱 phone:1 = 폰 판도 할 줄 안다(홈은 이때만 폰에서 판으로) · 📖 swap:1 = 판 한 장(켰을 때만 칸이 있다 — 끔이면 종전 글자 그대로)
       var cp = { onf: 'caps', book: 1, phone: BOOK_PH ? 1 : 0 };
       if (BOOK_SW) cp.swap = 1;
+      cp.pri = 1;   // 🏷 bookWarm{pri} 몫을 안다(위 bookRoom 한 지붕 · 2026-11-16) — 홈은 이 표시가 있을 때만 pri 를 싣는다(모르는 껍데기엔 종전 글자 그대로)
       try { ev.source.postMessage(cp, ev.origin); } catch (e) {}
       if (TAB0) { try { ev.source.postMessage({ onf: 'homeTab', v: TAB0 }, ev.origin); } catch (eT) {} TAB0 = ''; }   // 🔄 새로고침 전에 고른 홈 탭(아래 TAB0)
       if (!bookHome) { bookHome = ev.source; bookHomeOrigin = ev.origin; }   // 판 소식(bookPerf·bookClosed)을 받을 홈 — 되살린 판은 홈보다 먼저 떴다(mount rsBoot)

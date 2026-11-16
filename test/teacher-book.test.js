@@ -67,7 +67,7 @@ t('caps — 내 액자 후손·googleusercontent 에만 그 출처로 · 남의 
   s.send({ onf: 'bookHello' }, s.home, 'https://evil.example.com');
   assert.strictEqual(stranger.sent.length + s.home.sent.length, 0, '⛔ 남의 창·출처에 caps 를 답했다');
   s.send({ onf: 'bookHello' }, s.home);
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(s.home.sent)), [[{ onf: 'caps', book: 1, phone: 1 }, ORIGIN]], '⛔ caps 가 없거나 * 로 갔다(📱 선생님 폰 판은 기본 켬 — phone:1)');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(s.home.sent)), [[{ onf: 'caps', book: 1, phone: 1, pri: 1 }, ORIGIN]], '⛔ caps 가 없거나 * 로 갔다(📱 선생님 폰 판은 기본 켬 — phone:1)');
 });
 
 t('주소 — 아는 값만(선생님 보기 t·ttok·tas 포함) · 짧은 주소는 slug · embed=1 · 교재 앱(ONF.api.EXEC)으로', () => {
@@ -343,10 +343,10 @@ t('📱 「교재에서 나갈까요?」 칸(BOOK_LG · Peter 2026-10-24 스와�
 t('📱 스위치 — 기본 켬(caps phone:1) · 주소 phonepanel=0 이면 끄고 이 기기에 기억(선생님 키 onfThPhonePanel) · 꺼지면 폰 폭이어도 onf-ph·판 칸 없음 · 학생 키(onfPhonePanel)는 안 본다 · phonepanel=1 이 기억된 끔을 이긴다', () => {
   const caps = (s) => { s.send({ onf: 'bookHello' }, s.home); return jsn(s.home.sent.find((x) => x[0].onf === 'caps')[0]); };
   let s = phoneRun({ ls: { onfPhonePanel: '0' } });
-  assert.deepStrictEqual(caps(s), { onf: 'caps', book: 1, phone: 1 }, '⛔ 기본이 켬이 아니다(또는 학생 스위치 키를 봤다)');
+  assert.deepStrictEqual(caps(s), { onf: 'caps', book: 1, phone: 1, pri: 1 }, '⛔ 기본이 켬이 아니다(또는 학생 스위치 키를 봤다)');
   assert.ok(s.root.classList.contains('onf-ph'), '⛔ 폰 폭인데 <html> 에 onf-ph 가 없다');
   s = phoneRun({ search: '?phonepanel=0' });
-  assert.deepStrictEqual(caps(s), { onf: 'caps', book: 1, phone: 0 }, '⛔ phonepanel=0 인데 phone:1 — 홈이 폰에서 판으로 보낸다');
+  assert.deepStrictEqual(caps(s), { onf: 'caps', book: 1, phone: 0, pri: 1 }, '⛔ phonepanel=0 인데 phone:1 — 홈이 폰에서 판으로 보낸다');
   assert.strictEqual(s.g.localStorage.s.onfThPhonePanel, '0', '⛔ 끈 것을 이 기기에 기억 안 했다(다음에 주소 없이 열면 다시 켜진다)');
   assert.ok(!s.root.classList.contains('onf-ph'), '⛔ 꺼졌는데 폰 모양(onf-ph)');
   s.send({ onf: 'openBook', href: E1, left: 0 }, s.home);
@@ -1060,12 +1060,12 @@ t('H4 — 📱 폰: [열기] → bookSwap · 판 칸 push {onfBook:key(B)} · �
 t('H7 — caps: 스위치 켜면 swap:1 · 꺼짐이면 칸 없음(종전 글자 그대로) · 주소 swap=1|0 은 이 기기에 기억(onfThSwap)', () => {
   const caps = (s) => { s.send({ onf: 'bookHello' }, s.home); return jsn(s.home.sent.find((x) => x[0].onf === 'caps')[0]); };
   let s = phoneRun({ wide: true, search: '?swap=1' });
-  assert.deepStrictEqual(caps(s), { onf: 'caps', book: 1, phone: 1, swap: 1 }, '⛔ 켰는데 caps 에 swap:1 이 없다');
+  assert.deepStrictEqual(caps(s), { onf: 'caps', book: 1, phone: 1, swap: 1, pri: 1 }, '⛔ 켰는데 caps 에 swap:1 이 없다');
   assert.strictEqual(s.g.localStorage.s.onfThSwap, '1', '⛔ 켠 것을 이 기기에 기억 안 했다');
   s = phoneRun({ wide: true, ls: { onfThSwap: '1' } });
   assert.strictEqual(caps(s).swap, 1, '⛔ 기억한 켬을 안 따랐다');
   s = phoneRun({ wide: true, ls: { onfThSwap: '1' }, search: '?swap=0' });
-  assert.deepStrictEqual(caps(s), { onf: 'caps', book: 1, phone: 1 }, '⛔ swap=0 인데 swap 칸이 있다');
+  assert.deepStrictEqual(caps(s), { onf: 'caps', book: 1, phone: 1, pri: 1 }, '⛔ swap=0 인데 swap 칸이 있다');
   assert.strictEqual(s.g.localStorage.s.onfThSwap, '0', '⛔ 끈 것을 기억 안 했다');
   s = phoneRun({ wide: true, lsRaw: true, ls: { onfSwap: '0' } });   // 빈 저장소(새 기기) — 검사 장치 기본 끔(onfThSwap '0')을 안 깐다
   assert.strictEqual(caps(s).swap, 1, '⛔ 기본이 켬이 아니다(2026-10-21 Peter 「전체 켜줘」 · 또는 학생 키 onfSwap 을 봤다)');
