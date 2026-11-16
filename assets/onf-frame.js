@@ -282,7 +282,10 @@
   var FALL_SLOW_PAN = { book: ['fail-bridge'], thome: ['fail-none', 'fail-stale'], hwbook: ['fail-bridge', 'notch', 'stale'], hwext: ['fail-bridge', 'notch'] };   // 📝 과제 판 다리가 늦음(구글 바닥)·입장권 없음/거절 = 곧 풀리는 것 → 느림 갈래   // 🏫 선생님 홈 사본 없음·낡음 = 5분 틱이 곧 고쳐 놓는 상태 → 느림 갈래(2026-10-31 · 사본은 3시간·날짜마다 다시 짓는다 #155)
   /* 📖 교재 판 다리 늦음(fail-bridge) = 느림(2026-11-05 Peter 「A로 고쳐」 · 2차 검수 8번) — 종전 hard(하루)라 다리가 한 번 늦으면(배포 사이·구글 붐빔)
        그 기기 모든 교재가 하루 동안 구글 판(Peter 맥 실측 첫 열기 9.3초 → 정적 0.26초 · 11/05 01:56 한 번에 11/06 01:56 까지). 홈 판의 fail-bridge 는 그대로 하루. */
-  var FALL_SLOW = ['hello', 'paint', 'fail-time', 'fail-net'], FALL_SKIP = ['fail-mismatch', 'late-notice', 'late-stale', 'nodata'];
+  /* 🧯 그리기 전 스크립트 오류(fail-error) = 느림 갈래(Peter 2026-11-16 「?out=1 없이 기존 주소로 자동으로」) — 판 코드 오류는 다음 배포로 고쳐지는 것인데
+       종전 hard(하루)라 한 번 나면 그 기기가 고친 뒤에도 하루 동안 구글 판이었다(11-16 학생 홈 피드백 이름 ReferenceError → 「피드백을 못 읽었어요」 · Ownify #849 로 고침).
+       1번째 이번만 · 2번째 10분 · 3번째 1시간 · 4번째부터 하루(안 고쳐진 오류는 그대로 하루로 간다). 그린 뒤 오류(late-error)는 종전 그대로 hard. */
+  var FALL_SLOW = ['hello', 'paint', 'fail-time', 'fail-net', 'fail-error'], FALL_SKIP = ['fail-mismatch', 'late-notice', 'late-stale', 'nodata'];
   /* 🔭 누구 화면인가(2026-11-05 2차 검수 「물러남 줄에 누구·왜가 없다」) — fallback:*·sh:* 줄에 b = SHA-256 앞 8 hex · f = 'S'(학생)|'T'(선생님).
      학생 = mount 의 토큰 → 구글 _onfInkHash8(tok) · 홈 판 homeMismatch 줄의 b 와 같은 값 · 선생님 = 입장권(onf_tch)의 주소 소문자 → 구글 _onfTHomeH 'T:' 뒤 16 hex 의 앞 8.
      ⛔ 토큰·주소·이름은 안 싣는다 · 못 재면(옛 브라우저·저장소 막힘·입장권 없음) '' · 줄은 해시를 기다렸다 나간다(껍데기 문서는 안 떠나니 sendBeacon 이 늦어도 간다). */
@@ -434,6 +437,9 @@
     whoBeacon({ k: 'gp', c: 'sh:' + key });
   }
   function fallGet(k) { var v = String(global.localStorage.getItem(k) || '').split(','); return { at: Number(v[0]) || 0, n: Number(v[1]) || 0 }; }
+  /* 🧹 한 번 치우기(2026-11-16) — 위 fail-error 가 hard 이던 때 11-16 13:50~16:00(서울) 에 적힌 학생 홈 하루 막힘(다시 시도 시각 = 적은 때 + 하루)을 지운다.
+       그 사이 기록 = 학생 홈 피드백 이름 ReferenceError 하나뿐(clog fallback:home:fail-error · Loki 기기들). ponytail: 11-17 16:00 이 지나면 저절로 할 일 없음 — 그 뒤 지워도 된다. */
+  try { var hf = fallGet(FALL_KEY.home); if (hf.at >= 1794891000000 && hf.at <= 1794898800000) global.localStorage.removeItem(FALL_KEY.home); } catch (e) {}
   function fallBlocked(pan) {
     var b; try { b = Date.now() < fallGet(FALL_KEY[pan]).at; } catch (e) { gpSh(pan, 'nostore'); return true; }
     if (b) gpSh(pan, 'blocked');   // 🔭 위 「통째 구글 화면 세기」
