@@ -1702,5 +1702,101 @@ t('V8 갈아 끼우는 중(답 전)인 판엔 bookView 를 안 보낸다 — 판
   assert.ok(swapMsg(bi).slice(-1)[0].src === srcOf(s, E2), '⛔ 갈아 끼우는 중인 판을 줄 없는 [열기]가 그대로 보였다(나중 것이 이겨야)');
 });
 
+/* ═══ 🧮 흐름 표(2026-11-16 Peter 「이거 고치면 저거 느려지고 저거 고치면 이거 느려지는 게 계속 — 근본적으로」) ═══
+   한 세션에서 수업 날 흐름을 **차례대로** 다 밟는다 — 미리 띄우기가 여럿(지금 수업 1분마다 · 목록 · 학생 창 · ⭐ · 마우스 올림)이라
+   한 길을 빠르게 하려고 미리 띄운 판이 다른 길의 미리 판을 밀어내면, 그 길에서 「새 판(차갑게 열기)」이 생겨 여기서 바로 빨갛게 된다.
+   ⛔ 새 미리 띄우기·새 비키기 규칙을 넣으면 이 표에 그 흐름을 한 줄 더한다. 차갑게 열기 0 이 기준이다. */
+const FB = (slug, tok) => 'https://class.ownify.co.kr/' + slug + '?mode=share&t=' + tok + '&ttok=CRED&tas=Peter';
+const FM = (tok) => 'https://class.ownify.co.kr/?mode=mine&t=' + tok + '&ttok=M&tas=Peter';
+function flowRun() {
+  const s = phoneRun({ wide: true, frame: true, search: '?swap=1' }), cold = [];
+  const mk = s.g.bookMake;
+  s.g.bookMake = function (src, parked) { const p = mk.apply(this, arguments); if (!parked) cold.push(src.replace(/^.*\/exec\?/, '').slice(0, 40)); return p; };
+  const byTok = (tok, mine) => s.g.books.find((q) => !q.gone && q.src.indexOf('t=' + tok + '&') > 0 && /mode=mine/.test(q.src) === !!mine);
+  const knock = (p, n, views) => { const w = outUp(s, p.box, n); s.send({ onf: 'bookHi', views }, w, OUT_O); return w; };
+  const warm = (href, pri) => s.send(Object.assign({ onf: 'bookWarm', href, panel: 1, left: 270, out: 1 }, pri ? { pri } : {}), s.home);
+  return { s, cold, byTok, knock, warm };
+}
+t('F1 흐름 표 — 수업 날: 지금 수업(1분마다) · 목록 · 학생 창(교재·⭐) · 마우스 올림이 서로를 안 밀어낸다 · 누르는 길마다 차갑게 열기 0', () => {
+  const { s, cold, byTok, knock, warm } = flowRun();
+  const C = FB('cog-s1-e2-cc', 'TOKC'), A = FB('cog-s1-e1-aa', 'TOKA'), B = FB('fri-s1-e1-bb', 'TOKB');
+  warm(C, 'now'); knock(byTok('TOKC'), 1, 'line');                                     // 지금 수업 교재
+  ['L1', 'L2', 'L3'].forEach((k) => warm(FB('gp-s1-e1-' + k.toLowerCase(), k), 'list'));   // 홈 목록 물결
+  const L = s.g.books.find((q) => /t=L1&/.test(q.src)); if (L) knock(L, 2, 'line');
+  warm(A, 'focus'); const wa = knock(byTok('TOKA'), 3, 'line');                         // 학생 창(A) 열기
+  warm(FM('TOKA'), 'focus'); const wm = knock(byTok('TOKA', true), 4, 'review,tab');    // ⭐ 탭
+  warm(C, 'now');                                                                       // 1분 뒤 지금 수업 다시
+  warm(B, 'intent');                                                                    // 다른 학생 줄에 마우스
+  assert.ok(byTok('TOKC') && byTok('TOKA') && byTok('TOKA', true), '⛔ 미리 띄운 판이 밀려났다 — 지금 수업 C:' + !!byTok('TOKC') + ' · A 교재:' + !!byTok('TOKA') + ' · A ⭐:' + !!byTok('TOKA', true));
+  //   ① 「⭐ 내 문장 열기」 ② ⭐ 안 「교재에서 보기」(줄) ③ ✕ = ⭐ ④ ⭐ 닫고 수업 시작 = 지금 수업 교재
+  s.send({ onf: 'openBook', href: FM('TOKA'), left: 270, out: 1 }, s.home);
+  assert.deepStrictEqual(cold, [], '⛔ ① ⭐ 내 문장 열기가 새 판');
+  s.send({ onf: 'openBook', href: A + '&line=669' }, wm, OUT_O);
+  assert.deepStrictEqual(cold, [], '⛔ ② 교재에서 보기가 새 판(미리 띄운 A 교재가 밀려났다)');
+  assert.ok(jsn(wa.sent).some((x) => x[0].onf === 'bookView' && x[0].line === 669), '⛔ ② A 교재 판에 「669줄로」가 안 갔다');
+  s.send({ onf: 'bookClose' }, wa, OUT_O); s.flush();
+  assert.ok(cold.length === 0 && s.g.bookShown() === byTok('TOKA', true), '⛔ ③ ✕ 가 ⭐ 으로 0초에 안 돌아갔다');
+  s.send({ onf: 'bookClose' }, wm, OUT_O); s.flush();
+  s.send({ onf: 'openBook', href: C, left: 270, out: 1 }, s.home);
+  assert.deepStrictEqual(cold, [], '⛔ ④ 지금 수업 교재가 새 판');
+  assert.ok(s.g.books.filter((q) => !q.gone).length <= s.g.bookMax(), '⛔ 판 수 상한을 넘었다: ' + s.g.books.length);
+});
+t('F2 흐름 표 — 학생을 바꾸면(A → D) 앞 학생 몫부터 비킨다 · 지금 수업은 그대로 · 목록·마우스 올림은 높은 몫을 못 민다', () => {
+  const { s, byTok, knock, warm } = flowRun();
+  const C = FB('cog-s1-e2-cc', 'TOKC'), A = FB('cog-s1-e1-aa', 'TOKA'), D = FB('fri-s1-e3-dd', 'TOKD');
+  warm(C, 'now'); knock(byTok('TOKC'), 1, 'line');
+  warm(A, 'focus'); knock(byTok('TOKA'), 2, 'line');
+  warm(FM('TOKA'), 'focus'); knock(byTok('TOKA', true), 3, 'review,tab');
+  warm(FB('gp-s1-e1-x', 'TOKX'), 'list'); warm(FB('gp-s1-e1-y', 'TOKY'), 'intent');
+  assert.ok(byTok('TOKC') && byTok('TOKA') && byTok('TOKA', true) && !byTok('TOKX') && !byTok('TOKY'), '⛔ 낮은 몫(목록·마우스 올림)이 높은 몫을 밀어냈다');
+  warm(D, 'focus'); knock(byTok('TOKD'), 4, 'line');
+  assert.ok(byTok('TOKD') && byTok('TOKC') && !byTok('TOKA') && byTok('TOKA', true), '⛔ 학생을 바꿨는데 앞 학생 교재(가장 오래된 같은 몫)가 아니라 다른 것을 비켰다');
+  warm(FM('TOKD'), 'focus');
+  assert.ok(byTok('TOKD', true) && byTok('TOKD') && byTok('TOKC') && !byTok('TOKA', true), '⛔ 새 학생 ⭐ 이 앞 학생 ⭐ 대신 다른 것을 비켰다');
+});
+t('F3 몫 없는 옛 홈(pri 없음) = 종전 그대로 — 정적 미리 판 하나 · 노크한 숨긴 정적 판은 새 미리에 비킨다(O8)', () => {
+  const { s, byTok, knock, warm } = flowRun();
+  warm(FB('cog-s1-e1-aa', 'TOKA')); knock(byTok('TOKA'), 1, 'line');
+  warm(FB('cog-s1-e1-bb', 'TOKB'));
+  assert.ok(!byTok('TOKA') && byTok('TOKB') && s.g.books.length === 1, '⛔ 몫 없는 미리가 종전(정적 판 하나)과 다르다');
+});
+
+t('F4 흐름 표 — 사람이 본 판(seen)은 목록이 못 민다 · 목록 판을 지금 수업으로 또 부르면 몫이 오른다 · ⭐ 에서 연 교재가 보이는 동안 ⭐(✕ 로 돌아갈 판)은 다른 학생 미리가 못 민다', () => {
+  const { s, cold, byTok, knock, warm } = flowRun();
+  const E = FB('cog-s1-e4-ee', 'TOKE'), L = FB('gp-s1-e1-ll', 'TOKL'), F = FB('fri-s1-e2-ff', 'TOKF');
+  s.send({ onf: 'openBook', href: E, left: 270, out: 1 }, s.home);
+  const we = knock(byTok('TOKE'), 1, 'line'); s.send({ onf: 'bookClose' }, we, OUT_O); s.flush();
+  cold.length = 0;
+  warm(L, 'list'); knock(byTok('TOKL'), 2, 'line');
+  assert.ok(byTok('TOKE') && byTok('TOKL'), '⛔ 목록 미리가 사람이 본 판(E)을 밀었다');
+  warm(L, 'now');
+  warm(F, 'focus'); knock(byTok('TOKF'), 3, 'line');
+  warm(FM('TOKF'), 'focus'); const wm = knock(byTok('TOKF', true), 4, 'review,tab');
+  assert.ok(byTok('TOKL') && !byTok('TOKE') && byTok('TOKF', true), '⛔ 지금 수업으로 몫이 오른 판(L)을 밀었다(또는 E 대신 다른 것을)');
+  //   ⭐ → 「교재에서 보기」로 F 교재가 보이는 동안 다른 학생(G) 학생 창 미리 둘 — ✕ 로 돌아갈 ⭐ 은 남는다
+  s.send({ onf: 'openBook', href: FM('TOKF'), left: 270, out: 1 }, s.home);
+  s.send({ onf: 'openBook', href: F + '&line=3' }, wm, OUT_O);
+  const wf = s.g.bookShown(); assert.ok(wf === byTok('TOKF') && cold.length === 0, '전제: F 교재가 미리 판으로 보임');
+  warm(FB('cog-s1-e5-gg', 'TOKG'), 'focus'); warm(FM('TOKG'), 'focus');
+  assert.ok(byTok('TOKF', true), '⛔ ✕ 로 돌아갈 ⭐ 판을 다른 학생 미리가 밀었다');
+  s.send({ onf: 'bookClose' }, wf.win, OUT_O); s.flush();
+  assert.ok(cold.length === 0 && s.g.bookShown() === byTok('TOKF', true), '⛔ ✕ 가 ⭐ 으로 0초에 안 돌아갔다');
+});
+
+t('F5 흐름 표 — 지금 연 학생(focus)은 지금 수업(now)보다 남는다 · 목록 정적 판이 뜨는 중이어도 학생 창·⭐ 미리는 띄운다(몰림 막기는 목록끼리만)', () => {
+  let { s, byTok, knock, warm } = flowRun();
+  const A = FB('cog-s1-e1-aa', 'TOKA'), C = FB('cog-s1-e2-cc', 'TOKC'), E = FB('cog-s1-e4-ee', 'TOKE');
+  warm(A, 'focus'); knock(byTok('TOKA'), 1, 'line');
+  warm(FM('TOKA'), 'focus'); knock(byTok('TOKA', true), 2, 'review,tab');
+  s.send({ onf: 'openBook', href: E, left: 270, out: 1 }, s.home);
+  const we = knock(byTok('TOKE'), 3, 'line'); s.send({ onf: 'bookClose' }, we, OUT_O); s.flush();
+  warm(C, 'now');
+  assert.ok(byTok('TOKA') && byTok('TOKA', true) && byTok('TOKC') && !byTok('TOKE'), '⛔ 지금 수업 미리가 지금 연 학생 판을 밀었다(본 판 E 를 비켜야)');
+  ({ s, byTok, knock, warm } = flowRun());
+  warm(FB('gp-s1-e1-x', 'TOKX'), 'list');                       // 목록 정적 판 — 아직 노크 전(뜨는 중)
+  warm(A, 'focus'); warm(FM('TOKA'), 'focus');
+  assert.ok(byTok('TOKX') && byTok('TOKA') && byTok('TOKA', true), '⛔ 목록 정적 판이 뜨는 중이라 학생 창·⭐ 미리를 버렸다');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);
