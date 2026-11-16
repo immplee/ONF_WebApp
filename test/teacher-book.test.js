@@ -1788,10 +1788,9 @@ t('F5 흐름 표 — 지금 연 학생(focus)은 지금 수업(now)보다 남는
   const A = FB('cog-s1-e1-aa', 'TOKA'), C = FB('cog-s1-e2-cc', 'TOKC'), E = FB('cog-s1-e4-ee', 'TOKE');
   warm(A, 'focus'); knock(byTok('TOKA'), 1, 'line');
   warm(FM('TOKA'), 'focus'); knock(byTok('TOKA', true), 2, 'review,tab');
-  s.send({ onf: 'openBook', href: E, left: 270, out: 1 }, s.home);
-  const we = knock(byTok('TOKE'), 3, 'line'); s.send({ onf: 'bookClose' }, we, OUT_O); s.flush();
+  warm(E, 'intent'); knock(byTok('TOKE'), 3, 'line');   // 셋째 자리 = 마우스 올림(2) — ⚠️ 다른 학생 교재를 직접 열면 focus 가 그 학생으로 옮는다(F7)
   warm(C, 'now');
-  assert.ok(byTok('TOKA') && byTok('TOKA', true) && byTok('TOKC') && !byTok('TOKE'), '⛔ 지금 수업 미리가 지금 연 학생 판을 밀었다(본 판 E 를 비켜야)');
+  assert.ok(byTok('TOKA') && byTok('TOKA', true) && byTok('TOKC') && !byTok('TOKE'), '⛔ 지금 수업 미리가 지금 연 학생 판을 밀었다(마우스 올림 E 를 비켜야)');
   ({ s, byTok, knock, warm } = flowRun());
   warm(FB('gp-s1-e1-x', 'TOKX'), 'list');                       // 목록 정적 판 — 아직 노크 전(뜨는 중)
   warm(A, 'focus'); warm(FM('TOKA'), 'focus');
@@ -1808,6 +1807,65 @@ t('F6 흐름 표 — 마우스 올림(곧 누름)은 예전에 본 판보다 앞
   knock(byTok('TOKB'), 4, 'line'); cold.length = 0;
   s.send({ onf: 'openBook', href: B, left: 270, out: 1 }, s.home);
   assert.deepStrictEqual(cold, [], '⛔ 올려 둔 교재를 누르니 새 판');
+});
+
+/* ── 구멍 검수(2026-11-16 · 독립 검토가 찾은 넷 + 둘) ── */
+t('F7 학생 창(A)을 본 뒤 다른 학생 교재(B)를 직접 열면 focus 가 B 로 옮는다 — A 의 미리 판이 지금 수업(now) 미리를 막지 않는다', () => {
+  const { s, byTok, knock, warm } = flowRun();
+  const A = FB('cog-s1-e1-aa', 'TOKA'), B = FB('fri-s1-e2-bb', 'TOKB'), C = FB('cog-s1-e2-cc', 'TOKC');
+  warm(A, 'focus'); knock(byTok('TOKA'), 1, 'line');
+  warm(FM('TOKA'), 'focus'); knock(byTok('TOKA', true), 2, 'review,tab');
+  s.send({ onf: 'openBook', href: B, left: 270, out: 1 }, s.home); knock(byTok('TOKB'), 3, 'line');
+  warm(C, 'now');
+  assert.ok(byTok('TOKC'), '⛔ 지금 수업 미리가 지난 학생(A)의 focus 판에 막혔다 — 1분마다 버려진다');
+});
+t('F8 몫 없는 옛 홈 미리는 종전처럼 사람이 본 판을 비키고 띄운다(가장 오래 본 것부터)', () => {
+  const { s, byTok, knock, warm } = flowRun();
+  const E = FB('cog-s1-e4-ee', 'TOKE'), G = FB('cog-s1-e5-gg', 'TOKG'), H = FB('cog-s1-e6-hh', 'TOKH'), C = FB('cog-s1-e2-cc', 'TOKC');
+  [[E, 'TOKE', 1], [G, 'TOKG', 2]].forEach(([u, k, n]) => { s.send({ onf: 'openBook', href: u, left: 270, out: 1 }, s.home); const w = knock(byTok(k), n, 'line'); s.send({ onf: 'bookClose' }, w, OUT_O); s.flush(); });
+  s.send({ onf: 'openBook', href: H, left: 270, out: 1 }, s.home); knock(byTok('TOKH'), 3, 'line');
+  warm(C);
+  assert.ok(byTok('TOKC') && !byTok('TOKE'), '⛔ 몫 없는 미리가 본 판(E)을 안 비키고 버려졌다(종전과 다르다)');
+});
+t('F9 자리를 못 내도 focus 미리(학생 창·⭐ — 한 번만 오는 말)는 띄운다(종전처럼 · 버리면 다음 누름이 새 판)', () => {
+  const { s, byTok, knock, warm } = flowRun();
+  const A = FB('cog-s1-e1-aa', 'TOKA'), B = FB('fri-s1-e2-bb', 'TOKB');
+  warm(A, 'focus'); knock(byTok('TOKA'), 1, 'line');
+  warm(FM('TOKA'), 'focus'); const wm = knock(byTok('TOKA', true), 2, 'review,tab');
+  s.send({ onf: 'openBook', href: FM('TOKA'), left: 270, out: 1 }, s.home);
+  s.send({ onf: 'openBook', href: A + '&line=4' }, wm, OUT_O);   // A 보임 · ⭐ = 앞 판 사슬
+  warm(B, 'focus');                                              // 노크 전(후보) — 못 비킨다
+  warm(FM('TOKB'), 'focus');
+  assert.ok(byTok('TOKB', true), '⛔ 자리를 못 낸 focus 미리(⭐)를 조용히 버렸다');
+});
+t('F10 줄·보기 칸만 다른 판이 이미 있으면 미리가 판을 하나 더 띄우지 않는다(같은 교재 둘) · 몫만 오른다', () => {
+  const { s, knock, warm } = flowRun();
+  const A = FB('cog-s1-e1-aa', 'TOKA');
+  s.send({ onf: 'openBook', href: A + '&line=5', left: 270, out: 1 }, s.home);
+  const p = s.g.books[0], w = knock(p, 1, 'line'); s.send({ onf: 'bookClose' }, w, OUT_O); s.flush();
+  warm(A, 'focus');
+  assert.ok(s.g.books.filter((q) => !q.gone).length === 1 && p.pri === 4, '⛔ 같은 교재(줄만 다름)를 미리가 또 띄웠다(또는 몫을 안 올렸다)');
+});
+t('F11 늙은(2시간)·못 연 판을 새로 바꿔도 몫은 그대로 — 지금 수업 판이 본 판(seen)으로 떨어지지 않는다', () => {
+  const { s, byTok, knock, warm } = flowRun();
+  const C = FB('cog-s1-e2-cc', 'TOKC');
+  warm(C, 'now'); knock(byTok('TOKC'), 1, 'line');
+  byTok('TOKC').born -= 3 * 3600 * 1000;
+  s.send({ onf: 'openBook', href: C, left: 270, out: 1 }, s.home);
+  assert.ok(byTok('TOKC') && byTok('TOKC').pri === 3, '⛔ 늙은 판을 바꾼 새 판이 몫(now)을 잃었다: ' + (byTok('TOKC') || {}).pri);
+});
+
+t('F12 못 연 판(안내)을 새로 바꿔도 몫은 그대로', () => {
+  const s = run({ frame: true });
+  s.send({ onf: 'bookWarm', href: TURL, panel: 1, left: 270, pri: 'now' }, s.home);
+  const box = s.panel(), el = box.kids[0];
+  el.contentWindow = { length: 0, location: { get href() { throw new Error('cross-origin'); }, replace() {} } };
+  el.contentWindow.parent = el.contentWindow;
+  for (let i = 0; i < 2; i++) { (el.L.load || []).forEach((f) => f({})); s.timers.filter((x) => x.on && x.ms === 1500).forEach((x) => { x.on = false; x.f(); }); }
+  assert.ok(box.kids[1].kids.some((k) => k.className === 'onf-stuck'), '전제: 못 연 판');
+  s.send({ onf: 'openBook', href: TURL, left: 270 }, s.home);
+  const nb = s.g.books.find((q) => !q.gone);
+  assert.ok(s.panel() !== box && nb && nb.pri === 3, '⛔ 못 연 판을 바꾼 새 판이 몫(now)을 잃었다: ' + (nb && nb.pri));
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);

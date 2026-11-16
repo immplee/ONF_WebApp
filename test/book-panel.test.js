@@ -1874,5 +1874,47 @@ t('SF5 학생 흐름 표 — 기억해 둔 첫 교재(홈 띄우자마자 숨긴
   assert.ok(box(SB('E1')) && !box(SB('E2')), '⛔ 기억해 둔 첫 교재를 목록 미리가 밀어냈다(몫 0)');
 });
 
+/* ── 학생 구멍 검수(2026-11-16 · 선생님 F8~F11 쌍둥이) ── */
+t('SF6 몫 없는 옛 홈 미리는 종전처럼 본 판을 비키고 띄운다(가장 오래 본 것부터)', () => {
+  const { s, box, warm } = sFlow({ swap: false });
+  [SB('E4'), SB('E5')].forEach((h) => { s.send({ onf: 'openBook', href: h, left: 184 }, s.homeInner); const b = hiV(s, box(h), 'line'); s.send({ onf: 'bookClose' }, b); });
+  s.send({ onf: 'openBook', href: SB('E6'), left: 184 }, s.homeInner); hiV(s, box(SB('E6')), 'line');
+  warm(SB('E2'));
+  assert.ok(box(SB('E2')) && !box(SB('E4')), '⛔ 몫 없는 미리가 본 판(E4)을 안 비키고 버려졌다(종전과 다르다)');
+});
+t('SF7 자리를 못 내도 focus 미리(첫 교재·⭐)는 띄운다(종전처럼) — 보이는 판·앞 판 사슬만 남은 때', () => {
+  const { s, box, warm } = sFlow({ swap: false });
+  s.send({ onf: 'openBook', href: SB('E1'), left: 184 }, s.homeInner); const e1 = hiV(s, box(SB('E1')), 'line');
+  s.send({ onf: 'openBook', href: MINE }, e1); const mi = hiV(s, box(MINE), 'review,tab');
+  s.send({ onf: 'openBook', href: SB('X5') + '&line=2' }, mi);
+  assert.ok(s.panels().length === 3, '전제: 판 셋(보이는 판 + 앞 판 사슬 둘)');
+  warm(SB('E2'), 'focus');
+  assert.ok(box(SB('E2')), '⛔ 자리를 못 낸 focus 미리를 조용히 버렸다');
+});
+t('SF8 줄·보기 칸만 다른 판이 이미 있으면 미리가 판을 하나 더 띄우지 않는다 · 몫만 오른다', () => {
+  const { s, box, warm } = sFlow({ swap: false });
+  s.send({ onf: 'openBook', href: SB('E1') + '&line=5', left: 184 }, s.homeInner);
+  const bx = s.panels()[0], b = hiV(s, bx, 'line'); s.send({ onf: 'bookClose' }, b);
+  warm(SB('E1'), 'focus');
+  assert.ok(s.panels().length === 1 && s.obj(bx).pri === 4, '⛔ 같은 교재(줄만 다름)를 미리가 또 띄웠다(또는 몫을 안 올렸다)');
+});
+t('SF9 늙은(2시간) 판을 새로 바꿔도 몫은 그대로(첫 교재 focus 가 본 판으로 안 떨어진다)', () => {
+  const { s, box, warm } = sFlow({ swap: true });
+  warm(SB('E1'), 'focus'); const b = hiV(s, box(SB('E1')), 'line'); s.send({ onf: 'bookHi', views: 'line', swap: 1 }, b);
+  s.g.T += 3 * 3600 * 1000;
+  s.send({ onf: 'openBook', href: SB('E1'), left: 184 }, s.homeInner);
+  const nb = s.panels().find((x) => !x.classList.contains('park'));
+  assert.ok(nb && s.obj(nb) && s.obj(nb).pri === 4, '⛔ 늙은 판을 바꾼 새 판이 몫을 잃었다: ' + (nb && s.obj(nb) && s.obj(nb).pri));
+});
+
+t('SF10 못 연 판(안내)을 새로 바꿔도 몫은 그대로', () => {
+  const s = setup();
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 184, pri: 'focus' }, s.homeInner);
+  const box = s.panel(); stuckLoad(s, box);
+  s.send({ onf: 'openBook', href: E1, left: 184 }, s.homeInner);
+  const nb = s.panels().find((x) => x !== box);
+  assert.ok(nb && s.obj(nb) && s.obj(nb).pri === 4, '⛔ 못 연 판을 바꾼 새 판이 몫(focus)을 잃었다: ' + (nb && s.obj(nb) && s.obj(nb).pri));
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);
