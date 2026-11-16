@@ -62,7 +62,7 @@ t('홈 노크(bookHello)에 caps(book:1)를 그 출처로만 답한다 · 키보
   s.send({ onf: 'bookHello' }, stranger);
   assert.strictEqual(stranger.sent.length, 0, '⛔ 우리 액자 밖 창에 caps 를 답했다');
   s.send({ onf: 'bookHello' }, s.homeInner);
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(s.homeInner.sent)), [[{ onf: 'caps', book: 1, phone: 1 }, 'https://n-abc-0lu-script.googleusercontent.com']], '⛔ caps 가 없거나 * 로 갔다(📱 phone:1 = 폰 판도 할 줄 안다 · 10-14)');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(s.homeInner.sent)), [[{ onf: 'caps', book: 1, phone: 1, pri: 1 }, 'https://n-abc-0lu-script.googleusercontent.com']], '⛔ caps 가 없거나 * 로 갔다(📱 phone:1 = 폰 판도 할 줄 안다 · 10-14)');
 });
 
 t('홈 액자에서 온 openBook 만 판을 연다 · 남의 창·남의 출처는 버린다', () => {
@@ -989,7 +989,7 @@ t('🔄 홈 탭도 새로고침 뒤 그대로(Peter 2026-10-24) — 홈이 고�
 t('📱 폰 판 스위치 — 꺼져 있으면(opts.phone 없음) caps 에 phone 0 · 폰 폭이어도 onf-ph·판 칸 없음(종전 PC 판 그대로) · index.html 은 기본 켬(2026-10-16) · phonepanel=0 · 기억값 0 으로만 끈다', () => {
   const s = phoneSetup({ phone: false });
   s.send({ onf: 'bookHello' }, s.homeInner);
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(s.homeInner.sent.find((x) => x[0].onf === 'caps')[0])), { onf: 'caps', book: 1, phone: 0 }, '⛔ 스위치가 꺼졌는데 caps 에 phone:1 — 모든 폰에서 가로챈다');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(s.homeInner.sent.find((x) => x[0].onf === 'caps')[0])), { onf: 'caps', book: 1, phone: 0, pri: 1 }, '⛔ 스위치가 꺼졌는데 caps 에 phone:1 — 모든 폰에서 가로챈다');
   assert.ok(!s.root.classList.contains('onf-ph'), '⛔ 스위치가 꺼졌는데 폰 모양(onf-ph)');
   s.send({ onf: 'openBook', href: E1, left: 0 }, s.homeInner);
   assert.ok(!s.panel().classList.contains('park') && s.H.st.length === 2, '⛔ 스위치가 꺼졌는데 판이 PC 판(판 칸 하나 · 🖥 2026-10-24)이 아니다');
@@ -1605,8 +1605,8 @@ t("H4' — 📱 폰: [열기] → bookSwap · 판 칸 push {onfBook:key(B)} · �
 
 t("H7' — caps: 스위치 켜면 swap:1 · 꺼짐이면 칸 없음(종전 글자 그대로) · index.html: 주소 swap=1|0 을 이 기기에 기억(학생 키 onfSwap · 선생님 onfThSwap 아님) · 기본 켬(2026-10-21 Peter 「전체 켜줘」) · perf 넘김", () => {
   const caps = (s) => { s.send({ onf: 'bookHello' }, s.homeInner); return js(s.homeInner.sent.find((x) => x[0].onf === 'caps')[0]); };
-  assert.deepStrictEqual(caps(setup(null, { swap: true })), { onf: 'caps', book: 1, phone: 1, swap: 1 }, '⛔ 켰는데 caps 에 swap:1 이 없다');
-  assert.deepStrictEqual(caps(setup()), { onf: 'caps', book: 1, phone: 1 }, '⛔ 끔인데 caps 글자가 종전과 다르다');
+  assert.deepStrictEqual(caps(setup(null, { swap: true })), { onf: 'caps', book: 1, phone: 1, swap: 1, pri: 1 }, '⛔ 켰는데 caps 에 swap:1 이 없다');
+  assert.deepStrictEqual(caps(setup()), { onf: 'caps', book: 1, phone: 1, pri: 1 }, '⛔ 끔인데 caps 글자가 종전과 다르다');
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   const run = (search, ls) => {
     const st = Object.assign({}, ls || {}), opts = {};
@@ -1799,6 +1799,121 @@ t('📄 printTitle — 인쇄 동안만 탭 제목을 PDF 이름으로 · 두 �
   assert.strictEqual(s.g.document.title, 'Ownify 선생님', '⛔ 두 번째 되돌림이 제목을 바꿨다');
   s.send({ onf: 'printTitle', t: 'X' }, win('stranger'));
   assert.strictEqual(s.g.document.title, 'Ownify 선생님', '⛔ 남의 창 말로 제목이 바뀌었다');
+});
+
+/* ═══ 🧮 학생 흐름 표(2026-11-16 Peter 「학생 껍데기도 몫 방식으로」 · 선생님 쌍둥이 test/teacher-book.test.js F1~F6) ═══
+   한 세션에서 학생 흐름을 차례로 밟고 「누르는 길마다 새 판 0」을 잰다. 미리 띄우기가 다른 길 판을 밀어내면 여기서 빨갛게 된다.
+   ⛔ 학생 홈(Ownify ONF_Home_Html warmAt)에 미리 띄우는 곳을 더하면 몫을 고르고 이 표에 한 줄 더한다. */
+const fSrc = (h) => { const u = new URL(h), q = ['mode', 'sheet', 'view', 'line'].filter((k) => u.searchParams.get(k)).map((k) => k + '=' + encodeURIComponent(u.searchParams.get(k)));
+  return /^(share|mine)$/.test(u.searchParams.get('mode') || '') ? 'https://script.google.com/x/exec?t=T&' + q.join('&') + '&embed=1' : null; };
+const SB = (sh) => 'https://class.ownify.co.kr/?mode=share&sheet=' + sh;
+function sFlow(o) {
+  const s = setup(fSrc, o), n0 = { v: 0 };
+  const box = (h) => s.panels().find((x) => x.kids[0].src.indexOf(fSrc(h).replace(/&embed=1$/, '')) === 0 && !(s.obj(x) || {}).gone);
+  const warm = (h, pri) => s.send(Object.assign({ onf: 'bookWarm', href: h, panel: 1, left: 184 }, pri ? { pri } : {}), s.homeInner);
+  const fresh = () => { const seen = new Set(s.panels()); return () => s.panels().filter((x) => !seen.has(x)); };
+  return { s, box, warm, fresh };
+}
+t('SF1 학생 흐름 표 — 판이 다 찬 뒤 새 교재를 누르면 몫 낮은 판(다음 회차 · list)부터 비킨다 · 첫 교재·⭐(focus)은 남아 ⭐ 안 「교재에서 보기」 새 판 0', () => {
+  const { s, box, warm, fresh } = sFlow({ swap: false });
+  warm(SB('E1'), 'focus'); hiV(s, box(SB('E1')), 'cards,line');
+  warm(MINE, 'focus'); hiV(s, box(MINE), 'review,tab');
+  warm(SB('E2'), 'list');
+  assert.ok(box(SB('E1')) && box(MINE) && box(SB('E2')) && s.panels().length === 3, '전제: 미리 판 셋');
+  s.send({ onf: 'openBook', href: SB('X5'), left: 184 }, s.homeInner);   // 다른 교재(미리 없음) — 새 판 하나는 어쩔 수 없다
+  assert.ok(box(SB('E1')) && box(MINE) && !box(SB('E2')), '⛔ 새 교재를 열 때 다음 회차(list) 대신 첫 교재·⭐ 을 비켰다');
+  const nw = fresh();
+  s.send({ onf: 'openBook', href: MINE, left: 184 }, s.homeInner);
+  const mi = hiV(s, box(MINE), 'review,tab');
+  s.send({ onf: 'openBook', href: SB('E1') + '&line=17' }, mi);
+  assert.deepStrictEqual(nw(), [], '⛔ ⭐ → 「교재에서 보기」가 새 판(첫 교재가 밀려났다)');
+});
+t('SF2 학생 흐름 표 — 목록 몫(list) 미리는 첫 교재·⭐·본 판을 못 민다(자리 없으면 안 띄운다) · 같은 판을 높은 몫으로 또 부르면 몫만 오른다', () => {
+  const { s, box, warm } = sFlow({ swap: false });
+  warm(SB('E1'), 'focus'); hiV(s, box(SB('E1')), 'cards,line');
+  warm(MINE, 'focus'); hiV(s, box(MINE), 'review,tab');
+  s.send({ onf: 'openBook', href: SB('X5'), left: 184 }, s.homeInner); const bx = hiV(s, box(SB('X5')), 'line'); s.send({ onf: 'bookClose' }, bx);
+  warm(SB('E2'), 'list');
+  assert.ok(box(SB('E1')) && box(MINE) && box(SB('X5')) && !box(SB('E2')), '⛔ 목록 미리가 높은 몫(첫 교재·⭐·본 판)을 밀어냈다');
+  const { s: s2, box: b2, warm: w2 } = sFlow({ swap: false });
+  w2(SB('E2'), 'list'); hiV(s2, b2(SB('E2')), 'line'); w2(SB('E2'), 'focus');
+  w2(SB('E1'), 'focus'); hiV(s2, b2(SB('E1')), 'line'); w2(MINE, 'focus'); hiV(s2, b2(MINE), 'review,tab');
+  w2(SB('E3'), 'list');
+  assert.ok(b2(SB('E2')) && !b2(SB('E3')), '⛔ focus 로 다시 부른 판(E2)의 몫이 안 올랐다 — 목록 미리가 밀어냈다');
+});
+t('SF3 학생 — 홈 caps 에 pri:1 · 몫 없는 옛 홈은 종전 그대로(가장 오래 안 쓴 숨긴 판부터)', () => {
+  const { s, box, warm } = sFlow({ swap: false });
+  s.send({ onf: 'bookHello' }, s.homeInner);
+  assert.strictEqual(js(s.homeInner.sent).find((x) => x[0].onf === 'caps')[0].pri, 1, '⛔ caps 에 pri:1 이 없다(홈이 몫을 안 싣는다)');
+  warm(SB('E1')); hiV(s, box(SB('E1')), 'line'); warm(MINE); hiV(s, box(MINE), 'review,tab'); warm(SB('E2')); hiV(s, box(SB('E2')), 'line');
+  s.send({ onf: 'openBook', href: SB('X5'), left: 184 }, s.homeInner);
+  assert.ok(!box(SB('E1')) && box(MINE) && box(SB('E2')), '⛔ 몫 없는 옛 홈인데 종전(가장 오래된 숨긴 판 E1 부터)과 다르다');
+});
+
+t('SF4 학생 흐름 표 — ⭐ 에서 연 교재가 보이는 동안 ⭐(✕ 로 돌아갈 판)은 미리 띄우기가 못 민다 · ✕ = ⭐ 새 판 0', () => {
+  const { s, box, warm, fresh } = sFlow({ swap: false });
+  warm(SB('E1'), 'focus'); const ei = hiV(s, box(SB('E1')), 'cards,line');
+  s.send({ onf: 'openBook', href: MINE, left: 184 }, s.homeInner);
+  const mi = hiV(s, box(MINE), 'review,tab');
+  s.send({ onf: 'openBook', href: SB('E1') + '&line=9' }, mi);
+  warm(SB('X5'), 'focus');
+  warm(SB('E2'), 'focus');
+  assert.ok(box(MINE) && !box(SB('X5')), '⛔ ✕ 로 돌아갈 ⭐ 판을 미리 띄우기가 밀었다');
+  const nw = fresh();
+  s.send({ onf: 'bookClose' }, ei);
+  assert.ok(nw().length === 0 && !box(MINE).classList.contains('park'), '⛔ ✕ 가 ⭐ 으로 새 판 없이 안 돌아갔다');
+});
+t('SF5 학생 흐름 표 — 기억해 둔 첫 교재(홈 띄우자마자 숨긴 판)도 첫 교재 몫(focus) — 목록 미리가 못 민다', () => {
+  const ls = LSf({ onfPreBook: JSON.stringify({ k: 'kA', h: SB('E1'), ph: 0, t: 1.7e12 - 86400000 }) });
+  const { s, box, warm } = sFlow({ swap: false, preKey: 'kA', pre: pre(ls) });
+  assert.ok(box(SB('E1')), '전제: 기억한 첫 교재를 처음부터 띄웠다');
+  hiV(s, box(SB('E1')), 'line');
+  warm(MINE, 'focus'); hiV(s, box(MINE), 'review,tab');
+  s.send({ onf: 'openBook', href: SB('X5'), left: 184 }, s.homeInner); const bx = hiV(s, box(SB('X5')), 'line'); s.send({ onf: 'bookClose' }, bx);
+  warm(SB('E2'), 'list');
+  assert.ok(box(SB('E1')) && !box(SB('E2')), '⛔ 기억해 둔 첫 교재를 목록 미리가 밀어냈다(몫 0)');
+});
+
+/* ── 학생 구멍 검수(2026-11-16 · 선생님 F8~F11 쌍둥이) ── */
+t('SF6 몫 없는 옛 홈 미리는 종전처럼 본 판을 비키고 띄운다(가장 오래 본 것부터)', () => {
+  const { s, box, warm } = sFlow({ swap: false });
+  [SB('E4'), SB('E5')].forEach((h) => { s.send({ onf: 'openBook', href: h, left: 184 }, s.homeInner); const b = hiV(s, box(h), 'line'); s.send({ onf: 'bookClose' }, b); });
+  s.send({ onf: 'openBook', href: SB('E6'), left: 184 }, s.homeInner); hiV(s, box(SB('E6')), 'line');
+  warm(SB('E2'));
+  assert.ok(box(SB('E2')) && !box(SB('E4')), '⛔ 몫 없는 미리가 본 판(E4)을 안 비키고 버려졌다(종전과 다르다)');
+});
+t('SF7 자리를 못 내도 focus 미리(첫 교재·⭐)는 띄운다(종전처럼) — 보이는 판·앞 판 사슬만 남은 때', () => {
+  const { s, box, warm } = sFlow({ swap: false });
+  s.send({ onf: 'openBook', href: SB('E1'), left: 184 }, s.homeInner); const e1 = hiV(s, box(SB('E1')), 'line');
+  s.send({ onf: 'openBook', href: MINE }, e1); const mi = hiV(s, box(MINE), 'review,tab');
+  s.send({ onf: 'openBook', href: SB('X5') + '&line=2' }, mi);
+  assert.ok(s.panels().length === 3, '전제: 판 셋(보이는 판 + 앞 판 사슬 둘)');
+  warm(SB('E2'), 'focus');
+  assert.ok(box(SB('E2')), '⛔ 자리를 못 낸 focus 미리를 조용히 버렸다');
+});
+t('SF8 줄·보기 칸만 다른 판이 이미 있으면 미리가 판을 하나 더 띄우지 않는다 · 몫만 오른다', () => {
+  const { s, box, warm } = sFlow({ swap: false });
+  s.send({ onf: 'openBook', href: SB('E1') + '&line=5', left: 184 }, s.homeInner);
+  const bx = s.panels()[0], b = hiV(s, bx, 'line'); s.send({ onf: 'bookClose' }, b);
+  warm(SB('E1'), 'focus');
+  assert.ok(s.panels().length === 1 && s.obj(bx).pri === 4, '⛔ 같은 교재(줄만 다름)를 미리가 또 띄웠다(또는 몫을 안 올렸다)');
+});
+t('SF9 늙은(2시간) 판을 새로 바꿔도 몫은 그대로(첫 교재 focus 가 본 판으로 안 떨어진다)', () => {
+  const { s, box, warm } = sFlow({ swap: true });
+  warm(SB('E1'), 'focus'); const b = hiV(s, box(SB('E1')), 'line'); s.send({ onf: 'bookHi', views: 'line', swap: 1 }, b);
+  s.g.T += 3 * 3600 * 1000;
+  s.send({ onf: 'openBook', href: SB('E1'), left: 184 }, s.homeInner);
+  const nb = s.panels().find((x) => !x.classList.contains('park'));
+  assert.ok(nb && s.obj(nb) && s.obj(nb).pri === 4, '⛔ 늙은 판을 바꾼 새 판이 몫을 잃었다: ' + (nb && s.obj(nb) && s.obj(nb).pri));
+});
+
+t('SF10 못 연 판(안내)을 새로 바꿔도 몫은 그대로', () => {
+  const s = setup();
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 184, pri: 'focus' }, s.homeInner);
+  const box = s.panel(); stuckLoad(s, box);
+  s.send({ onf: 'openBook', href: E1, left: 184 }, s.homeInner);
+  const nb = s.panels().find((x) => x !== box);
+  assert.ok(nb && s.obj(nb) && s.obj(nb).pri === 4, '⛔ 못 연 판을 바꾼 새 판이 몫(focus)을 잃었다: ' + (nb && s.obj(nb) && s.obj(nb).pri));
 });
 
 console.log(`\n${pass}개 통과, ${fail}개 실패`);

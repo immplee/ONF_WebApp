@@ -729,6 +729,7 @@
       if (ev.data.onf === 'bookHello' && opts.bookSrc) {   // 📖 swap:1 = 판 한 장(켰을 때만 칸이 있다 — 끔이면 종전 글자 그대로 · 홈은 이때만 미리 넷을 보낸다)
         var cp = { onf: 'caps', book: 1, phone: opts.phone ? 1 : 0 };
         if (BOOK_SW) cp.swap = 1;
+        cp.pri = 1;   // 🏷 bookWarm{pri} 몫을 안다(위 bookRoom 한 지붕 · 2026-11-16) — 홈은 이 표시가 있을 때만 pri 를 싣는다
         try { ev.source.postMessage(cp, ev.origin); } catch (eC) {}
         if (TAB0) { try { ev.source.postMessage({ onf: 'homeTab', v: TAB0 }, ev.origin); } catch (eT) {} TAB0 = ''; }   // 🔄 새로고침 전에 고른 홈 탭(아래 TAB0) — 홈이 처음 노크할 때 한 번
         return;
@@ -745,7 +746,7 @@
         if (ev.data.panel !== 1) { bookWarm(ev.data.href); return; }
         var wout = ev.data.out === 1, wsrc = wout && opts.bookSrc(ev.data.href);   // 🌤 T7 라이브 F2(2026-10-24) — 홈이 미리 받기에도 out:1 을 싣는다 → 숨긴 판도 정적 판 · 기억에 o:1(openBook 과 같은 outSeen)
         if (wsrc) outSeen[wsrc] = 1;
-        preSave(ev.data.href); bookPre(ev.data.href, ev.data.left, ev.data.m, ev.data.r, wout, ev.data.cf);   // 📖 cf = 홈이 openBook 과 같은 손(onfSwapCfOf)으로 실은 사본 힌트
+        preSave(ev.data.href); bookPre(ev.data.href, ev.data.left, ev.data.m, ev.data.r, wout, ev.data.cf, typeof ev.data.pri === 'string' ? ev.data.pri : '');   // 📖 cf = 홈이 openBook 과 같은 손(onfSwapCfOf)으로 실은 사본 힌트
         return;
       }
       /* 📐 창 크기가 바뀌었다(2026-10-16 Peter 「B로 가자」 · 설계서 §4.1) — 홈이 다시 잰 메뉴 끝·여백·모서리를 **판 전부**(보이는 판·숨긴 판)에 새로 단다.
@@ -1146,8 +1147,8 @@
     function bookIdle(p) { p.idle = null; if (p !== bookBoard(false) && p !== bookBoard(true)) bookDrop(p); }   // 🌤 정적 판(첫 교재)·지금 길 판 둘 다 하루 판
     /* p 를 보이고 보이던 판은 숨긴다 · 폰이면 판 칸(histBook) · 키보드 보정 자리(sync). ⚠️ 새 판(bookMake 가 보이게 만든)이면 books 끝이라 bookShown 은 보이던 옛 판을 먼저 찾는다. */
     function bookShow(p, left, m, r) {
-      if (p.oe && p.oe.stuck()) { bookDrop(p); p = bookMake(p.src, false); }   // 🔐 못 연 판(안내) — 지우고 새로 받는다(반박 검토 🟡4 · 종전: 안내 그대로 · [닫기] 해야 새로)
-      if (bookAged(p)) { var old = p; p = bookMake(old.src, false); p.home = old.home; bookRetire(old); }   // 📖 2시간 넘은 숨긴 판(판은 30분 지우기에서 빠진다) — 옛 코드 그대로 안 띄우고 새로 · 옛 판은 저장 중일 수 있어 안 지운다
+      if (p.oe && p.oe.stuck()) { var op = p.pri; bookDrop(p); p = bookMake(p.src, false); p.pri = op; }   // 🏷 몫은 그대로(구멍 검수 SF9) · 🔐 못 연 판(안내) — 지우고 새로 받는다(반박 검토 🟡4 · 종전: 안내 그대로 · [닫기] 해야 새로)
+      if (bookAged(p)) { var old = p; p = bookMake(old.src, false); p.home = old.home; p.pri = old.pri; bookRetire(old); }   // 📖 2시간 넘은 숨긴 판(판은 30분 지우기에서 빠진다) — 옛 코드 그대로 안 띄우고 새로 · 옛 판은 저장 중일 수 있어 안 지운다
       var cur = bookShown();
       if (cur && cur !== p) bookPark(cur, true);
       if (typeof left === 'number') bookPlace(p, left, m, r);
@@ -1156,6 +1157,7 @@
       if (p.parked) bookPark(p, false);
       if (p.rs && p.win) setTimeout(function () { rsTell(p); }, 0);   // 🔙 숨긴 채 노크한 밑 판(아래 rsLowOpen) — 보일 때 되살릴 상태(노크 전이면 bookHi 가 보낸다)
       books.splice(books.indexOf(p), 1); books.push(p);   // 가장 최근
+      if ((p.pri || 0) < BOOK_PRI.seen) p.pri = BOOK_PRI.seen;   // 🏷 사람이 본 판(위 bookRoom)
       bookRoom(bookMax());
       sync();
     }
@@ -1270,15 +1272,31 @@
     }
     /* 판이 n 개를 넘으면 가장 오래 안 쓴 **숨긴** 판부터 지운다 — 보이는 판·📖 판(bookBoard)·📖 노크 전 판 후보(bookCand)은 안 건드린다 · ⭐ 내 문장 판은 정적 판이 있는 넓은 화면에서만 맨 나중(아래 pin · [복습 시작] 0초)(books 는 오래 안 쓴 것이 앞). */
     /* ⛔ 자격 내린 판(gone — 늙음·stale·답 없음)은 **세지도 지우지도 않는다**(2단계 반박 🟠 2026-10-17) — 맺음(안 보낸 칸·실패 카드·오프라인 백업)이 끝나기 전에 지우면 그 글이 사라진다 · 30분 지우기(bookIdle)가 치운다. */
-    function bookRoom(n) {
-      var bd = bookBoard(false) || bookBoard(true), pin = !phone() && books.some(function (x) { return x.out && !x.gone; }), c = 0, i, q, k;   // 🌤 pin = ⭐ 내 문장 판은 나중에(정적 판이 있는 넓은 화면만 · 통제자 판정 2026-10-24) — 정적 판 없는 학생·폰은 종전 한 바퀴 그대로
+    /* 🏷 판 몫 — 비키기 한 지붕(2026-11-16 Peter 「학생 껍데기도 몫 방식으로」 · ⚠️ 쌍둥이: teacher/index.html BOOK_PRI·bookRank·bookRoom 이 정본 주석).
+       종전엔 「가장 오래 안 쓴 숨긴 판」 + ⭐ 예외(pin) 하나였다 → 판이 찬 뒤 다른 교재를 누르면 첫 교재가 밀려 ⭐ 안 「교재에서 보기」가 새 판이었다(SF1).
+       몫: 홈 bookWarm{pri} — list 0(다음 회차·둘째 교재) · focus 4(첫 교재·⭐) · 사람이 본 판 seen 1 · 보이는 판의 앞 판 사슬 5. 미리 띄우기는 제 몫 이하만 비키고 자리 없으면 안 띄운다.
+       사람이 누른 열기(pri 없음)는 무엇이든 비킨다 — 낮은 몫 → 오래 안 쓴 것 차례. pin(정적 판 있는 넓은 화면 · ⭐ 맨 나중)은 몫 없는 판에만 덧붙인다(몫 없는 옛 홈 = 종전 차례).
+       ⛔ 새 미리 띄우기는 몫을 고르고 test/book-panel.test.js 「학생 흐름 표」(SF~)에 한 줄 더한다. */
+    /* ⛔ 자격 내린 판(gone — 늙음·stale·답 없음)은 **세지도 지우지도 않는다**(2단계 반박 🟠 2026-10-17) — 맺음(안 보낸 칸·실패 카드·오프라인 백업)이 끝나기 전에 지우면 그 글이 사라진다 · 30분 지우기(bookIdle)가 치운다. */
+    var BOOK_PRI = { list: 0, seen: 1, intent: 2, now: 3, focus: 4 };
+    function bookRank(q, cur, pin) { if (cur && bookOpener(cur, q)) return 5; var r = q.pri || 0; return pin && bookMine(q.src) && r < BOOK_PRI.intent ? r + 2 : r; }   // pin = ⭐ 은 몫 없는 판 중 맨 나중(종전 두 바퀴와 같은 차례)
+    function bookRoom(n, pri) {
+      var bd = bookBoard(false) || bookBoard(true), cur = bookShown(), pin = !phone() && books.some(function (x) { return x.out && !x.gone; }), c = 0, i, q, best;   // 🌤 pin = 정적 판이 있는 넓은 화면만(통제자 판정 2026-10-24)
+      if (typeof pri !== 'number') pri = Infinity;
       for (i = 0; i < books.length; i++) if (!books[i].gone) c++;
-      for (k = pin ? 0 : 1; k < 2; k++) for (i = 0; c > n && i < books.length; ) { q = books[i]; if (q.parked && q !== bd && !q.gone && !bookCand(q) && !(k === 0 && bookMine(q.src))) { bookDrop(q); c--; } else i++; }   // 첫 바퀴에 못 줄였으면 내 문장도(판 수는 안 넘는다)
+      while (c > n) {
+        best = null;
+        for (i = 0; i < books.length; i++) { q = books[i]; if (q.parked && q !== bd && !q.gone && !bookCand(q) && bookRank(q, cur, pin) <= pri && (!best || bookRank(q, cur, pin) < bookRank(best, cur, pin))) best = q; }
+        if (!best) return false;
+        bookDrop(best); c--;
+      }
+      return true;
     }
-    function bookPre(href, left, m, r, out, cf) {   // cf = 홈 사본 힌트(없으면 bookMake 가 /who · bookCfFor)
-      var src = opts.bookSrc(href), b, ex;
+    function bookPre(href, left, m, r, out, cf, pri) {   // cf = 홈 사본 힌트(없으면 bookMake 가 /who · bookCfFor) · pri = 🏷 몫 이름(위 BOOK_PRI)
+      var src = opts.bookSrc(href), b, ex, pr = BOOK_PRI[pri] || 0;
       if (!src) return;
-      if ((ex = bookFind(src))) { if (ex.parked) bookPlace(ex, left, m, r); return; }   // 🚀 이미 있는 숨긴 판(미리 띄운 판 · 자리값 없이 만든 것)에 홈이 잰 자리를 단다(반박 🟡2 — 보일 때 폭이 바뀌어 다시 그리던 것)
+      ex = bookFind(src) || books.filter(function (q) { return !q.gone && !q.sw && bookBase(q.src) === bookBase(src) && outSame(q, src, out); })[0];   // 🏷 줄·보기 칸만 다른 판도 같은 판(구멍 검수 SF8 — 같은 교재 판 둘)
+      if (ex) { if (pr > (ex.pri || 0)) ex.pri = pr; if (ex.parked) bookPlace(ex, left, m, r); return; }   // 🏷 높은 몫으로 또 부르면 몫만 올린다   // 🚀 이미 있는 숨긴 판(미리 띄운 판 · 자리값 없이 만든 것)에 홈이 잰 자리를 단다(반박 🟡2 — 보일 때 폭이 바뀌어 다시 그리던 것)
       b = bookBoardFor(src, out);
       if (b) { bookFetch(b, src); return; }   // 📖 판이 값만 받아 둔다(새 판 0 · 접속 표시 0 · 판이 차례를 맡는다)
       /* 🌤 둘째 교재 고침(2026-10-24 · 검토 고침 1 의 「버림」을 걷음) — 첫 교재가 정적 판이면 안 켠 교재 몫 판이 따로 있어야 한다(정적 판은 판으로 안 쓴다 · I1).
@@ -1288,8 +1306,8 @@
       if (!outWant(src, out) && bookBook(src) && books.some(function (q) { return q.out && !q.gone && bookBook(q.src) === bookBook(src); })) return;
       if (!bookMine(src) && !outWant(src, out) && books.some(function (q) { return bookCand(q) && !q.out; })) { if (bookQ.length < BOOK_Q_MAX && bookQ.indexOf(src) < 0) bookQ.push(src); return; }   // 📖 곧 판이 될 판이 노크 전 — 줄에 세운다(아래 bookCand) · 🌤 정적 판 후보 뒤엔 안 선다(그 판엔 흘리지 않는다 — 바로 지금 길 숨긴 판)
       //   ⚠️ 선생님 껍데기의 D1(폰은 미리 판 없음)은 안 가져온다 — 학생 폰은 숨긴 미리 판 하나가 종전 그대로다(설계 §7.2 · 그 판이 곧 판이 된다)
-      bookRoom(bookMax() - 1);   // 자리가 차면 가장 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 — 종전엔 안 띄웠다 · 📱 폰은 자리 2)
-      var np = bookMake(src, true, out, cf); np.home = true;   // 📖 홈이 미리 띄운 판 — 노크하면 판이 된다
+      if (!bookRoom(bookMax() - 1, pri ? pr : BOOK_PRI.now) && pr < BOOK_PRI.focus) return;   // 🏷 몫 없는 옛 홈은 종전처럼 본 판까지 비킨다(SF6) · focus(첫 교재·⭐)는 자리를 못 내도 띄운다(종전처럼 · SF7)   // 자리가 차면 몫 낮은 → 오래 안 쓴 숨긴 판을 비킨다(2026-10-14 Peter 「미리 띄우는 교재 셋」 · 📱 폰은 자리 2) · 🏷 내 몫 이하로 자리를 못 내면 안 띄운다
+      var np = bookMake(src, true, out, cf); np.home = true; np.pri = pr;   // 📖 홈이 미리 띄운 판 — 노크하면 판이 된다
       bookPlace(np, left, m, r);
     }
     /* ═══ 📖 교재 판 한 장 2단계(학생 · 2026-10-17 · 설계 ONF_SlackBot docs/2026-10-15-교재판-한장-설계.md §5.2 · §7.2 갈래 표 4) ═══
@@ -1509,7 +1527,7 @@
         var pb = bookBook(opts.bookSrc(v.h) || '');
         if (pb && [rv].concat(ru).some(function (x) { return bookBook(opts.bookSrc(x.h) || '') === pb; })) return;
       }
-      bookPre(v.h, undefined, undefined, undefined, v.o === 1);   // 🌤 o 없는 옛 기억은 지금 길
+      bookPre(v.h, undefined, undefined, undefined, v.o === 1, undefined, 'focus');   // 🌤 o 없는 옛 기억은 지금 길 · 🏷 기억한 첫 교재 = focus(홈 warmAt 첫 교재와 같은 몫)
       preP = bookFind(opts.bookSrc(v.h));   // 🚀 미리 띄운 판(위 preSave 가 오늘 주소와 견준다)
     }
     /* 🌤 밖으로 2(2026-10-24 · 판정 2·5) — 링크 직행 교재(fileId·slug)면 /who 를 WHO_MS 안 묻고 cf 가 오면 첫 판을 정적 판(openApp)으로.
