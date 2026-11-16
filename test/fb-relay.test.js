@@ -38,11 +38,12 @@ t('③ 옆 교재가 없으면 댓글은 과제 판에 바로 nobook', () => {
 });
 t('④ 교재 → 과제 판: 세 가지만 · 꼴 거름 · 과제 판 출처로', () => {
   const c = run();
-  c.hwFbBack({ onf: 'fbPick', row: 7, w0: 1, w1: 2, text: 'show', ipa: 'ʃoʊ', sheet: 'E1', extra: 1 });
+  c.hwFbBack({ onf: 'fbPick', row: 7, w0: 1, w1: 2, text: 'show', ipa: 'ʃoʊ', sheet: 'E1', pv: 'now', nx: 'me', cq: ['Now', 'show', 'me', { evil: 1 }, 'x'.repeat(99)].concat(Array(50).fill('a')), extra: 1 });
   c.hwFbBack({ onf: 'fbFocus', id: 'abc' }); c.hwFbBack({ onf: 'fbCmtAck', id: 'abc', ok: true }); c.hwFbBack({ onf: 'hwbook', x: 1 });
   assert.deepStrictEqual(c.hwWin.sent.map((x) => x[0].onf), ['fbPick', 'fbFocus', 'fbCmtAck']);
   assert.ok(c.hwWin.sent.every((x) => x[1] === 'https://board.example'));
-  assert.deepStrictEqual(Object.keys(c.hwWin.sent[0][0]).sort(), ['ipa', 'onf', 'row', 'sheet', 'text', 'w0', 'w1']);
+  assert.deepStrictEqual(Object.keys(c.hwWin.sent[0][0]).sort(), ['cq', 'ipa', 'nx', 'onf', 'pv', 'row', 'sheet', 'text', 'w0', 'w1']);
+  const cq = c.hwWin.sent[0][0].cq; assert.equal(cq.length, 40); assert.deepStrictEqual([cq[0], cq[1], cq[3], cq[4].length], ['Now', 'show', '[object Object]', 40]); assert.equal(c.hwWin.sent[0][0].pv, 'now');   // 🎞️ 그 줄 낱말 40개 · 글 40자 · 꼴 거름(2026-11-16)
 });
 t('⑨ 💬 보낸 피드백 댓글 고치기·지우기(cs · 2026-11-15) — 꼴 거름(text null = 지우기) · 옆 교재 없으면 nobook(op·cm 같이) · 교재 → 판 답에 op·cm·cf · 다시 노크엔 안 실음 · 필기(draw)도 다시 노크에', () => {
   const c = run(); c.hwBk = { win: win(), origin: 'https://book.example' };
