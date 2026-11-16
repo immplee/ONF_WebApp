@@ -1573,15 +1573,17 @@ ta('FB1 까닭별 표 — slow(hello·paint·fail-time·fail-net) 연속 1 = 0 �
   assert.strictEqual(thr.F.fallBlocked('book'), true, '⛔ 저장소가 막힌 창은 막힘(종전 — 열 때마다 시한을 안 낸다)');
   assert.doesNotThrow(() => { thr.F.fallBack('book', 'hello'); thr.F.fallOk('book'); });
 });
-ta('FB1b 🧹 한 번 치우기(2026-11-16) — 11-16 13:50~16:00(서울)에 적힌 학생 홈 하루 막힘만 열 때 지운다 · 그 밖 막힘·다른 판은 그대로', () => {
+ta('FB1b 🧹 한 번 치우기(2026-11-16) — 11-16 13:50~15:00(서울)에 적힌 학생·선생님 홈 하루 막힘만 열 때 지운다 · 그 밖 막힘·다른 판은 그대로', () => {
   const run = (init) => { const ls = LSf(init), g = { T: 1.7e12, localStorage: ls, setTimeout, clearTimeout, URL, console: { info() {}, log() {}, warn() {} }, navigator: { userAgent: 'x', sendBeacon: () => true }, document: { addEventListener() {} }, addEventListener() {} };
     g.window = g; g.Date = { now: () => g.T }; vm.createContext(g); vm.runInContext(CODE, g, { filename: 'onf-frame.js' }); return ls.m; };
   const D = 86400000, at = (h, m) => Date.UTC(2026, 10, 16, h - 9, m) + D;   // 서울 시각에 적힌 하루 막힘의 다시 시도 시각
   assert.ok(!('onfOutFailHome' in run({ onfOutFailHome: at(13, 57) + ',1' })), '⛔ 13:57 에 적힌 홈 막힘이 남았다(Loki 기기)');
   assert.ok(!('onfOutFailHome' in run({ onfOutFailHome: at(14, 23) + ',2' })), '⛔ 14:23 홈 막힘이 남았다');
   assert.strictEqual(run({ onfOutFailHome: at(13, 40) + ',1' }).onfOutFailHome, at(13, 40) + ',1', '⛔ 창 밖(13:40) 막힘까지 지웠다');
-  assert.strictEqual(run({ onfOutFailHome: at(16, 30) + ',1' }).onfOutFailHome, at(16, 30) + ',1', '⛔ 창 밖(16:30) 막힘까지 지웠다');
+  assert.strictEqual(run({ onfOutFailHome: at(15, 10) + ',1' }).onfOutFailHome, at(15, 10) + ',1', '⛔ 창 밖(15:10 — 고친 배포 뒤) 막힘까지 지웠다');
   assert.strictEqual(run({ onfOutFail: at(14, 0) + ',1' }).onfOutFail, at(14, 0) + ',1', '⛔ 교재 칸까지 지웠다');
+  assert.ok(!('onfTOutFail' in run({ onfTOutFail: at(14, 22) + ',1' })), '⛔ 14:22 선생님 홈 막힘이 남았다(Peter iPad)');
+  assert.strictEqual(run({ onfTOutFail: at(12, 0) + ',1' }).onfTOutFail, at(12, 0) + ',1', '⛔ 창 밖 선생님 홈 막힘까지 지웠다');
 });
 ta('FB2 물러날 때마다 clog 한 줄 {k:err, c:fallback:<판>:<까닭>:<연속>, d} — 값 칸 없음 · Worker /clog · 판 글자는 a-z·- 20자로', async () => {
   const ls = LSf(), beacons = [], g = { T: 1.7e12, localStorage: ls, setTimeout, clearTimeout, URL, console: { info() {}, log() {}, warn() {} },
