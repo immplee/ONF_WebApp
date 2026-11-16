@@ -437,9 +437,9 @@
     whoBeacon({ k: 'gp', c: 'sh:' + key });
   }
   function fallGet(k) { var v = String(global.localStorage.getItem(k) || '').split(','); return { at: Number(v[0]) || 0, n: Number(v[1]) || 0 }; }
-  /* 🧹 한 번 치우기(2026-11-16) — 위 fail-error 가 hard 이던 때 11-16 13:50~16:00(서울) 에 적힌 학생 홈 하루 막힘(다시 시도 시각 = 적은 때 + 하루)을 지운다.
-       그 사이 기록 = 학생 홈 피드백 이름 ReferenceError 하나뿐(clog fallback:home:fail-error · Loki 기기들). ponytail: 11-17 16:00 이 지나면 저절로 할 일 없음 — 그 뒤 지워도 된다. */
-  try { var hf = fallGet(FALL_KEY.home); if (hf.at >= 1794891000000 && hf.at <= 1794898800000) global.localStorage.removeItem(FALL_KEY.home); } catch (e) {}
+  /* 🧹 한 번 치우기(2026-11-16) — 위 fail-error 가 hard 이던 때 11-16 13:50~15:00(서울) 에 적힌 학생·선생님 홈 하루 막힘(다시 시도 시각 = 적은 때 + 하루)을 지운다.
+       그 사이 기록 = 학생 홈 피드백 이름 ReferenceError 하나뿐(clog fallback:home:fail-error · Loki 기기들). ponytail: 11-17 15:00 이 지나면 저절로 할 일 없음 — 그 뒤 지워도 된다. */
+  ['home', 'thome'].forEach(function (pan) { try { var hf = fallGet(FALL_KEY[pan]); if (hf.at >= 1794891000000 && hf.at <= 1794895200000) global.localStorage.removeItem(FALL_KEY[pan]); } catch (e) {} });   // 🏫 선생님 홈도(같은 날 iPad thome fail-error 14:22 — 같은 병 · Ownify FbList 순서)
   function fallBlocked(pan) {
     var b; try { b = Date.now() < fallGet(FALL_KEY[pan]).at; } catch (e) { gpSh(pan, 'nostore'); return true; }
     if (b) gpSh(pan, 'blocked');   // 🔭 위 「통째 구글 화면 세기」
