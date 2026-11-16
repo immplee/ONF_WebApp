@@ -1798,5 +1798,17 @@ t('F5 흐름 표 — 지금 연 학생(focus)은 지금 수업(now)보다 남는
   assert.ok(byTok('TOKX') && byTok('TOKA') && byTok('TOKA', true), '⛔ 목록 정적 판이 뜨는 중이라 학생 창·⭐ 미리를 버렸다');
 });
 
+t('F6 흐름 표 — 마우스 올림(곧 누름)은 예전에 본 판보다 앞선다(종전 「오래된 것 비킴」 그대로 — 본 판 셋이 차 있어도 올린 교재를 미리) · 지금 수업·지금 학생은 못 민다', () => {
+  const { s, cold, byTok, knock, warm } = flowRun();
+  const E = FB('cog-s1-e4-ee', 'TOKE'), G = FB('cog-s1-e5-gg', 'TOKG'), H = FB('cog-s1-e6-hh', 'TOKH'), B = FB('fri-s1-e1-bb', 'TOKB');
+  [[E, 'TOKE', 1], [G, 'TOKG', 2], [H, 'TOKH', 3]].forEach(([u, k, n]) => { s.send({ onf: 'openBook', href: u, left: 270, out: 1 }, s.home); const w = knock(byTok(k), n, 'line'); s.send({ onf: 'bookClose' }, w, OUT_O); s.flush(); });
+  assert.ok(byTok('TOKE') && byTok('TOKG') && byTok('TOKH'), '전제: 본 판 셋');
+  warm(B, 'intent');
+  assert.ok(byTok('TOKB') && !byTok('TOKE') && byTok('TOKG') && byTok('TOKH'), '⛔ 마우스 올린 교재를 미리 안 띄웠다(또는 가장 오래 본 E 대신 다른 것을 비켰다)');
+  knock(byTok('TOKB'), 4, 'line'); cold.length = 0;
+  s.send({ onf: 'openBook', href: B, left: 270, out: 1 }, s.home);
+  assert.deepStrictEqual(cold, [], '⛔ 올려 둔 교재를 누르니 새 판');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);
