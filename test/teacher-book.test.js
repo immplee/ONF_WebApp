@@ -1868,5 +1868,52 @@ t('F12 못 연 판(안내)을 새로 바꿔도 몫은 그대로', () => {
   assert.ok(s.panel() !== box && nb && nb.pri === 3, '⛔ 못 연 판을 바꾼 새 판이 몫(now)을 잃었다: ' + (nb && nb.pri));
 });
 
+/* ═══ ✏️ 피드백 탭 「교재에서 고치고 보내기」 — 홈 주소의 fbrd 를 그 교재 판에 {bookView, fb} 로 (Peter 2026-11-18 「피드백 모드도 안 되어 있고 그냥 필기 모드」) ═══ */
+console.log('[✏️ fbrd — 그 회차로 바로 피드백 모드]');
+const fbOf = (w) => viewsOf(w).filter((m) => typeof m.fb === 'string');
+t('FB1 뜬 판(views line,fb) — fbrd 주소는 새 판 없이 같은 판에 bookView{line} 다음 bookView{fb} · 같은 회차를 또 눌러도 또 보낸다 · 판 주소엔 fbrd 가 없다', () => {
+  const s = phoneRun({ wide: true });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+  const P = s.panel(), src0 = P.kids[0].src, bi = vKnock(s, P, 1, 'line,fb');
+  s.send({ onf: 'openBook', href: E1 + '&line=17&fbrd=r3abc', left: 270 }, s.home);
+  assert.ok(s.panels().length === 1 && P.kids[0].src === src0 && !/fbrd/.test(src0), '⛔ fbrd 주소에 새 판을 받았다(또는 판 주소에 fbrd 가 실렸다)');
+  assert.deepStrictEqual(viewsOf(bi), [{ onf: 'bookView', line: 17 }, { onf: 'bookView', fb: 'r3abc' }], '⛔ 「17줄로」 다음 「그 회차로」가 안 갔다');
+  s.send({ onf: 'openBook', href: E1 + '&fbrd=r3abc', left: 270 }, s.home);
+  assert.strictEqual(fbOf(bi).length, 2, '⛔ 같은 회차를 다시 누르면 말이 안 간다(피드백을 끈 뒤 다시 못 켠다)');
+});
+t('FB2 할 줄 모르는 판·꼴 틀린 값엔 안 보낸다 — 옛 교재(views line) · 대문자·기호 · 33자 · fbrd 없는 다음 [열기]는 쥔 말을 버린다', () => {
+  const s = phoneRun({ wide: true });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+  const bi = vKnock(s, s.panel(), 1, 'cards,line');
+  s.send({ onf: 'openBook', href: E1 + '&fbrd=r3abc', left: 270 }, s.home);
+  assert.strictEqual(fbOf(bi).length, 0, '⛔ fb 를 모르는 옛 교재에 보냈다');
+  s.send({ onf: 'openBook', href: E1, left: 270 }, s.home);                      // 쥔 말을 버린다
+  s.send({ onf: 'bookHi', views: 'line,fb' }, bi);
+  assert.strictEqual(fbOf(bi).length, 0, '⛔ 다른 [열기] 뒤에도 옛 「그 회차로」를 보냈다');
+  for (const bad of ['R3', 'a-b', 'x'.repeat(33), '']) {
+    s.send({ onf: 'openBook', href: E1 + '&fbrd=' + bad, left: 270 }, s.home);
+    assert.strictEqual(fbOf(bi).length, 0, '⛔ 꼴 틀린 회차 값을 판에 넘겼다: ' + bad);
+  }
+});
+t('FB3 새 판(노크 전) — 쥐고 있다가 그 판이 fb 를 안다고 노크하면 그때 한 번', () => {
+  const s = phoneRun({ wide: true });
+  s.send({ onf: 'openBook', href: E1 + '&fbrd=r9', left: 270 }, s.home);
+  const P = s.panel(); assert.ok(P && !/fbrd/.test(P.kids[0].src), '⛔ 새 판 주소에 fbrd 가 실렸다');
+  const bw = win('fb-exec', s.top), bi = win('fb-user', win('fb-sbx', bw)); P.kids[0].contentWindow = bw;
+  s.send({ onf: 'bookHi', views: 'line,fb' }, bi);
+  assert.deepStrictEqual(fbOf(bi), [{ onf: 'bookView', fb: 'r9' }], '⛔ 노크한 새 판에 「그 회차로」가 안 갔다');
+  s.send({ onf: 'bookHi', views: 'line,fb', swap: 1 }, bi);
+  assert.strictEqual(fbOf(bi).length, 1, '⛔ 둘째 노크에 또 보냈다(두 번 켠다)');
+});
+t('FB4 갈아 끼우기 — 답 전엔 안 보내고(판은 아직 옛 교재) 갈아 끼운 뒤에 보낸다', () => {
+  const { s, bi } = boardRun();
+  s.send({ onf: 'bookHi', views: 'line,fb', swap: 1 }, bi); bi.sent.length = 0;
+  s.send({ onf: 'openBook', href: E2 + '&fbrd=r7', left: 270 }, s.home);
+  const m = swapMsg(bi);
+  assert.ok(m.length === 1 && !/fbrd/.test(m[0].src) && fbOf(bi).length === 0, '⛔ 갈아 끼우는 중에 「그 회차로」를 보냈다(또는 안 갈아 끼웠다)');
+  s.send({ onf: 'bookSwapped', id: m[0].id, ok: true, from: 'cache', ms: 40 }, bi);
+  assert.deepStrictEqual(fbOf(bi), [{ onf: 'bookView', fb: 'r7' }], '⛔ 갈아 끼운 판에 「그 회차로」가 안 갔다');
+});
+
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);
