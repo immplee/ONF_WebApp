@@ -1793,7 +1793,7 @@ function bookOpen(href, left, m, r, home, cf, out) {   // cf = 📖 ☁️ 홈�
   if (!src) return;
   var fl = !outWant(src, out);   // 🧺 지금 길로 여는 교재 — 남은 쓰기를 숨긴 정적 판으로 한 번 넘겨준다(위 bookFlushSoon · 보이는 판이 뜬 뒤)
   var a = bookAsk(src), vm = { onf: 'bookView' };
-  if (home) { var fbr = fbAsk(href); fbWant = fbr ? { rd: fbr, src: src, at: Date.now() } : null; }   // ✏️ 위 fbTell
+  if (home) { var fbr = fbAsk(href); fbWant = fbr ? { rd: fbr, src: src, at: Date.now() } : null; } else fbWant = null;   // ✏️ 위 fbTell · 판 안 링크로 연 교재엔 옛 「그 회차로」를 안 보낸다(구멍 점검 2026-11-19)
   p = bookFind(src);
   if (p && !outSame(p, src, out)) { bookRetire(p); p = null; }   // 🌤 길이 다른 판 — 자격 내리고 그 길 새 판(학생 껍데기와 같다)
   p = p || bookLike(src, a, out);   // 📖 view·line 만 다른 판이 할 줄 알면 그 판(위 bookLike) — 갈아 끼우기보다 **먼저**(0초 길)
@@ -1804,7 +1804,8 @@ function bookOpen(href, left, m, r, home, cf, out) {   // cf = 📖 ☁️ 홈�
   if (fl) bookFlushSoon(bookShown(), src);
   if (a.view) { if (bookTabOf(p, a.view)) vm.tab = a.view; else vm.view = a.view; }   // ⭐ 내 문장 드라마 칸은 tab 칸으로(위 bookTabOf)
   if (a.line) vm.line = a.line;
-  if (bookCan(p, a)) { try { p.win.postMessage(vm, p.origin); } catch (e) {} }   // 보인다(bookPark) 다음에 — 페이지가 「보임」 손질 뒤 연다
+  if (bookCan(p, a)) { if (fbWant && (p.views || []).indexOf('fb') >= 0 && bookBase(p.src) === bookBase(fbWant.src)) { vm.fb = fbWant.rd; fbWant = null; }   /* ✏️ 줄과 「그 회차로」를 한 말로 — 따로 보내면 교재가 피드백 켜진 채 줄을 굴려 첫 체크 자리와 다퉜다(구멍 점검 2026-11-19) */
+    try { p.win.postMessage(vm, p.origin); } catch (e) {} }   // 보인다(bookPark) 다음에 — 페이지가 「보임」 손질 뒤 연다
   fbTell();   // ✏️ 이미 뜬 판이면 바로(줄 말 뒤에)
   rsMark(bookShown(), href, out, cf);
 }
