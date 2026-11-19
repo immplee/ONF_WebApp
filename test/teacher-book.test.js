@@ -36,7 +36,7 @@ function run(o) {
   const homeExec = win('home-exec', top), home = win('home-user', win('home-sbx', homeExec));
   const frame = { contentWindow: homeExec };
   const g = { URL, URLSearchParams, top, frame, innerWidth: 1440, location: { href: 'https://class.ownify.co.kr/teacher/' },
-    document: { body, createElement: mkEl, documentElement: { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; },
+    document: { body, createElement: mkEl, querySelector: () => null, documentElement: { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; },
       classList: { set: new Set(), toggle(c, on) { on ? this.set.add(c) : this.set.delete(c); }, contains(c) { return this.set.has(c); } } } }, ONF: { api: { EXEC } }, localStorage: { s: o.lsRaw ? {} : { onfThSwap: '0' }, getItem(k) { return k in this.s ? this.s[k] : null; }, setItem(k, v) { this.s[k] = String(v); }, removeItem(k) { delete this.s[k]; } },
     addEventListener: (k, f) => { (L[k] = L[k] || []).push(f); }, removeEventListener: (k, f) => { L[k] = (L[k] || []).filter((x) => x !== f); } };
   const timers = [];

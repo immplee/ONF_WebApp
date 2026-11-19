@@ -33,7 +33,7 @@ function setup(bs, o) {
   g.T = 1.7e12; g.Date = { now: () => g.T };   // 📖 판 나이(2시간) — 가짜 시계(g.T 를 민다 · onf-frame.js 는 Date.now 만 쓴다) g.location = { search: '', pathname: '/', href: 'https://class.ownify.co.kr/' };
   g.navigator = { userAgent: 'node' }; g.history = { state: null, replaceState() {}, pushState() {} };
   const root = { attrs: {}, setAttribute(k, v) { root.attrs[k] = v; } };
-  g.document = { addEventListener() {}, body, createElement: mkEl, documentElement: root };
+  g.document = { addEventListener() {}, body, createElement: mkEl, documentElement: root, querySelector: () => null };
   g.addEventListener = (k, fn) => { (listeners[k] = listeners[k] || []).push(fn); };
   g.removeEventListener = (k, fn) => { listeners[k] = (listeners[k] || []).filter((x) => x !== fn); };
   if (o.pre) o.pre(g, root);
