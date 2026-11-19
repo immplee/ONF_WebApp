@@ -12,7 +12,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Ownify">
-<meta name="theme-color" content="#7a5c3e">
+<!-- 📱 위 상태 막대·주소창 색 = 화면 바탕(보수공사 ⑤ G · 2026-11-19) — 종전 갈색 한 색(#7a5c3e)은 밝은·어두운 화면 둘 다 위에 갈색 띠였다.
+     기기 다크/라이트를 따른다(화면 기본 = auto) · 앱 안에서 테마를 기기와 다르게 고르면 막대만 기기 쪽 색(받아들임) · 되돌리기 = 이 두 줄을 옛 한 줄로. -->
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fdfbf7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1E1611">
 <!-- 🌤 링크 직행 교재 /who(onf-frame.js ONF_W_EDGE 와 같은 출처 · 서울 길) — 연결을 미리 열어 800ms 시한 안에 들게 -->
 <link rel="preconnect" href="https://app.ownify.co.kr" crossorigin>
 <!-- ⛔ **매니페스트만은 상대경로다.** 다른 자산(CSS·JS·아이콘)과 규칙이 반대이므로 헷갈리지 마라.
