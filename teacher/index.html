@@ -6,8 +6,7 @@
 <title>Ownify 선생님</title>
 <!-- 📱 위 상태 막대·주소창 색 = 화면 바탕(보수공사 ⑤ G · 2026-11-19) — 종전 갈색 한 색(#7a5c3e)은 밝은·어두운 화면 둘 다 위에 갈색 띠였다.
      기기 다크/라이트를 따른다(화면 기본 = auto) · 앱 안에서 테마를 기기와 다르게 고르면 막대만 기기 쪽 색(받아들임) · 되돌리기 = 이 두 줄을 옛 한 줄로. -->
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fdfbf7">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1E1611">
+<meta name="theme-color" content="#1E1611"><!-- 📱 상태 막대 색 = 화면 바탕 — 기본 다크라 한 줄 · 머리 스크립트·테마 받는 손이 data-theme 따라 갈아 끼운다(2026-11-20 · 기기 밝음/어두움 따라가던 한 쌍은 앱 색과 반대로 떴다) -->
 <!-- 홈 화면 추가(아이콘). ⛔ 학생 액자의 manifest 를 그대로 쓰면 이름·start_url 이 학생 것이라
      같은 아이콘 두 개가 생긴다 — teacher/ 전용으로 따로 둔다(아이콘 그림은 같은 파일을 가리킨다).
      ⚠️ iOS 사파리는 manifest 를 안 보고 apple-touch-icon 을 본다. 둘 다 필요하다. -->
@@ -21,7 +20,7 @@
 <meta name="apple-mobile-web-app-title" content="선생님">
 <link rel="apple-touch-icon" href="../assets/icon/onf-180.png">
 <link rel="icon" href="../assets/icon/onf-32.png" sizes="32x32">
-<script>/* 🌙 다크 모드 — 안쪽 액자가 알려 준 색(onfTheme · onf-frame.js)을 **그리기 전에** 단다 · 없으면 어둡게(Peter 2026-10-14 「홈페이지 기본은 다크모드로」 — 종전 기기 설정 · 홈에서 「기기 설정 따라」를 고르면 안쪽이 그 색을 알려 남는다) */(function(){try{var v=localStorage.getItem("onfTheme"),d=v!=="light";document.documentElement.setAttribute("data-theme",d?"dark":"light");}catch(e){}})();</script>
+<script>/* 🌙 다크 모드 — 안쪽 액자가 알려 준 색(onfTheme · onf-frame.js)을 **그리기 전에** 단다 · 없으면 어둡게(Peter 2026-10-14 「홈페이지 기본은 다크모드로」 — 종전 기기 설정 · 홈에서 「기기 설정 따라」를 고르면 안쪽이 그 색을 알려 남는다) */(function(){try{var v=localStorage.getItem("onfTheme"),d=v!=="light";document.documentElement.setAttribute("data-theme",d?"dark":"light");var tc=document.querySelector("meta[name=theme-color]");if(tc)tc.setAttribute("content",d?"#1E1611":"#fdfbf7");}catch(e){}})();</script>
 <script>/* 🏫 정적 먼저 기기 스위치 판정 한 곳(2026-10-30 · 넓히기 준비) — 머리 미리 받기(아래 tPre)와 본 스크립트(TOUTV)가 **이 함수 하나**로 정한다.
    주소 tout(1|2|0) > 이 기기 기억(onf_tout) > 기본 TOUT_DEF → '0'(지금 길) | '1'(정적 먼저 · WebKit·홈 화면 앱 뺌) | '2'(WebKit·홈 화면 앱도).
    TOUT_DEF: '0' = 시험(?tout 붙인 기기만) · 넓히면 '2'(켜기 커밋 하나) — 크롬 류는 '1' 과 같고, WebKit 은 판이 익명 다리로 쓴다.
@@ -2085,6 +2084,7 @@ window.addEventListener('resize', bookKb);
 function onfShellTheme(v) {
   if (v !== 'dark' && v !== 'light') return;
   document.documentElement.setAttribute('data-theme', v);
+  var tc = document.querySelector('meta[name=theme-color]'); if (tc) tc.setAttribute('content', v === 'dark' ? '#1E1611' : '#fdfbf7');   // 📱 상태 막대도 같이
   try { localStorage.setItem('onfTheme', v); } catch (e) {}
   themeTell();
 }

@@ -759,7 +759,7 @@
          보이기·숨기기·주소는 안 건드린다(다시 안 불러온다) · 위 홈 자물쇠를 지난 말만 — 판 액자 쪽 말은 여기까지 못 온다. */
       if (ev.data.onf === 'bookBox' && opts.bookSrc) { for (var bi = 0; bi < books.length; bi++) bookPlace(books[bi], ev.data.left, ev.data.m, ev.data.r); sync(); return; }
       /* 🌙 화면 색(Peter 2026-10-12 다크 모드) — 안쪽 홈이 알린다 · 틀·판 둘레·「불러오는 중」을 같은 색으로 · 다음에 열 때 머리 스크립트가 그리기 전에 쓴다. 아는 값만. */
-      if (ev.data.onf === 'theme') { if (ev.data.v === 'dark' || ev.data.v === 'light') { document.documentElement.setAttribute('data-theme', ev.data.v); try { localStorage.setItem('onfTheme', ev.data.v); } catch (eT) {} themeTell(); } return; }
+      if (ev.data.onf === 'theme') { if (ev.data.v === 'dark' || ev.data.v === 'light') { document.documentElement.setAttribute('data-theme', ev.data.v); var tc = document.querySelector('meta[name=theme-color]'); if (tc) tc.setAttribute('content', ev.data.v === 'dark' ? '#1E1611' : '#fdfbf7'); try { localStorage.setItem('onfTheme', ev.data.v); } catch (eT) {} themeTell(); } return; }
       if (ev.data.onf === 'themeAsk') { themeAsk(ev); return; }   // 🌙 폰에선 교재가 홈 액자째 넘어가 이 자리에서 묻는다
       /* 📤 과제 끝맺음 맡기기(반박 검토 🟡3 2026-10-16) — credentialless 창(위 openExec 우회)의 과제 화면은 제 저장소가 페이지와 같이 사라져
          「못 한 끝맺음(이름·도장·「새 과제」)은 다음에 열 때」를 못 지킨다 → 그 창이 이 껍데기 저장소(onfHwFin)에 맡기고(hwFin · sid 로 넣고 뺀다) 열 때 묻는다(hwFinAsk).
