@@ -948,11 +948,11 @@ ta('S4e slug 링크 → 몸통 {t, slug}(f·s 칸 없음) · cf 면 정적 판',
   assert.deepStrictEqual(Object.keys(JSON.parse(f.calls[0].init.body)), ['t', 'f'], '⛔ 없는 칸을 실었다(빈 값은 Worker 가 400 bad)');
 });
 
-ta('S4f 안 묻는 때 — 기기 out=0 · 토큰 없음 · 그날 물러남 · ⭐ 내 문장 · 🗂️ 카드 덱 · ttok → /who 0회 · 바로 지금 길', async () => {
+ta('S4f 안 묻는 때 — 기기 out=0 · 토큰 없음 · 그날 물러남 · 🗂️ 카드 덱 · ttok → /who 0회 · 바로 지금 길', async () => {
   const D = 86400000;
   const cases = [['out=0', { out: false }], ['토큰 없음', { tok: '' }],   // ☁️ 정적 판 안 쓴 기기(없음·15일 전)는 이제 묻는다(2026-11-01 밖으로 5단계 ④ · 아래 N6 · 첫 판 시한만 길게)
     ['그날 물러남', { ls: UL({ onfOutFail: BLK }) }],
-    ['내 문장', { src: DSRC.replace('mode=share', 'mode=mine') }], ['카드 덱', { src: DSRC + '&view=cards' }], ['ttok', { src: DSRC + '&ttok=X' }]];
+    ['카드 덱', { src: DSRC + '&view=cards' }], ['ttok', { src: DSRC + '&ttok=X' }]];   // ⭐ 내 문장은 /who 없이 정적 /mine/ 먼저(아래 S4h · 2026-11-20)
   for (const [nm, o] of cases) {
     const s = wsetup(o);
     assert.strictEqual(s.calls.length, 0, '⛔ ' + nm + ' — /who 를 물었다');
@@ -961,6 +961,37 @@ ta('S4f 안 묻는 때 — 기기 out=0 · 토큰 없음 · 그날 물러남 · 
   for (const [nm, ls] of [['정적 판 안 씀', LSf()], ['15일 전', UL({ onfOutUsed: String(1.7e12 - 15 * D) })]]) {
     const s = wsetup({ ls });
     assert.strictEqual(s.calls.length, 1, '⛔ ' + nm + ' — 차가운 기기라고 링크 직행을 구글 교재로 보냈다(2026-11-01 밖으로 5단계 ④)');
+  }
+});
+
+/* ⭐ 들어가는 길 점검(2026-11-20) — 첫 판이 내 문장 주소(?mode=mine · 학생 토큰)면 판(S5g)과 같은 정적 /mine/ 먼저. 종전엔 이 갈래가 없어 주소로 바로 연 내 문장
+   (교재를 바로 연 창의 ☰ 「⭐ 내 문장」 · 새 탭 · 북마크)이 늘 구글 판 9~12초였다(헤드리스 · 시험 학생 · 구글 부름 7 → 정적 1.1초 · 0). */
+const MSRC = 'https://script.google.com/x/exec?t=TOK&mode=mine', MSRCV = MSRC + '&view=review';
+ta('S4i 첫 판 내 문장 → /who 0회 · 액자 = /mine/(토큰 없음) · hello 에 outBoot{tok, src, cf:null} · 로고 ok · onfOutUsed 새로 · 칸(view) 주소 그대로', async () => {
+  for (const src of [MSRC, MSRCV]) {
+    const s = wsetup({ src });
+    assert.strictEqual(s.calls.length, 0, '⛔ 내 문장인데 /who 를 물었다');
+    assert.strictEqual(s.frameEl.src, OUT_MINE, '⛔ 첫 판 내 문장이 정적 /mine/ 이 아니다: ' + s.frameEl.src);
+    assert.ok(s.frameEl.src.indexOf('TOK') < 0, '⛔ 정적 판 주소에 토큰');
+    assert.strictEqual(s.okN.n, 0, '⛔ hello 전에 로고를 걷었다');
+    s.send({ onf: 'outHello' }, win('stranger', s.top), OUT_O);
+    assert.strictEqual(boots(s.homeWin).length, 0, '⛔ 남의 창 hello 에 outBoot');
+    s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+    assert.deepStrictEqual(boots(s.homeWin), [[{ onf: 'outBoot', tok: 'TOK', src, cf: null }, OUT_O]], '⛔ outBoot 꼴·출처');
+    assert.strictEqual(s.okN.n, 1, '⛔ 정적 내 문장이 떴는데 로고가 안 걷혔다');
+    assert.strictEqual(s.g.localStorage.getItem('onfOutUsed'), String(s.g.T), '⛔ onfOutUsed 를 안 적었다');
+  }
+});
+ta('S4i 첫 판 내 문장 물러남 — outFail·hello 없음 → 같은 액자에 지금 exec 주소 · ttok(선생님 보기)·out=0·토큰 없음·그날 물러남 → 바로 지금 길', async () => {
+  const f = wsetup({ src: MSRC });
+  f.send({ onf: 'outFail', why: 'notice' }, f.homeWin, OUT_O);
+  assert.strictEqual(f.frameEl.src, MSRC, '⛔ outFail 인데 지금 길로 안 물러났다(끝난 학생 안내는 구글 판이 한다)');
+  const h = wsetup({ src: MSRC });
+  h.fire(2500);
+  assert.strictEqual(h.frameEl.src, MSRC, '⛔ hello 없음인데 지금 길로 안 물러났다');
+  for (const [nm, o] of [['ttok', { src: MSRC + '&ttok=X' }], ['out=0', { src: MSRC, out: false }], ['토큰 없음', { src: MSRC, tok: '' }], ['그날 물러남', { src: MSRC, ls: UL({ onfOutFail: BLK }) }]]) {
+    const s = wsetup(o);
+    assert.strictEqual(s.frameEl.src, o.src, '⛔ ' + nm + ' — 지금 길이 아니다: ' + s.frameEl.src);
   }
 });
 
