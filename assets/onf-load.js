@@ -141,7 +141,7 @@
         + svg('onf-ld-ghost', LETTERS.join('')) + '<div class="onf-ld-fill"><div class="onf-ld-fi">' + letters() + '</div></div></div></div>';
       doc.body.appendChild(box);
       fillEl = box.querySelector('.onf-ld-fill'); fiEl = box.querySelector('.onf-ld-fi');
-      mid(); global.addEventListener('resize', mid); vp0 = vp();
+      mid(); global.addEventListener('resize', mid); vp0 = vp(); midTick();
     } catch (e) { try { if (box && box.parentNode) box.parentNode.removeChild(box); } catch (e2) {} box = null; }
   }
   /* 📐 로고 세로 자리 = **보이는 키(innerHeight)의 가운데** px (Peter 2026-11-20 「모바일에서 로고가 가운데보다 살짝 아래 있다가 위로 올라온다」).
@@ -151,22 +151,27 @@
      보이는 키는 배치 창이 고쳐져도 그대로라 그 순간 안 움직인다. 보이는 키가 정말 바뀔 때(돌림·창 크기)만 따라가고 · 날기 시작하면 멈춘다(fly 가 자리를 잰 뒤).
      ⚠️ 보이는 키 **자체**가 늦게 바뀌는 기기(아이패드 크롬 = 0.15초에 1024→892)는 그때 한 번 따라간다 — 그 전엔 맞는 값을 알 길이 없다(종전과 같은 한 번).
      CSS top:50% 는 JS 가 못 단 때의 바닥 값으로 남는다(보이는 키 = 배치 창이면 두 값이 같다 — 데스크톱·사파리·안드로이드는 무변). */
-  var midOn = true, vp0 = '';
-  function mid() {
-    try { var h = global.innerHeight; if (midOn && box && h > 0) box.querySelector('.onf-ld-logo').style.top = h / 2 + 'px'; } catch (e) {}
+  /* 🔁 프레임마다도 본다(Peter 2026-11-20 「학생 홈 단추로 들어가면 로고가 아직도 아래」) — 선생님 홈이 연 새 탭(아이폰 크롬)은 막을 그릴 때 보이는 키가 **화면 전체**였다가
+     (clog ldvp:c:932,932>745,745,745:932 — 그릴 때 932 = screen 키 · 날 때 745) 줄었는데, 종전 resize 만 따라가 로고가 466 에 남았다(보이는 가운데 372 보다 94px 아래).
+     그 새 탭에서 resize 가 안 왔다고 본다(실기기 줄 ldvp 의 r = resize 수로 확인) → 날기 전까지 rAF 로 innerHeight 가 바뀌면 따라간다(같으면 아무것도 안 쓴다). */
+  var midOn = true, vp0 = '', midH = 0, midRs = 0;
+  function mid(ev) {
+    try { var h = global.innerHeight; if (ev && ev.type === 'resize') midRs++; if (midOn && box && h > 0 && h !== midH) { midH = h; box.querySelector('.onf-ld-logo').style.top = h / 2 + 'px'; } } catch (e) {}
   }
+  function midTick() { if (!midOn) return; mid(); try { global.requestAnimationFrame(midTick); } catch (e) {} }
   function midOff() { if (midOn) vpSend(); midOn = false; try { global.removeEventListener('resize', mid); } catch (e) {} }   // 날 때·걷힐 때 한 번
   /* 🔭 실기기 확인 한 줄(clog perf 'ldvp:…') — 에뮬레이터는 iOS 주소창·배치 창 어긋남을 못 흉내 낸다. 아이폰·아이패드만 · 기기마다 처음 3번 ·
-     값 = 브라우저(c 크롬 · s 사파리 · a 홈 화면 앱) · 막 그릴 때 [보이는 키, 막 키] → 날 때·걷힐 때 [보이는 키, 막 키, visualViewport 키] · 화면 키. 토큰·주소 없음.
+     값 = 브라우저(c 크롬 · s 사파리 · a 홈 화면 앱) · 막 그릴 때 [보이는 키, 막 키] → 날 때·걷힐 때 [보이는 키, 막 키, visualViewport 키] · 화면 키 · o opener 1/0 · r 받은 resize 수. 토큰·주소 없음.
      ponytail: 아이폰 크롬·사파리 줄을 몇 개 본 뒤 지워라(vpProbe 처럼). */
   function vp() { try { return Math.round(global.innerHeight) + ',' + Math.round(box.getBoundingClientRect().height); } catch (e) { return ''; } }
   function vpSend() {
     try {
       var nv = global.navigator, u = (nv && nv.userAgent) || '', d = /iPad/.test(u) || (/Macintosh/.test(u) && nv.maxTouchPoints > 1) ? 'ipad' : /iPhone|iPod/.test(u) ? 'ios' : '';
-      var n = +(ls && ls.getItem('onfLdVp')) || 0, W = global.ONF && ONF.frame && ONF.frame.WORKER;
+      var n = +(ls && ls.getItem('onfLdVp2')) || 0, W = global.ONF && ONF.frame && ONF.frame.WORKER, o = 0;   // 2 = 프레임마다 따라가기 뒤 새로 3번(2026-11-20)
       if (!d || !vp0 || n >= 3 || !W || !nv.sendBeacon) return;
-      ls.setItem('onfLdVp', String(n + 1)); var vv = global.visualViewport;
-      nv.sendBeacon(W + '/clog', JSON.stringify([{ k: 'perf', c: ('ldvp:' + (nv.standalone ? 'a' : /CriOS/.test(u) ? 'c' : 's') + ':' + vp0 + '>' + vp() + ',' + (vv ? Math.round(vv.height) : 0) + ':' + ((global.screen && screen.height) || 0)).slice(0, 60), l: 0, d: d }]));
+      try { o = global.opener ? 1 : 0; } catch (eO) { o = 1; }   // 1 = opener 를 쥔 새 탭(선생님 홈 옛 단추) · 0 = 주소·noopener
+      ls.setItem('onfLdVp2', String(n + 1)); var vv = global.visualViewport;
+      nv.sendBeacon(W + '/clog', JSON.stringify([{ k: 'perf', c: ('ldvp:' + (nv.standalone ? 'a' : /CriOS/.test(u) ? 'c' : 's') + ':' + vp0 + '>' + vp() + ',' + (vv ? Math.round(vv.height) : 0) + ':' + ((global.screen && screen.height) || 0) + ':o' + o + 'r' + midRs).slice(0, 60), l: 0, d: d }]));
     } catch (e) {}
   }
   try {
