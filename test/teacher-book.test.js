@@ -1881,6 +1881,25 @@ t('FB1 뜬 판(views line,fb) — fbrd 주소는 새 판 없이 같은 판에 bo
   s.send({ onf: 'openBook', href: E1 + '&fbrd=r3abc', left: 270 }, s.home);
   assert.strictEqual(fbOf(bi).length, 2, '⛔ 같은 회차를 다시 누르면 말이 안 간다(피드백을 끈 뒤 다시 못 켠다)');
 });
+t('FB1r 🎧 fbrr(시작 창이 골라 둘 녹음 · 과제함 미드 「피드백 n차」 2026-11-20) — fb 와 한 말로 fbr · 판 주소엔 없음 · 꼴 틀린 값·fbrd 없는 fbrr 은 안 보냄 · 노크 전에 쥐었다 보내도 실림', () => {
+  const s = phoneRun({ wide: true });
+  s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
+  const P = s.panel(), src0 = P.kids[0].src, bi = vKnock(s, P, 1, 'line,fb');
+  s.send({ onf: 'openBook', href: E1 + '&fbrd=new&fbrr=AUDIOfile_0001-xyz', left: 270 }, s.home);
+  assert.ok(!/fbrr/.test(P.kids[0].src) && P.kids[0].src === src0, '⛔ 판 주소에 fbrr 가 실렸다(새 판)');
+  assert.deepStrictEqual(fbOf(bi).slice(-1)[0], { onf: 'bookView', fb: 'new', fbr: 'AUDIOfile_0001-xyz' }, '⛔ 녹음 id 가 「그 회차로」와 같이 안 갔다');
+  s.send({ onf: 'openBook', href: E1 + '&line=17&fbrd=new&fbrr=AUDIOfile_0003-xyz', left: 270 }, s.home);
+  assert.deepStrictEqual(viewsOf(bi).slice(-1)[0], { onf: 'bookView', line: 17, fb: 'new', fbr: 'AUDIOfile_0003-xyz' }, '⛔ 줄과 한 말로 갈 때 녹음 id 가 빠졌다');
+  s.send({ onf: 'openBook', href: E1 + '&fbrd=new&fbrr=a<b', left: 270 }, s.home);
+  assert.deepStrictEqual(fbOf(bi).slice(-1)[0], { onf: 'bookView', fb: 'new' }, '⛔ 꼴 틀린 녹음 id 를 넘겼다');
+  const n = fbOf(bi).length; s.send({ onf: 'openBook', href: E1 + '&fbrr=AUDIOfile_0001-xyz', left: 270 }, s.home);
+  assert.strictEqual(fbOf(bi).length, n, '⛔ fbrd 없이 fbrr 만으로 말을 보냈다');
+  const s2 = phoneRun({ wide: true });
+  s2.send({ onf: 'openBook', href: E1 + '&fbrd=new&fbrr=AUDIOfile_0002-xyz', left: 270 }, s2.home);
+  const bw2 = win('fb-exec', s2.top), b2 = win('fb-user', win('fb-sbx', bw2)); s2.panel().kids[0].contentWindow = bw2;
+  s2.send({ onf: 'bookHi', views: 'line,fb' }, b2);
+  assert.deepStrictEqual(fbOf(b2).slice(-1)[0], { onf: 'bookView', fb: 'new', fbr: 'AUDIOfile_0002-xyz' }, '⛔ 노크 전에 쥔 말에 녹음 id 가 빠졌다');
+});
 t('FB2 할 줄 모르는 판·꼴 틀린 값엔 안 보낸다 — 옛 교재(views line) · 대문자·기호 · 33자 · fbrd 없는 다음 [열기]는 쥔 말을 버린다', () => {
   const s = phoneRun({ wide: true });
   s.send({ onf: 'bookWarm', href: E1, panel: 1, left: 270 }, s.home);
