@@ -141,7 +141,33 @@
         + svg('onf-ld-ghost', LETTERS.join('')) + '<div class="onf-ld-fill"><div class="onf-ld-fi">' + letters() + '</div></div></div></div>';
       doc.body.appendChild(box);
       fillEl = box.querySelector('.onf-ld-fill'); fiEl = box.querySelector('.onf-ld-fi');
+      mid(); global.addEventListener('resize', mid); vp0 = vp();
     } catch (e) { try { if (box && box.parentNode) box.parentNode.removeChild(box); } catch (e2) {} box = null; }
+  }
+  /* 📐 로고 세로 자리 = **보이는 키(innerHeight)의 가운데** px (Peter 2026-11-20 「모바일에서 로고가 가운데보다 살짝 아래 있다가 위로 올라온다」).
+     종전 top:50% 는 막 상자(position:fixed inset 0 = 배치 창)의 가운데였다. iOS 크롬(WebKit)은 배치 창을 기기 전체로 두고 주소창·막대 몫만큼 보이는 창만 줄인다
+     (아이패드 실측 2026-11-16 clog vp1/vp2: 배치 1024 · 보이는 892 — onf-frame.js vhFit) → 로고가 그 몫의 절반만큼 아래에 서 있다가
+     배치 창이 고쳐지는 순간(아이패드 = vhFit 의 onf-vcut · 그 밖 = 브라우저가 고칠 때 · 아니면 날 때) 위로 올라왔다(재현 harness: 폰 50px · 아이패드 66px).
+     보이는 키는 배치 창이 고쳐져도 그대로라 그 순간 안 움직인다. 보이는 키가 정말 바뀔 때(돌림·창 크기)만 따라가고 · 날기 시작하면 멈춘다(fly 가 자리를 잰 뒤).
+     ⚠️ 보이는 키 **자체**가 늦게 바뀌는 기기(아이패드 크롬 = 0.15초에 1024→892)는 그때 한 번 따라간다 — 그 전엔 맞는 값을 알 길이 없다(종전과 같은 한 번).
+     CSS top:50% 는 JS 가 못 단 때의 바닥 값으로 남는다(보이는 키 = 배치 창이면 두 값이 같다 — 데스크톱·사파리·안드로이드는 무변). */
+  var midOn = true, vp0 = '';
+  function mid() {
+    try { var h = global.innerHeight; if (midOn && box && h > 0) box.querySelector('.onf-ld-logo').style.top = h / 2 + 'px'; } catch (e) {}
+  }
+  function midOff() { if (midOn) vpSend(); midOn = false; try { global.removeEventListener('resize', mid); } catch (e) {} }   // 날 때·걷힐 때 한 번
+  /* 🔭 실기기 확인 한 줄(clog perf 'ldvp:…') — 에뮬레이터는 iOS 주소창·배치 창 어긋남을 못 흉내 낸다. 아이폰·아이패드만 · 기기마다 처음 3번 ·
+     값 = 브라우저(c 크롬 · s 사파리 · a 홈 화면 앱) · 막 그릴 때 [보이는 키, 막 키] → 날 때·걷힐 때 [보이는 키, 막 키, visualViewport 키] · 화면 키. 토큰·주소 없음.
+     ponytail: 아이폰 크롬·사파리 줄을 몇 개 본 뒤 지워라(vpProbe 처럼). */
+  function vp() { try { return Math.round(global.innerHeight) + ',' + Math.round(box.getBoundingClientRect().height); } catch (e) { return ''; } }
+  function vpSend() {
+    try {
+      var nv = global.navigator, u = (nv && nv.userAgent) || '', d = /iPad/.test(u) || (/Macintosh/.test(u) && nv.maxTouchPoints > 1) ? 'ipad' : /iPhone|iPod/.test(u) ? 'ios' : '';
+      var n = +(ls && ls.getItem('onfLdVp')) || 0, W = global.ONF && ONF.frame && ONF.frame.WORKER;
+      if (!d || !vp0 || n >= 3 || !W || !nv.sendBeacon) return;
+      ls.setItem('onfLdVp', String(n + 1)); var vv = global.visualViewport;
+      nv.sendBeacon(W + '/clog', JSON.stringify([{ k: 'perf', c: ('ldvp:' + (nv.standalone ? 'a' : /CriOS/.test(u) ? 'c' : 's') + ':' + vp0 + '>' + vp() + ',' + (vv ? Math.round(vv.height) : 0) + ':' + ((global.screen && screen.height) || 0)).slice(0, 60), l: 0, d: d }]));
+    } catch (e) {}
   }
   try {
     lazy = !!(doc && doc.currentScript && doc.currentScript.hasAttribute && doc.currentScript.hasAttribute('data-lazy'));
@@ -194,6 +220,7 @@
     function gone() {
       if (phase === 'gone') return;
       phase = 'gone';
+      midOff();
       hold(false);
       tellHome('brandDone');                                                // 홈 로고 다시 보이기(받은 적 없으면 아무 일 없다)
       timers.forEach(clearTimeout);
@@ -236,6 +263,7 @@
     /* 활처럼 휜 길 — 가로(바깥 .onf-ld-logo)와 세로·크기(안 .onf-ld-in)를 서로 다른 곡선으로. 끝은 길게 감속. 홈은 안 움직인다(목업 v3 에서 홈이 커지는 중이라 끝이 튀었다). */
     function fly() {
       phase = 'fly';
+      midOff();                                                             // 📐 자리를 잰 뒤엔 안 따라간다(애니메이션 시작점이 흔들리지 않게)
       var lg = box.querySelector('.onf-ld-logo'), inn = box.querySelector('.onf-ld-in');
       var fr = frameEl.getBoundingClientRect(), a = inn.getBoundingClientRect();
       if (!a.width) return fade();
