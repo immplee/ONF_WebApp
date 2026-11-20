@@ -1241,8 +1241,9 @@ window.addEventListener('message', function (ev) {
    새 파일인지·내 학생인지는 홈이 가리고 서버가 다시 본다(onfTeacherHwSeen). */
 function hwSawRelay(d) {
   var t = typeof d.t === 'string' && d.t.length <= 200 ? d.t : '', ids = Array.isArray(d.ids) ? d.ids.filter(function (x) { return typeof x === 'string' && /^[\w-]{10,200}$/.test(x); }).slice(0, 50) : [];
-  if (!t || !ids.length || !appWin) return;
-  try { appWin.postMessage({ onf: 'hwSaw', t: t, ids: ids }, appOrigin); } catch (e) {}
+  if ((d.t != null && d.t !== '' && !t) || !ids.length || !appWin) return;   // 토큰 = 과제 판 · 없음 = 📖 교재만 판(홈이 파일 id 로 학생을 찾는다 · 2026-11-20 구멍 점검) · 꼴이 틀린 토큰은 버림
+  var m = { onf: 'hwSaw', ids: ids }; if (t) m.t = t;
+  try { appWin.postMessage(m, appOrigin); } catch (e) {}
 }
 function hwClose() {
   hwFbNext = null;   // 📚 「지난 수업 자료 열기」 범위는 그 판이 떠 있는 동안만
@@ -1293,7 +1294,7 @@ window.addEventListener('popstate', function () {
 });
 window.addEventListener('message', function (ev) {
   var d = ev && ev.data;
-  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwbookBookWarm' && d.onf !== 'hwTap' && d.onf !== 'reload' && d.onf !== 'hwWin' && d.onf !== 'hwPen' && d.onf !== 'hwFb' && d.onf !== 'hwbookLesson' && d.onf !== 'hwFbAsk' && d.onf !== 'hwLeaveKeep' && d.onf !== 'hwRec' && d.onf !== 'hwBand' && d.onf !== 'hwPenOp' && d.onf !== 'outHello' && d.onf !== 'outFail')) return;
+  if (!d || (d.onf !== 'hwbook' && d.onf !== 'hwSaw' && d.onf !== 'hwbookBack' && d.onf !== 'hwbookWarm' && d.onf !== 'auth-please' && d.onf !== 'themeAsk' && d.onf !== 'hwbookView' && d.onf !== 'hwbookBookWarm' && d.onf !== 'hwTap' && d.onf !== 'reload' && d.onf !== 'hwWin' && d.onf !== 'hwPen' && d.onf !== 'hwFb' && d.onf !== 'hwbookLesson' && d.onf !== 'hwFbAsk' && d.onf !== 'hwLeaveKeep' && d.onf !== 'hwRec' && d.onf !== 'hwBand' && d.onf !== 'hwPenOp' && d.onf !== 'outHello' && d.onf !== 'outFail')) return;
   if (hwFr && hwFrom(ev.source)) {   // 과제 판 액자에서 온 말
     /* 📝 정적 과제 판이 살아 있으면(hwOut) 그 판 창(액자 직접 자식 — 정적 판은 겹이 없다) + 그 판 출처만 · 판 안 구글 액자(다리)는 안 받는다 · 그 밖(구글 판)은 종전 그대로 googleusercontent 만 */
     if (hwOut) { if (ev.source !== hwFr.contentWindow || ev.origin !== hwOut.org) return; }
@@ -2191,6 +2192,7 @@ window.addEventListener('message', function (ev) {
      뗌(touchend)은 처음 닿은 그 판으로 간다(터치 사건은 처음 대상에 묶인다) — 사람은 새로 고침을 당겼다. 기억은 **보이는 판**으로(숨긴 판을 열린 판으로 적지 않는다). */
   if (d.onf === 'reload') { var rq = bookShown(); if (rq) rsSave(rq); if (typeof reopenLog === 'function') reopenLog(p.parked ? 'pullbookhid' : 'pullbook'); location.reload(); return; }
   if (p.parked) return;                                        // ⛔ 숨긴 판은 닫기·전체·갈아 끼우기를 못 부른다
+  if (d.onf === 'hwSaw') { hwSawRelay({ ids: d.ids }); return; }   // 📤 교재만 판 피드백이 들은 녹음·체크한 녹음 → 홈(토큰은 안 받는다 — 홈이 그 파일의 학생을 찾는다 · 2026-11-20)
   if (d.onf === 'printTitle') { if (window.ONF && ONF.frame && ONF.frame.printTitle) ONF.frame.printTitle(d.t); return; }   // 📄 PDF 저장 이름 — 판 안 교재가 인쇄하는 동안만 탭 제목(assets/onf-frame.js printTitle · 쌍둥이)
   if (d.onf === 'bookState') { if (histSmall(d.st)) { try { p.st = JSON.parse(JSON.stringify(d.st)); } catch (e) { return; } rsSave(p); } return; }   // 🔄 보이는 판의 지금 상태
   if (d.onf === 'bookLeaveKeep') { histGuard(p); try { p.win.postMessage({ onf: 'bookLeaveKept' }, p.origin); } catch (e) {} return; }   // 📱 「나갈까요?」 취소 — 물음 칸 다시(되묻기가 떠 있는 채)
