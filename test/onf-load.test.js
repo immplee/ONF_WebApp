@@ -191,8 +191,10 @@ t('📐 로고 세로 자리 = 보이는 키(innerHeight) 가운데 px — 막 �
   resize(600); assert.strictEqual(lg.style.top, '350px', '⛔ 나는 중에 자리를 바꿨다(애니메이션 시작점이 튄다)');
   assert.strictEqual((s.L.resize || []).length, 0, '⛔ 날기 시작했는데 resize 손을 안 뗐다');
 });
-t('📐 resize 없이 보이는 키가 줄어도(선생님 홈이 연 아이폰 크롬 새 탭 · clog ldvp 932→745) 다음 프레임에 따라간다 · 날면 멈춘다 (Peter 2026-11-20)', () => {
+t('📐 resize 없이 보이는 키가 줄어도(선생님 홈이 연 아이폰 크롬 새 탭 · 실측 932→745) 다음 프레임에 따라간다 · 날면 멈춘다 · 실기기 확인 기록(clog)은 안 보낸다 (Peter 2026-11-20)', () => {
   const s = env({ vh: 932 }), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box(), lg = box.querySelector('.onf-ld-logo');
+  const beacons = []; s.g.ONF.frame.WORKER = 'https://w.test';
+  s.g.navigator = { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) CriOS/140', sendBeacon: (u, b) => { beacons.push(b); return true; } };
   assert.strictEqual(lg.style.top, '466px');
   s.g.innerHeight = 745; s.tick(20);   // resize 말 없이
   assert.strictEqual(lg.style.top, '372.5px', '⛔ resize 가 안 온 새 탭에서 로고가 화면 전체 가운데(466)에 남았다 — 보이는 가운데보다 94px 아래: ' + lg.style.top);
@@ -201,6 +203,9 @@ t('📐 resize 없이 보이는 키가 줄어도(선생님 홈이 연 아이폰 
   assert.strictEqual(lg.anims.length, 1, '난다');
   s.g.innerHeight = 600; s.tick(50);
   assert.strictEqual(lg.style.top, '372.5px', '⛔ 나는 중에 프레임 따라가기가 자리를 바꿨다(애니메이션 시작점이 튄다)');
+  s.tick(3000);
+  assert.deepStrictEqual(beacons, [], '⛔ 실기기 확인 기록이 남았다(2026-11-20 확인 끝 · 지웠다): ' + beacons.join(' '));
+  assert.ok(!Object.keys(s.ls).some((x) => /^onfLdVp/.test(x)), '⛔ 기기 저장 칸 onfLdVp* 를 또 쓴다');
 });
 t('PC 글자 이름(k=text) → 통통 뒤 홈 글자를 먼저 보이고 겹친 로고를 살짝 걷는다', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
