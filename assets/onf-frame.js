@@ -1623,6 +1623,21 @@
       try { if (frameEl.isConnected && frameEl.contentWindow) frameEl.contentWindow.location.replace(ONF_OUT_HOME_URL); else frameEl.src = ONF_OUT_HOME_URL; } catch (e) { frameEl.src = ONF_OUT_HOME_URL; }   // 📱 replace — openExec 끝 주석
     }
     var wq = whoQ(src);
+    /* ⭐ 첫 판이 내 문장 주소(?mode=mine · 학생 토큰)면 판(bookMake)과 같은 정적 /mine/ 먼저(들어가는 길 점검 2026-11-20) — 종전엔 이 갈래가 없어 늘 구글 판이었다:
+       홈 판으로 열면 0.07~0.5초인데, 주소로 바로 열면(교재 ☰ 「⭐ 내 문장」을 교재를 바로 연 창에서 · 새 탭·북마크) 구글 doGet 9~12초(헤드리스 · 구글 부름 7).
+       선생님 보기(ttok)는 outOk 가 거른다(지금 길 그대로) · 안 뜨면(hello 시한·outFail — 끝난 학생 안내 등) 같은 액자에 지금 길 + 물러남 기억(판과 같은 'book').
+       mainOut = 정적 판이 첫 판이다(넘겨주기 판을 안 띄운다 — 판 갈래 p.out 과 같은 까닭) · 교재 쓰기 대기열 손(onQ)은 교재 첫 판 몫이라 안 단다. */
+    function mainMine() {
+      var cold = homeCold();   // ⛔ 아래에서 onfOutUsed 를 지금으로 적기 **전에** 잰다(교재 첫 판 갈래와 같다)
+      mainOut = true; flushStop();
+      try { global.localStorage.setItem(OUT_USED, String(Date.now())); } catch (eU) {}
+      openApp(frameEl, OUT_MINE_URL, src, null, function (why) {
+        console.info('[onf] 첫 판 정적 내 문장이 안 떴다 — 지금 길로 다시');
+        fallBack('book', why);
+        mainOut = false; appWin = null; histWin = null; histOrigin = '';
+        mainExec();
+      }, opts.tok, opts.hooks || null, cold ? HOME_PAINT_MS_COLD : 0);
+    }
     /* 🖨️ 프린트용 교재(opts.print — index.html 이 mode=print 일 때만 넘긴다 · 위 printOut) — 정적 판을 열었으면 여기서 끝 · 못 서면 같은 액자에 지금 길(mainExec).
        그린 뒤 물러나면(정적 판에서만 못 여는 회차) 보던 회차로 연다 — 주소의 sheetName 만 바꾼다. */
     function printBack(sheet) {
@@ -1631,6 +1646,7 @@
     }
     if (opts.print && printOut(frameEl, opts.print, printBack, opts.hooks || null)) { /* 정적 프린트 판이 열렸다 */ }
     else if (homeQ()) mainHome();   // 홈 표시면 교재 주소가 없어 whoQ 는 늘 null
+    else if (bookMine(src) && outOk(src)) mainMine();   // ⭐ 위 mainMine — 교재 주소가 아니라 whoQ 는 null
     else if (wq) (bookCfFor(src, null, wq) || Promise.resolve(null)).then(function (cf) {   // 📖 판 사본 힌트와 한 지붕(bookCfFor)
       if (!cf) { gpSh('book', 'nocf'); return mainExec(); }   // 🔭 첫 판 사본 힌트 없음 → 통째 구글(위 gpSh)
       var mk = mainBook(src), cold = homeCold();   // ⛔ 아래에서 onfOutUsed 를 지금으로 적기 **전에** 잰다
