@@ -995,6 +995,25 @@ ta('S4i 첫 판 내 문장 물러남 — outFail·hello 없음 → 같은 액자
   }
 });
 
+/* 🧑🏻‍🏫 선생님이 교재를 주소로 바로(봇 링크·새 탭) 연 창의 ☰ 「⭐ 내 문장」(2026-11-20 Peter 「둘 다 고쳐」) — 맨 위 창이 선생님 보기 내 문장 주소(ttok·tas·tsg)로 이 껍데기에 온다.
+   종전: ttok 이면 다 걸러 늘 구글 판(7~12초) → 이름 서명(tsg 43자+)이 실렸으면 학생 첫 판과 같은 정적 /mine/(사본 먼저 읽기만 · 다리가 자격 판정 · 틀리면 outFail → 지금 길).
+   ttok 만·짧은 tsg 는 종전 그대로 지금 길(확인 안 된 이름엔 정적 판을 안 연다 · Ownify _onfBookMineTUrl 과 같은 거름). */
+ta('S4k 선생님 보기 내 문장(ttok+tsg) 첫 판 → 정적 /mine/ · outBoot src 그대로 · outFail → 지금 길 · ttok 만·짧은 tsg → 지금 길', async () => {
+  const TS = MSRC + '&view=' + encodeURIComponent('Nova S1') + '&ttok=c0ffee0123456789&tas=Nova&tsg=' + 'A'.repeat(43);
+  const s = wsetup({ src: TS });
+  assert.strictEqual(s.calls.length, 0, '⛔ 내 문장인데 /who 를 물었다');
+  assert.strictEqual(s.frameEl.src, OUT_MINE, '⛔ 선생님 보기 내 문장(tsg 확인 주소)이 정적 /mine/ 이 아니다(구글 판 7~12초): ' + s.frameEl.src);
+  s.send({ onf: 'outHello' }, s.homeWin, OUT_O);
+  assert.deepStrictEqual(boots(s.homeWin), [[{ onf: 'outBoot', tok: 'TOK', src: TS, cf: null }, OUT_O]], '⛔ outBoot 꼴 — 정적 판이 주소의 ttok·tas·tsg 로 다리를 띄운다');
+  const f = wsetup({ src: TS });
+  f.send({ onf: 'outFail', why: 'bad_arg' }, f.homeWin, OUT_O);
+  assert.strictEqual(f.frameEl.src, TS, '⛔ 다리가 자격을 거절(bad_arg)했는데 지금 길로 안 물러났다');
+  for (const [nm, src] of [['ttok 만', MSRC + '&ttok=X&tas=Nova'], ['짧은 tsg', MSRC + '&ttok=X&tas=Nova&tsg=short'], ['osg 만', MSRC + '&ttok=X&tas=Nova&osg=' + 'A'.repeat(43)]]) {
+    const n = wsetup({ src });
+    assert.strictEqual(n.frameEl.src, src, '⛔ ' + nm + ' — 확인 안 된 선생님 보기 내 문장을 정적 판으로 열었다: ' + n.frameEl.src);
+  }
+});
+
 /* 검토 고침 1 — 첫 판 정적 판의 outQueue 도 남은 쓰기 표시(onfOutPending)로 · 열쇠는 판과 같은 교재 주소(bookSrc 꼴) — 다음에 지금 길 판으로 열 때 넘겨주기가 찾는다.
    첫 판 정적 판이 사는 동안엔 넘겨주기 판을 안 띄운다(한 출처에 정적 판 둘 금지) · 물러난 뒤엔 띄운다. */
 ta('S4g 첫 판 정적 판 outQueue → onfOutPending:<판 교재 주소> · 남의 창·출처는 버림 · n 0 이면 지움', async () => {

@@ -1023,11 +1023,16 @@
       return ok ? v : null;
     }
     /* 🌤 밖으로 1(2026-10-24 · 위 openApp) — 이 판을 정적 판으로 띄우나: 기기 스위치(index.html out · onfOut) · 토큰 · 물러남 기억에 안 막힘(위 fallBlocked 'book' · 까닭별) ·
-       ⭐ 내 문장 선생님 보기(ttok)는 지금 길(4-② 2026-10-29 · 홈 onfOutOf 도 0 이지만 껍데기가 한 번 더 · 선생님 내 문장은 ④) — 내 문장·🗂️ 카드 덱은 홈이 out:1(학생별 스위치)일 때만 여기 온다.
+       ⭐ 내 문장 선생님 보기(ttok)는 이름 서명(tsg)이 실렸을 때만(아래 mineTchOk · 2026-11-20) — 아니면 지금 길(4-② 2026-10-29) — 내 문장·🗂️ 카드 덱은 홈이 out:1(학생별 스위치)일 때만 여기 온다.
        outSeen = 홈이 out:1 로 연 판 주소(아래 preWrite 의 o:1). */
     var outSeen = {};
+    /* 🧑🏻‍🏫 선생님 보기 내 문장은 이름 서명(tsg)이 실린 주소만 정적 /mine/(2026-11-20 Peter 「둘 다 고쳐」 — 선생님이 교재를 **주소로 바로**(봇 링크·새 탭) 연 창에서
+       ☰ 「⭐ 내 문장」을 누르면 맨 위 창이 이 껍데기로 넘어오는데, 종전엔 ttok 이면 다 걸러 늘 구글 판(7~12초)이었다. 선생님 홈 판(teacher/index.html outOk)과 같은 정적 판 ·
+       사본 먼저 읽기만(tv · Ownify #1099) · 다리가 구글과 같은 판정(틀린 자격 = bad_arg → outFail → 지금 길). 교재 ☰ ⭐ 는 서버가 tsg 를 확인한 이름에만 주소를 짓는다(Ownify #1103).
+       ttok 만(tsg 없음) = 종전 그대로 지금 길 — 확인 안 된 이름엔 정적 판을 안 연다. 꼴 = Ownify _onfBookMineTUrl 과 같은 거름. */
+    function mineTchOk(src) { return /[?&]tsg=[A-Za-z0-9_%-]{43,}(&|$)/.test(src); }
     function outOk(src) {
-      if (!opts.out || !opts.tok || (bookMine(src) && /[?&]ttok=/.test(src))) return false;
+      if (!opts.out || !opts.tok || (bookMine(src) && /[?&]ttok=/.test(src) && !mineTchOk(src))) return false;
       return !fallBlocked('book');   // 🔁 위 물러남 기억(까닭별 · 저장소가 막힌 창 = 막힘 — 실패를 못 기억하니 열 때마다 2.5초를 안 낸다)
     }
     /* 🌤 이 열기가 정적 판으로 갈 판인가 · 판 p 가 같은 길인가(검토 고침 1 · 2026-10-24) — 정적 판도 지금 교재와 같은 bookHi swap:1 로 판(board)이 된다.
@@ -1625,7 +1630,7 @@
     var wq = whoQ(src);
     /* ⭐ 첫 판이 내 문장 주소(?mode=mine · 학생 토큰)면 판(bookMake)과 같은 정적 /mine/ 먼저(들어가는 길 점검 2026-11-20) — 종전엔 이 갈래가 없어 늘 구글 판이었다:
        홈 판으로 열면 0.07~0.5초인데, 주소로 바로 열면(교재 ☰ 「⭐ 내 문장」을 교재를 바로 연 창에서 · 새 탭·북마크) 구글 doGet 9~12초(헤드리스 · 구글 부름 7).
-       선생님 보기(ttok)는 outOk 가 거른다(지금 길 그대로) · 안 뜨면(hello 시한·outFail — 끝난 학생 안내 등) 같은 액자에 지금 길 + 물러남 기억(판과 같은 'book').
+       선생님 보기(ttok)는 tsg 가 실렸을 때만(outOk mineTchOk · 2026-11-20 — 교재를 주소로 바로 연 선생님 창의 ☰ ⭐) · 아니면 지금 길 · 안 뜨면(hello 시한·outFail — 끝난 학생 안내 등) 같은 액자에 지금 길 + 물러남 기억(판과 같은 'book').
        mainOut = 정적 판이 첫 판이다(넘겨주기 판을 안 띄운다 — 판 갈래 p.out 과 같은 까닭) · 교재 쓰기 대기열 손(onQ)은 교재 첫 판 몫이라 안 단다. */
     function mainMine() {
       var cold = homeCold();   // ⛔ 아래에서 onfOutUsed 를 지금으로 적기 **전에** 잰다(교재 첫 판 갈래와 같다)
