@@ -1924,5 +1924,10 @@ t('FB4 갈아 끼우기 — 답 전엔 안 보내고(판은 아직 옛 교재) �
   assert.deepStrictEqual(fbOf(bi), [{ onf: 'bookView', fb: 'r7' }], '⛔ 갈아 끼운 판에 「그 회차로」가 안 갔다');
 });
 
+t('📐 caps.sab — 맨 위 창의 홈 막대 몫을 싣는다 · 0 이면 칸 없음 · 잰 칸은 body 에 안 남긴다(학생 껍데기 sabNow 쌍둥이 · 2026-11-20)', () => {
+  const caps = (pb) => { const s = run({ pre: (g) => { g.getComputedStyle = () => ({ paddingBottom: pb }); } }); s.send({ onf: 'bookHello' }, s.home); return { c: JSON.parse(JSON.stringify(s.home.sent.find((x) => x[0].onf === 'caps')[0])), left: s.g.document.body.kids.length }; };
+  const a = caps('34px'); assert.strictEqual(a.c.sab, 34, '⛔ 홈 막대 몫이 caps 에 없다'); assert.strictEqual(a.left, 0, '⛔ 잰 칸이 body 에 남았다');
+  assert.ok(!('sab' in caps('0px').c), '⛔ 0 인데 sab 칸 — 종전 글자가 바뀌었다');
+});
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);
