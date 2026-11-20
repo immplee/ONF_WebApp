@@ -54,8 +54,10 @@
     /* 주소가 이긴다: `?t=`(선생님 링크) → `/i/<토큰>`(아이콘) → 저장된 것.
        ⛔ 찾았으면 **저장까지** 한다. 아이콘으로 처음 열린 앱은 저장소가 비어 있으므로,
          여기서 안 넣으면 앱 안에서 새로고침 한 번에 토큰이 사라진다. */
-    var t = new URLSearchParams(location.search).get('t') || tokenFromPath();
-    if (t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} try { sessionStorage.setItem(TOKEN_KEY, t); } catch (e1) {} return t; }
+    var q = new URLSearchParams(location.search), t = q.get('t') || tokenFromPath();
+    /* 🔒 [2026-11-20 후속 구멍 점검] 선생님 보기 주소(`ttok` 이 실림 — 교재·☰ ⭐ 내 문장 선생님 보기)의 `t` 는 **보는 학생** 토큰이다 —
+       기기 토큰(localStorage)에 넣으면 그 선생님 기기에서 나중에 맨 주소·홈 화면 앱을 열 때 그 학생 홈이 열렸다. 이 탭(sessionStorage · 새로고침)만. */
+    if (t) { if (!q.get('ttok')) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} } try { sessionStorage.setItem(TOKEN_KEY, t); } catch (e1) {} return t; }
     /* 🗂️ [2026-11-04 Peter 「두 학생 홈을 탭 둘에 열고 먼저 연 탭을 새로고침하면 마지막에 연 학생 홈이 뜬다」]
        localStorage 는 **탭끼리 같이 쓴다** — 주소의 토큰은 위에서 지워지니(hideToken) 새로고침한 탭이 마지막에 연 학생 것을 읽었다.
        → 이 탭이 받은 토큰(sessionStorage · 탭마다 따로 · 새로고침엔 남는다)이 먼저 · 없으면(아이콘으로 다시 연 앱·새 탭) 종전 localStorage. */

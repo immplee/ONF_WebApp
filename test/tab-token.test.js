@@ -29,5 +29,12 @@ t('토큰 없는 새 탭(홈 화면 앱 다시 열기 · 북마크) — 종전�
   const C = tab('https://class.ownify.co.kr/');
   assert.strictEqual(C.load(), 'tokBBBBBBBB');
 });
+t('선생님 보기 주소(?t=학생&ttok=…) — 학생 토큰을 이 기기의 「내 토큰」(localStorage)에 안 남긴다 · 이 탭 새로고침은 그대로(2026-11-20 후속 구멍 점검)', () => {
+  const T = tab('https://class.ownify.co.kr/?mode=mine&t=tokSTUDENT01&ttok=c0ffee0123456789&tas=Neo');
+  assert.strictEqual(T.load(), 'tokSTUDENT01');
+  assert.strictEqual(LS.getItem('onfTok'), 'tokBBBBBBBB', '⛔ 선생님 보기 주소의 학생 토큰이 기기 토큰이 됐다 — 나중에 맨 주소를 열면 그 학생 홈');
+  assert.strictEqual(T.load(), 'tokSTUDENT01', '⛔ 선생님 보기 탭 새로고침에 토큰이 사라졌다');
+  assert.strictEqual(tab('https://class.ownify.co.kr/').load(), 'tokBBBBBBBB', '⛔ 다른 새 탭이 선생님이 본 학생 홈을 연다');
+});
 console.log(fail ? `❌ 실패 ${fail} / 통과 ${pass}` : `✅ 통과 ${pass}`);
 if (fail) process.exit(1);
