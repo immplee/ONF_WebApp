@@ -47,7 +47,7 @@ function env(o) {
     matchMedia: () => ({ matches: !!o.reduced }),
     addEventListener: (k, f) => { (L[k] = L[k] || []).push(f); },
     removeEventListener: (k, f) => { L[k] = (L[k] || []).filter((x) => x !== f); },
-    innerWidth: 390, innerHeight: 844,
+    innerWidth: 390, innerHeight: o.vh || 844,
     document: { body, head, createElement: (tag) => mkEl(tag), currentScript: { hasAttribute: (k) => k === 'data-lazy' && !!o.lazy } }
   };
   g.window = g;
@@ -179,6 +179,17 @@ t('홈 + 로고 자리 → 홈 로고 숨김 → 난다(가로·세로 따로 ·
   s.tick(900);
   assert.strictEqual(s.box(), null, '⛔ 통통 뒤 막이 남는다');
   assert.deepStrictEqual(h.user.sent.map((x) => x[0]), ['brandHold', 'brandDone'], '⛔ 걷을 때 홈 로고를 다시 보이라고 안 했다');
+});
+t('📐 로고 세로 자리 = 보이는 키(innerHeight) 가운데 px — 막 상자(배치 창)가 보이는 키보다 커도(iOS 크롬) 그 가운데로 안 내려간다 · 보이는 키가 바뀌면 따라가고 · 날기 시작하면 멈춘다 (Peter 2026-11-20)', () => {
+  const s = env({ vh: 744 }), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box(), lg = box.querySelector('.onf-ld-logo');
+  const resize = (v) => { s.g.innerHeight = v; (s.L.resize || []).slice().forEach((f) => f()); };
+  assert.strictEqual(lg.style.top, '372px', '⛔ 로고가 보이는 키(744)의 가운데가 아니다 — 막 상자(배치 창) 50% 면 크롬에서 주소창 몫 절반만큼 아래에 섰다가 올라간다: ' + lg.style.top);
+  resize(700); assert.strictEqual(lg.style.top, '350px', '⛔ 보이는 키가 바뀌었는데(돌림·창 크기) 안 따라갔다');
+  box.querySelector('.onf-ld-in').rect = { left: 45, top: 325, width: 300, height: 50 };
+  k.ok(); s.tick(600); h.send(BRAND); s.tick(800);
+  assert.strictEqual(lg.anims.length, 1, '난다');
+  resize(600); assert.strictEqual(lg.style.top, '350px', '⛔ 나는 중에 자리를 바꿨다(애니메이션 시작점이 튄다)');
+  assert.strictEqual((s.L.resize || []).length, 0, '⛔ 날기 시작했는데 resize 손을 안 뗐다');
 });
 t('PC 글자 이름(k=text) → 통통 뒤 홈 글자를 먼저 보이고 겹친 로고를 살짝 걷는다', () => {
   const s = env(), h = homeFrame(s), k = s.g.ONF.load.bind(h.fr, { home: true }), box = s.box();
