@@ -736,6 +736,7 @@
         var cp = { onf: 'caps', book: 1, phone: opts.phone ? 1 : 0 };
         if (BOOK_SW) cp.swap = 1;
         cp.pri = 1;   // 🏷 bookWarm{pri} 몫을 안다(위 bookRoom 한 지붕 · 2026-11-16) — 홈은 이 표시가 있을 때만 pri 를 싣는다
+        var sb = sabNow(); if (sb) cp.sab = sb;   // 📐 홈 막대 몫(위 sabNow)
         try { ev.source.postMessage(cp, ev.origin); } catch (eC) {}
         if (TAB0) { try { ev.source.postMessage({ onf: 'homeTab', v: TAB0 }, ev.origin); } catch (eT) {} TAB0 = ''; }   // 🔄 새로고침 전에 고른 홈 탭(아래 TAB0) — 홈이 처음 노크할 때 한 번
         return;
@@ -1211,6 +1212,13 @@
     /* 홈 탭도 같다(Peter 2026-10-24 「탭을 고르고 새로고침하면 무조건 홈」) — 홈이 탭을 바꿀 때 homeTab 으로 알리면 이 탭에 적고, 다시 읽히면 홈의 첫 노크(bookHello)에 돌려준다.
        ⛔ 돌려줄 값은 **읽힐 때 한 번** 잡아 둔다(TAB0) — 홈이 뜨자마자 처음 그린 탭(오늘)을 먼저 알리면 적힌 값이 그걸로 덮인다. */
     var TAB_KEY = 'onfHomeTab', TAB0 = (function () { try { return global.sessionStorage.getItem(TAB_KEY) || ''; } catch (e) { return ''; } })();
+    /* 📐 아이폰 홈 막대(밑 가로줄) 몫 px — 홈은 액자 안이라 env(safe-area-inset-bottom) 가 0 일 수 있다 → 맨 위 창(껍데기)에서 재서 caps 에 sab 로 싣는다(Ownify ONF_Dash_Engine --onf-sab · 아래 탭 막대 · 2026-11-20). 0 이면 칸 없음(종전 글자 그대로) */
+    function sabNow() {
+      var d = global.document, gcs = global.getComputedStyle; if (!d || !d.body || typeof gcs !== 'function') return 0;
+      var el = d.createElement('div'), v = 0; el.style.cssText = 'position:fixed;left:0;bottom:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-bottom:env(safe-area-inset-bottom,0px)';
+      try { d.body.appendChild(el); v = Math.round(parseFloat(gcs(el).paddingBottom) || 0); } catch (e) {} try { d.body.removeChild(el); } catch (e2) {}
+      return v > 0 && v <= 60 ? v : 0;
+    }
     function rsMark(p, href, out) { if (!p) return; p.href = href; p.hout = out ? 1 : 0; rsH[p.key] = { h: href, o: p.hout }; rsSave(p); }
     /* 🔙 판 사슬(2026-11-11 Peter 「뒤로는 켠 순서 역순으로 하나씩」 · ⚠️ 쌍둥이: teacher/index.html rsLow — 정본 주석은 그쪽) — 보이는 판 밑 판들(u · 아래 것부터 · 상한 BOOK_MAX-1)도 적는다.
        차례 = 기록 칸 그대로(rsRun) · 주소 = 그 판 번호로 연 링크(rsH) · b = 내 back 이 바로 밑 판. 맨 위가 이 판 줄이 아니면 앞서 적은 사슬(p.rsU) 그대로. */

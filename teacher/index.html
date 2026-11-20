@@ -1829,6 +1829,13 @@ function rsWin() {
 function rsWinMine() { var w = rsWin(); return w === '' || w.indexOf('.s.') === 0; }   // mount 때 되살리기·덮개를 타는 창(홈 · 주소로 연 학생 창)
 /* 홈 탭도(학생 껍데기 TAB0 와 같다) — 돌려줄 값은 읽힐 때 한 번 잡는다(홈이 처음 그린 오늘 탭이 먼저 와서 덮지 않게) */
 var TAB_KEY = 'onfThHomeTab', TAB0 = (function () { try { return sessionStorage.getItem(TAB_KEY) || ''; } catch (e) { return ''; } })();
+/* 📐 아이폰 홈 막대(밑 가로줄) 몫 px — 홈은 액자 안이라 env(safe-area-inset-bottom) 가 0 일 수 있다 → 맨 위 창(껍데기)에서 재서 caps 에 sab 로 싣는다(Ownify ONF_Dash_Engine --onf-sab · 아래 탭 막대 · 2026-11-20). 0 이면 칸 없음(종전 글자 그대로) · 쌍둥이 = assets/onf-frame.js sabNow */
+function sabNow() {
+  if (!document.body || typeof getComputedStyle !== 'function') return 0;
+  var el = document.createElement('div'), v = 0; el.style.cssText = 'position:fixed;left:0;bottom:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-bottom:env(safe-area-inset-bottom,0px)';
+  try { document.body.appendChild(el); v = Math.round(parseFloat(getComputedStyle(el).paddingBottom) || 0); } catch (e) {} try { document.body.removeChild(el); } catch (e2) {}
+  return v > 0 && v <= 60 ? v : 0;
+}
 function rsMark(p, href, out, cf) { if (!p) return; href = (fbAsk(href) && bookStrip(String(href), ['fbrd'])) || href;   /* ✏️ fbrd 는 한 번 쓰는 말 — 새로 고침 기억에 안 남긴다 */ p.href = href; p.hout = out ? 1 : 0; p.hcf = bookCfOk(cf); rsH[p.key] = { h: href, o: p.hout, c: p.hcf }; rsSave(p); }   // 📖 hcf = 홈이 실은 사본 힌트(밖으로 7 · 2026-11-01) — 되살린 정적 판도 Worker /book/boot(없으면 다리 3.5초 · 5단계에 남긴 틈)   // 🌤 hout = 홈이 out:1 로 연 판(되살릴 때 같은 길 · 학생 껍데기 rsMark 쌍둥이 · 2026-10-28)
 /* 🔐 교재 판 기억 = **그 선생님** 것(Peter 2026-11-08 「로그아웃해도 마지막에 연 교재 기억이 남는다」) — 기억 주소엔 학생 토큰이 들어 있다.
    같은 탭에서 다른 계정으로 들어오면(다른 계정으로 로그인 · 입장권 바뀜) 그 교재가 열렸다 → 적을 때 지금 신원(이메일)을 같이 적고, 되살릴 때 다르거나 모르면 버린다.
@@ -2133,6 +2140,7 @@ window.addEventListener('message', function (ev) {
       var cp = { onf: 'caps', book: 1, phone: BOOK_PH ? 1 : 0 };
       if (BOOK_SW) cp.swap = 1;
       cp.pri = 1;   // 🏷 bookWarm{pri} 몫을 안다(위 bookRoom 한 지붕 · 2026-11-16) — 홈은 이 표시가 있을 때만 pri 를 싣는다(모르는 껍데기엔 종전 글자 그대로)
+      var sb = sabNow(); if (sb) cp.sab = sb;   // 📐 홈 막대 몫(위 sabNow)
       try { ev.source.postMessage(cp, ev.origin); } catch (e) {}
       if (TAB0) { try { ev.source.postMessage({ onf: 'homeTab', v: TAB0 }, ev.origin); } catch (eT) {} TAB0 = ''; }   // 🔄 새로고침 전에 고른 홈 탭(아래 TAB0)
       if (!bookHome) { bookHome = ev.source; bookHomeOrigin = ev.origin; }   // 판 소식(bookPerf·bookClosed)을 받을 홈 — 되살린 판은 홈보다 먼저 떴다(mount rsBoot)

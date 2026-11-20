@@ -1916,5 +1916,11 @@ t('SF10 못 연 판(안내)을 새로 바꿔도 몫은 그대로', () => {
   assert.ok(nb && s.obj(nb) && s.obj(nb).pri === 4, '⛔ 못 연 판을 바꾼 새 판이 몫(focus)을 잃었다: ' + (nb && s.obj(nb) && s.obj(nb).pri));
 });
 
+t('📐 caps.sab — 맨 위 창의 홈 막대 몫(env safe-area-inset-bottom)을 싣는다 · 0 이면 칸 없음(종전 글자) · 잰 칸은 body 에 안 남긴다(Ownify 아래 탭 막대 · 2026-11-20)', () => {
+  const caps = (pb) => { const s = setup(null, { pre: (g) => { g.getComputedStyle = () => ({ paddingBottom: pb }); } }); s.send({ onf: 'bookHello' }, s.homeInner); return { c: js(s.homeInner.sent.find((x) => x[0].onf === 'caps')[0]), left: s.body.kids.filter((k) => !k.className).length }; };
+  const a = caps('34px'); assert.strictEqual(a.c.sab, 34, '⛔ 홈 막대 몫이 caps 에 없다 — 홈 안 아래 탭 막대가 홈 막대에 걸친다'); assert.strictEqual(a.left, 0, '⛔ 잰 칸이 body 에 남았다');
+  assert.ok(!('sab' in caps('0px').c), '⛔ 0 인데 sab 칸 — 종전 글자가 바뀌었다');
+  assert.ok(!('sab' in caps('400px').c), '⛔ 말이 안 되는 값(60 넘음)을 실었다');
+});
 console.log(`\n${pass}개 통과, ${fail}개 실패`);
 process.exit(fail ? 1 : 0);
