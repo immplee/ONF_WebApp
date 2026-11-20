@@ -1237,6 +1237,13 @@ window.addEventListener('message', function (ev) {
   if (d.onf === 'printTitle') { if (window.ONF && ONF.frame && ONF.frame.printTitle) ONF.frame.printTitle(d.t); return; }
   if (d.onf === 'bookClose') { hwViewSet('photo'); hwTellView(); }
 });
+/* 📤 과제 판 → 홈 「본 파일」(hwSaw) — 아는 칸만 넘긴다: 학생 토큰 t(200자 안) · 파일 id 목록(50개 · 각 200자 안 · 글자꼴 [\w-]) · 홈(appWin)이 없으면 버린다.
+   새 파일인지·내 학생인지는 홈이 가리고 서버가 다시 본다(onfTeacherHwSeen). */
+function hwSawRelay(d) {
+  var t = typeof d.t === 'string' && d.t.length <= 200 ? d.t : '', ids = Array.isArray(d.ids) ? d.ids.filter(function (x) { return typeof x === 'string' && /^[\w-]{10,200}$/.test(x); }).slice(0, 50) : [];
+  if (!t || !ids.length || !appWin) return;
+  try { appWin.postMessage({ onf: 'hwSaw', t: t, ids: ids }, appOrigin); } catch (e) {}
+}
 function hwClose() {
   hwFbNext = null;   // 📚 「지난 수업 자료 열기」 범위는 그 판이 떠 있는 동안만
   var hwShown = false; try { hwShown = !!(hwBox && !hwWarmOn); } catch (eS) {}   // 👆 보이던 판을 걷으면 초점을 밑(교재 판·홈)으로 — 끝에서
@@ -1330,6 +1337,7 @@ window.addEventListener('message', function (ev) {
     if (d.onf === 'hwPenOp' && (d.op === 'undo' || d.op === 'redo') && hwBk && hwBk.win) { try { hwBk.win.postMessage({ onf: 'penRelay', op: d.op }, hwBk.origin); } catch (e) {} }   // ↩️ 펜 줄 ↩︎·↪︎ 가 옆 교재 차례 — 교재가 되돌린다(Peter 2026-10-30 4차 「교재에 필기하고 나면 되돌리기가 안 돼」)   // 📖 옆에 = 위 줄·펜 줄 띠 높이(0 = 종전 배치)
     if (d.onf === 'hwbookLesson') { hwLessonGo(d); return; }   // 📚 발음 피드백 「M/D 수업 자료 열기」 — 같은 학생 그 수업 자료로 · 열린 뒤 그 범위 녹음으로 시작 창(2026-11-08)
     if (d.onf === 'hwFbAsk') { hwFbAskAns(); return; }
+    if (d.onf === 'hwSaw') { hwSawRelay(d); return; }   // 📤 과제 판에서 본 사진·녹음 → 홈이 새 파일만 골라 확인(2026-11-20 Peter 「확인을 안 눌러도 보거나 듣고 피드백을 주면 자동 확인」)
     if (d.onf === 'hwFb') hwFbRelay(d);   // 🎧 발음 피드백 목록 → 옆 교재(2026-11-06 2단계)
     if (d.onf === 'hwPen') hwPenRelay(d);   // 📖 펜 줄 하나 — 과제 판 도구를 옆 교재로(⑬)   // 📖 교재 옆에 · 교재만 · 사진만(과제 첨삭 5단계)
     return;
