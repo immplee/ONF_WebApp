@@ -1792,6 +1792,14 @@
       MCH.onmessage = function (e) { var o = e && e.data; if (!o || o.k !== 'beat') return; monAt = Date.now(); monK = String(o.key || ''); monTellFr(); };
       monPost({ k: 'who' });
     }
+    /* 🖥️ 맨 위 화면이 바뀜(Peter 2026-11-23 「확장 창이 모든 페이지를 따라다니되 보이면 안 되는 페이지는 로고만」) — 선생님 껍데기 focusTop 이 부른다.
+       win = 새 맨 위 판(교재·과제 판) → 그 판에 {onf:'monTop'}(판이 보여도 되면 monGo · 로고 화면이면 monIdle — 판 몫 ONF_Present _monTick) ·
+       win 없음 = 선생님 홈이 맨 위 → 모니터 창이 지금 보이는 화면(beat key)을 로고로(idle). 모니터 창 소리가 6초 안에 없으면 아무것도 안 한다. */
+    global.onfMonTop = function (win, origin) {
+      if (!MCH || monIs || !monAt || Date.now() - monAt > 6000) return;
+      if (win) { try { win.postMessage({ onf: 'monTop' }, origin || '*'); } catch (e) {} return; }
+      if (monK) monPost({ k: 'idle', key: monK });
+    };
     onMon._onfFs = true;   // 늘 듣는 귀(위 onFs 와 같다)
     global.addEventListener('message', onMon);
     if (canMon() && typeof scr.addEventListener === 'function') scr.addEventListener('change', function () { monTell(); });
