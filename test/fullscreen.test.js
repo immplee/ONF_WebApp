@@ -193,6 +193,18 @@ t('창 소리가 없으면(모니터 창 없음) monState 없음 — 판이 갈�
   s.send({ onf: 'monitorHello' }, book, OUT);
   assert.ok(!book.got.some((x) => x[0].onf === 'monState'));
 });
+t('🖥️ onfMonTop(2026-11-23 Peter 「모든 페이지 따라가기 · 보이면 안 되는 페이지는 로고」) — 홈이 맨 위 = 창이 보이는 화면을 로고 · 판이 맨 위 = 그 판에 monTop · 창 소리 없으면 아무것도', () => {
+  const p = monPair(), book = p.t.frame(p.t.g);
+  assert.strictEqual(typeof p.t.g.onfMonTop, 'function', '⛔ 껍데기에 onfMonTop 이 없다(focusTop 이 부른다)');
+  const stray = p.t.frame(p.t.g); p.t.g.onfMonTop(stray); assert.ok(!stray.got.some((x) => x[0].onf === 'monTop'), '⛔ monHello 안 한 판(출처 모름)에 보냈다');
+  p.t.send({ onf: 'monitorHello' }, book, OUT); p.t.g.onfMonTop(book); assert.deepStrictEqual(last(book), [{ onf: 'monTop' }, OUT], '⛔ 맨 위가 된 판에 안 알렸다(그 판 출처로)');
+  p.t.g.onfMonTop(null); const c = p.TO.filter((x) => x[1] === 1500).pop(); assert.ok(c, '⛔ 홈이 맨 위인데 로고 시계가 없다'); c[0]();
+  assert.strictEqual(p.app.length, 1, '⛔ 홈이 맨 위인데 모니터에 마지막 교재가 남았다');
+  const s = env(), b2 = s.frame(s.g); s.send({ onf: 'monitorHello' }, b2, OUT); s.g.onfMonTop(b2); s.g.onfMonTop(null);
+  assert.ok(!b2.got.some((x) => x[0].onf === 'monTop'), '⛔ 모니터 창이 없는데 판에 말했다');
+  const T = fs.readFileSync(path.join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
+  assert.ok(/function focusTop\(\)[^\n]*\n[^\n]*onfMonTop\(el === frame \? null : el\.contentWindow\)/.test(T), '⛔ 선생님 껍데기 focusTop 이 맨 위 바뀜을 안 알린다');
+});
 console.log(`${pass}개 통과, ${fail}개 실패`);
 if (fail) process.exit(1);
 })();
