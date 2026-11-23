@@ -854,7 +854,7 @@ function hwShape(f, hwt, au, rs, fb) {
   var a = au && /^\d{4}-\d{2}-\d{2}$/.test(String(au.d || '')) && Number(au.at) >= 0 && Number(au.at) < 1e14 ? { d: String(au.d), at: Number(au.at) } : null;   // 🎧 들으며 필기 — 그 녹음(날짜 · 올린 시각)을 띄운 판(4단계 · 2026-10-24)
   var o = { f: files, hwt: tk, a: a };
   if (rs) o.rs = 1;
-  if (fb && typeof fb === 'object' && typeof fb.rd === 'string' && /^[a-z0-9]{0,32}$/.test(fb.rd)) o.fb = { rd: fb.rd };   // ✏️ 피드백 회차(판 HB_FBGO · 꼴만 통과 — 회차 id [a-z0-9] · '' = 옛 묶음)   // 🔄 새로 고침 되살리기 — 없으면 판은 처음 쪽·사진만(닫았다 다시 연 판이 옛 자리로 튀지 않게 · 2026-11-08 검토 ④)
+  if (fb && typeof fb === 'object' && typeof fb.rd === 'string' && /^[a-z0-9]{0,32}$/.test(fb.rd)) { o.fb = { rd: fb.rd }; if (/^[a-z0-9]{4,32}$/.test(String(fb.i || ''))) o.fb.i = String(fb.i); }   // 📷 i = 그 회차 안 그 줄(선생님 홈 피드백 줄 톡 → 판이 그 자리로 · 2026-11-23)   // ✏️ 피드백 회차(판 HB_FBGO · 꼴만 통과 — 회차 id [a-z0-9] · '' = 옛 묶음)   // 🔄 새로 고침 되살리기 — 없으면 판은 처음 쪽·사진만(닫았다 다시 연 판이 옛 자리로 튀지 않게 · 2026-11-08 검토 ④)
   return o;
 }
 function hwWarm(t) {
