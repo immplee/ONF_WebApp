@@ -205,6 +205,17 @@ t('🖥️ onfMonTop(2026-11-23 Peter 「모든 페이지 따라가기 · 보이
   const T = fs.readFileSync(path.join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
   assert.ok(/function focusTop\(\)[^\n]*\n[^\n]*onfMonTop\(el === frame \? null : el\.contentWindow\)/.test(T), '⛔ 선생님 껍데기 focusTop 이 맨 위 바뀜을 안 알린다');
 });
+t('🖥️ 로고 갇힘 되살리기(2026-11-25 Peter 「원본 창을 켜면 확장 창에 로고만」) — 덮인 창 박자에 cov · 선생님 껍데기가 판에 monState cov:1 · go 로 걷히면 cov 없음', () => {
+  const p = monPair(), book = p.t.frame(p.t.g), A = 'https://script.ownify.co.kr/?t=T1&mode=share&fileId=A&ext=1';
+  p.t.send({ onf: 'monitorHello' }, book, OUT);
+  p.t.send({ onf: 'monIdle', url: A, why: 'end' }, book, OUT); p.TO.filter((x) => x[1] === 1500).pop()[0]();
+  assert.strictEqual(p.app.length, 1, '⛔ 로고를 안 덮었다');
+  assert.deepStrictEqual(last(book), [{ onf: 'monState', key: 'share|A|T1', cov: 1 }, OUT], '⛔ 덮인 창이 그 사실을 안 알렸다(판이 걷을 수 없다 — 로고에 영영 갇힘)');
+  p.t.send({ onf: 'monGo', url: A }, book, OUT);
+  assert.deepStrictEqual(last(book), [{ onf: 'monState', key: 'share|A|T1' }, OUT], '⛔ 걷힌 뒤에도 덮였다고 알린다');
+  p.t.g.onfMonTop(null); p.TO.filter((x) => x[1] === 1500).pop()[0]();
+  assert.deepStrictEqual(last(book), [{ onf: 'monState', key: 'share|A|T1', cov: 1 }, OUT], '⛔ 홈이 덮은 뒤 cov 가 안 실렸다');
+});
 console.log(`${pass}개 통과, ${fail}개 실패`);
 if (fail) process.exit(1);
 })();
