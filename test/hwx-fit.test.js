@@ -55,6 +55,13 @@ t('숫자 기록 — 바뀔 때만 · 0.8초 모아서 · perf hwvp:… · 값�
   for (let i = 0; i < 20; i++) { r.sb.innerHeight = 1000 + i; r.L.resize(); r.timers.splice(0).forEach((f) => f()); }
   assert.ok(r.beacons.length <= 8, '⛔ 기록이 끝없이 간다: ' + r.beacons.length);
 });
+t('⛔ 보이는 칸이 창보다 15% 넘게 작으면 안 믿는다(Peter 2026-11-25 「확장 화면이 반으로 잘려 위에만 작게 · 아래 불러오는 중」 · 실기기 clog 3008×1560 에 보이는 높이 394·669·892) — 액자는 창 그대로 · 기록엔 받은 값', () => {
+  for (const vh of [394, 669, 892]) {
+    const r = run({ W: 3008, H: 1560, vv: { height: vh }, safe: [32, 0, 28, 0], fs: true });
+    assert.deepStrictEqual([r.props['--hwx-t'], r.props['--hwx-h'], r.props['--hwx-w']], ['32px', (1560 - 32 - 28 - 132) + 'px', '3008px'], '⛔ 보이는 높이 ' + vh + ' 를 믿어 액자가 위쪽만 남았다');
+    r.timers.forEach((f) => f()); assert.ok(r.beacons[0][1][0].c.startsWith('hwvp:3008,1560,3008,' + vh + ','), '⛔ 기록이 받은 값을 안 남긴다 — 다음 원인 찾기가 막힌다');
+  }
+});
 t('📺 TV 위 띠(실기기 기록 3008×1560 · 안전 위 32·아래 28 · 전체 화면) — 16:9 로 셈한 띠 132px 만큼 아래를 비워 TV 기준 가운데', () => {
   const r = run({ W: 3008, H: 1560, safe: [32, 0, 28, 0], fs: true });
   assert.deepStrictEqual([r.props['--hwx-t'], r.props['--hwx-h']], ['32px', (1560 - 32 - 28 - 132) + 'px'], '⛔ 창 안 가운데 = TV 로는 아래로 쏠린다');

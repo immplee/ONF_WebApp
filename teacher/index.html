@@ -981,9 +981,13 @@ if (new URLSearchParams(location.search).get('mode') === 'hwext') (function () {
     var cs = pr ? getComputedStyle(pr) : null, st = cs ? px(cs.paddingTop) : 0, sr = cs ? px(cs.paddingRight) : 0, sb = cs ? px(cs.paddingBottom) : 0, sl = cs ? px(cs.paddingLeft) : 0;
     var W = window.innerWidth || 0, H = window.innerHeight || 0, vv = window.visualViewport, z1 = !vv || Math.abs((vv.scale || 1) - 1) < 0.01;
     var vw = vv && z1 ? Math.min(W, Math.round(vv.width)) : W, vh = vv && z1 ? Math.min(H, Math.round(vv.height)) : H, vt = vv && z1 ? Math.max(0, Math.round(vv.offsetTop)) : 0, vl = vv && z1 ? Math.max(0, Math.round(vv.offsetLeft)) : 0;
-    de.style.setProperty('--hwx-l', (vl + sl) + 'px'); de.style.setProperty('--hwx-t', (vt + st) + 'px');
+    /* ⛔ 보이는 칸이 창보다 15% 넘게 작으면 안 믿는다(Peter 2026-11-25 「확장 화면이 반으로 잘려 위쪽에만 작게 뜨고 아래에 불러오는 중」) — 모니터에 옮긴 아이패드 창이
+       보이는 칸 높이를 394·669·892(창 1560)로 잘못 알렸다(clog hwvp 11-18·11-25) · 액자가 그 높이로 줄어 위에만 그려지고 아래로 껍데기 「불러오는 중」이 비쳤다.
+       실기기 기록 61줄 중 맞는 차이는 0 — 확장 창엔 키보드도 없다. ponytail: 85% 문턱 — 맞는 큰 차이가 생기면 그때 다시. */
+    var ok = vw >= W * 0.85 && vh >= H * 0.85, fw = ok ? vw : W, fh = ok ? vh : H, ft = ok ? vt : 0, fl = ok ? vl : 0;   // 기록(hwvp)엔 받은 값 그대로
+    de.style.setProperty('--hwx-l', (fl + sl) + 'px'); de.style.setProperty('--hwx-t', (ft + st) + 'px');
     var fs = document.fullscreenElement || document.webkitFullscreenElement ? 1 : 0, band = tvBand(W, H, fs);
-    de.style.setProperty('--hwx-w', Math.max(0, vw - sl - sr) + 'px'); de.style.setProperty('--hwx-h', Math.max(0, vh - st - sb - band) + 'px');
+    de.style.setProperty('--hwx-w', Math.max(0, fw - sl - sr) + 'px'); de.style.setProperty('--hwx-h', Math.max(0, fh - st - sb - band) + 'px');
     var sc = window.screen || {}, k = [W, H, vw, vh, vt, st, sb, sl, sr, fs, sc.width || 0, sc.height || 0, window.screenY || 0, band].join(',');
     if (k !== last && n < 8) { last = k; clearTimeout(tm); tm = setTimeout(function () { n++; hwvpLog(k); }, 800); }
     de.classList.add('onf-hwx');   // 값을 다 단 뒤에 켠다(반쯤 단 값으로 액자가 0 이 되지 않게)
