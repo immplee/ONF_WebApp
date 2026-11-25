@@ -1761,35 +1761,37 @@
          {k:'idle', key} = 지금 보이는 화면의 선생님 판이 떠났다 → 1.5초 뒤 로고만(쉬는 시간에 학생 교재가 모니터에 남지 않게 · 그 사이 go 가 오면 안 덮음).
        ▸ 선생님 껍데기: beat 를 들으면 monHello 한 판들에 {onf:'monState', key} · 판의 monGo/monIdle 을 채널로 옮긴다(주소 검사 extOk).
          어느 판이 언제 갈아타기를 부를지는 판(Ownify ONF_Present_Html _monTick)이 정한다 — 여기는 나르기만. */
-    var MCH = null, monIs = !!(global.location && /[?&]ext=1(&|$)/.test(global.location.search)), monFr = [], monAt = 0, monK = '';
+    var MCH = null, monIs = !!(global.location && /[?&]ext=1(&|$)/.test(global.location.search)), monFr = [], monAt = 0, monK = '', monCov = false, monLogs = 0;
     function monKey(u) { try { var p = new URL(String(u), global.location ? global.location.href : 'https://class.ownify.co.kr/').searchParams; return [p.get('mode') || 'book', p.get('fileId') || p.get('s') || '', p.get('t') || ''].join('|'); } catch (e) { return ''; } }
     function monPost(o) { try { if (MCH) MCH.postMessage(o); } catch (e) {} }
-    function monTellFr(a) { if (!monAt || Date.now() - monAt > 6000) return; (a ? [a] : monFr).forEach(function (x) { try { x.win.postMessage({ onf: 'monState', key: monK }, x.origin); } catch (e) {} }); }
+    function monTellFr(a) { if (!monAt || Date.now() - monAt > 6000) return; var m = monCov ? { onf: 'monState', key: monK, cov: 1 } : { onf: 'monState', key: monK }; (a ? [a] : monFr).forEach(function (x) { try { x.win.postMessage(m, x.origin); } catch (e) {} }); }   // cov = 창이 그 화면 그대로 로고에 덮여 있다(판이 앞에 보이면 걷는다 · ONF_Present _monHeal)
+    function monLog(c) { if (monLogs >= 8) return; monLogs++; whoBeacon({ k: 'perf', c: String(c).slice(0, 60) }); }   // 🔭 누가 로고를 씌웠나(2026-11-25 Peter 「원본 창을 켜면 확장 창에 로고만」 — 실기기에서만 난다) · 한 창 8줄
     function monMsg(d, ev) {
       if (d.onf === 'monHello') { var a = { win: ev.source, origin: ev.origin }; if (!monFr.some(function (x) { return x.win === ev.source; })) monFr.push(a); monTellFr(a); return; }
       if (!extOk(d.url)) return;
       if (d.onf === 'monGo') monPost({ k: 'go', url: String(d.url) });
-      else monPost({ k: 'idle', key: monKey(d.url) });
+      else monPost({ k: 'idle', key: monKey(d.url), why: String(d.why || '?').slice(0, 12) });
     }
     try { if (typeof BroadcastChannel === 'function') MCH = new BroadcastChannel('onf-mon'); } catch (e) {}
     if (MCH && monIs) {
       var myKey = monKey(global.location.href), cov = null, covT = 0;
-      var beat = function () { monPost({ k: 'beat', key: myKey }); };
-      var uncover = function () { clearTimeout(covT); covT = 0; if (cov) { cov.remove(); cov = null; } };
+      var beat = function () { monPost(cov ? { k: 'beat', key: myKey, cov: 1 } : { k: 'beat', key: myKey }); };   // cov = 로고에 덮여 있다 — 이 화면 판이 앞에 보이면 걷어 간다(갇힘 되살리기 · 2026-11-25)
+      var uncover = function () { clearTimeout(covT); covT = 0; if (cov) { cov.remove(); cov = null; monLog('monuncov'); } };
       MCH.onmessage = function (e) {
         var o = e && e.data; if (!o || typeof o !== 'object') return;
         if (o.k === 'who') { beat(); return; }
         if (o.k === 'go' && extOk(o.url)) { uncover(); if (monKey(o.url) === myKey) beat(); else try { global.location.replace(String(o.url)); } catch (x) {} return; }
-        if (o.k === 'idle' && o.key === myKey && !cov && !covT) covT = setTimeout(function () {
+        if (o.k === 'idle' && o.key === myKey && !cov && !covT) { var why = String(o.why || '?').slice(0, 12); covT = setTimeout(function () {
           covT = 0; cov = doc.createElement('div'); cov.id = 'onfMonIdle';
           cov.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#1d1916;display:flex;align-items:center;justify-content:center;pointer-events:none';
           cov.innerHTML = '<img src="/assets/icon/onf-512.png" alt="" style="width:128px;height:128px;border-radius:28px;opacity:.9">';
           (doc.body || doc.documentElement).appendChild(cov);
-        }, 1500);
+          monLog('moncov ' + why); beat();   // 바로 알린다 — 판이 앞에 보이면 2초 박자를 안 기다리고 걷는다
+        }, 1500); }
       };
       beat(); global.setInterval(beat, 2000);
     } else if (MCH) {
-      MCH.onmessage = function (e) { var o = e && e.data; if (!o || o.k !== 'beat') return; monAt = Date.now(); monK = String(o.key || ''); monTellFr(); };
+      MCH.onmessage = function (e) { var o = e && e.data; if (!o || o.k !== 'beat') return; monAt = Date.now(); monK = String(o.key || ''); monCov = !!o.cov; monTellFr(); };
       monPost({ k: 'who' });
     }
     /* 🖥️ 맨 위 화면이 바뀜(Peter 2026-11-23 「확장 창이 모든 페이지를 따라다니되 보이면 안 되는 페이지는 로고만」) — 선생님 껍데기 focusTop 이 부른다.
@@ -1798,7 +1800,7 @@
     global.onfMonTop = function (win) {
       if (!MCH || monIs || !monAt || Date.now() - monAt > 6000) return;
       if (win) { var a = monFr.filter(function (x) { return x.win === win; })[0]; if (a) try { a.win.postMessage({ onf: 'monTop' }, a.origin); } catch (e) {} return; }   // 출처 = 그 판이 monHello 로 알린 것(⛔ '*' 발신 금지 — 출처 자물쇠)
-      if (monK) monPost({ k: 'idle', key: monK });
+      if (monK) monPost({ k: 'idle', key: monK, why: 'home' });
     };
     onMon._onfFs = true;   // 늘 듣는 귀(위 onFs 와 같다)
     global.addEventListener('message', onMon);
