@@ -517,6 +517,14 @@ var frameWatch = null;
    그린 뒤 화면 노크(auth-please)는 위 onf-knock 이 받는다 — 정적 판 창(직접 자식 · 그 출처)이면 답이 구글 토큰이 아니라 입장권(answer · appTch).
    ponytail: 시한 둘은 짐작(판 boot 4초 · /t/home/get 4초에 맞춤)·첫 실패 면제(학생 cold) 없음 — 라이브 재기로 고친다. */
 var tOut = null, TOUT_HELLO_MS = 3000, TOUT_PAINT_MS = 8000, TOUT_EXT_MS = 15000;   // 🖥️ 확장 판 첫 보기 시한(Worker 4초 → 다리 8초)
+/* 📱 구글 토큰 없는 기기(gNone · 폰·아이패드 WebKit·열쇠 꺼짐 — devkeyOff · 이 페이지에 구글 토큰 pending 없음)는 정적 판(선생님 홈·과제 판·확장 창)이 물러나면 갈 곳이
+   로그인 화면(gate)뿐이다 — 「망이 느려 시한 안에 안 섰다」만으로 로그인을 띄우고, 그 물러남 기억(10분·1시간)으로 다음 열기도 로그인부터였다
+   (Peter 아이폰 크롬 2026-11-26 15:58 clog: tcf:*:time 줄줄이 → fallback:hwbook:hello:1·2 → sh:hwbook:blocked → 「수업 자료」 로그인 창).
+   ⇒ 그런 기기는 시한을 세 배로 기다리고(outWait) · 시한 넘김·망(outSlow)으로 물러나도 기억은 안 남긴다(다음 열기는 다시 정적 판) ·
+   판이 스스로 못 연다고 한 것(입장권 거절·익명 다리 꺼짐 등 outFail)은 종전대로 기억하고 로그인으로 — 그건 로그인이 맞다. */
+function gNone() { return !pending && devkeyOff(); }
+function outWait(ms) { return gNone() ? ms * 3 : ms; }
+function outSlow(why) { return gNone() && /^(hello|paint|fail-time|fail-net)$/.test(String(why)); }
 function tOutLive() { return tOut && !tOut.gone ? tOut.org : ''; }   // 살아 있는 정적 먼저의 판 출처 · 없으면 ''
 /** 미리 받은 사본(머리 tPre) 약속 — 한 번만 · 같은 입장권일 때만 · 없으면 null. 꺼낸 뒤 잡고 있지 않는다(학생 열쇠가 든 답) */
 function tPreTake(tk) {
@@ -548,7 +556,7 @@ function tOutOpen(fallback, LD) {
     if (me.gone || me.drawn) return;
     me.gone = true; clearTimeout(tm); window.removeEventListener('message', onMsg);
     if (typeof reopenLog === 'function') reopenLog((ext ? 'hwext-' : 'tout-') + why);
-    ONF.frame.fallBack(key, why);   // 🔁 물러남 기억 한 곳(onf-frame.js · 까닭별 · clog fallback:thome:<까닭>:<연속>)
+    if (!outSlow(why)) ONF.frame.fallBack(key, why);   // 📱 위 outSlow · 🔁 물러남 기억 한 곳(onf-frame.js · 까닭별 · clog fallback:thome:<까닭>:<연속>)
     console.info('[onf] 정적 선생님 홈이 안 떴다 — 지금 길로 다시');
     if (appTch) { appWin = null; appOrigin = ''; appTch = false; }
     fallback();
@@ -559,7 +567,7 @@ function tOutOpen(fallback, LD) {
     if (d.onf === 'outFail') return back('fail-' + (/^[a-z]{1,10}$/.test(d.why) ? d.why : 'x'));
     if (ext && d.onf === 'outHello') {   // 🖥️ 확장 판은 노크(auth-please)로 입장권을 받는다(답은 아래 노크 손) — outBoot 없음 · 첫 보기까지 시계(Worker 4초 + 다리 8초 + 여유)
       if (!tchGet()) return back('notch');
-      if (!me.drawn) { clearTimeout(tm); tm = setTimeout(function () { back('paint'); }, TOUT_EXT_MS); }
+      if (!me.drawn) { clearTimeout(tm); tm = setTimeout(function () { back('paint'); }, outWait(TOUT_EXT_MS)); }
       return;
     }
     /* 🖥️ 섰다 = 판이 첫 보기 답(live)을 받았다(outDrawn) — ⛔ 노크가 아니다: 노크는 첫 부름 전에 오므로 그걸 「섰다」로 보면 열리기 전 outFail(bridge·anon)을 버려
@@ -578,13 +586,13 @@ function tOutOpen(fallback, LD) {
         try { src.postMessage(m, me.org); } catch (e) {}
       };
       if (p) p.then(send); else send(null);
-      if (!me.drawn) { clearTimeout(tm); tm = setTimeout(function () { back('paint'); }, TOUT_PAINT_MS); }
+      if (!me.drawn) { clearTimeout(tm); tm = setTimeout(function () { back('paint'); }, outWait(TOUT_PAINT_MS)); }
       return;
     }
     if (d.onf === 'homeDrawn' && !me.drawn) { me.drawn = true; clearTimeout(tm); ONF.frame.fallOk(key); if (LD) LD.ok(); }
   }
   window.addEventListener('message', onMsg);
-  tm = setTimeout(function () { back('hello'); }, TOUT_HELLO_MS);
+  tm = setTimeout(function () { back('hello'); }, outWait(TOUT_HELLO_MS));
   try { frame.contentWindow.location.replace(url); } catch (e) { frame.src = url; }   // 📱 replace — 지금 길과 같은 까닭(WebKit 기록 칸)
 }
 
@@ -1392,15 +1400,15 @@ function hwSrc(t, l, warm) {
   return EXEC + '?mode=hwbook&' + q;
 }
 /** 붙인 뒤 시계 — 머리 outHello 가 안 오면 구글 판 */
-function hwOutArm() { var me = hwOut; if (me) me.tm = setTimeout(function () { hwOutBack(me, 'hello'); }, HWOUT_HELLO_MS); }
+function hwOutArm() { var me = hwOut; if (me) me.tm = setTimeout(function () { hwOutBack(me, 'hello'); }, outWait(HWOUT_HELLO_MS)); }
 /** 머리가 섰다 — 노크(auth-please)까지 시계 하나 더(큰 판 · 느린 기기) */
-function hwOutHello(me) { if (!me || me !== hwOut || me.hi || me.ok) return; me.hi = true; clearTimeout(me.tm); me.tm = setTimeout(function () { hwOutBack(me, 'paint'); }, HWOUT_KNOCK_MS); }
+function hwOutHello(me) { if (!me || me !== hwOut || me.hi || me.ok) return; me.hi = true; clearTimeout(me.tm); me.tm = setTimeout(function () { hwOutBack(me, 'paint'); }, outWait(HWOUT_KNOCK_MS)); }
 /** 정적 판을 버리고 같은 액자에 구글 판 — 같은 t·l·warm · 노크 자물쇠(hwWin)를 비워 구글 판 노크를 받는다 */
 function hwOutBack(me, why) {
   if (!me || me !== hwOut) return;
   clearTimeout(me.tm); hwOut = null; hwWin = null; hwOrigin = ''; hwGave = ''; if (me.go && !hwGo) hwGo = me.go;
   if (typeof reopenLog === 'function') reopenLog('hwout-' + why);
-  try { ONF.frame.fallBack('hwbook', why); } catch (e) {}
+  try { if (!outSlow(why)) ONF.frame.fallBack('hwbook', why); } catch (e) {}   // 📱 느린 망으로 물러난 구글 없는 기기는 기억 안 남김(위 outSlow)
   console.info('[onf] 정적 과제 판이 안 떴다 — 구글 판으로');
   hwCutTold = -1; hwRecR = null; hwBand = 0;   // 새 판은 띠·플레이어·자른 폭을 모른다 — 다시 알린다(옛 값이면 같은 폭이라 hwbookCut 을 안 보냈다 · 2026-10-31 전수 검수 C3)
   if (hwView !== 'photo' && !hwWarmOn) { hwViewSet('photo'); } else hwLay();
