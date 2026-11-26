@@ -619,7 +619,7 @@ t('W3 tout=2 WebKit 판이 outFail(anon — 익명 다리 꺼진 빌드) → 지
 });
 
 t('W4 입장권만으로 연 정적 홈(tchOnly)이 그리기 전에 물러나면 → 구글 exec 를 바로 열지 않고 로그인 화면(구글 창구) → 누르면 지금 길 · 로그인 뒤 물러남은 종전대로 곧장 지금 길', async () => {
-  for (const kick of [(R) => R.fromApp({ onf: 'outFail', why: 'copy' }), (R) => R.advance(3000), (R) => { R.fromApp({ onf: 'outHello' }); R.advance(8000); }]) {
+  for (const kick of [(R) => R.fromApp({ onf: 'outFail', why: 'copy' }), (R) => R.advance(9000), (R) => { R.fromApp({ onf: 'outHello' }); R.advance(24000); }]) {   // 📱 구글 없는 기기 = 시한 세 배(아래 W4s)
     const R = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD });
     assert.deepStrictEqual(R.nav, [TURL]);
     kick(R);
@@ -634,6 +634,24 @@ t('W4 입장권만으로 연 정적 홈(tchOnly)이 그리기 전에 물러나�
   const Q = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD }); login(Q); await tick();
   Q.fromApp({ onf: 'outFail', why: 'copy' });
   assert.ok(Q.execOpen() && Q.els.lock.hidden === true, '⛔ 구글 토큰이 있는데 로그인 화면을 또 보였다');
+});
+
+t('W4s 📱 구글 토큰 없는 기기(WebKit · 입장권만) — 정적 판 시한 세 배(느린 망에 로그인부터 띄우지 않게) · 시한 넘김·망으로 물러나도 물러남 기억 0(다음 열기 = 다시 정적 판) · 판이 못 연다고 한 것(outFail)은 종전대로 기억 · 구글 토큰 있으면 종전 시한 (Peter 아이폰 2026-11-26 「수업 자료 들어가려니 다시 로그인」)', async () => {
+  const R = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD });
+  R.advance(3000); assert.ok(R.els.lock.hidden !== false, '⛔ 3초 만에 로그인 화면(시한 세 배여야 한다)');
+  R.advance(6000); assert.ok(R.els.lock.hidden === false, '전제: 9초 뒤엔 물러나 로그인 화면');
+  assert.strictEqual(R.g.localStorage.getItem('onfTOutFail'), null, '⛔ 느린 망 물러남을 기억했다 — 다음 열기도 로그인부터');
+  const H = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD });
+  H.fromApp({ onf: 'outFail', why: 'copy' });
+  assert.ok(H.g.localStorage.getItem('onfTOutFail') !== null, '⛔ 판이 못 연다고 한 것(outFail)은 기억해야 한다');
+  const G = boot({ onf_tch: tchCell(20), onf_tout: '2' }, { nav: IPAD }); login(G); await tick();
+  assert.ok(G.nav.length >= 1);
+  const W = fs.readFileSync(path.join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
+  assert.match(W, /function gNone\(\) \{ return !pending && devkeyOff\(\); \}/, '구글 없는 기기 = 이 페이지 구글 토큰 없음 + 열쇠 못 쓰는 기기');
+  assert.match(W, /hwOutBack\(me, 'hello'\); \}, outWait\(HWOUT_HELLO_MS\)\); \}/, '과제 판 머리 시한도 세 배');
+  assert.match(W, /hwOutBack\(me, 'paint'\); \}, outWait\(HWOUT_KNOCK_MS\)\); \}/, '과제 판 노크 시한도 세 배');
+  assert.match(W, /if \(!outSlow\(why\)\) ONF\.frame\.fallBack\('hwbook', why\);/, '과제 판 느린 물러남은 기억 안 남김');
+  assert.match(W, /if \(!outSlow\(why\)\) ONF\.frame\.fallBack\(key, why\);/, '선생님 홈·확장 창 느린 물러남도');
 });
 
 t('W5r 🔄 새로 고침 되살리기(rs:1) 판이 로그인 문에 걸려 「홈으로 돌아가기」 = 판 기억을 지운다(껍데기 onfHwUp · 홈에 hwClosed) — 안 지우면 새로 고침마다 문이 다시 떴다(검토 2 ⑤) · 보통 열기 문은 종전 그대로', async () => {
