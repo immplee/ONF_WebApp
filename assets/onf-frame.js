@@ -1730,8 +1730,9 @@
     }
     function onMon(ev) {
       var d = ev && ev.data;
-      if (!d || (d.onf !== 'monitorHello' && d.onf !== 'extOpen' && d.onf !== 'extClose' && d.onf !== 'extRelease' && d.onf !== 'extPend' && d.onf !== 'monHello' && d.onf !== 'monGo' && d.onf !== 'monIdle') || !ev.source || !isAppOrigin(ev.origin) || !inside(ev.source)) return;
-      if (d.onf === 'monHello' || d.onf === 'monGo' || d.onf === 'monIdle') { monMsg(d, ev); return; }   // 🖥️ 모니터 창 이어 쓰기(아래 MON)
+      if (!d || (d.onf !== 'monitorHello' && d.onf !== 'extOpen' && d.onf !== 'extClose' && d.onf !== 'extRelease' && d.onf !== 'extPend' && d.onf !== 'monHello' && d.onf !== 'monGo' && d.onf !== 'monIdle' && d.onf !== 'xbOut') || !ev.source || !isAppOrigin(ev.origin) || !inside(ev.source)) return;
+      if (d.onf === 'monHello' || d.onf === 'monGo' || d.onf === 'monIdle') { monMsg(d, ev); return; }
+      if (d.onf === 'xbOut') { xbOut(d, ev); return; }   // 🔁 판 직통 다리(아래 XB)   // 🖥️ 모니터 창 이어 쓰기(아래 MON)
       if (d.onf === 'extPend') {   // 📱 아이패드 꾹 = 「새 윈도우에서 열기」 링크가 이 껍데기 맨 주소(/)다 — 긴 확장 주소는 30초 맡겨 두고 새 창 index.html 머리가 꺼내 간다(EXT_PEND) · 빈 url = 짧게 눌렀다(지움)
         try { if (d.url === '') global.localStorage.removeItem(EXT_PEND); else if (extOk(d.url)) global.localStorage.setItem(EXT_PEND, JSON.stringify({ u: String(d.url), t: Date.now() })); } catch (e) {}
         return;
@@ -1773,6 +1774,21 @@
       else monPost({ k: 'idle', key: monKey(d.url), why: String(d.why || '?').slice(0, 12) });
     }
     try { if (typeof BroadcastChannel === 'function') MCH = new BroadcastChannel('onf-mon'); } catch (e) {}
+    /* 🔁 판 직통 다리(Ownify ONF_ShareView _xbShell · Peter 2026-11-26 「근본적으로」) — 판끼리 직통(BroadcastChannel 'onf-ext')은 같은 출처 판끼리만 닿는다.
+       선생님 판(정적 app.ownify.co.kr)과 확장 창 판(구글 googleusercontent)처럼 출처가 갈리면 카드·장면이 영영 안 갔다 → 맨 위 껍데기끼리(늘 같은 출처) 'onf-mon' 으로 나른다.
+       ▸ 판 {onf:'xbOut', m} = 이 판을 다리 손님으로(m 없는 인사도) · m 이 있으면 다른 창 껍데기로 {k:'xb', m}
+       ▸ {k:'xb', m} 을 들으면 손님 판 전부에 {onf:'xbIn', m}(출처 = 그 판이 말을 걸어 온 출처 · ⛔ '*' 금지). 무엇을 받을지(교재 id·확장 창 여부)는 판이 가른다 — 여기는 나르기만.
+       손님 판은 닫힌 창을 걸러 낸다(최대 8 · 오래된 것부터). */
+    var xbFr = [];
+    function xbOut(d, ev) {
+      xbFr = xbFr.filter(function (x) { try { return x.win !== ev.source && !x.win.closed; } catch (e) { return false; } });
+      xbFr.push({ win: ev.source, origin: ev.origin }); if (xbFr.length > 8) xbFr.shift();
+      if (d.m && typeof d.m === 'object') monPost({ k: 'xb', m: d.m });
+    }
+    if (MCH && typeof MCH.addEventListener === 'function') MCH.addEventListener('message', function (e) {
+      var o = e && e.data; if (!o || o.k !== 'xb' || !o.m || typeof o.m !== 'object') return;
+      xbFr.forEach(function (x) { try { x.win.postMessage({ onf: 'xbIn', m: o.m }, x.origin); } catch (er) {} });
+    });
     if (MCH && monIs) {
       var myKey = monKey(global.location.href), cov = null, covT = 0;
       var beat = function () { monPost(cov ? { k: 'beat', key: myKey, cov: 1 } : { k: 'beat', key: myKey }); };   // cov = 로고에 덮여 있다 — 이 화면 판이 앞에 보이면 걷어 간다(갇힘 되살리기 · 2026-11-25)
