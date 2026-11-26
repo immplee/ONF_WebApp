@@ -153,7 +153,7 @@ t('index.html 머리 — 맨 주소로 뜬 새 창은 30초 안 맡긴 주소로
   assert.deepStrictEqual(run({}, store()), []);
 });
 console.log('[🖥️ 모니터 창 이어 쓰기(2026-11-05 Peter 「하루 한 번 띄워 두고 어떤 교재·과제 판을 열든 따라오게」)]');
-function bus() { const chs = []; return function BC(name) { const me = { name, onmessage: null, postMessage(m) { chs.filter((c) => c !== me && c.name === name && c.onmessage).forEach((c) => c.onmessage({ data: JSON.parse(JSON.stringify(m)) })); } }; chs.push(me); return me; }; }
+function bus() { const chs = []; return function BC(name) { const me = { name, onmessage: null, ls: [], addEventListener(k, f) { if (k === 'message') me.ls.push(f); }, postMessage(m) { chs.filter((c) => c !== me && c.name === name).forEach((c) => { const ev = { data: JSON.parse(JSON.stringify(m)) }; if (c.onmessage) c.onmessage(ev); c.ls.forEach((f) => f(ev)); }); } }; chs.push(me); return me; }; }
 function monPair() {
   const BC = bus(), TO = [], app = [], rep = [];
   const tm = { setTimeout: (f, ms) => { TO.push([f, ms]); return TO.length; }, clearTimeout: (i) => { if (TO[i - 1]) TO[i - 1][0] = () => {}; }, setInterval: () => 0, BroadcastChannel: BC, URL };
@@ -187,6 +187,18 @@ t('monIdle = 창이 그 화면을 보이고 있을 때만 1.5초 뒤 로고 · �
   p.t.send({ onf: 'monIdle', url: A }, book, OUT); p.TO.filter((x) => x[1] === 1500).pop()[0]();
   assert.strictEqual(p.app.length, 1, '⛔ 로고를 안 덮었다(쉬는 시간에 학생 교재가 모니터에 남는다)');
   assert.ok(/onf-512\.png/.test(p.app[0].innerHTML) && /pointer-events:none/.test(p.app[0].style.cssText), '⛔ 로고 덮개 모양이 다르다');
+});
+t('🔁 판 직통 다리(2026-11-26 Peter 「원서 리콜링카드 확장 창에 『아직 담은 문장이 없어요』 · 근본적으로」) — 출처가 다른 두 판(정적·구글)도 껍데기끼리 나른다 · 손님 판에만 · 그 판 출처로 · 남의 출처·빈 인사는 안 나름', () => {
+  const p = monPair(), tch = p.t.frame(p.t.g), ext = p.m.frame(p.m.g), stray = p.t.frame(p.t.g);
+  p.t.send({ onf: 'xbOut', m: null }, tch, OUT);   // 선생님 판(정적) 인사 = 손님 등록 · 빈 인사는 안 나른다
+  p.m.send({ onf: 'xbOut', m: { ch: 'hi', f: 'MINE', pid: 'p1' } }, ext, GAS);   // 확장 창 판(구글) hi
+  assert.deepStrictEqual(last(tch), [{ onf: 'xbIn', m: { ch: 'hi', f: 'MINE', pid: 'p1' } }, OUT], '⛔ 확장 창 hi 가 다른 출처 선생님 판에 안 닿았다');
+  assert.ok(!stray.got.length, '⛔ 인사 안 한 판(손님 아님)에 보냈다');
+  p.t.send({ onf: 'xbOut', m: { ch: 'cd', f: 'MINE', h: '<div id="onfCardsBack"></div>' } }, tch, OUT);
+  assert.deepStrictEqual(last(ext), [{ onf: 'xbIn', m: { ch: 'cd', f: 'MINE', h: '<div id="onfCardsBack"></div>' } }, GAS], '⛔ 선생님 카드가 확장 창(구글 판)에 안 닿았다');
+  const n0 = ext.got.length; p.t.send({ onf: 'xbOut', m: { ch: 'cd', f: 'MINE', h: 'x' } }, p.t.frame(p.t.g), 'https://evil.example');
+  assert.strictEqual(ext.got.length, n0, '⛔ 남의 출처 판 글을 날랐다');
+  p.t.send({ onf: 'xbOut', m: null }, tch, OUT); assert.strictEqual(ext.got.length, n0, '⛔ 빈 인사를 날랐다');
 });
 t('창 소리가 없으면(모니터 창 없음) monState 없음 — 판이 갈아타기를 안 부른다', () => {
   const s = env(), book = s.frame(s.g);
