@@ -656,7 +656,10 @@
       //    그러면 앱의 고정 요소(입력창·화살표)가 통째로 화면 밖으로 나간다. 밀린 만큼 되민다.
       //    ⚠️ 핀치줌 중엔 풀어라 — 줌 팬과 싸우면 화면이 손가락을 쫓아다닌다.
       var notZooming = Math.abs((vv.scale || 1) - 1) < 0.02;
-      el.style.transform = (notZooming && vv.offsetTop > 0)
+      //    🔍 배율이 1 근처(1~2%)인 핀치에서도 offsetTop 이 생겨 앱 전체가 10~23px 밀렸다(Peter 2026-11-28 「확대·축소할 때 엉뚱한 곳으로 튐」 전수) —
+      //       미는 건 배율이 거의 정확히 1 이고 키보드가 정말 떠 있을 때(액자 키 − 보이는 칸 × 배율 > KB_MIN)만. ⛔ innerHeight 로 재지 않는다(B3).
+      var er = el.getBoundingClientRect(), kbUp = (er.bottom - er.top) - vv.height * (vv.scale || 1) > KB_MIN;
+      el.style.transform = (notZooming && Math.abs((vv.scale || 1) - 1) < 0.001 && kbUp && vv.offsetTop > 0)
         ? 'translateY(' + vv.offsetTop + 'px)' : '';
       if (diagEl) diagEl.style.transform = el.style.transform;
 
