@@ -980,7 +980,7 @@ t('H4d 교재만 + 녹음 플레이어 — 판 상자 = 플레이어 묶음 크�
 t('H4e 죽은 토큰 노크 — One Tap 이 4초 안에 토큰을 못 주면 로그인 버튼 화면(gate) · 홈 교재 판은 과제 판 칸 뒤로에 안 숨는다(2026-10-31 전수 검수)', () => {
   const H = require('fs').readFileSync(require('path').join(__dirname, '..', 'teacher', 'index.html'), 'utf8');
   assert.ok(/var hb0 = hwBox; setTimeout\(function \(\) \{ if \(hwWant && hwBox && hwBox === hb0 && !gateGo\) gate\(function \(\) \{ hwTell\(\); \}/.test(H), '⛔ One Tap 이 막히면(쿨다운) 과제 판이 20초 뒤 「로그인을 확인하지 못했어요」에 갇힌다');
-  assert.ok(/window\.addEventListener\('popstate', function \(\) \{ var s0 = histTop\(\); if \(s0 && s0\.onfHw\) return; (?:if \(histVirt\) bkOver = null; else if \(bkOverCatch\(s0\)\) return; )?bookPop\(s0\); \}\);/.test(H), '⛔ 과제 판 칸 뒤로가 홈 교재 판을 숨기고 복원 기억을 지운다');
+  assert.ok(/window\.addEventListener\('popstate', function \(\) \{ var s0 = histTop\(\); if \(s0 && s0\.onfHw\) (?:return;|\{ bkOver = null; return; \}) (?:if \(histVirt\) bkOver = null; else if \(bkOverCatch\(s0\)\) return; )?bookPop\(s0\); \}\);/.test(H), '⛔ 과제 판 칸 뒤로가 홈 교재 판을 숨기고 복원 기억을 지운다');
 });
 t('H5 그리기 전 outFail(anon·bridge)·입장권 없음·거절(stale 같은 입장권) = 구글 판 + 기억(까닭별 · 다리·입장권 = 느림 · anon = 하루) · 물러난 뒤 다음 열기는 막힘이면 바로 구글', () => {
   const R = hwOpenR({ onf_tch: tchCell(20), onf_hwout: '1' });
