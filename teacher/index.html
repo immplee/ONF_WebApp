@@ -2246,6 +2246,7 @@ window.addEventListener('message', function (ev) {
   else if (d.onf === 'bookFull') p.box.classList.toggle('full', !!d.on);
   else if (d.onf === 'openBook' && typeof d.href === 'string') {
     bookOpen(d.href, undefined, undefined, undefined, false, null, d.out === 1 || bookOutLike(d.href));   // 🌤 판 안 링크도 그 교재·내 문장의 길(정적 판)을 따른다(위 bookOutLike)
+    if (d.ds === 1) return;   // 🔗 내 기기 연동이 옮긴 교재(Ownify ONF_ShareView _dsGoIn · 2026-11-28) — 사람이 연 게 아니라 「앞 판」 줄을 잇지 않는다(✕ = 홈 · 따라 옮길 때마다 뒤로 칸이 쌓이지 않게)
     var q = bookShown();                                      // 🅱 앞 판 규칙(위 bookClose) — 새로 보이게 된 판 q 의 「나를 열어 준 판」을 p 로 · 돌아간 것이면 그대로 · 폰은 종전
     if (q && q !== p && !phone() && !bookOpener(p, q)) { q.back = p; rsSave(q); }   // 🔙 앞 판(b)도 기억에(위 bookOpen 의 rsMark 는 back 전이었다)
   }
