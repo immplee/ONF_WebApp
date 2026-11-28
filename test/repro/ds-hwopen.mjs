@@ -64,5 +64,9 @@ try {
   await bf().evaluate((l) => top.postMessage({ onf: 'hwOpenReq', t: 'TokFlash01', l: l }, '*'), L2);
   for (let i = 0; i < 40 && (await hwL()).indexOf(L2) < 0; i++) await p.waitForTimeout(100);
   say('③ 수업 자료 판 「hwOpenReq」(다른 수업) → 그 수업 자료로 바뀜', { src: (await hwL()).slice(0, 160) }, (await hwL()).indexOf('l=' + L2) >= 0);
+  for (let i = 0; i < 40 && !(bf() && bf().url().indexOf(L2) >= 0); i++) await p.waitForTimeout(100);   // 새 판 액자가 뜰 때까지
+  await bf().evaluate(() => top.postMessage({ onf: 'auth-please' }, '*')); await p.waitForTimeout(300);
+  await bf().evaluate((l) => top.postMessage({ onf: 'hwOpenReq', t: 'OtherStu99', l: l }, '*'), L1); await p.waitForTimeout(500);
+  say('④ 다른 학생 토큰 부탁은 보이는 판을 안 닫는다', { src: (await hwL()).slice(0, 120) }, (await hwL()).indexOf('t=TokFlash01') >= 0 && (await hwL()).indexOf('l=' + L2) >= 0);
 } finally { await b.close(); }
 console.log(ENG + (bad ? ' — 실패 ' + bad : ' — 통과')); process.exit(bad ? 1 : 0);
