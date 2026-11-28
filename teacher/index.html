@@ -1314,7 +1314,8 @@ window.addEventListener('message', function (ev) {
     if (d.onf === 'outHello') { hwOutHello(hwOut); return; }
     if (d.onf === 'outFail') { hwOutBack(hwOut, 'fail-' + (/^[a-z]{1,10}$/.test(String(d.why)) ? d.why : 'x')); return; }
     if (hwWin && ev.source !== hwWin) return;   // 한 번 정하면 그 창만(노크 자물쇠와 같다)
-    hwWin = ev.source; hwOrigin = ev.origin;
+    var hwNew = hwWin !== ev.source; hwWin = ev.source; hwOrigin = ev.origin;
+    if (hwNew && typeof hwKbHi === 'function') hwKbHi();   /* ⌨️ 판 창이 정해졌다 — 자판 신호 첫 값(위 hwKb) */
     if (d.onf === 'auth-please') {
       hwSeen = true;
       var w = hwBox && hwBox.querySelector('.onf-wait'); if (w) w.hidden = true;
@@ -2109,8 +2110,23 @@ function bookKb() {
   if (h > 0) { clearTimeout(kbZero); kbZero = null; kbSend(p, h, top); }
   else if (kbH !== 0 && !kbZero) kbZero = setTimeout(function () { kbZero = null; kbSend(phone() ? bookShown() : null, 0, 0); }, 300);   // 「키보드 없음」은 300ms 유지될 때만(B7)
 }
-if (window.visualViewport) { window.visualViewport.addEventListener('resize', bookKb); window.visualViewport.addEventListener('scroll', bookKb); }
-window.addEventListener('resize', bookKb);
+/* ⌨️ 과제 판(수업 자료) 자판 신호(2026-11-28 「아이패드+매직 키보드에서 판이 괜히 올라감」) — 판은 글상자에 들어갈 때 자판 자리만큼 미리 올린다(Pen tbLiftBox).
+   화면 자판이 안 뜨면(하드웨어 키보드) 판이 그걸 알 길이 없었다 — 껍데기가 판에도 높이만 보낸다(밀기 transform 은 안 한다 · 폰 판 bookKb 와 같은 셈).
+   판 창이 정해지면 지금 값을 한 번(자판 없음 = 0) — 받으면 판은 「이 껍데기는 알려 준다」로 알고, 0.9초 안에 자판이 안 뜨면 올린 판을 되돌린다. */
+var hwKbH = -1, hwKbZ = null;
+function hwKbSend(h, top) { if (!hwWin || !hwOrigin || h === hwKbH) return; hwKbH = h; try { hwWin.postMessage({ onf: 'kbH', h: h, top: top }, hwOrigin); } catch (e) {} }
+function hwKb() {
+  var vv = window.visualViewport; if (!vv || !hwFr || !hwWin || !hwBox || hwBox.style.visibility === 'hidden') return;
+  if (Math.abs((vv.scale || 1) - 1) >= 0.02) return;   // 핀치줌 중엔 모른다(B4)
+  var r = hwFr.getBoundingClientRect(), kt = vv.offsetTop + vv.height, h = Math.round(r.bottom - kt), top;
+  if (h < 60) h = 0;   // 하드웨어 키보드의 아래 단축 막대(≈55)는 자판이 아니다
+  top = h > 0 ? Math.round(kt - r.top) : 0;
+  if (h > 0) { clearTimeout(hwKbZ); hwKbZ = null; hwKbSend(h, top); }
+  else if (hwKbH !== 0 && !hwKbZ) hwKbZ = setTimeout(function () { hwKbZ = null; hwKbSend(0, 0); }, 300);   // 「자판 없음」은 300ms 유지될 때만(B7)
+}
+function hwKbHi() { hwKbH = -1; clearTimeout(hwKbZ); hwKbZ = null; hwKb(); }
+if (window.visualViewport) { window.visualViewport.addEventListener('resize', bookKb); window.visualViewport.addEventListener('scroll', bookKb); window.visualViewport.addEventListener('resize', hwKb); window.visualViewport.addEventListener('scroll', hwKb); }
+window.addEventListener('resize', bookKb); window.addEventListener('resize', hwKb);
 /** 🌙 안쪽이 알려 준 화면 색 — 틀·판 둘레·「불러오는 중」도 같은 색 · 다음에 열 때 머리 스크립트가 그리기 전에 쓴다. 아는 값만. */
 function onfShellTheme(v) {
   if (v !== 'dark' && v !== 'light') return;
