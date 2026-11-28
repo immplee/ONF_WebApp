@@ -1542,7 +1542,7 @@ function bookHist(p, ev) {
   t = histTop();
   if (d.op === 'push' && !p.parked && d.state && Object.prototype.toString.call(d.state) === '[object Object]') {
     try { flat = JSON.parse(JSON.stringify(d.state)); if (unescape(encodeURIComponent(JSON.stringify(flat))).length <= 2048) histPush({ onfHist: d.id, s: flat, n: homeN(), b: p.key, bd: histRun() + 1 }); } catch (e) {}
-  } else if (d.op === 'back' && t && t.onfHist === d.id && t.b === p.key) histGo(1, true);   // 맨 위가 이 판의 그 칸일 때만(남의 칸 보호 · 👆 줄에 남은 칸이면 줄에서)
+  } else if (d.op === 'back' && t && t.onfHist === d.id && t.b === p.key) { bkOverArm(t); histGo(1, true); }   // 맨 위가 이 판의 그 칸일 때만(남의 칸 보호 · 👆 줄에 남은 칸이면 줄에서)
 }
 /* 기록 칸이 빠졌다 — 폰이면 맨 위 칸 주인 판을 보이고(지워졌으면 그 주소로 다시 받음) · 홈 칸·바닥이면 보이는 판을 숨긴다. 판 안쪽엔 그 판 맨 위 칸을 알린다. 🖥 PC 도 같다(2026-10-24). */
 function bookPop(s) {
@@ -2236,7 +2236,24 @@ window.addEventListener('message', function (ev) {
   }
 });
 window.addEventListener('keydown', function (e) { if (e.key === 'Escape') bookClose(false); });   // 보이는 판만(숨긴 판은 Esc 를 안 먹는다)
-window.addEventListener('popstate', function () { var s0 = histTop(); if (s0 && s0.onfHw) return; bookPop(s0); });   // 과제 판 칸(보기·물음)이 오가는 뒤로는 홈 교재 판과 무관 — 종전엔 홈 교재 판을 숨기고 새로고침 복원 기억을 지웠다(2026-10-31 전수 검수)   // 📱 홈 칸 깊이·홈 알림은 onf-hist 블록(판 칸이 맨 위면 홈은 안 바뀌었다)
+/* 🛟 판 안쪽 칸 하나 걷기가 판 칸까지 넘어감(Peter 2026-11-28 아이패드 「준비 모드 들어가니까 홈으로 한 번 나가졌다」 · ⚠️ 쌍둥이: 학생 assets/onf-frame.js) —
+   clog 로 잰 것: 교재는 안 죽었다(9초 뒤 같은 숨긴 판 ready n2) = 뒤로가 판을 숨겼다. 같은 길(보기 ▾ → 준비 = 메뉴 칸 걷기)을 액자 흉내로 돌리면 칸 하나만 빠진다 →
+   WebKit 이 손짓 없이 쌓인 칸 + 앞 칸을 건너뛰어(onf-book histQ 주석) 판 안쪽 칸 하나 걷은 back() 이 「나갈까요?」·판 칸까지 내려간 것으로 본다(실기기로는 못 쟀다).
+   → 판 안쪽 칸을 걷으려 back() 한 직후(1.5초 안) 내려앉은 칸이 그 칸 바로 밑(bd-1)보다 깊으면 = 넘어감: 판을 숨기지 않고 판 칸·물음 칸을 다시 쌓고 clog 한 줄(bkover).
+   사람이 1.5초 안에 뒤로를 또 누른 것과는 못 가른다 — 그 두 번째는 한 번 먹는다(다음 뒤로가 다시 묻는다 · 받아들임). 흉내 popstate(줄 칸 걷기)는 넘어갈 수 없다 — 건 것을 푼다. */
+var bkOver = null;
+function bkOverArm(t) { bkOver = { at: Date.now(), k: bookOwner(t), bd: Number(t.bd) || 0 }; }
+function bkOverCatch(s) {
+  var o = bkOver; bkOver = null;
+  if (!o || Date.now() - o.at > 1500 || o.bd < 2) return false;
+  var got = bookOwner(s) === o.k ? (Number(s.bd) || 0) : 0, p = bookShown();
+  if (got >= o.bd - 1 || !p || p.key !== o.k) return false;
+  try { var w = window.ONF && ONF.frame && ONF.frame.WORKER; if (w && navigator.sendBeacon) navigator.sendBeacon(w + '/clog', JSON.stringify([{ k: 'err', c: 'bkover ' + (s ? (s.lg ? 'lg' : s.onfBook ? 'bk' : s.onfHist ? 'h' : 'x') : '0') + ' ' + got + '/' + (o.bd - 1), d: tbkDev() }])); } catch (e) {}
+  histBook(p); histGuard(p);   // 판 칸·「나갈까요?」 칸 다시(손짓 밖이면 줄 · 다음 톡에 쌓인다)
+  if (p.hw) { try { p.hw.postMessage({ onf: 'hist-pop', id: '', s: null }, p.ho); } catch (e2) {} }   // 판 안쪽 칸은 다 빠졌다
+  return true;
+}
+window.addEventListener('popstate', function () { var s0 = histTop(); if (s0 && s0.onfHw) return; if (histVirt) bkOver = null; else if (bkOverCatch(s0)) return; bookPop(s0); });   // 과제 판 칸(보기·물음)이 오가는 뒤로는 홈 교재 판과 무관 — 종전엔 홈 교재 판을 숨기고 새로고침 복원 기억을 지웠다(2026-10-31 전수 검수)   // 📱 홈 칸 깊이·홈 알림은 onf-hist 블록(판 칸이 맨 위면 홈은 안 바뀌었다)
 /* 📱 폰 ↔ PC(폭이 바뀜) — 모양(<html class="onf-ph">)·자리 수를 맞추고, 폰이 되면 보이는 판에 판 칸(뒤로 = 숨김) · 폰→PC 면 남은 판 칸은 ✕ 가 걷는다. 옛 사파리는 addListener 뿐. */
 function bookMode() {
   try { document.documentElement.classList.toggle('onf-ph', phone()); } catch (e) {}

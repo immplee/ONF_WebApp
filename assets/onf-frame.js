@@ -865,6 +865,7 @@
     global.addEventListener('popstate', function () {
       var s = history.state, h = (s && s.onfHist) ? s : null;
       histDepth = (h || bookOwner(s)) ? Math.max(0, Number(s.n) || 0) : 0;   // 📱 판 칸의 n = 그 아래 홈 칸 수
+      if (bkOverCatch(s)) return;                         // 🛟 판 안쪽 칸 하나 걷기가 판 칸까지 넘어감 — 판 그대로(아래 bkOverCatch)
       bookPop(s);                                         // 📱 폰 판 — 맨 위 칸 주인 판을 보이거나(판 칸) 숨긴다(홈 칸·바닥)
       if (!histWin || bookOwner(s)) return;               // `hi` 전엔 알릴 안쪽이 없다 · 📱 판 칸이 맨 위면 홈은 안 바뀌었다(폰 판 칸은 늘 홈 칸 위에 쌓인다)
       try { histWin.postMessage({ onf: 'hist-pop', id: h ? h.onfHist : '', s: h ? (h.s || null) : null }, histOrigin); } catch (e) {}   // '*' 금지
@@ -953,7 +954,7 @@
       t = histTop();
       if (d.op === 'push' && !p.parked && histSmall(d.state)) {
         try { flat = JSON.parse(JSON.stringify(d.state)); history.pushState(runAt({ onfHist: d.id, s: flat, n: histDepth, b: p.key, bd: histRun() + 1 }), ''); } catch (e) {}
-      } else if (d.op === 'back' && t && t.onfHist === d.id && t.b === p.key) history.back();   // 맨 위가 이 판의 그 칸일 때만(남의 칸 보호)
+      } else if (d.op === 'back' && t && t.onfHist === d.id && t.b === p.key) { bkOverArm(t); history.back(); }   // 맨 위가 이 판의 그 칸일 때만(남의 칸 보호) · 🛟 넘어감 지킴(bkOverCatch)
     }
     /* 기록 칸이 빠졌다(뒤로·앞으로) — 폰이면 맨 위 칸 주인 판을 보이고(없어졌으면 다시 받음) · 홈 칸·바닥이면 보이는 판을 숨긴다.
        판 안쪽엔 그 판 맨 위 칸을 알린다(판 칸이면 '' = 안쪽 칸 없음) · 홈 칸·바닥이면 다리 있는 판 전부에 '' (판 칸은 늘 홈 칸 위라 남은 판 칸이 없다). 🖥 PC 도 같다(2026-10-24). */
@@ -978,6 +979,20 @@
       try { global.fetch(src, { mode: 'no-cors', credentials: 'omit', cache: 'no-store' }).catch(function () {}); } catch (e) {}
     }
     function bookShown() { for (var i = 0; i < books.length; i++) if (!books[i].parked) return books[i]; return null; }
+    /* 🛟 판 안쪽 칸 하나 걷기가 판 칸까지 넘어감(Peter 2026-11-28 아이패드 · ⚠️ 쌍둥이 정본 주석 = teacher/index.html bkOverCatch) — back() 직후 1.5초 안 내려앉은 칸이
+       그 칸 바로 밑(bd-1)보다 깊으면 판을 숨기지 않고 판 칸·물음 칸을 다시 쌓고 clog 한 줄(bkover). */
+    var bkOver = null;
+    function bkOverArm(t) { bkOver = { at: Date.now(), k: bookOwner(t), bd: Number(t.bd) || 0 }; }
+    function bkOverCatch(s) {
+      var o = bkOver; bkOver = null;
+      if (!o || Date.now() - o.at > 1500 || o.bd < 2) return false;
+      var got = bookOwner(s) === o.k ? (Number(s.bd) || 0) : 0, p = bookShown();
+      if (got >= o.bd - 1 || !p || p.key !== o.k) return false;
+      whoBeacon({ k: 'err', c: 'bkover ' + (s ? (s.lg ? 'lg' : s.onfBook ? 'bk' : s.onfHist ? 'h' : 'x') : '0') + ' ' + got + '/' + (o.bd - 1) });
+      histBook(p); histGuard(p);
+      if (p.hw) { try { p.hw.postMessage({ onf: 'hist-pop', id: '', s: null }, p.ho); } catch (e) {} }
+      return true;
+    }
     function bookFind(src) { for (var i = 0; i < books.length; i++) if (books[i].src === src && !books[i].gone) return books[i]; return null; }   // 📖 gone = 내용과 주소가 어긋날 수 있는 판(아래 bookRetire)
     /* ⚠️ 쌍둥이: teacher/index.html bookAsk·bookLike·bookCan·bookTabOf·bookCanView·bookOutLike(2026-11-16 — 선생님 껍데기도 같은 지붕 · 한쪽을 고치면 다른 쪽도).
        📖 view 만 다른 주소는 같은 판에서 연다(2026-10-14 Peter 「미리 띄워 둔 내 문장 판에 '복습/카드 열어'를 전달해서, 다시 안 불러오고 바로 열기」).
