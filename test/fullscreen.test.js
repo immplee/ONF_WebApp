@@ -137,14 +137,19 @@ t('extPend — 우리 ext 주소만 30초 맡김 · 빈 url = 지움 · ⛔ 남�
   const other = { postMessage() {} }; other.parent = other; s.send({ onf: 'extPend', url: EXT }, other, GAS);
   assert.ok(!('onfExtPend' in ls.m), '⛔ 남의 주소·출처·창의 말로 맡겼다(새 창이 거기로 간다)');
 });
-t('index.html 머리 — 맨 주소로 뜬 새 창은 30초 안 맡긴 주소로 간다(한 번 · 지움) · 낡음·맨 주소 아님·남의 주소면 그냥 홈', () => {
+t('index.html 머리 — 맨 주소로 뜬 새 창은 30초 안 맡긴 주소로 간다(미리보기가 먼저 읽어도 · 새로 고침은 안 감) · 낡음·맨 주소 아님·남의 주소면 그냥 홈', () => {
   const H = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   const js = (H.match(/<script>\/\* 📱 아이패드 「화면 확장」 새 창[\s\S]*?\*\/([\s\S]*?)<\/script>/) || [])[1];
   assert.ok(js, '⛔ index.html 머리에 맡긴 주소 꺼내기가 없다');
   assert.ok(H.indexOf(js) < H.indexOf('/assets/onf-load.js'), '⛔ 꺼내기가 로고 로딩 뒤다(홈이 먼저 그려진다)');
-  const run = (loc, ls) => { const went = []; vm.runInNewContext(js, { location: Object.assign({ pathname: '/', search: '', hash: '', replace: (u) => went.push(u) }, loc), localStorage: ls, JSON, Date }); return went; };
+  const run = (loc, ls, nav) => { const went = []; const ctx = { location: Object.assign({ pathname: '/', search: '', hash: '', replace: (u) => went.push(u) }, loc), localStorage: ls, JSON, Date }; if (nav) ctx.performance = { getEntriesByType: (k) => (k === 'navigation' ? [{ type: nav }] : []) }; vm.runInNewContext(js, ctx); return went; };
   const T = 'https://class.ownify.co.kr/teacher/?mode=hwext&t=S&s=1&ext=1', pend = (u, ago) => store({ onfExtPend: JSON.stringify({ u, t: Date.now() - ago }) });
-  let ls = pend(T, 5000); assert.deepStrictEqual(run({}, ls), [T], '⛔ 맡긴 확장 주소로 안 갔다'); assert.ok(!('onfExtPend' in ls.m), '⛔ 쓴 뒤 안 지웠다(다음 홈도 확장으로 간다)');
+  let ls = pend(T, 5000); assert.deepStrictEqual(run({}, ls), [T], '⛔ 맡긴 확장 주소로 안 갔다');
+  /* 📱 2026-11-28 Peter 「화면 확장을 누르면 홈화면으로 나가지는 경우가 있어」 — 꾹 누르면 사파리·크롬 링크 미리보기가 이 주소(/)를 **진짜로 열어** 맡긴 주소를 먼저 꺼낸다.
+     그때 지우면 「새로운 윈도우에서 열기」로 뜬 진짜 창은 빈손 = 선생님 홈(아이패드 시뮬레이터 재현: 미리보기 EXT · 새 창 HOME). 30초 안엔 두 번째도 간다 */
+  assert.deepStrictEqual(run({}, ls, 'navigate'), [T], '⛔ 미리보기가 먼저 꺼내 간 뒤 진짜 새 창이 홈으로 떴다');
+  assert.deepStrictEqual(run({}, pend(T, 3000), 'reload'), [], '⛔ 맨 주소 새로 고침(선생님 홈)까지 확장 창으로 끌고 갔다');
+  assert.deepStrictEqual(run({}, pend(T, 3000), 'back_forward'), [], '⛔ 뒤로 가기로 돌아온 홈까지 확장 창으로 끌고 갔다');
   assert.deepStrictEqual(run({}, pend(EXT, 1000)), [EXT]);
   ls = pend(T, 31000); assert.deepStrictEqual(run({}, ls), [], '⛔ 낡은(30초 넘은) 주소로 갔다'); assert.ok(!('onfExtPend' in ls.m));
   assert.deepStrictEqual(run({ search: '?t=abc' }, pend(T, 1000)), [], '⛔ 학생 링크(맨 주소 아님)까지 끌고 갔다');
