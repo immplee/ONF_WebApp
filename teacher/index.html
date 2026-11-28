@@ -1194,6 +1194,8 @@ function hwOpenReq(d) {
   var t = String(d && d.t || ''), l = String(d && d.l || '');
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(t) || !/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(l) || gateGo) return;
   if (hwBox && !hwWarmOn && hwT === t && hwL === l) return;
+  if (hwBox && !hwWarmOn && hwT && hwT !== t) return;   // ⛔ 보이는 판이 다른 학생 것이면 안 닫는다(교재 칸 학생과 판 학생이 다를 때 · 2026-11-28 구멍 점검 ⑪)
+  if (tchOnly && !pending && !hwOutQ()) return;   // ⛔ 구글 창구 전(입장권만 연 홈)에 구글 판은 로그인 문 없이 「불러오는 중」에 멈춘다 — 선생님 홈 길(hwbook)처럼 묻지 않고 그냥 안 연다(사람이 직접 열면 그 길이 묻는다)
   hwOpen(t, l, []);
   hwOpenedTell(appWin, appOrigin, t, l);
 }
