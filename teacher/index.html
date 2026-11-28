@@ -2268,7 +2268,7 @@ function bkOverCatch(s) {
   if (p.hw) { try { p.hw.postMessage({ onf: 'hist-pop', id: '', s: null }, p.ho); } catch (e2) {} }   // 판 안쪽 칸은 다 빠졌다
   return true;
 }
-window.addEventListener('popstate', function () { var s0 = histTop(); if (s0 && s0.onfHw) return; if (histVirt) bkOver = null; else if (bkOverCatch(s0)) return; bookPop(s0); });   // 과제 판 칸(보기·물음)이 오가는 뒤로는 홈 교재 판과 무관 — 종전엔 홈 교재 판을 숨기고 새로고침 복원 기억을 지웠다(2026-10-31 전수 검수)   // 📱 홈 칸 깊이·홈 알림은 onf-hist 블록(판 칸이 맨 위면 홈은 안 바뀌었다)
+window.addEventListener('popstate', function () { var s0 = histTop(); if (s0 && s0.onfHw) { bkOver = null; return; } if (histVirt) bkOver = null; else if (bkOverCatch(s0)) return; bookPop(s0); });   // 과제 판 칸에 내려앉음 = 판은 그대로 · 건 지킴은 푼다(남으면 1.5초 안 사람 뒤로를 먹는다 · 구멍 점검 2026-11-28)   // 과제 판 칸(보기·물음)이 오가는 뒤로는 홈 교재 판과 무관 — 종전엔 홈 교재 판을 숨기고 새로고침 복원 기억을 지웠다(2026-10-31 전수 검수)   // 📱 홈 칸 깊이·홈 알림은 onf-hist 블록(판 칸이 맨 위면 홈은 안 바뀌었다)
 /* 📱 폰 ↔ PC(폭이 바뀜) — 모양(<html class="onf-ph">)·자리 수를 맞추고, 폰이 되면 보이는 판에 판 칸(뒤로 = 숨김) · 폰→PC 면 남은 판 칸은 ✕ 가 걷는다. 옛 사파리는 addListener 뿐. */
 function bookMode() {
   try { document.documentElement.classList.toggle('onf-ph', phone()); } catch (e) {}
